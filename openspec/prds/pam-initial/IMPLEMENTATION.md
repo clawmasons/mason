@@ -142,7 +142,7 @@ Implement the toolFilter generation algorithm and the mcp-proxy `config.json` ge
 
 ---
 
-## CHANGE: Claude Code Runtime Materializer
+## CHANGE: Claude Code Runtime Materializer ✅
 
 Implement the `RuntimeMaterializer` interface and the Claude Code materializer. Generates the workspace directory with `.claude/settings.json` (MCP config pointing to proxy), slash commands from tasks, `AGENTS.md` with role/tool declarations, and the `skills/` directory with materialized skill artifacts.
 
@@ -156,6 +156,15 @@ Implement the `RuntimeMaterializer` interface and the Claude Code materializer. 
 - Generates `AGENTS.md` with all roles and per-role tool lists matching PRD §7.2.3
 - Copies skill artifacts into `skills/{skill-name}/` preserving directory structure
 - Generates a Dockerfile for the Claude Code runtime container
+
+**Implemented:** 2026-03-03
+- [Proposal](../../changes/archive/2026-03-03-claude-code-materializer/proposal.md)
+- [Design](../../changes/archive/2026-03-03-claude-code-materializer/design.md)
+- [Tasks](../../changes/archive/2026-03-03-claude-code-materializer/tasks.md)
+- [Specs: materializer-interface](../../changes/archive/2026-03-03-claude-code-materializer/specs/materializer-interface/spec.md)
+- [Specs: claude-code-materializer](../../changes/archive/2026-03-03-claude-code-materializer/specs/claude-code-materializer/spec.md)
+- [Main Spec: materializer-interface](../../specs/materializer-interface/spec.md)
+- [Main Spec: claude-code-materializer](../../specs/claude-code-materializer/spec.md)
 
 ---
 

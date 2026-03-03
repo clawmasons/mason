@@ -43,3 +43,10 @@ export {
   type McpServerEntry,
   type ProxyConfig,
 } from "./generator/index.js";
+
+export {
+  claudeCodeMaterializer,
+  type RuntimeMaterializer,
+  type MaterializationResult,
+  type ComposeServiceDef,
+} from "./materializer/index.js";
