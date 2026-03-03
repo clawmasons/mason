@@ -64,7 +64,7 @@ Implement the CLI entry point (`bin/pam`) using Commander.js and the `pam init` 
 
 ---
 
-## CHANGE: Package Discovery & Dependency Graph Resolution
+## CHANGE: Package Discovery & Dependency Graph Resolution ✅
 
 Implement the graph resolver that reads installed npm packages, parses their `pam` fields, and walks the typed dependency graph (agent → roles → tasks → apps + skills) to produce a `ResolvedAgent` data structure. This is the core engine that powers validate, install, and build.
 
@@ -77,6 +77,15 @@ Implement the graph resolver that reads installed npm packages, parses their `pa
 - Resolving the PRD's `@clawforge/agent-repo-ops` example yields 2 roles, their tasks, apps, and skills
 - Circular dependency detection throws a clear error for composite task cycles
 - Missing dependencies produce actionable error messages (e.g., "task X requires app Y which is not installed")
+
+**Implemented:** 2026-03-03
+- [Proposal](../../changes/archive/2026-03-03-package-discovery-dependency-graph/proposal.md)
+- [Design](../../changes/archive/2026-03-03-package-discovery-dependency-graph/design.md)
+- [Tasks](../../changes/archive/2026-03-03-package-discovery-dependency-graph/tasks.md)
+- [Specs: package-discovery](../../changes/archive/2026-03-03-package-discovery-dependency-graph/specs/package-discovery/spec.md)
+- [Specs: dependency-graph-resolution](../../changes/archive/2026-03-03-package-discovery-dependency-graph/specs/dependency-graph-resolution/spec.md)
+- [Main Spec: package-discovery](../../specs/package-discovery/spec.md)
+- [Main Spec: dependency-graph-resolution](../../specs/dependency-graph-resolution/spec.md)
 
 ---
 
