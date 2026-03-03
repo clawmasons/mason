@@ -12,3 +12,18 @@ export {
   parsePamField,
   type PamField,
 } from "./schemas/index.js";
+
+export {
+  type DiscoveredPackage,
+  type ResolvedAgent,
+  type ResolvedApp,
+  type ResolvedRole,
+  type ResolvedSkill,
+  type ResolvedTask,
+  PackageNotFoundError,
+  InvalidPamFieldError,
+  CircularDependencyError,
+  TypeMismatchError,
+  discoverPackages,
+  resolveAgent,
+} from "./resolver/index.js";

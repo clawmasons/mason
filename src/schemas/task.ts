@@ -10,6 +10,7 @@ export const taskPamFieldSchema = z.object({
       skills: z.array(z.string()).optional(),
     })
     .optional(),
+  tasks: z.array(z.string()).optional(),
   timeout: z.string().optional(),
   approval: z.enum(["auto", "confirm", "review"]).optional(),
 });
