@@ -34,3 +34,12 @@ export {
   type ValidationError,
   type ValidationErrorCategory,
 } from "./validator/index.js";
+
+export {
+  computeToolFilters,
+  getAppShortName,
+  generateProxyConfig,
+  type ToolFilter,
+  type McpServerEntry,
+  type ProxyConfig,
+} from "./generator/index.js";
