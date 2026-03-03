@@ -46,6 +46,8 @@ export interface ResolvedTask {
   prompt?: string;
   timeout?: string;
   approval?: "auto" | "confirm" | "review";
+  requiredApps?: string[];
+  requiredSkills?: string[];
   apps: ResolvedApp[];
   skills: ResolvedSkill[];
   subTasks: ResolvedTask[];

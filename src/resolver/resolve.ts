@@ -144,6 +144,8 @@ function resolveTask(
     prompt: pam.prompt,
     timeout: pam.timeout,
     approval: pam.approval,
+    requiredApps: pam.requires?.apps,
+    requiredSkills: pam.requires?.skills,
     apps,
     skills,
     subTasks,

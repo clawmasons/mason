@@ -89,7 +89,7 @@ Implement the graph resolver that reads installed npm packages, parses their `pa
 
 ---
 
-## CHANGE: pam validate — Graph Validation
+## CHANGE: pam validate — Graph Validation ✅
 
 Implement `pam validate <agent>` which runs all validation checks against a resolved agent graph. This is the governance gate that CI/CD pipelines use to catch permission and configuration errors before deployment.
 
@@ -102,8 +102,16 @@ Implement `pam validate <agent>` which runs all validation checks against a reso
 - Validates tool existence: role's allow-list tools exist in app's `pam.tools`
 - Validates skill availability: task's required skills are resolvable
 - Validates app launch config: stdio apps have command+args, remote apps have url
-- Detects circular composite task references
+- Detects circular composite task references (handled by resolver)
 - Exit code 0 on valid agent, non-zero with structured error output on invalid
+- `--json` flag for machine-readable output
+
+**Implemented:** 2026-03-03
+- [Proposal](../../changes/archive/2026-03-03-pam-validate-graph-validation/proposal.md)
+- [Design](../../changes/archive/2026-03-03-pam-validate-graph-validation/design.md)
+- [Tasks](../../changes/archive/2026-03-03-pam-validate-graph-validation/tasks.md)
+- [Specs: graph-validation](../../changes/archive/2026-03-03-pam-validate-graph-validation/specs/graph-validation/spec.md)
+- [Main Spec: graph-validation](../../specs/graph-validation/spec.md)
 
 ---
 

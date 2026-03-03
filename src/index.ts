@@ -27,3 +27,10 @@ export {
   discoverPackages,
   resolveAgent,
 } from "./resolver/index.js";
+
+export {
+  validateAgent,
+  type ValidationResult,
+  type ValidationError,
+  type ValidationErrorCategory,
+} from "./validator/index.js";
