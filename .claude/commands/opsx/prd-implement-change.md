@@ -12,9 +12,9 @@ Before doing anything else, run these checks and **stop immediately** if any fai
 
 2. **Check branch name** — Run `git branch --show-current`. If the result is `main` or `master`, stop and tell the user: "You're on the main branch. Please create and checkout a feature branch first (e.g. `git checkout -b opsx/my-feature`)."
 
-3. **Find the Change to Implement** Find the relevant PRD.md and IMPLEMENTATION.md in the openspce/prds/ directory.  If no change was specified, find the first unimplementated change.
+3. **Find the Change to Implement** Find the relevant PRD.md and IMPLEMENTATION.md in the openspce/prds/ directory.  If no change was specified, find the first unimplementated change.  The branch name should be a short summary of the change
    
-If both checks pass, proceed.
+If checks pass, proceed.
 
 Confirm the change to implement.
 
@@ -36,7 +36,7 @@ Execute each step in order, completing each fully before moving to the next:
 
 7. **Archive** — Execute the instructions from `/opsx:archive`. Archive the completed spec.
 
-8. **Update Change** - Update the change in IMPLEMENTATION.md with relative links to the archived proposal, design, tasks, and specs implemented with the change.
+8. **Update Change** - Update the change in IMPLEMENTATION.md with relative links to the archived proposal, design, tasks, and specs implemented with the change.  Also make any changes to the PRD.md and IMPLEMENTATION to match was was done in the change.
 
 After each step, briefly summarize what was done before moving to the next. If any step fails or the user wants to stop, halt the flow and report status.
 
