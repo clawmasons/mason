@@ -16,7 +16,7 @@ Tech stack: TypeScript, Node.js, Commander.js (CLI), Zod (schema validation), np
 
 # Implementation Steps
 
-## CHANGE: Project Bootstrap & Package Schema Types
+## CHANGE: Project Bootstrap & Package Schema Types ✅
 
 Set up the TypeScript project with build tooling (tsconfig, vitest, eslint) and define the core `pam` field types and Zod schema validators for all five package types (app, skill, task, role, agent). This is the type foundation everything else builds on.
 
@@ -29,6 +29,13 @@ Set up the TypeScript project with build tooling (tsconfig, vitest, eslint) and 
 - Valid PRD example package.json snippets pass validation
 - Invalid/missing fields produce clear Zod error messages
 - Published types are importable: `import { AppSchema, RoleSchema, ... } from '@clawforge/pam'`
+
+**Implemented:** 2026-03-03
+- [Proposal](../../changes/archive/2026-03-03-project-bootstrap-schema-types/proposal.md)
+- [Design](../../changes/archive/2026-03-03-project-bootstrap-schema-types/design.md)
+- [Tasks](../../changes/archive/2026-03-03-project-bootstrap-schema-types/tasks.md)
+- [Specs](../../changes/archive/2026-03-03-project-bootstrap-schema-types/specs/package-schema-validation/spec.md)
+- [Main Spec](../../specs/package-schema-validation/spec.md)
 
 ---
 
