@@ -168,7 +168,7 @@ Implement the `RuntimeMaterializer` interface and the Claude Code materializer. 
 
 ---
 
-## CHANGE: Docker Compose & Environment Generation
+## CHANGE: Docker Compose & Environment Generation ✅
 
 Implement the Docker Compose generator that assembles the `docker-compose.yml` with the mcp-proxy service, one service per declared runtime, the agent-net bridge network, and the `.env` file template. Also generates `pam.lock.json` with the resolved graph snapshot.
 
@@ -183,6 +183,17 @@ Implement the Docker Compose generator that assembles the `docker-compose.yml` w
 - Runtime services depend on mcp-proxy, mount workspace, pass correct env vars
 - `.env` template lists all required variables with placeholder values
 - `pam.lock.json` contains resolved graph with exact versions
+
+**Implemented:** 2026-03-03
+- [Proposal](../../changes/archive/2026-03-03-docker-compose-env-generation/proposal.md)
+- [Design](../../changes/archive/2026-03-03-docker-compose-env-generation/design.md)
+- [Tasks](../../changes/archive/2026-03-03-docker-compose-env-generation/tasks.md)
+- [Specs: docker-compose-generation](../../changes/archive/2026-03-03-docker-compose-env-generation/specs/docker-compose-generation/spec.md)
+- [Specs: env-generation](../../changes/archive/2026-03-03-docker-compose-env-generation/specs/env-generation/spec.md)
+- [Specs: lock-file-generation](../../changes/archive/2026-03-03-docker-compose-env-generation/specs/lock-file-generation/spec.md)
+- [Main Spec: docker-compose-generation](../../specs/docker-compose-generation/spec.md)
+- [Main Spec: env-generation](../../specs/env-generation/spec.md)
+- [Main Spec: lock-file-generation](../../specs/lock-file-generation/spec.md)
 
 ---
 
