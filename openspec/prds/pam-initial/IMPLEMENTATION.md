@@ -39,7 +39,7 @@ Set up the TypeScript project with build tooling (tsconfig, vitest, eslint) and 
 
 ---
 
-## CHANGE: pam init — Workspace Scaffolding
+## CHANGE: pam init — Workspace Scaffolding ✅
 
 Implement the CLI entry point (`bin/pam`) using Commander.js and the `pam init` command. Creates the foundational workspace structure: root package.json with workspaces config, `.pam/` directory with config.json, `.env.example` template, and the type-organized directory layout (apps/, tasks/, skills/, roles/, agents/).
 
@@ -52,6 +52,15 @@ Implement the CLI entry point (`bin/pam`) using Commander.js and the `pam init` 
 - Root package.json has `"workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"]`
 - `.pam/config.json` and `.env.example` exist with reasonable defaults
 - Running `pam init` twice warns that workspace already exists
+
+**Implemented:** 2026-03-03
+- [Proposal](../../changes/archive/2026-03-03-pam-init-workspace-scaffolding/proposal.md)
+- [Design](../../changes/archive/2026-03-03-pam-init-workspace-scaffolding/design.md)
+- [Tasks](../../changes/archive/2026-03-03-pam-init-workspace-scaffolding/tasks.md)
+- [Specs: cli-framework](../../changes/archive/2026-03-03-pam-init-workspace-scaffolding/specs/cli-framework/spec.md)
+- [Specs: workspace-init](../../changes/archive/2026-03-03-pam-init-workspace-scaffolding/specs/workspace-init/spec.md)
+- [Main Spec: cli-framework](../../specs/cli-framework/spec.md)
+- [Main Spec: workspace-init](../../specs/workspace-init/spec.md)
 
 ---
 
