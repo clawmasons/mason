@@ -197,7 +197,7 @@ Implement the Docker Compose generator that assembles the `docker-compose.yml` w
 
 ---
 
-## CHANGE: pam install — Full Orchestrated Flow
+## CHANGE: pam install — Full Orchestrated Flow ✅
 
 Wire together all preceding components into the `pam install <agent-pkg>` command: npm install → graph resolution → validation → toolFilter computation → proxy config generation → runtime materialization → compose generation → lock file → credential prompting. This is the primary user-facing command.
 
@@ -211,6 +211,15 @@ Wire together all preceding components into the `pam install <agent-pkg>` comman
 - Validation errors abort install with clear messages
 - Re-running install updates existing scaffold (idempotent)
 - Credential prompting interactively asks for missing env vars (or reads from PAM_ENV_FILE)
+
+**Implemented:** 2026-03-03
+- [Proposal](../../changes/archive/2026-03-03-pam-install-orchestrated-flow/proposal.md)
+- [Design](../../changes/archive/2026-03-03-pam-install-orchestrated-flow/design.md)
+- [Tasks](../../changes/archive/2026-03-03-pam-install-orchestrated-flow/tasks.md)
+- [Specs: pam-install-command](../../changes/archive/2026-03-03-pam-install-orchestrated-flow/specs/pam-install-command/spec.md)
+- [Main Spec: pam-install-command](../../specs/pam-install-command/spec.md)
+
+**Notes:** npm install delegation and interactive credential prompting are deferred to future changes. The command currently assumes packages are already in the workspace. Unknown runtimes are warned and skipped rather than failing.
 
 ---
 

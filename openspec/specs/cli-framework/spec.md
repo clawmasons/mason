@@ -26,6 +26,10 @@ The system SHALL support registering commands as individual modules. Each comman
 - **WHEN** the CLI starts
 - **THEN** the `init` command is available and appears in help output
 
+#### Scenario: Install command is registered
+- **WHEN** the CLI starts
+- **THEN** the `install` command is available and appears in help output
+
 #### Scenario: Command isolation
 - **WHEN** a new command module is added to `src/cli/commands/`
 - **THEN** it can be registered without modifying other command modules
