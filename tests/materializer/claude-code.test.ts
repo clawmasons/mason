@@ -402,23 +402,46 @@ describe("claudeCodeMaterializer", () => {
       expect(dockerfile).toContain("npm install -g @anthropic-ai/claude-code");
     });
 
-    it("sets workspace as working directory", () => {
+    it("sets workspace as working directory under node home", () => {
       const agent = makeRepoOpsAgent();
       const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
-      expect(dockerfile).toContain("WORKDIR /workspace");
+      expect(dockerfile).toContain("WORKDIR /home/node/workspace");
     });
 
-    it("copies workspace directory", () => {
+    it("copies workspace directory with node ownership", () => {
       const agent = makeRepoOpsAgent();
       const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
-      expect(dockerfile).toContain("COPY workspace/ /workspace/");
+      expect(dockerfile).toContain("COPY --chown=node:node workspace/ /home/node/workspace/");
     });
 
-    it("skips OOBE setup wizard", () => {
+    it("skips OOBE setup wizard in node home", () => {
       const agent = makeRepoOpsAgent();
       const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
       expect(dockerfile).toContain("hasCompletedOnboarding");
-      expect(dockerfile).toContain("/root/.claude.json");
+      expect(dockerfile).toContain("/home/node/.claude.json");
+      expect(dockerfile).not.toContain("/root/.claude");
+    });
+
+    it("runs as node user", () => {
+      const agent = makeRepoOpsAgent();
+      const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
+      expect(dockerfile).toContain("USER node");
+    });
+
+    it("creates Claude config directory owned by node", () => {
+      const agent = makeRepoOpsAgent();
+      const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
+      expect(dockerfile).toContain("mkdir -p /home/node/.claude");
+      expect(dockerfile).toContain("chown -R node:node");
+    });
+
+    it("creates entrypoint script for credential injection", () => {
+      const agent = makeRepoOpsAgent();
+      const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
+      expect(dockerfile).toContain("entrypoint.sh");
+      expect(dockerfile).toContain("CLAUDE_AUTH_TOKEN");
+      expect(dockerfile).toContain("/home/node/.claude/.credentials.json");
+      expect(dockerfile).toContain("ENTRYPOINT");
     });
 
     it("disables auto-updater", () => {
@@ -441,10 +464,10 @@ describe("claudeCodeMaterializer", () => {
       expect(service.depends_on).toContain("mcp-proxy");
     });
 
-    it("mounts workspace volume", () => {
+    it("mounts workspace volume at /home/node/workspace", () => {
       const agent = makeRepoOpsAgent();
       const service = claudeCodeMaterializer.generateComposeService(agent);
-      expect(service.volumes).toContain("./claude-code/workspace:/workspace");
+      expect(service.volumes).toContain("./claude-code/workspace:/home/node/workspace");
     });
 
     it("includes PAM_ROLES with all role short names", () => {
@@ -453,10 +476,17 @@ describe("claudeCodeMaterializer", () => {
       expect(service.environment).toContain("PAM_ROLES=issue-manager,pr-reviewer");
     });
 
-    it("includes ANTHROPIC_API_KEY env var", () => {
+    it("includes CLAUDE_AUTH_TOKEN env var", () => {
       const agent = makeRepoOpsAgent();
       const service = claudeCodeMaterializer.generateComposeService(agent);
-      expect(service.environment).toContain("ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}");
+      expect(service.environment).toContain("CLAUDE_AUTH_TOKEN=${CLAUDE_AUTH_TOKEN}");
+    });
+
+    it("does not include ANTHROPIC_API_KEY", () => {
+      const agent = makeRepoOpsAgent();
+      const service = claudeCodeMaterializer.generateComposeService(agent);
+      const hasAnthropicKey = service.environment.some(e => e.includes("ANTHROPIC_API_KEY"));
+      expect(hasAnthropicKey).toBe(false);
     });
 
     it("enables interactive mode", () => {
@@ -478,10 +508,10 @@ describe("claudeCodeMaterializer", () => {
       expect(service.restart).toBe("no");
     });
 
-    it("sets /workspace as working directory", () => {
+    it("sets /home/node/workspace as working directory", () => {
       const agent = makeRepoOpsAgent();
       const service = claudeCodeMaterializer.generateComposeService(agent);
-      expect(service.working_dir).toBe("/workspace");
+      expect(service.working_dir).toBe("/home/node/workspace");
     });
   });
 });

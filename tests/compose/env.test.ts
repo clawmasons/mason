@@ -143,12 +143,19 @@ describe("generateEnvTemplate", () => {
     });
   });
 
-  describe("runtime API keys section", () => {
-    it("includes ANTHROPIC_API_KEY for claude-code runtime", () => {
+  describe("runtime auth section", () => {
+    it("includes CLAUDE_AUTH_TOKEN for claude-code runtime", () => {
       const agent = makeRepoOpsAgent();
       agent.runtimes = ["claude-code"];
       const env = generateEnvTemplate(agent);
-      expect(env).toContain("ANTHROPIC_API_KEY=");
+      expect(env).toContain("CLAUDE_AUTH_TOKEN=");
+    });
+
+    it("does not include ANTHROPIC_API_KEY for claude-code runtime", () => {
+      const agent = makeRepoOpsAgent();
+      agent.runtimes = ["claude-code"];
+      const env = generateEnvTemplate(agent);
+      expect(env).not.toContain("ANTHROPIC_API_KEY=");
     });
 
     it("includes OPENAI_API_KEY for codex runtime", () => {
@@ -158,10 +165,10 @@ describe("generateEnvTemplate", () => {
       expect(env).toContain("OPENAI_API_KEY=");
     });
 
-    it("includes both keys for multi-runtime agent", () => {
+    it("includes both auth vars for multi-runtime agent", () => {
       const agent = makeRepoOpsAgent();
       const env = generateEnvTemplate(agent);
-      expect(env).toContain("ANTHROPIC_API_KEY=");
+      expect(env).toContain("CLAUDE_AUTH_TOKEN=");
       expect(env).toContain("OPENAI_API_KEY=");
     });
 
@@ -170,24 +177,24 @@ describe("generateEnvTemplate", () => {
       agent.runtimes = ["aider"];
       const env = generateEnvTemplate(agent);
       // Should not crash, just no key for aider
-      expect(env).toContain("# Runtime API Keys");
+      expect(env).toContain("# Runtime Auth");
     });
 
-    it("has # Runtime API Keys comment header", () => {
+    it("has # Runtime Auth comment header", () => {
       const agent = makeRepoOpsAgent();
       const env = generateEnvTemplate(agent);
-      expect(env).toContain("# Runtime API Keys");
+      expect(env).toContain("# Runtime Auth");
     });
   });
 
   describe("section ordering", () => {
-    it("has sections in order: Proxy, App Credentials, Runtime API Keys", () => {
+    it("has sections in order: Proxy, App Credentials, Runtime Auth", () => {
       const agent = makeRepoOpsAgent();
       const env = generateEnvTemplate(agent);
 
       const proxyIdx = env.indexOf("# Proxy");
       const appIdx = env.indexOf("# App Credentials");
-      const runtimeIdx = env.indexOf("# Runtime API Keys");
+      const runtimeIdx = env.indexOf("# Runtime Auth");
 
       expect(proxyIdx).toBeLessThan(appIdx);
       expect(appIdx).toBeLessThan(runtimeIdx);

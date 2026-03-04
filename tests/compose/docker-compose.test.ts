@@ -68,9 +68,9 @@ function makeClaudeCodeService(): ComposeServiceDef {
   return {
     build: "./claude-code",
     restart: "no",
-    volumes: ["./claude-code/workspace:/workspace"],
-    working_dir: "/workspace",
-    environment: ["ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}", "PAM_ROLES=issue-manager"],
+    volumes: ["./claude-code/workspace:/home/node/workspace"],
+    working_dir: "/home/node/workspace",
+    environment: ["CLAUDE_AUTH_TOKEN=${CLAUDE_AUTH_TOKEN}", "PAM_ROLES=issue-manager"],
     depends_on: ["mcp-proxy"],
     stdin_open: true,
     tty: true,
@@ -203,7 +203,7 @@ describe("generateDockerCompose", () => {
 
       expect(yaml).toContain("claude-code:");
       expect(yaml).toContain("build: ./claude-code");
-      expect(yaml).toContain("ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}");
+      expect(yaml).toContain("CLAUDE_AUTH_TOKEN=${CLAUDE_AUTH_TOKEN}");
     });
 
     it("includes multiple runtime services", () => {

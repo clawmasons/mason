@@ -1,8 +1,8 @@
 import type { ResolvedAgent, ResolvedApp } from "../resolver/types.js";
 
-/** Known runtime → API key variable mappings. */
+/** Known runtime → auth variable mappings. */
 const RUNTIME_API_KEYS: Record<string, string> = {
-  "claude-code": "ANTHROPIC_API_KEY",
+  "claude-code": "CLAUDE_AUTH_TOKEN",
   codex: "OPENAI_API_KEY",
 };
 
@@ -69,9 +69,9 @@ export function generateEnvTemplate(agent: ResolvedAgent): string {
     lines.push(`${varName}=`);
   }
 
-  // Runtime API keys section
+  // Runtime auth section
   lines.push("");
-  lines.push("# Runtime API Keys");
+  lines.push("# Runtime Auth");
   for (const runtime of agent.runtimes) {
     const apiKey = RUNTIME_API_KEYS[runtime];
     if (apiKey) {
