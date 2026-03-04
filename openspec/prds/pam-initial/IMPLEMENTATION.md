@@ -223,7 +223,7 @@ Wire together all preceding components into the `pam install <agent-pkg>` comman
 
 ---
 
-## CHANGE: pam build, list, and permissions Commands
+## CHANGE: pam build, list, and permissions Commands ✅
 
 Implement the remaining read-only CLI commands: `pam build <agent>` (resolves graph + produces pam.lock.json without scaffolding), `pam list` (displays installed agents and their role/task/app tree), `pam permissions <agent>` (displays the resolved permission matrix and generated toolFilter).
 
@@ -236,6 +236,17 @@ Implement the remaining read-only CLI commands: `pam build <agent>` (resolves gr
 - `pam list` outputs a tree view: agent → roles → tasks → apps/skills
 - `pam permissions` outputs a matrix: role → app → [allowed tools], plus the generated toolFilter
 - All commands return non-zero exit codes when no agent is installed or agent not found
+
+**Implemented:** 2026-03-03
+- [Proposal](../../changes/archive/2026-03-03-pam-build-list-permissions/proposal.md)
+- [Design](../../changes/archive/2026-03-03-pam-build-list-permissions/design.md)
+- [Tasks](../../changes/archive/2026-03-03-pam-build-list-permissions/tasks.md)
+- [Specs: build-command](../../changes/archive/2026-03-03-pam-build-list-permissions/specs/build-command/spec.md)
+- [Specs: list-command](../../changes/archive/2026-03-03-pam-build-list-permissions/specs/list-command/spec.md)
+- [Specs: permissions-command](../../changes/archive/2026-03-03-pam-build-list-permissions/specs/permissions-command/spec.md)
+- [Main Spec: build-command](../../specs/build-command/spec.md)
+- [Main Spec: list-command](../../specs/list-command/spec.md)
+- [Main Spec: permissions-command](../../specs/permissions-command/spec.md)
 
 ---
 
