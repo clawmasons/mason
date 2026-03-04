@@ -276,7 +276,7 @@ Implement `pam run <agent> [--runtime=X]` and `pam stop <agent>`. Run starts the
 
 ---
 
-## CHANGE: pam add & remove — Dependency Management
+## CHANGE: pam add & remove — Dependency Management ✅
 
 Implement `pam add <pkg>` (wraps `npm install` with pam field validation and type compatibility checking) and `pam remove <pkg>` (wraps `npm uninstall` with dependent package checking).
 
@@ -289,6 +289,15 @@ Implement `pam add <pkg>` (wraps `npm install` with pam field validation and typ
 - `pam add` with a non-pam package (no `pam` field) rejects with error
 - `pam remove` with dependents warns and requires `--force` to proceed
 - `pam remove` without dependents runs npm uninstall cleanly
+
+**Implemented:** 2026-03-03
+- [Proposal](../../changes/archive/2026-03-03-pam-add-remove/proposal.md)
+- [Design](../../changes/archive/2026-03-03-pam-add-remove/design.md)
+- [Tasks](../../changes/archive/2026-03-03-pam-add-remove/tasks.md)
+- [Specs: add-command](../../changes/archive/2026-03-03-pam-add-remove/specs/add-command/spec.md)
+- [Specs: remove-command](../../changes/archive/2026-03-03-pam-add-remove/specs/remove-command/spec.md)
+- [Main Spec: add-command](../../specs/add-command/spec.md)
+- [Main Spec: remove-command](../../specs/remove-command/spec.md)
 
 ---
 
