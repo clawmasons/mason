@@ -366,4 +366,57 @@ describe("runInstall", () => {
     expect(logOutput).toContain("claude-code");
     expect(logOutput).toContain(".env");
   });
+
+  it("shows pam run as primary next step", async () => {
+    setupValidAgent();
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("pam run");
+  });
+
+  it("bakes proxy token into settings.json", async () => {
+    setupValidAgent();
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    const settingsPath = path.join(outputDir, "claude-code/workspace/.claude/settings.json");
+    const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+    const authHeader = settings.mcpServers["pam-proxy"].headers.Authorization;
+
+    // Should contain actual token, not the placeholder
+    expect(authHeader).not.toContain("${PAM_PROXY_TOKEN}");
+    expect(authHeader).toMatch(/^Bearer [a-f0-9]{64}$/);
+  });
+
+  it("docker-compose.yml includes PAM_PROXY_TOKEN in mcp-proxy env", async () => {
+    setupValidAgent();
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
+    const proxySection = composeContent.split("claude-code:")[0];
+    expect(proxySection).toContain("PAM_PROXY_TOKEN=${PAM_PROXY_TOKEN}");
+  });
+
+  it("Dockerfile includes OOBE skip and DISABLE_AUTOUPDATER", async () => {
+    setupValidAgent();
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    const dockerfile = fs.readFileSync(path.join(outputDir, "claude-code/Dockerfile"), "utf-8");
+    expect(dockerfile).toContain("hasCompletedOnboarding");
+    expect(dockerfile).toContain("DISABLE_AUTOUPDATER=1");
+  });
+
+  it("claude-code compose service has restart no", async () => {
+    setupValidAgent();
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
+    const claudeSection = composeContent.split("claude-code:")[1];
+    expect(claudeSection).toContain("restart: no");
+  });
 });
+

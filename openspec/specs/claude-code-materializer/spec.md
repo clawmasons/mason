@@ -8,7 +8,7 @@ TBD - created by archiving change claude-code-materializer. Update Purpose after
 The Claude Code materializer SHALL generate a `.claude/settings.json` file containing a single `mcpServers` entry named `"pam-proxy"` with:
 - `type` set to the agent's proxy type (default `"sse"`)
 - `url` set to `{proxyEndpoint}/sse` (for SSE) or `{proxyEndpoint}/mcp` (for streamable-http)
-- `headers.Authorization` set to `"Bearer ${PAM_PROXY_TOKEN}"`
+- `headers.Authorization` set to `"Bearer <actual-token>"` when a `proxyToken` is provided, or `"Bearer ${PAM_PROXY_TOKEN}"` as a fallback placeholder
 - A `permissions` block with `allow: ["mcp__pam-proxy__*"]` and `deny: []`
 
 #### Scenario: Default SSE proxy settings
@@ -19,8 +19,12 @@ The Claude Code materializer SHALL generate a `.claude/settings.json` file conta
 - **WHEN** the agent has `proxy.port` of 8080 and `proxy.type` of `"streamable-http"`
 - **THEN** the settings SHALL have `mcpServers.pam-proxy.url` equal to `"http://mcp-proxy:8080/mcp"` and `mcpServers.pam-proxy.type` equal to `"streamable-http"`
 
-#### Scenario: Auth header present
-- **WHEN** settings.json is generated
+#### Scenario: Auth header with baked token
+- **WHEN** settings.json is generated with a `proxyToken` of `"abc123"`
+- **THEN** `mcpServers.pam-proxy.headers.Authorization` SHALL equal `"Bearer abc123"`
+
+#### Scenario: Auth header placeholder fallback
+- **WHEN** settings.json is generated without a `proxyToken`
 - **THEN** `mcpServers.pam-proxy.headers.Authorization` SHALL equal `"Bearer ${PAM_PROXY_TOKEN}"`
 
 ### Requirement: Claude Code materializer generates slash commands from tasks
@@ -71,6 +75,8 @@ For each unique skill across all roles, the materializer SHALL generate a `skill
 The `generateDockerfile()` method SHALL return a Dockerfile string that:
 - Uses a Node.js base image
 - Installs the Claude Code CLI (`@anthropic-ai/claude-code`)
+- Skips the Claude Code OOBE setup wizard by writing `{"hasCompletedOnboarding": true}` to `/root/.claude/settings.json`
+- Sets `DISABLE_AUTOUPDATER=1` environment variable
 - Sets up a `/workspace` working directory
 - Copies the workspace directory into the container
 
@@ -78,11 +84,19 @@ The `generateDockerfile()` method SHALL return a Dockerfile string that:
 - **WHEN** `generateDockerfile()` is called
 - **THEN** the result SHALL contain `FROM node:`, `npm install -g @anthropic-ai/claude-code`, `WORKDIR /workspace`, and a `COPY` instruction
 
+#### Scenario: Dockerfile skips OOBE
+- **WHEN** `generateDockerfile()` is called
+- **THEN** the result SHALL contain a `RUN` instruction that creates `/root/.claude/settings.json` with `hasCompletedOnboarding: true`
+
+#### Scenario: Dockerfile disables auto-updater
+- **WHEN** `generateDockerfile()` is called
+- **THEN** the result SHALL contain `ENV DISABLE_AUTOUPDATER=1`
+
 ### Requirement: Claude Code materializer generates a docker-compose service definition
 
 The `generateComposeService()` method SHALL return a `ComposeServiceDef` with:
 - `build` pointing to `./claude-code`
-- `restart` set to `unless-stopped`
+- `restart` set to `"no"` (interactive containers should not auto-restart)
 - `volumes` bind-mounting the workspace
 - `depends_on` including `mcp-proxy`
 - `stdin_open` and `tty` set to `true`

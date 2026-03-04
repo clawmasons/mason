@@ -25,6 +25,43 @@ export function registerRunCommand(program: Command): void {
     });
 }
 
+/**
+ * Parse service names from a docker-compose.yml file.
+ * Returns all top-level keys under the `services:` block.
+ */
+function parseServiceNames(composePath: string): string[] {
+  const content = fs.readFileSync(composePath, "utf-8");
+  const services: string[] = [];
+  let inServices = false;
+
+  for (const line of content.split("\n")) {
+    if (/^services:\s*$/.test(line)) {
+      inServices = true;
+      continue;
+    }
+    // Top-level key (not indented) ends the services block
+    if (inServices && /^\S/.test(line) && !line.startsWith("#")) {
+      break;
+    }
+    // Service names are indented exactly 2 spaces followed by name:
+    if (inServices) {
+      const match = line.match(/^  (\S+):\s*$/);
+      if (match) {
+        services.push(match[1]);
+      }
+    }
+  }
+
+  return services;
+}
+
+/**
+ * Detect runtime services (everything except mcp-proxy) from compose file.
+ */
+function detectRuntimes(composePath: string): string[] {
+  return parseServiceNames(composePath).filter((s) => s !== "mcp-proxy");
+}
+
 export async function runAgent(
   rootDir: string,
   agentName: string,
@@ -64,34 +101,61 @@ export async function runAgent(
       return;
     }
 
-    // 4. Build docker compose args
-    const args = ["compose", "-f", composePath, "up", "-d"];
+    // 4. Determine runtime to run
+    let runtime = options.runtime;
 
-    if (options.runtime) {
+    if (runtime) {
       // Validate runtime exists in compose file
       const composeContent = fs.readFileSync(composePath, "utf-8");
-      // Simple check: look for the service name in the compose file
-      const servicePattern = new RegExp(`^\\s+${options.runtime}:`, "m");
+      const servicePattern = new RegExp(`^\\s+${runtime}:`, "m");
       if (!servicePattern.test(composeContent)) {
         console.error(
-          `\n✘ Runtime "${options.runtime}" not found in ${composePath}\n`,
+          `\n✘ Runtime "${runtime}" not found in ${composePath}\n`,
         );
         process.exit(1);
         return;
       }
-      args.push("mcp-proxy", options.runtime);
+    } else {
+      // Auto-detect single runtime
+      const runtimes = detectRuntimes(composePath);
+      if (runtimes.length === 0) {
+        console.error(
+          `\n✘ No runtime services found in ${composePath}\n`,
+        );
+        process.exit(1);
+        return;
+      }
+      if (runtimes.length > 1) {
+        console.error(
+          `\n✘ Multiple runtimes found: ${runtimes.join(", ")}\n  Use --runtime <name> to specify which runtime to start.\n`,
+        );
+        process.exit(1);
+        return;
+      }
+      runtime = runtimes[0];
     }
 
-    // 5. Execute docker compose
-    console.log(`Starting agent "${agentName}"...`);
-    const exitCode = await execDockerCompose(args);
+    // 5. Phase 1: Start mcp-proxy detached
+    console.log(`Starting mcp-proxy for "${agentName}"...`);
+    const proxyArgs = ["compose", "-f", composePath, "up", "-d", "mcp-proxy"];
+    const proxyExitCode = await execDockerCompose(proxyArgs);
 
-    if (exitCode !== 0) {
-      process.exit(exitCode);
+    if (proxyExitCode !== 0) {
+      process.exit(proxyExitCode);
       return;
     }
 
-    console.log(`\n✔ Agent "${agentName}" is running.\n`);
+    // 6. Phase 2: Run runtime interactively
+    console.log(`Starting runtime "${runtime}" interactively...`);
+    const runtimeArgs = ["compose", "-f", composePath, "run", "--rm", runtime];
+    const runtimeExitCode = await execDockerCompose(runtimeArgs);
+
+    if (runtimeExitCode !== 0) {
+      process.exit(runtimeExitCode);
+      return;
+    }
+
+    console.log(`\n✔ Agent "${agentName}" session complete.\n`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\n✘ Run failed: ${message}\n`);

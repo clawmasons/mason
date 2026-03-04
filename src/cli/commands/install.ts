@@ -64,7 +64,10 @@ export async function runInstall(
     console.log("Generating mcp-proxy config...");
     const proxyConfig = generateProxyConfig(agent);
 
-    // 5. Materialize runtimes
+    // 5. Generate proxy auth token (before materialization so it can be baked in)
+    const proxyToken = crypto.randomBytes(32).toString("hex");
+
+    // 6. Materialize runtimes
     const proxyPort = agent.proxy?.port ?? 9090;
     const proxyEndpoint = `http://mcp-proxy:${proxyPort}`;
     const runtimeServices = new Map<string, ComposeServiceDef>();
@@ -81,8 +84,8 @@ export async function runInstall(
 
       console.log(`Materializing ${runtime} workspace...`);
 
-      // Workspace files
-      const workspace = materializer.materializeWorkspace(agent, proxyEndpoint);
+      // Workspace files (pass token so it gets baked into settings)
+      const workspace = materializer.materializeWorkspace(agent, proxyEndpoint, proxyToken);
       for (const [relPath, content] of workspace) {
         allFiles.set(`${runtime}/workspace/${relPath}`, content);
       }
@@ -106,7 +109,6 @@ export async function runInstall(
 
     // 8. Generate .env with proxy token
     const envTemplate = generateEnvTemplate(agent);
-    const proxyToken = crypto.randomBytes(32).toString("hex");
     const envContent = envTemplate.replace("PAM_PROXY_TOKEN=", `PAM_PROXY_TOKEN=${proxyToken}`);
     allFiles.set(".env", envContent);
 
@@ -136,9 +138,14 @@ export async function runInstall(
     if (skippedRuntimes.length > 0) {
       console.log(`  Skipped: ${skippedRuntimes.join(", ")} (no materializer)`);
     }
+    const composePath = path.join(outputDir, "docker-compose.yml");
+    const runtimeName = materializedRuntimes[0] ?? "claude-code";
     console.log(`\n  Next steps:`);
     console.log(`    1. Fill in credentials in ${path.join(outputDir, ".env")}`);
-    console.log(`    2. Run: docker compose -f ${path.join(outputDir, "docker-compose.yml")} up\n`);
+    console.log(`    2. Run: pam run ${agentName}`);
+    console.log(`       Or manually:`);
+    console.log(`         docker compose -f ${composePath} up -d mcp-proxy`);
+    console.log(`         docker compose -f ${composePath} run --rm ${runtimeName}\n`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\n✘ Install failed: ${message}\n`);
