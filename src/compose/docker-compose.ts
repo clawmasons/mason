@@ -116,11 +116,10 @@ export function generateDockerCompose(
   lines.push("    volumes:");
   lines.push("      - ./mcp-proxy/config.json:/config/config.json:ro");
 
-  if (envVars.length > 0) {
-    lines.push("    environment:");
-    for (const varName of envVars) {
-      lines.push(`      - ${varName}=\${${varName}}`);
-    }
+  lines.push("    environment:");
+  lines.push("      - PAM_PROXY_TOKEN=${PAM_PROXY_TOKEN}");
+  for (const varName of envVars) {
+    lines.push(`      - ${varName}=\${${varName}}`);
   }
 
   lines.push("    logging:");

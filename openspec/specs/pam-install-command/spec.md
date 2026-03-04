@@ -15,9 +15,9 @@ When `pam install <agent>` is run, the command SHALL execute the following stage
 2. Resolve the agent's dependency graph via `resolveAgent()`
 3. Validate the resolved graph via `validateAgent()` — abort with error if invalid
 4. Generate the mcp-proxy config via `generateProxyConfig()`
-5. For each declared runtime with a registered materializer: materialize workspace, generate Dockerfile, generate compose service
-6. Generate docker-compose.yml, .env template, and pam.lock.json
-7. Generate a random proxy auth token
+5. Generate a random proxy auth token (before materialization so it can be baked into runtime configs)
+6. For each declared runtime with a registered materializer: materialize workspace (passing the token), generate Dockerfile, generate compose service
+7. Generate docker-compose.yml, .env template (with token injected), and pam.lock.json
 8. Write all artifacts to the output directory
 
 #### Scenario: Successful install creates complete directory structure
@@ -36,13 +36,19 @@ When `pam install <agent>` is run, the command SHALL execute the following stage
 - **WHEN** `pam install` is run with an agent that fails validation
 - **THEN** the command SHALL print validation errors and exit with non-zero status without writing any files
 
-### Requirement: pam install generates a proxy auth token
+### Requirement: pam install generates a proxy auth token and bakes it into runtime configs
 
-The install command SHALL generate a cryptographically random token using `crypto.randomBytes(32)` and inject it into the `.env` file as the `PAM_PROXY_TOKEN` value.
+The install command SHALL generate a cryptographically random token using `crypto.randomBytes(32)` before materialization. The token SHALL be:
+- Injected into the `.env` file as the `PAM_PROXY_TOKEN` value
+- Passed to `materializeWorkspace()` so runtimes can bake the actual token value into their settings (e.g., Claude Code's `settings.json` Authorization header)
 
 #### Scenario: Token is present in .env
 - **WHEN** install completes successfully
 - **THEN** the `.env` file SHALL contain `PAM_PROXY_TOKEN=<64-char-hex-string>` where the value is non-empty
+
+#### Scenario: Token is baked into runtime settings
+- **WHEN** install completes successfully for a claude-code runtime
+- **THEN** `claude-code/workspace/.claude/settings.json` SHALL contain `Authorization: "Bearer <actual-token>"` with the real token, not an env var placeholder
 
 ### Requirement: pam install uses a materializer registry
 
@@ -82,11 +88,11 @@ The command SHALL print a success message listing:
 - The output directory path
 - The number of generated files
 - The runtimes that were materialized
-- A reminder to fill in `.env` credentials
+- Next steps: fill in `.env` credentials, then run with `pam run <agent>` (primary) or `docker compose` (manual alternative)
 
 #### Scenario: Success output
 - **WHEN** install completes successfully
-- **THEN** the output SHALL contain the output directory path and mention `.env`
+- **THEN** the output SHALL contain the output directory path, mention `.env`, and show `pam run` as the primary command
 
 ## MODIFIED Requirements
 

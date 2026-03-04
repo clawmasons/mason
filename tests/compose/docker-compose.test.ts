@@ -67,7 +67,7 @@ function makeRepoOpsAgent(): ResolvedAgent {
 function makeClaudeCodeService(): ComposeServiceDef {
   return {
     build: "./claude-code",
-    restart: "unless-stopped",
+    restart: "no",
     volumes: ["./claude-code/workspace:/workspace"],
     working_dir: "/workspace",
     environment: ["ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}", "PAM_ROLES=issue-manager"],
@@ -81,7 +81,7 @@ function makeClaudeCodeService(): ComposeServiceDef {
 function makeCodexService(): ComposeServiceDef {
   return {
     build: "./codex",
-    restart: "unless-stopped",
+    restart: "no",
     volumes: ["./codex/workspace:/workspace"],
     working_dir: "/workspace",
     environment: ["OPENAI_API_KEY=${OPENAI_API_KEY}", "PAM_ROLES=issue-manager"],
@@ -153,6 +153,15 @@ describe("generateDockerCompose", () => {
 
       expect(yaml).toContain("GITHUB_TOKEN=${GITHUB_TOKEN}");
       expect(yaml).toContain("SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}");
+    });
+
+    it("always includes PAM_PROXY_TOKEN in mcp-proxy environment", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services);
+
+      const proxySection = yaml.split("claude-code:")[0];
+      expect(proxySection).toContain("PAM_PROXY_TOKEN=${PAM_PROXY_TOKEN}");
     });
 
     it("includes JSON logging config", () => {

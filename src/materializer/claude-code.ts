@@ -82,8 +82,12 @@ function collectAllTasks(
 function generateSettingsJson(
   proxyEndpoint: string,
   proxyType: "sse" | "streamable-http",
+  proxyToken?: string,
 ): string {
   const path = proxyType === "sse" ? "/sse" : "/mcp";
+  const bearerValue = proxyToken
+    ? `Bearer ${proxyToken}`
+    : "Bearer ${PAM_PROXY_TOKEN}";
 
   const settings = {
     mcpServers: {
@@ -91,7 +95,7 @@ function generateSettingsJson(
         type: proxyType,
         url: `${proxyEndpoint}${path}`,
         headers: {
-          Authorization: "Bearer ${PAM_PROXY_TOKEN}",
+          Authorization: bearerValue,
         },
       },
     },
@@ -226,6 +230,7 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
   materializeWorkspace(
     agent: ResolvedAgent,
     proxyEndpoint: string,
+    proxyToken?: string,
   ): MaterializationResult {
     const result: MaterializationResult = new Map();
     const proxyType = agent.proxy?.type ?? "sse";
@@ -233,7 +238,7 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     // .claude/settings.json
     result.set(
       ".claude/settings.json",
-      generateSettingsJson(proxyEndpoint, proxyType),
+      generateSettingsJson(proxyEndpoint, proxyType, proxyToken),
     );
 
     // .claude/commands/{task-short-name}.md
@@ -268,6 +273,10 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
       "",
       "RUN npm install -g @anthropic-ai/claude-code",
       "",
+      "# Skip Claude Code OOBE setup wizard",
+      'RUN echo \'{"hasCompletedOnboarding": true}\' > /root/.claude.json',
+      "ENV DISABLE_AUTOUPDATER=1",
+      "",
       "WORKDIR /workspace",
       "COPY workspace/ /workspace/",
       "",
@@ -282,7 +291,7 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
 
     return {
       build: "./claude-code",
-      restart: "unless-stopped",
+      restart: "no",
       volumes: ["./claude-code/workspace:/workspace"],
       working_dir: "/workspace",
       environment: [

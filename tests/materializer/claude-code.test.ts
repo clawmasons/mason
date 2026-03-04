@@ -161,12 +161,21 @@ describe("claudeCodeMaterializer", () => {
         expect(settings.mcpServers["pam-proxy"].url).toBe("http://mcp-proxy:9090/mcp");
       });
 
-      it("includes auth header with PAM_PROXY_TOKEN", () => {
+      it("includes placeholder auth header when no token provided", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const settings = JSON.parse(result.get(".claude/settings.json")!);
         expect(settings.mcpServers["pam-proxy"].headers.Authorization).toBe("Bearer ${PAM_PROXY_TOKEN}");
+      });
+
+      it("bakes actual token into auth header when proxyToken provided", () => {
+        const agent = makeRepoOpsAgent();
+        const token = "abc123def456";
+        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", token);
+
+        const settings = JSON.parse(result.get(".claude/settings.json")!);
+        expect(settings.mcpServers["pam-proxy"].headers.Authorization).toBe("Bearer abc123def456");
       });
 
       it("includes permissions allowing all proxy tools", () => {
@@ -404,6 +413,19 @@ describe("claudeCodeMaterializer", () => {
       const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
       expect(dockerfile).toContain("COPY workspace/ /workspace/");
     });
+
+    it("skips OOBE setup wizard", () => {
+      const agent = makeRepoOpsAgent();
+      const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
+      expect(dockerfile).toContain("hasCompletedOnboarding");
+      expect(dockerfile).toContain("/root/.claude.json");
+    });
+
+    it("disables auto-updater", () => {
+      const agent = makeRepoOpsAgent();
+      const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
+      expect(dockerfile).toContain("DISABLE_AUTOUPDATER=1");
+    });
   });
 
   describe("generateComposeService", () => {
@@ -450,10 +472,10 @@ describe("claudeCodeMaterializer", () => {
       expect(service.networks).toContain("agent-net");
     });
 
-    it("uses unless-stopped restart policy", () => {
+    it("uses no restart policy for interactive containers", () => {
       const agent = makeRepoOpsAgent();
       const service = claudeCodeMaterializer.generateComposeService(agent);
-      expect(service.restart).toBe("unless-stopped");
+      expect(service.restart).toBe("no");
     });
 
     it("sets /workspace as working directory", () => {

@@ -39,6 +39,7 @@ export interface RuntimeMaterializer {
   materializeWorkspace(
     agent: ResolvedAgent,
     proxyEndpoint: string,
+    proxyToken?: string,
   ): MaterializationResult;
 
   /** Generate a Dockerfile string for this runtime's container. */

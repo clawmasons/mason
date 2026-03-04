@@ -1,0 +1,17 @@
+{
+  "name": "@example/role-writer",
+  "version": "1.0.0",
+  "description": "Writer role — permission boundary for filesystem note operations",
+  "pam": {
+    "type": "role",
+    "description": "Manages notes on the filesystem: read, write, list, and create directories.",
+    "tasks": ["@example/task-take-notes"],
+    "skills": ["@example/skill-markdown-conventions"],
+    "permissions": {
+      "@example/app-filesystem": {
+        "allow": ["read_file", "write_file", "list_directory", "create_directory"],
+        "deny": []
+      }
+    }
+  }
+}

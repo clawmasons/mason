@@ -14,10 +14,14 @@ vi.mock("../../src/cli/commands/docker-utils.js", async () => {
   };
 });
 
+// Track all spawn calls for assertion
+const spawnCalls: string[][] = [];
+
 // Mock child_process.spawn to avoid real docker calls
 vi.mock("node:child_process", () => ({
   execSync: vi.fn(),
-  spawn: vi.fn(() => {
+  spawn: vi.fn((_cmd: string, args: string[]) => {
+    spawnCalls.push(args);
     const events: Record<string, (...args: unknown[]) => void> = {};
     const mock = {
       on: (event: string, cb: (...args: unknown[]) => void) => {
@@ -78,6 +82,7 @@ describe("runAgent", () => {
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    spawnCalls.length = 0;
   });
 
   afterEach(() => {
@@ -85,12 +90,12 @@ describe("runAgent", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function setupAgentDir(envContent: string): string {
+  function setupAgentDir(envContent: string, composeContent?: string): string {
     const agentDir = path.join(tmpDir, ".pam", "agents", "ops");
     fs.mkdirSync(agentDir, { recursive: true });
     fs.writeFileSync(
       path.join(agentDir, "docker-compose.yml"),
-      `version: "3.8"\nservices:\n  mcp-proxy:\n    image: proxy\n  claude-code:\n    build: ./claude-code\n`,
+      composeContent ?? `services:\n  mcp-proxy:\n    image: proxy\n  claude-code:\n    build: ./claude-code\n`,
     );
     fs.writeFileSync(path.join(agentDir, ".env"), envContent);
     return agentDir;
@@ -123,12 +128,12 @@ describe("runAgent", () => {
     expect(errorOutput).toContain("GITHUB_TOKEN");
   });
 
-  it("succeeds with valid configuration", async () => {
+  it("succeeds with valid configuration and auto-detects single runtime", async () => {
     setupAgentDir("GITHUB_TOKEN=abc123\nPAM_PROXY_TOKEN=xyz\n");
     await runAgent(tmpDir, "@test/agent-ops", {});
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("running");
+    expect(logOutput).toContain("session complete");
   });
 
   it("exits 1 when runtime not found in compose file", async () => {
@@ -150,11 +155,50 @@ describe("runAgent", () => {
     fs.mkdirSync(customDir, { recursive: true });
     fs.writeFileSync(
       path.join(customDir, "docker-compose.yml"),
-      `version: "3.8"\nservices:\n  mcp-proxy:\n    image: proxy\n`,
+      `services:\n  mcp-proxy:\n    image: proxy\n  claude-code:\n    build: ./claude-code\n`,
     );
     fs.writeFileSync(path.join(customDir, ".env"), "TOKEN=abc\n");
 
     await runAgent(tmpDir, "@test/agent-ops", { outputDir: customDir });
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+  });
+
+  it("runs two-phase: mcp-proxy detached then runtime interactive", async () => {
+    setupAgentDir("GITHUB_TOKEN=abc\nPAM_PROXY_TOKEN=xyz\n");
+    await runAgent(tmpDir, "@test/agent-ops", {});
+
+    // Should have 2 spawn calls
+    expect(spawnCalls.length).toBe(2);
+
+    // Phase 1: up -d mcp-proxy
+    expect(spawnCalls[0]).toEqual(
+      expect.arrayContaining(["up", "-d", "mcp-proxy"]),
+    );
+
+    // Phase 2: run --rm <runtime>
+    expect(spawnCalls[1]).toEqual(
+      expect.arrayContaining(["run", "--rm", "claude-code"]),
+    );
+  });
+
+  it("exits 1 when multiple runtimes and no --runtime flag", async () => {
+    setupAgentDir(
+      "TOKEN=abc\n",
+      `services:\n  mcp-proxy:\n    image: proxy\n  claude-code:\n    build: ./cc\n  codex:\n    build: ./codex\n`,
+    );
+    await runAgent(tmpDir, "@test/agent-ops", {});
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const errorOutput = errorSpy.mock.calls.flat().join("\n");
+    expect(errorOutput).toContain("Multiple runtimes");
+    expect(errorOutput).toContain("--runtime");
+  });
+
+  it("succeeds with multiple runtimes when --runtime is specified", async () => {
+    setupAgentDir(
+      "TOKEN=abc\n",
+      `services:\n  mcp-proxy:\n    image: proxy\n  claude-code:\n    build: ./cc\n  codex:\n    build: ./codex\n`,
+    );
+    await runAgent(tmpDir, "@test/agent-ops", { runtime: "claude-code" });
     expect(exitSpy).not.toHaveBeenCalledWith(1);
   });
 });
