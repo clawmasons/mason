@@ -254,6 +254,35 @@ describe("generateDockerCompose", () => {
     });
   });
 
+  describe("proxy Dockerfile support", () => {
+    it("uses build: ./mcp-proxy when hasProxyDockerfile is true", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services, true);
+
+      expect(yaml).toContain("build: ./mcp-proxy");
+      expect(yaml).not.toContain("image: ghcr.io/tbxark/mcp-proxy:latest");
+    });
+
+    it("uses image: when hasProxyDockerfile is false", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services, false);
+
+      expect(yaml).toContain("image: ghcr.io/tbxark/mcp-proxy:latest");
+      expect(yaml).not.toContain("build: ./mcp-proxy");
+    });
+
+    it("uses image: when hasProxyDockerfile is undefined (backward compatible)", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services);
+
+      expect(yaml).toContain("image: ghcr.io/tbxark/mcp-proxy:latest");
+      expect(yaml).not.toContain("build: ./mcp-proxy");
+    });
+  });
+
   describe("env var deduplication", () => {
     it("deduplicates env vars when multiple apps reference the same variable", () => {
       const agent = makeRepoOpsAgent();
