@@ -382,7 +382,10 @@ describe("runInstall", () => {
 
     const settingsPath = path.join(outputDir, "claude-code/workspace/.claude/settings.json");
     const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-    const authHeader = settings.mcpServers["pam-proxy"].headers.Authorization;
+    // Per-server entries: pick the first server (github) to check the baked token
+    const serverKeys = Object.keys(settings.mcpServers);
+    expect(serverKeys.length).toBeGreaterThan(0);
+    const authHeader = settings.mcpServers[serverKeys[0]].headers.Authorization;
 
     // Should contain actual token, not the placeholder
     expect(authHeader).not.toContain("${PAM_PROXY_TOKEN}");

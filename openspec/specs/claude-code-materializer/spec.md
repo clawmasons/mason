@@ -3,29 +3,33 @@
 ## Purpose
 TBD - created by archiving change claude-code-materializer. Update Purpose after archive.
 ## Requirements
-### Requirement: Claude Code materializer generates settings.json with pam-proxy MCP server
+### Requirement: Claude Code materializer generates settings.json with per-server MCP entries
 
-The Claude Code materializer SHALL generate a `.claude/settings.json` file containing a single `mcpServers` entry named `"pam-proxy"` with:
+The Claude Code materializer SHALL generate a `.claude/settings.json` file containing one `mcpServers` entry per unique app in the agent, keyed by the app's short name (e.g., `"github"`, `"slack"`). Each entry SHALL have:
 - `type` set to the agent's proxy type (default `"sse"`)
-- `url` set to `{proxyEndpoint}/sse` (for SSE) or `{proxyEndpoint}/mcp` (for streamable-http)
+- `url` set to `{proxyEndpoint}/{shortName}/sse` (for SSE) or `{proxyEndpoint}/{shortName}/mcp` (for streamable-http)
 - `headers.Authorization` set to `"Bearer <actual-token>"` when a `proxyToken` is provided, or `"Bearer ${PAM_PROXY_TOKEN}"` as a fallback placeholder
-- A `permissions` block with `allow: ["mcp__pam-proxy__*"]` and `deny: []`
+- A `permissions` block with `allow: ["mcp__{shortName}__*", ...]` for each app and `deny: []`
 
 #### Scenario: Default SSE proxy settings
-- **WHEN** materializeWorkspace is called with a resolved agent using default SSE proxy on port 9090
-- **THEN** the result SHALL contain key `.claude/settings.json` with a JSON object having `mcpServers.pam-proxy.url` equal to `"http://mcp-proxy:9090/sse"` and `mcpServers.pam-proxy.type` equal to `"sse"`
+- **WHEN** materializeWorkspace is called with a resolved agent having apps `github` and `slack` using default SSE proxy on port 9090
+- **THEN** the result SHALL contain key `.claude/settings.json` with a JSON object having `mcpServers.github.url` equal to `"http://mcp-proxy:9090/github/sse"` and `mcpServers.slack.url` equal to `"http://mcp-proxy:9090/slack/sse"`, both with `type` equal to `"sse"`
 
 #### Scenario: Custom proxy port and streamable-http
 - **WHEN** the agent has `proxy.port` of 8080 and `proxy.type` of `"streamable-http"`
-- **THEN** the settings SHALL have `mcpServers.pam-proxy.url` equal to `"http://mcp-proxy:8080/mcp"` and `mcpServers.pam-proxy.type` equal to `"streamable-http"`
+- **THEN** the settings SHALL have `mcpServers.github.url` equal to `"http://mcp-proxy:8080/github/mcp"` and `mcpServers.github.type` equal to `"streamable-http"`
 
 #### Scenario: Auth header with baked token
 - **WHEN** settings.json is generated with a `proxyToken` of `"abc123"`
-- **THEN** `mcpServers.pam-proxy.headers.Authorization` SHALL equal `"Bearer abc123"`
+- **THEN** each server entry's `headers.Authorization` SHALL equal `"Bearer abc123"`
 
 #### Scenario: Auth header placeholder fallback
 - **WHEN** settings.json is generated without a `proxyToken`
-- **THEN** `mcpServers.pam-proxy.headers.Authorization` SHALL equal `"Bearer ${PAM_PROXY_TOKEN}"`
+- **THEN** each server entry's `headers.Authorization` SHALL equal `"Bearer ${PAM_PROXY_TOKEN}"`
+
+#### Scenario: Per-server permissions
+- **WHEN** the agent has apps `github` and `slack`
+- **THEN** `permissions.allow` SHALL equal `["mcp__github__*", "mcp__slack__*"]`
 
 ### Requirement: Claude Code materializer generates slash commands from tasks
 
@@ -73,35 +77,63 @@ For each unique skill across all roles, the materializer SHALL generate a `skill
 ### Requirement: Claude Code materializer generates a Dockerfile
 
 The `generateDockerfile()` method SHALL return a Dockerfile string that:
-- Uses a Node.js base image
-- Installs the Claude Code CLI (`@anthropic-ai/claude-code`)
-- Skips the Claude Code OOBE setup wizard by writing `{"hasCompletedOnboarding": true}` to `/root/.claude/settings.json`
-- Sets `DISABLE_AUTOUPDATER=1` environment variable
-- Sets up a `/workspace` working directory
-- Copies the workspace directory into the container
+- Uses `node:22-slim` base image
+- Installs Claude Code CLI globally as root
+- Creates `/home/node/.claude` directory owned by `node:node`
+- Writes OOBE bypass to `/home/node/.claude.json` (not `/root/.claude.json`)
+- Creates an entrypoint script at `/home/node/entrypoint.sh` that writes `CLAUDE_AUTH_TOKEN` env var content to `/home/node/.claude/.credentials.json` if set, then execs the passed command
+- Sets `DISABLE_AUTOUPDATER=1`
+- Switches to `USER node`
+- Sets `WORKDIR /home/node/workspace`
+- Copies workspace directory to `/home/node/workspace/` with `node:node` ownership
+- Uses the entrypoint script as `ENTRYPOINT`
+- Defaults CMD to `["claude", "--dangerously-skip-permissions"]` to bypass all permission prompts in the isolated container
 
-#### Scenario: Dockerfile content
+#### Scenario: Dockerfile runs as node user
 - **WHEN** `generateDockerfile()` is called
-- **THEN** the result SHALL contain `FROM node:`, `npm install -g @anthropic-ai/claude-code`, `WORKDIR /workspace`, and a `COPY` instruction
+- **THEN** the result SHALL contain `USER node`
 
-#### Scenario: Dockerfile skips OOBE
+#### Scenario: Dockerfile sets up Claude config in node home
 - **WHEN** `generateDockerfile()` is called
-- **THEN** the result SHALL contain a `RUN` instruction that creates `/root/.claude/settings.json` with `hasCompletedOnboarding: true`
+- **THEN** the result SHALL contain `/home/node/.claude` and `/home/node/.claude.json`
+- **AND** SHALL NOT contain `/root/.claude`
+
+#### Scenario: Dockerfile creates entrypoint for credentials
+- **WHEN** `generateDockerfile()` is called
+- **THEN** the result SHALL contain an entrypoint script that writes `CLAUDE_AUTH_TOKEN` to `/home/node/.claude/.credentials.json`
+
+#### Scenario: Dockerfile workspace at /home/node/workspace
+- **WHEN** `generateDockerfile()` is called
+- **THEN** the result SHALL contain `WORKDIR /home/node/workspace` and `COPY --chown=node:node workspace/ /home/node/workspace/`
 
 #### Scenario: Dockerfile disables auto-updater
 - **WHEN** `generateDockerfile()` is called
 - **THEN** the result SHALL contain `ENV DISABLE_AUTOUPDATER=1`
+
+#### Scenario: Dockerfile bypasses permission prompts
+- **WHEN** `generateDockerfile()` is called
+- **THEN** the CMD SHALL include `--dangerously-skip-permissions`
+- **AND** the result SHALL NOT contain `trustedDirectories`
 
 ### Requirement: Claude Code materializer generates a docker-compose service definition
 
 The `generateComposeService()` method SHALL return a `ComposeServiceDef` with:
 - `build` pointing to `./claude-code`
 - `restart` set to `"no"` (interactive containers should not auto-restart)
-- `volumes` bind-mounting the workspace
+- `volumes` bind-mounting workspace to `/home/node/workspace`
 - `depends_on` including `mcp-proxy`
 - `stdin_open` and `tty` set to `true`
 - `networks` including `agent-net`
-- `environment` including `ANTHROPIC_API_KEY` and `PAM_ROLES`
+- `environment` including `CLAUDE_AUTH_TOKEN` (not `ANTHROPIC_API_KEY`) and `PAM_ROLES`
+- `working_dir` set to `/home/node/workspace`
+
+#### Scenario: Compose service uses CLAUDE_AUTH_TOKEN
+- **WHEN** `generateComposeService()` is called
+- **THEN** the environment SHALL contain `CLAUDE_AUTH_TOKEN=${CLAUDE_AUTH_TOKEN}` and SHALL NOT contain `ANTHROPIC_API_KEY`
+
+#### Scenario: Compose service mounts workspace at /home/node/workspace
+- **WHEN** `generateComposeService()` is called
+- **THEN** volumes SHALL contain `./claude-code/workspace:/home/node/workspace` and `working_dir` SHALL be `/home/node/workspace`
 
 #### Scenario: Compose service has correct structure
 - **WHEN** `generateComposeService()` is called with an agent having roles `issue-manager` and `pr-reviewer`

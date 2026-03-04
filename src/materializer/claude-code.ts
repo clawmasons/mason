@@ -1,4 +1,4 @@
-import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from "../resolver/types.js";
+import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedTask, ResolvedSkill } from "../resolver/types.js";
 import { getAppShortName } from "../generator/toolfilter.js";
 import type { RuntimeMaterializer, MaterializationResult, ComposeServiceDef } from "./types.js";
 
@@ -77,30 +77,58 @@ function collectAllTasks(
 }
 
 /**
+ * Collect all unique apps from a resolved agent's roles.
+ */
+function collectAllApps(agent: ResolvedAgent): Map<string, ResolvedApp> {
+  const apps = new Map<string, ResolvedApp>();
+  for (const role of agent.roles) {
+    for (const app of role.apps) {
+      if (!apps.has(app.name)) {
+        apps.set(app.name, app);
+      }
+    }
+  }
+  return apps;
+}
+
+/**
  * Generate .claude/settings.json content.
+ *
+ * Creates one MCP server entry per app, keyed by short name.
+ * Each entry points to the per-server endpoint exposed by mcp-proxy:
+ *   /{shortName}/sse  (SSE)  or  /{shortName}/mcp  (streamable-http)
  */
 function generateSettingsJson(
+  agent: ResolvedAgent,
   proxyEndpoint: string,
   proxyType: "sse" | "streamable-http",
   proxyToken?: string,
 ): string {
-  const path = proxyType === "sse" ? "/sse" : "/mcp";
+  const pathSuffix = proxyType === "sse" ? "/sse" : "/mcp";
   const bearerValue = proxyToken
     ? `Bearer ${proxyToken}`
     : "Bearer ${PAM_PROXY_TOKEN}";
 
-  const settings = {
-    mcpServers: {
-      "pam-proxy": {
-        type: proxyType,
-        url: `${proxyEndpoint}${path}`,
-        headers: {
-          Authorization: bearerValue,
-        },
+  const allApps = collectAllApps(agent);
+  const mcpServers: Record<string, object> = {};
+  const permissions: string[] = [];
+
+  for (const [appName] of allApps) {
+    const shortName = getAppShortName(appName);
+    mcpServers[shortName] = {
+      type: proxyType,
+      url: `${proxyEndpoint}/${shortName}${pathSuffix}`,
+      headers: {
+        Authorization: bearerValue,
       },
-    },
+    };
+    permissions.push(`mcp__${shortName}__*`);
+  }
+
+  const settings = {
+    mcpServers,
     permissions: {
-      allow: ["mcp__pam-proxy__*"],
+      allow: permissions,
       deny: [],
     },
   };
@@ -238,7 +266,7 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     // .claude/settings.json
     result.set(
       ".claude/settings.json",
-      generateSettingsJson(proxyEndpoint, proxyType, proxyToken),
+      generateSettingsJson(agent, proxyEndpoint, proxyType, proxyToken),
     );
 
     // .claude/commands/{task-short-name}.md
@@ -273,14 +301,39 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
       "",
       "RUN npm install -g @anthropic-ai/claude-code",
       "",
-      "# Skip Claude Code OOBE setup wizard",
-      'RUN echo \'{"hasCompletedOnboarding": true}\' > /root/.claude.json',
+      "# Skip Claude Code OOBE setup wizard and workspace trust prompt",
+      "RUN cat <<'CLAUDE_JSON' > /home/node/.claude.json",
+      "{",
+      '  "hasCompletedOnboarding": true,',
+      '  "projects": {',
+      '    "/home/node/workspace": {',
+      '      "hasTrustDialogAccepted": true',
+      "    }",
+      "  }",
+      "}",
+      "CLAUDE_JSON",
+      "",
+      "# Create Claude config directory (used by entrypoint for credentials)",
+      "RUN mkdir -p /home/node/.claude \\",
+      "  && chown -R node:node /home/node/.claude /home/node/.claude.json",
+      "",
+      "# Entrypoint: inject credentials from env var if set",
+      "RUN printf '%s\\n' '#!/bin/sh' \\",
+      "  'if [ -n \"$CLAUDE_AUTH_TOKEN\" ]; then' \\",
+      "  '  mkdir -p /home/node/.claude' \\",
+      '  \'  printf "%s" "$CLAUDE_AUTH_TOKEN" > /home/node/.claude/.credentials.json\' \\',
+      "  'fi' \\",
+      "  'exec \"$@\"' > /home/node/entrypoint.sh \\",
+      "  && chmod +x /home/node/entrypoint.sh",
+      "",
       "ENV DISABLE_AUTOUPDATER=1",
       "",
-      "WORKDIR /workspace",
-      "COPY workspace/ /workspace/",
+      "USER node",
+      "WORKDIR /home/node/workspace",
+      "COPY --chown=node:node workspace/ /home/node/workspace/",
       "",
-      'CMD ["claude"]',
+      'ENTRYPOINT ["/home/node/entrypoint.sh"]',
+      'CMD ["claude", "--dangerously-skip-permissions"]',
     ].join("\n");
   },
 
@@ -292,10 +345,10 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     return {
       build: "./claude-code",
       restart: "no",
-      volumes: ["./claude-code/workspace:/workspace"],
-      working_dir: "/workspace",
+      volumes: ["./claude-code/workspace:/home/node/workspace"],
+      working_dir: "/home/node/workspace",
       environment: [
-        "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}",
+        "CLAUDE_AUTH_TOKEN=${CLAUDE_AUTH_TOKEN}",
         `PAM_ROLES=${roleNames}`,
       ],
       depends_on: ["mcp-proxy"],

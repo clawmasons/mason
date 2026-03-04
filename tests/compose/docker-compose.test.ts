@@ -68,9 +68,9 @@ function makeClaudeCodeService(): ComposeServiceDef {
   return {
     build: "./claude-code",
     restart: "no",
-    volumes: ["./claude-code/workspace:/workspace"],
-    working_dir: "/workspace",
-    environment: ["ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}", "PAM_ROLES=issue-manager"],
+    volumes: ["./claude-code/workspace:/home/node/workspace"],
+    working_dir: "/home/node/workspace",
+    environment: ["CLAUDE_AUTH_TOKEN=${CLAUDE_AUTH_TOKEN}", "PAM_ROLES=issue-manager"],
     depends_on: ["mcp-proxy"],
     stdin_open: true,
     tty: true,
@@ -134,6 +134,25 @@ describe("generateDockerCompose", () => {
       const yaml = generateDockerCompose(agent, services);
 
       expect(yaml).toContain("./mcp-proxy/config.json:/config/config.json:ro");
+    });
+
+    it("mounts mcp-proxy logs directory", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services);
+
+      expect(yaml).toContain("./mcp-proxy/logs:/logs");
+    });
+
+    it("wraps mcp-proxy command with tee to write logs to mounted volume", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services);
+
+      expect(yaml).toContain('entrypoint: ["/bin/sh", "-c"]');
+      expect(yaml).toContain(
+        'command: ["mcp-proxy --config /config/config.json 2>&1 | tee -a /logs/mcp-proxy.log"]',
+      );
     });
 
     it("has restart unless-stopped", () => {
@@ -203,7 +222,7 @@ describe("generateDockerCompose", () => {
 
       expect(yaml).toContain("claude-code:");
       expect(yaml).toContain("build: ./claude-code");
-      expect(yaml).toContain("ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}");
+      expect(yaml).toContain("CLAUDE_AUTH_TOKEN=${CLAUDE_AUTH_TOKEN}");
     });
 
     it("includes multiple runtime services", () => {

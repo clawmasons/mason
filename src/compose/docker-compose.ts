@@ -115,11 +115,16 @@ export function generateDockerCompose(
   } else {
     lines.push(`    image: ${image}`);
   }
+  lines.push('    entrypoint: ["/bin/sh", "-c"]');
+  lines.push(
+    '    command: ["mcp-proxy --config /config/config.json 2>&1 | tee -a /logs/mcp-proxy.log"]',
+  );
   lines.push("    restart: unless-stopped");
   lines.push("    ports:");
   lines.push(`      - "\${PAM_PROXY_PORT:-${port}}:${port}"`);
   lines.push("    volumes:");
   lines.push("      - ./mcp-proxy/config.json:/config/config.json:ro");
+  lines.push("      - ./mcp-proxy/logs:/logs");
 
   lines.push("    environment:");
   lines.push("      - PAM_PROXY_TOKEN=${PAM_PROXY_TOKEN}");
