@@ -6,6 +6,7 @@ import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { validateAgent } from "../../validator/validate.js";
 import { generateProxyConfig } from "../../generator/proxy-config.js";
+import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
 import { getAppShortName } from "../../generator/toolfilter.js";
 import { claudeCodeMaterializer } from "../../materializer/claude-code.js";
 import type { RuntimeMaterializer, ComposeServiceDef } from "../../materializer/types.js";
@@ -63,6 +64,7 @@ export async function runInstall(
     // 4. Generate mcp-proxy config
     console.log("Generating mcp-proxy config...");
     const proxyConfig = generateProxyConfig(agent);
+    const proxyDockerfile = generateProxyDockerfile(agent);
 
     // 5. Generate proxy auth token (before materialization so it can be baked in)
     const proxyToken = crypto.randomBytes(32).toString("hex");
@@ -101,10 +103,13 @@ export async function runInstall(
 
     // 6. Generate proxy config file
     allFiles.set("mcp-proxy/config.json", JSON.stringify(proxyConfig, null, 2));
+    if (proxyDockerfile !== null) {
+      allFiles.set("mcp-proxy/Dockerfile", proxyDockerfile);
+    }
 
     // 7. Generate docker-compose.yml
     console.log("Generating docker-compose.yml...");
-    const composeYaml = generateDockerCompose(agent, runtimeServices);
+    const composeYaml = generateDockerCompose(agent, runtimeServices, proxyDockerfile !== null);
     allFiles.set("docker-compose.yml", composeYaml);
 
     // 8. Generate .env with proxy token

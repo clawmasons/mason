@@ -1,5 +1,5 @@
 ---
-# .claude/commands/opsx/prd-change.md
+# .claude/commands/opsx/prd-implement-change.md
 ---
 
 Run the full OpenSpec lifecycle based on a PRD IMPLEMENTATION planned change change: new → ff → apply -> test -> verify sync → archive → commit → PR

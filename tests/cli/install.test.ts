@@ -399,6 +399,29 @@ describe("runInstall", () => {
     expect(proxySection).toContain("PAM_PROXY_TOKEN=${PAM_PROXY_TOKEN}");
   });
 
+  it("generates mcp-proxy/Dockerfile when agent has stdio apps", async () => {
+    setupValidAgent();
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    const dockerfilePath = path.join(outputDir, "mcp-proxy/Dockerfile");
+    expect(fs.existsSync(dockerfilePath)).toBe(true);
+
+    const dockerfile = fs.readFileSync(dockerfilePath, "utf-8");
+    expect(dockerfile).toContain("FROM node:22-slim");
+    expect(dockerfile).toContain("COPY --from=proxy /main /usr/local/bin/mcp-proxy");
+  });
+
+  it("docker-compose.yml uses build: when stdio apps exist", async () => {
+    setupValidAgent();
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
+    expect(composeContent).toContain("build: ./mcp-proxy");
+    expect(composeContent).not.toContain("image: ghcr.io/tbxark/mcp-proxy:latest");
+  });
+
   it("Dockerfile includes OOBE skip and DISABLE_AUTOUPDATER", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");

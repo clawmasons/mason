@@ -97,6 +97,7 @@ function renderComposeService(service: ComposeServiceDef): string {
 export function generateDockerCompose(
   agent: ResolvedAgent,
   runtimeServices: Map<string, ComposeServiceDef>,
+  hasProxyDockerfile?: boolean,
 ): string {
   const port = agent.proxy?.port ?? 9090;
   const image = agent.proxy?.image ?? "ghcr.io/tbxark/mcp-proxy:latest";
@@ -109,7 +110,11 @@ export function generateDockerCompose(
 
   // mcp-proxy service
   lines.push("  mcp-proxy:");
-  lines.push(`    image: ${image}`);
+  if (hasProxyDockerfile) {
+    lines.push("    build: ./mcp-proxy");
+  } else {
+    lines.push(`    image: ${image}`);
+  }
   lines.push("    restart: unless-stopped");
   lines.push("    ports:");
   lines.push(`      - "\${PAM_PROXY_PORT:-${port}}:${port}"`);
