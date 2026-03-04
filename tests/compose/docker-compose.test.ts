@@ -136,6 +136,25 @@ describe("generateDockerCompose", () => {
       expect(yaml).toContain("./mcp-proxy/config.json:/config/config.json:ro");
     });
 
+    it("mounts mcp-proxy logs directory", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services);
+
+      expect(yaml).toContain("./mcp-proxy/logs:/logs");
+    });
+
+    it("wraps mcp-proxy command with tee to write logs to mounted volume", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services);
+
+      expect(yaml).toContain('entrypoint: ["/bin/sh", "-c"]');
+      expect(yaml).toContain(
+        'command: ["mcp-proxy --config /config/config.json 2>&1 | tee -a /logs/mcp-proxy.log"]',
+      );
+    });
+
     it("has restart unless-stopped", () => {
       const agent = makeRepoOpsAgent();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);

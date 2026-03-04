@@ -130,7 +130,7 @@ describe("claudeCodeMaterializer", () => {
 
   describe("materializeWorkspace", () => {
     describe("settings.json", () => {
-      it("generates settings with default SSE proxy", () => {
+      it("generates per-server entries with default SSE proxy", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
@@ -138,27 +138,31 @@ describe("claudeCodeMaterializer", () => {
         expect(settingsJson).toBeDefined();
 
         const settings = JSON.parse(settingsJson!);
-        expect(settings.mcpServers["pam-proxy"].type).toBe("sse");
-        expect(settings.mcpServers["pam-proxy"].url).toBe("http://mcp-proxy:9090/sse");
+        expect(settings.mcpServers.github).toBeDefined();
+        expect(settings.mcpServers.github.type).toBe("sse");
+        expect(settings.mcpServers.github.url).toBe("http://mcp-proxy:9090/github/sse");
+        expect(settings.mcpServers.slack).toBeDefined();
+        expect(settings.mcpServers.slack.url).toBe("http://mcp-proxy:9090/slack/sse");
+        expect(settings.mcpServers["pam-proxy"]).toBeUndefined();
       });
 
-      it("generates settings with custom port", () => {
+      it("generates per-server entries with custom port", () => {
         const agent = makeRepoOpsAgent();
         agent.proxy = { port: 8080, type: "sse" };
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:8080");
 
         const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.mcpServers["pam-proxy"].url).toBe("http://mcp-proxy:8080/sse");
+        expect(settings.mcpServers.github.url).toBe("http://mcp-proxy:8080/github/sse");
       });
 
-      it("generates settings with streamable-http transport", () => {
+      it("generates per-server entries with streamable-http transport", () => {
         const agent = makeRepoOpsAgent();
         agent.proxy = { port: 9090, type: "streamable-http" };
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.mcpServers["pam-proxy"].type).toBe("streamable-http");
-        expect(settings.mcpServers["pam-proxy"].url).toBe("http://mcp-proxy:9090/mcp");
+        expect(settings.mcpServers.github.type).toBe("streamable-http");
+        expect(settings.mcpServers.github.url).toBe("http://mcp-proxy:9090/github/mcp");
       });
 
       it("includes placeholder auth header when no token provided", () => {
@@ -166,7 +170,7 @@ describe("claudeCodeMaterializer", () => {
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.mcpServers["pam-proxy"].headers.Authorization).toBe("Bearer ${PAM_PROXY_TOKEN}");
+        expect(settings.mcpServers.github.headers.Authorization).toBe("Bearer ${PAM_PROXY_TOKEN}");
       });
 
       it("bakes actual token into auth header when proxyToken provided", () => {
@@ -175,15 +179,16 @@ describe("claudeCodeMaterializer", () => {
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", token);
 
         const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.mcpServers["pam-proxy"].headers.Authorization).toBe("Bearer abc123def456");
+        expect(settings.mcpServers.github.headers.Authorization).toBe("Bearer abc123def456");
+        expect(settings.mcpServers.slack.headers.Authorization).toBe("Bearer abc123def456");
       });
 
-      it("includes permissions allowing all proxy tools", () => {
+      it("includes per-server permissions", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.permissions.allow).toEqual(["mcp__pam-proxy__*"]);
+        expect(settings.permissions.allow).toEqual(["mcp__github__*", "mcp__slack__*"]);
         expect(settings.permissions.deny).toEqual([]);
       });
 
@@ -193,8 +198,8 @@ describe("claudeCodeMaterializer", () => {
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.mcpServers["pam-proxy"].type).toBe("sse");
-        expect(settings.mcpServers["pam-proxy"].url).toBe("http://mcp-proxy:9090/sse");
+        expect(settings.mcpServers.github.type).toBe("sse");
+        expect(settings.mcpServers.github.url).toBe("http://mcp-proxy:9090/github/sse");
       });
     });
 
@@ -422,6 +427,13 @@ describe("claudeCodeMaterializer", () => {
       expect(dockerfile).not.toContain("/root/.claude");
     });
 
+    it("pre-accepts workspace trust dialog", () => {
+      const agent = makeRepoOpsAgent();
+      const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
+      expect(dockerfile).toContain("hasTrustDialogAccepted");
+      expect(dockerfile).toContain("/home/node/workspace");
+    });
+
     it("runs as node user", () => {
       const agent = makeRepoOpsAgent();
       const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
@@ -433,6 +445,18 @@ describe("claudeCodeMaterializer", () => {
       const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
       expect(dockerfile).toContain("mkdir -p /home/node/.claude");
       expect(dockerfile).toContain("chown -R node:node");
+    });
+
+    it("uses --dangerously-skip-permissions in CMD", () => {
+      const agent = makeRepoOpsAgent();
+      const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
+      expect(dockerfile).toContain('CMD ["claude", "--dangerously-skip-permissions"]');
+    });
+
+    it("does not reference trustedDirectories", () => {
+      const agent = makeRepoOpsAgent();
+      const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
+      expect(dockerfile).not.toContain("trustedDirectories");
     });
 
     it("creates entrypoint script for credential injection", () => {

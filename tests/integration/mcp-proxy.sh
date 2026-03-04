@@ -255,6 +255,33 @@ echo "$CALL_RESPONSE" | jq -e '.result' >/dev/null 2>&1 || {
 
 pass "tools/call (list_directory) executed successfully"
 
+# ── Test: tools/call (write_file + read_file round-trip) ──
+
+info "Testing MCP tools/call (write_file → read_file round-trip)..."
+
+WRITE_CONTENT="hello from pam integration test"
+WRITE_RESPONSE=$(mcp_request "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"write_file\",\"arguments\":{\"path\":\"/workspace/notes/test.txt\",\"content\":\"$WRITE_CONTENT\"}}}")
+echo "$WRITE_RESPONSE" | jq -e '.result' >/dev/null 2>&1 || {
+  echo "Response: $WRITE_RESPONSE"
+  fail "write_file did not return expected result"
+}
+pass "write_file executed successfully"
+
+READ_RESPONSE=$(mcp_request '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"read_file","arguments":{"path":"/workspace/notes/test.txt"}}}')
+echo "$READ_RESPONSE" | jq -e '.result' >/dev/null 2>&1 || {
+  echo "Response: $READ_RESPONSE"
+  fail "read_file did not return expected result"
+}
+
+READ_TEXT=$(echo "$READ_RESPONSE" | jq -r '.result.content[0].text')
+if [[ "$READ_TEXT" == *"$WRITE_CONTENT"* ]]; then
+  pass "read_file returned written content"
+else
+  echo "Expected content containing: $WRITE_CONTENT"
+  echo "Got: $READ_TEXT"
+  fail "read_file content mismatch"
+fi
+
 # ── Test: Unauthenticated request rejected ──
 
 info "Testing unauthenticated request rejection..."

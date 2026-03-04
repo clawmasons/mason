@@ -1,4 +1,4 @@
-import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from "../resolver/types.js";
+import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedTask, ResolvedSkill } from "../resolver/types.js";
 import { getAppShortName } from "../generator/toolfilter.js";
 import type { RuntimeMaterializer, MaterializationResult, ComposeServiceDef } from "./types.js";
 
@@ -77,30 +77,58 @@ function collectAllTasks(
 }
 
 /**
+ * Collect all unique apps from a resolved agent's roles.
+ */
+function collectAllApps(agent: ResolvedAgent): Map<string, ResolvedApp> {
+  const apps = new Map<string, ResolvedApp>();
+  for (const role of agent.roles) {
+    for (const app of role.apps) {
+      if (!apps.has(app.name)) {
+        apps.set(app.name, app);
+      }
+    }
+  }
+  return apps;
+}
+
+/**
  * Generate .claude/settings.json content.
+ *
+ * Creates one MCP server entry per app, keyed by short name.
+ * Each entry points to the per-server endpoint exposed by mcp-proxy:
+ *   /{shortName}/sse  (SSE)  or  /{shortName}/mcp  (streamable-http)
  */
 function generateSettingsJson(
+  agent: ResolvedAgent,
   proxyEndpoint: string,
   proxyType: "sse" | "streamable-http",
   proxyToken?: string,
 ): string {
-  const path = proxyType === "sse" ? "/sse" : "/mcp";
+  const pathSuffix = proxyType === "sse" ? "/sse" : "/mcp";
   const bearerValue = proxyToken
     ? `Bearer ${proxyToken}`
     : "Bearer ${PAM_PROXY_TOKEN}";
 
-  const settings = {
-    mcpServers: {
-      "pam-proxy": {
-        type: proxyType,
-        url: `${proxyEndpoint}${path}`,
-        headers: {
-          Authorization: bearerValue,
-        },
+  const allApps = collectAllApps(agent);
+  const mcpServers: Record<string, object> = {};
+  const permissions: string[] = [];
+
+  for (const [appName] of allApps) {
+    const shortName = getAppShortName(appName);
+    mcpServers[shortName] = {
+      type: proxyType,
+      url: `${proxyEndpoint}/${shortName}${pathSuffix}`,
+      headers: {
+        Authorization: bearerValue,
       },
-    },
+    };
+    permissions.push(`mcp__${shortName}__*`);
+  }
+
+  const settings = {
+    mcpServers,
     permissions: {
-      allow: ["mcp__pam-proxy__*"],
+      allow: permissions,
       deny: [],
     },
   };
@@ -238,7 +266,7 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     // .claude/settings.json
     result.set(
       ".claude/settings.json",
-      generateSettingsJson(proxyEndpoint, proxyType, proxyToken),
+      generateSettingsJson(agent, proxyEndpoint, proxyType, proxyToken),
     );
 
     // .claude/commands/{task-short-name}.md
@@ -273,11 +301,21 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
       "",
       "RUN npm install -g @anthropic-ai/claude-code",
       "",
-      "# Skip Claude Code OOBE setup wizard",
-      'RUN echo \'{"hasCompletedOnboarding": true}\' > /home/node/.claude.json',
+      "# Skip Claude Code OOBE setup wizard and workspace trust prompt",
+      "RUN cat <<'CLAUDE_JSON' > /home/node/.claude.json",
+      "{",
+      '  "hasCompletedOnboarding": true,',
+      '  "projects": {',
+      '    "/home/node/workspace": {',
+      '      "hasTrustDialogAccepted": true',
+      "    }",
+      "  }",
+      "}",
+      "CLAUDE_JSON",
       "",
-      "# Create Claude config directory",
-      "RUN mkdir -p /home/node/.claude && chown -R node:node /home/node/.claude /home/node/.claude.json",
+      "# Create Claude config directory (used by entrypoint for credentials)",
+      "RUN mkdir -p /home/node/.claude \\",
+      "  && chown -R node:node /home/node/.claude /home/node/.claude.json",
       "",
       "# Entrypoint: inject credentials from env var if set",
       "RUN printf '%s\\n' '#!/bin/sh' \\",
@@ -295,7 +333,7 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
       "COPY --chown=node:node workspace/ /home/node/workspace/",
       "",
       'ENTRYPOINT ["/home/node/entrypoint.sh"]',
-      'CMD ["claude"]',
+      'CMD ["claude", "--dangerously-skip-permissions"]',
     ].join("\n");
   },
 
