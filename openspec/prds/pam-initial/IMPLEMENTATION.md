@@ -250,7 +250,7 @@ Implement the remaining read-only CLI commands: `pam build <agent>` (resolves gr
 
 ---
 
-## CHANGE: pam run & stop — Docker Lifecycle
+## CHANGE: pam run & stop — Docker Lifecycle ✅
 
 Implement `pam run <agent> [--runtime=X]` and `pam stop <agent>`. Run starts the Docker Compose stack (or a single runtime if `--runtime` specified). Stop tears it down. Both delegate to `docker compose` under the hood.
 
@@ -264,6 +264,15 @@ Implement `pam run <agent> [--runtime=X]` and `pam stop <agent>`. Run starts the
 - `pam stop` executes `docker compose down` cleanly
 - Missing `.env` values produce a clear error before starting Docker
 - Exit codes propagate from Docker Compose
+
+**Implemented:** 2026-03-03
+- [Proposal](../../changes/archive/2026-03-03-pam-run-stop-docker-lifecycle/proposal.md)
+- [Design](../../changes/archive/2026-03-03-pam-run-stop-docker-lifecycle/design.md)
+- [Tasks](../../changes/archive/2026-03-03-pam-run-stop-docker-lifecycle/tasks.md)
+- [Specs: run-command](../../changes/archive/2026-03-03-pam-run-stop-docker-lifecycle/specs/run-command/spec.md)
+- [Specs: stop-command](../../changes/archive/2026-03-03-pam-run-stop-docker-lifecycle/specs/stop-command/spec.md)
+- [Main Spec: run-command](../../specs/run-command/spec.md)
+- [Main Spec: stop-command](../../specs/stop-command/spec.md)
 
 ---
 
