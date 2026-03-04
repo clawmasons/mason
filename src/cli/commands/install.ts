@@ -96,6 +96,11 @@ export async function runInstall(
       const dockerfile = materializer.generateDockerfile(agent);
       allFiles.set(`${runtime}/Dockerfile`, dockerfile);
 
+      // Config JSON (e.g., .claude.json for OOBE bypass)
+      if (materializer.generateConfigJson) {
+        allFiles.set(`${runtime}/.claude.json`, materializer.generateConfigJson());
+      }
+
       // Compose service
       const service = materializer.generateComposeService(agent);
       runtimeServices.set(runtime, service);
@@ -134,6 +139,14 @@ export async function runInstall(
       fs.writeFileSync(fullPath, content);
     }
 
+    // Create empty .claude/ directories for runtimes that generate config JSON
+    for (const runtime of agent.runtimes) {
+      const materializer = materializerRegistry.get(runtime);
+      if (materializer?.generateConfigJson) {
+        fs.mkdirSync(path.join(outputDir, runtime, ".claude"), { recursive: true });
+      }
+    }
+
     // Success summary
     const materializedRuntimes = agent.runtimes.filter((r) => materializerRegistry.has(r));
     console.log(`\n✔ Agent "${agentName}" installed successfully!\n`);
@@ -146,11 +159,12 @@ export async function runInstall(
     const composePath = path.join(outputDir, "docker-compose.yml");
     const runtimeName = materializedRuntimes[0] ?? "claude-code";
     console.log(`\n  Next steps:`);
-    console.log(`    1. Fill in credentials in ${path.join(outputDir, ".env")}`);
+    console.log(`    1. Fill in app credentials in ${path.join(outputDir, ".env")}`);
     console.log(`    2. Run: pam run ${agentName}`);
     console.log(`       Or manually:`);
     console.log(`         docker compose -f ${composePath} up -d mcp-proxy`);
-    console.log(`         docker compose -f ${composePath} run --rm ${runtimeName}\n`);
+    console.log(`         docker compose -f ${composePath} run --rm ${runtimeName}`);
+    console.log(`    3. On first run, authenticate with: /login\n`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\n✘ Install failed: ${message}\n`);

@@ -2,7 +2,6 @@ import type { ResolvedAgent, ResolvedApp } from "../resolver/types.js";
 
 /** Known runtime → auth variable mappings. */
 const RUNTIME_API_KEYS: Record<string, string> = {
-  "claude-code": "CLAUDE_AUTH_TOKEN",
   codex: "OPENAI_API_KEY",
 };
 

@@ -425,14 +425,37 @@ describe("runInstall", () => {
     expect(composeContent).not.toContain("image: ghcr.io/tbxark/mcp-proxy:latest");
   });
 
-  it("Dockerfile includes OOBE skip and DISABLE_AUTOUPDATER", async () => {
+  it("Dockerfile includes DISABLE_AUTOUPDATER but not OOBE (externalized)", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
     const dockerfile = fs.readFileSync(path.join(outputDir, "claude-code/Dockerfile"), "utf-8");
-    expect(dockerfile).toContain("hasCompletedOnboarding");
+    expect(dockerfile).not.toContain("hasCompletedOnboarding");
     expect(dockerfile).toContain("DISABLE_AUTOUPDATER=1");
+  });
+
+  it("generates .claude.json with OOBE bypass alongside workspace", async () => {
+    setupValidAgent();
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    const claudeJsonPath = path.join(outputDir, "claude-code/.claude.json");
+    expect(fs.existsSync(claudeJsonPath)).toBe(true);
+
+    const config = JSON.parse(fs.readFileSync(claudeJsonPath, "utf-8"));
+    expect(config.hasCompletedOnboarding).toBe(true);
+    expect(config.projects["/home/node/workspace"].hasTrustDialogAccepted).toBe(true);
+  });
+
+  it("creates empty .claude/ directory for volume mount", async () => {
+    setupValidAgent();
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    const claudeDir = path.join(outputDir, "claude-code/.claude");
+    expect(fs.existsSync(claudeDir)).toBe(true);
+    expect(fs.statSync(claudeDir).isDirectory()).toBe(true);
   });
 
   it("claude-code compose service has restart no", async () => {

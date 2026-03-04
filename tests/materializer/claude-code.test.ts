@@ -419,32 +419,33 @@ describe("claudeCodeMaterializer", () => {
       expect(dockerfile).toContain("COPY --chown=node:node workspace/ /home/node/workspace/");
     });
 
-    it("skips OOBE setup wizard in node home", () => {
+    it("does not create .claude.json in Dockerfile (externalized)", () => {
       const agent = makeRepoOpsAgent();
       const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
-      expect(dockerfile).toContain("hasCompletedOnboarding");
-      expect(dockerfile).toContain("/home/node/.claude.json");
-      expect(dockerfile).not.toContain("/root/.claude");
+      expect(dockerfile).not.toContain(".claude.json");
+      expect(dockerfile).not.toContain("hasCompletedOnboarding");
     });
 
-    it("pre-accepts workspace trust dialog", () => {
+    it("does not create .claude directory in Dockerfile (externalized)", () => {
       const agent = makeRepoOpsAgent();
       const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
-      expect(dockerfile).toContain("hasTrustDialogAccepted");
-      expect(dockerfile).toContain("/home/node/workspace");
+      expect(dockerfile).not.toContain("mkdir -p /home/node/.claude");
+      expect(dockerfile).not.toContain("chown -R node:node");
+    });
+
+    it("does not handle credentials in Dockerfile (login on first run)", () => {
+      const agent = makeRepoOpsAgent();
+      const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
+      expect(dockerfile).not.toContain("CLAUDE_AUTH_TOKEN");
+      expect(dockerfile).not.toContain(".credentials.json");
+      expect(dockerfile).not.toContain("entrypoint");
+      expect(dockerfile).not.toContain("ENTRYPOINT");
     });
 
     it("runs as node user", () => {
       const agent = makeRepoOpsAgent();
       const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
       expect(dockerfile).toContain("USER node");
-    });
-
-    it("creates Claude config directory owned by node", () => {
-      const agent = makeRepoOpsAgent();
-      const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
-      expect(dockerfile).toContain("mkdir -p /home/node/.claude");
-      expect(dockerfile).toContain("chown -R node:node");
     });
 
     it("uses --dangerously-skip-permissions in CMD", () => {
@@ -457,15 +458,6 @@ describe("claudeCodeMaterializer", () => {
       const agent = makeRepoOpsAgent();
       const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
       expect(dockerfile).not.toContain("trustedDirectories");
-    });
-
-    it("creates entrypoint script for credential injection", () => {
-      const agent = makeRepoOpsAgent();
-      const dockerfile = claudeCodeMaterializer.generateDockerfile(agent);
-      expect(dockerfile).toContain("entrypoint.sh");
-      expect(dockerfile).toContain("CLAUDE_AUTH_TOKEN");
-      expect(dockerfile).toContain("/home/node/.claude/.credentials.json");
-      expect(dockerfile).toContain("ENTRYPOINT");
     });
 
     it("disables auto-updater", () => {
@@ -494,16 +486,29 @@ describe("claudeCodeMaterializer", () => {
       expect(service.volumes).toContain("./claude-code/workspace:/home/node/workspace");
     });
 
+    it("mounts .claude directory at /home/node/.claude", () => {
+      const agent = makeRepoOpsAgent();
+      const service = claudeCodeMaterializer.generateComposeService(agent);
+      expect(service.volumes).toContain("./claude-code/.claude:/home/node/.claude");
+    });
+
+    it("mounts .claude.json at /home/node/.claude.json", () => {
+      const agent = makeRepoOpsAgent();
+      const service = claudeCodeMaterializer.generateComposeService(agent);
+      expect(service.volumes).toContain("./claude-code/.claude.json:/home/node/.claude.json");
+    });
+
     it("includes PAM_ROLES with all role short names", () => {
       const agent = makeRepoOpsAgent();
       const service = claudeCodeMaterializer.generateComposeService(agent);
       expect(service.environment).toContain("PAM_ROLES=issue-manager,pr-reviewer");
     });
 
-    it("includes CLAUDE_AUTH_TOKEN env var", () => {
+    it("does not include CLAUDE_AUTH_TOKEN", () => {
       const agent = makeRepoOpsAgent();
       const service = claudeCodeMaterializer.generateComposeService(agent);
-      expect(service.environment).toContain("CLAUDE_AUTH_TOKEN=${CLAUDE_AUTH_TOKEN}");
+      const hasAuthToken = service.environment.some(e => e.includes("CLAUDE_AUTH_TOKEN"));
+      expect(hasAuthToken).toBe(false);
     });
 
     it("does not include ANTHROPIC_API_KEY", () => {
@@ -536,6 +541,23 @@ describe("claudeCodeMaterializer", () => {
       const agent = makeRepoOpsAgent();
       const service = claudeCodeMaterializer.generateComposeService(agent);
       expect(service.working_dir).toBe("/home/node/workspace");
+    });
+  });
+
+  describe("generateConfigJson", () => {
+    it("returns valid JSON", () => {
+      const json = claudeCodeMaterializer.generateConfigJson!();
+      expect(() => JSON.parse(json)).not.toThrow();
+    });
+
+    it("skips onboarding", () => {
+      const config = JSON.parse(claudeCodeMaterializer.generateConfigJson!());
+      expect(config.hasCompletedOnboarding).toBe(true);
+    });
+
+    it("pre-accepts workspace trust dialog for /home/node/workspace", () => {
+      const config = JSON.parse(claudeCodeMaterializer.generateConfigJson!());
+      expect(config.projects["/home/node/workspace"].hasTrustDialogAccepted).toBe(true);
     });
   });
 });

@@ -144,11 +144,11 @@ describe("generateEnvTemplate", () => {
   });
 
   describe("runtime auth section", () => {
-    it("includes CLAUDE_AUTH_TOKEN for claude-code runtime", () => {
+    it("does not include CLAUDE_AUTH_TOKEN for claude-code runtime (login on first run)", () => {
       const agent = makeRepoOpsAgent();
       agent.runtimes = ["claude-code"];
       const env = generateEnvTemplate(agent);
-      expect(env).toContain("CLAUDE_AUTH_TOKEN=");
+      expect(env).not.toContain("CLAUDE_AUTH_TOKEN=");
     });
 
     it("does not include ANTHROPIC_API_KEY for claude-code runtime", () => {
@@ -165,10 +165,10 @@ describe("generateEnvTemplate", () => {
       expect(env).toContain("OPENAI_API_KEY=");
     });
 
-    it("includes both auth vars for multi-runtime agent", () => {
+    it("includes only codex auth var for multi-runtime agent", () => {
       const agent = makeRepoOpsAgent();
       const env = generateEnvTemplate(agent);
-      expect(env).toContain("CLAUDE_AUTH_TOKEN=");
+      expect(env).not.toContain("CLAUDE_AUTH_TOKEN=");
       expect(env).toContain("OPENAI_API_KEY=");
     });
 

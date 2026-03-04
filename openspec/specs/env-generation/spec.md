@@ -1,4 +1,9 @@
-## ADDED Requirements
+# env-generation Specification
+
+## Purpose
+Generates .env template files with all required environment variables for the agent stack.
+
+## Requirements
 
 ### Requirement: generateEnvTemplate produces a .env file string with all required variables
 
@@ -27,12 +32,17 @@ The function SHALL walk all resolved apps across all roles, collect the keys fro
 ### Requirement: Runtime auth variables are included
 
 For each declared runtime, the function SHALL include the conventional auth variable:
-- `claude-code` → `CLAUDE_AUTH_TOKEN=`
 - `codex` → `OPENAI_API_KEY=`
 
-#### Scenario: Agent with claude-code runtime
+The `claude-code` runtime SHALL NOT map to any auth variable. Users authenticate by running `/login` inside the container on first run.
+
+#### Scenario: Agent with claude-code runtime has no auth token
 - **WHEN** agent has `runtimes: ["claude-code"]`
-- **THEN** the template SHALL include `CLAUDE_AUTH_TOKEN=` (not `ANTHROPIC_API_KEY=`)
+- **THEN** the template SHALL NOT include `CLAUDE_AUTH_TOKEN=` or `ANTHROPIC_API_KEY=`
+
+#### Scenario: Agent with codex runtime still includes OPENAI_API_KEY
+- **WHEN** agent has `runtimes: ["codex"]`
+- **THEN** the template SHALL include `OPENAI_API_KEY=`
 
 ### Requirement: Output is grouped with section comments
 
