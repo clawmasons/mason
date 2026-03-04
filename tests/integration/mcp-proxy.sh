@@ -1,0 +1,290 @@
+#!/usr/bin/env bash
+# MCP Proxy Integration Test
+#
+# Validates the full pipeline:
+#   build → pam install → docker compose up → MCP protocol requests
+#
+# Requirements: Docker, Node.js, jq, curl
+# Usage: bash tests/integration/mcp-proxy.sh
+
+set -euo pipefail
+
+# ─── Configuration ───────────────────────────────────────────────────────────
+
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+EXAMPLE_DIR="$PROJECT_ROOT/example"
+AGENT_DIR=""  # Set after install
+PROXY_PORT="${PAM_PROXY_PORT:-9099}"  # Use non-default port to avoid conflicts
+PROXY_TOKEN=""  # Extracted from .env after install
+MAX_RETRIES=30
+RETRY_INTERVAL=1
+COMPOSE_CMD=""
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+pass() { echo -e "${GREEN}✔ PASS${NC}: $1"; }
+fail() { echo -e "${RED}✘ FAIL${NC}: $1"; exit 1; }
+info() { echo -e "${YELLOW}→${NC} $1"; }
+
+# Detect docker compose command (v2 plugin vs standalone)
+detect_compose() {
+  if docker compose version &>/dev/null; then
+    COMPOSE_CMD="docker compose"
+  elif docker-compose version &>/dev/null; then
+    COMPOSE_CMD="docker-compose"
+  else
+    fail "Neither 'docker compose' nor 'docker-compose' found"
+  fi
+}
+
+# ─── Cleanup ─────────────────────────────────────────────────────────────────
+
+cleanup() {
+  info "Cleaning up Docker resources..."
+  if [[ -n "$AGENT_DIR" && -f "$AGENT_DIR/docker-compose.yml" ]]; then
+    (cd "$AGENT_DIR" && $COMPOSE_CMD down --remove-orphans 2>/dev/null) || true
+  fi
+  # Remove generated .pam directory
+  if [[ -d "$EXAMPLE_DIR/.pam" ]]; then
+    rm -rf "$EXAMPLE_DIR/.pam"
+  fi
+}
+
+trap cleanup EXIT
+
+# ─── Step 1: Prerequisites ──────────────────────────────────────────────────
+
+info "Checking prerequisites..."
+
+command -v docker &>/dev/null || fail "docker not found"
+command -v jq &>/dev/null || fail "jq not found"
+command -v curl &>/dev/null || fail "curl not found"
+command -v node &>/dev/null || fail "node not found"
+
+detect_compose
+pass "Prerequisites OK ($COMPOSE_CMD)"
+
+# ─── Step 2: Build pam ──────────────────────────────────────────────────────
+
+info "Building pam..."
+(cd "$PROJECT_ROOT" && npm run build) || fail "npm run build failed"
+pass "pam built"
+
+# ─── Step 3: Run pam install ─────────────────────────────────────────────────
+
+info "Running pam install from example directory..."
+
+# Clean previous install
+rm -rf "$EXAMPLE_DIR/.pam"
+
+(cd "$EXAMPLE_DIR" && node ../bin/pam.js install @example/agent-note-taker) || fail "pam install failed"
+
+AGENT_DIR="$EXAMPLE_DIR/.pam/agents/note-taker"
+
+# Verify generated files exist
+[[ -f "$AGENT_DIR/mcp-proxy/config.json" ]] || fail "mcp-proxy/config.json not generated"
+[[ -f "$AGENT_DIR/docker-compose.yml" ]] || fail "docker-compose.yml not generated"
+[[ -f "$AGENT_DIR/.env" ]] || fail ".env not generated"
+
+pass "pam install produced expected files"
+
+# ─── Step 4: Validate generated config ───────────────────────────────────────
+
+info "Validating generated proxy config..."
+
+CONFIG="$AGENT_DIR/mcp-proxy/config.json"
+
+# Check config is valid JSON with expected keys
+jq -e '.mcpProxy' "$CONFIG" >/dev/null || fail "config.json missing mcpProxy key"
+jq -e '.mcpServers' "$CONFIG" >/dev/null || fail "config.json missing mcpServers key"
+jq -e '.mcpServers.filesystem' "$CONFIG" >/dev/null || fail "config.json missing filesystem server"
+
+# Verify filesystem server has expected tools
+TOOLS=$(jq -r '.mcpServers.filesystem.options.toolFilter.list[]' "$CONFIG" | sort)
+echo "$TOOLS" | grep -q "read_file" || fail "Missing read_file tool in config"
+echo "$TOOLS" | grep -q "write_file" || fail "Missing write_file tool in config"
+echo "$TOOLS" | grep -q "list_directory" || fail "Missing list_directory tool in config"
+
+pass "Proxy config valid with expected tools"
+
+# ─── Step 5: Prepare for Docker ──────────────────────────────────────────────
+
+info "Preparing Docker environment..."
+
+# Extract proxy token from .env
+PROXY_TOKEN=$(grep '^PAM_PROXY_TOKEN=' "$AGENT_DIR/.env" | cut -d= -f2)
+[[ -n "$PROXY_TOKEN" ]] || fail "PAM_PROXY_TOKEN not found in .env"
+
+# Override port to avoid conflicts
+sed -i.bak "s/^PAM_PROXY_PORT=.*/PAM_PROXY_PORT=$PROXY_PORT/" "$AGENT_DIR/.env"
+rm -f "$AGENT_DIR/.env.bak"
+
+# Switch proxy config to streamable-http for simpler curl testing
+# (SSE requires persistent connections, streamable-http is request/response)
+jq '.mcpProxy.type = "streamable-http"' "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+
+# Create notes directory that the filesystem MCP server needs
+mkdir -p "$AGENT_DIR/notes"
+
+# The mcp-proxy container runs stdio commands (npx) — it needs Node.js.
+# Create a custom Dockerfile that extends the proxy image with Node.js.
+cat > "$AGENT_DIR/mcp-proxy/Dockerfile" << 'DOCKERFILE'
+FROM ghcr.io/tbxark/mcp-proxy:latest AS proxy
+
+FROM node:22-slim
+COPY --from=proxy /main /usr/local/bin/mcp-proxy
+ENTRYPOINT ["mcp-proxy"]
+CMD ["--config", "/config/config.json"]
+DOCKERFILE
+
+# Rewrite docker-compose to build mcp-proxy instead of using image,
+# and add notes volume mount for the filesystem server
+COMPOSE_FILE="$AGENT_DIR/docker-compose.yml"
+python3 -c "
+import sys
+content = open(sys.argv[1]).read()
+content = content.replace(
+    'image: ghcr.io/tbxark/mcp-proxy:latest',
+    'build: ./mcp-proxy'
+)
+content = content.replace(
+    '- ./mcp-proxy/config.json:/config/config.json:ro',
+    '- ./mcp-proxy/config.json:/config/config.json:ro\n      - ./notes:/workspace/notes'
+)
+open(sys.argv[1], 'w').write(content)
+" "$COMPOSE_FILE"
+
+# Update filesystem server args to use absolute path inside container
+jq '.mcpServers.filesystem.args = ["-y", "@modelcontextprotocol/server-filesystem", "/workspace/notes"]' \
+  "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+
+pass "Docker environment prepared"
+
+# ─── Step 6: Start mcp-proxy ────────────────────────────────────────────────
+
+info "Starting mcp-proxy via docker compose..."
+
+(cd "$AGENT_DIR" && $COMPOSE_CMD up -d --build mcp-proxy) || fail "docker compose up failed"
+
+pass "mcp-proxy container started"
+
+# ─── Step 7: Wait for proxy readiness ────────────────────────────────────────
+
+info "Waiting for proxy to become ready (max ${MAX_RETRIES}s)..."
+
+PROXY_URL="http://localhost:$PROXY_PORT"
+
+for i in $(seq 1 $MAX_RETRIES); do
+  # Try a POST to the filesystem server endpoint (each server gets /<name>/ in streamable-http mode)
+  HTTP_CODE=$(curl -s -o /tmp/mcp-ready-response -w '%{http_code}' \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $PROXY_TOKEN" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' \
+    "$PROXY_URL/filesystem/" 2>/dev/null) || HTTP_CODE="000"
+
+  if [[ "$HTTP_CODE" == "200" ]]; then
+    pass "Proxy ready after ${i}s (HTTP $HTTP_CODE)"
+    break
+  fi
+
+  if [[ $i -eq $MAX_RETRIES ]]; then
+    echo "Last HTTP status: $HTTP_CODE"
+    echo "Last response: $(cat /tmp/mcp-ready-response 2>/dev/null)"
+    echo "--- mcp-proxy logs ---"
+    (cd "$AGENT_DIR" && $COMPOSE_CMD logs mcp-proxy 2>&1) || true
+    echo "--- end logs ---"
+    fail "Proxy did not become ready within ${MAX_RETRIES}s"
+  fi
+
+  sleep $RETRY_INTERVAL
+done
+
+# ─── Step 8: MCP Protocol Tests ─────────────────────────────────────────────
+
+MCP_URL="$PROXY_URL/filesystem/"
+
+# Helper: send MCP request and return response body
+mcp_request() {
+  local payload="$1"
+  curl -sf \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $PROXY_TOKEN" \
+    -d "$payload" \
+    "$MCP_URL"
+}
+
+# ── Test: Initialize ──
+
+info "Testing MCP initialize..."
+
+INIT_RESPONSE=$(mcp_request '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"integration-test","version":"1.0"}}}')
+echo "$INIT_RESPONSE" | jq -e '.result.protocolVersion' >/dev/null 2>&1 || {
+  echo "Response: $INIT_RESPONSE"
+  fail "initialize did not return expected result"
+}
+pass "MCP initialize succeeded"
+
+# Send initialized notification (required by protocol)
+mcp_request '{"jsonrpc":"2.0","method":"notifications/initialized"}' >/dev/null 2>&1 || true
+
+# ── Test: tools/list ──
+
+info "Testing MCP tools/list..."
+
+TOOLS_RESPONSE=$(mcp_request '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}')
+echo "$TOOLS_RESPONSE" | jq -e '.result.tools' >/dev/null 2>&1 || {
+  echo "Response: $TOOLS_RESPONSE"
+  fail "tools/list did not return expected result"
+}
+
+# Verify expected tools are present
+TOOL_NAMES=$(echo "$TOOLS_RESPONSE" | jq -r '.result.tools[].name')
+echo "$TOOL_NAMES" | grep -q "read_file" || fail "tools/list missing read_file"
+echo "$TOOL_NAMES" | grep -q "write_file" || fail "tools/list missing write_file"
+echo "$TOOL_NAMES" | grep -q "list_directory" || fail "tools/list missing list_directory"
+echo "$TOOL_NAMES" | grep -q "create_directory" || fail "tools/list missing create_directory"
+
+pass "tools/list returned all expected filesystem tools"
+
+# ── Test: tools/call (list_directory) ──
+
+info "Testing MCP tools/call (list_directory)..."
+
+CALL_RESPONSE=$(mcp_request '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_directory","arguments":{"path":"/workspace/notes"}}}')
+echo "$CALL_RESPONSE" | jq -e '.result' >/dev/null 2>&1 || {
+  echo "Response: $CALL_RESPONSE"
+  fail "tools/call did not return expected result"
+}
+
+pass "tools/call (list_directory) executed successfully"
+
+# ── Test: Unauthenticated request rejected ──
+
+info "Testing unauthenticated request rejection..."
+
+UNAUTH_STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/list","params":{}}' \
+  "$MCP_URL" 2>/dev/null) || UNAUTH_STATUS="000"
+
+if [[ "$UNAUTH_STATUS" == "401" || "$UNAUTH_STATUS" == "403" || "$UNAUTH_STATUS" -ne 0 ]]; then
+  pass "Unauthenticated request correctly rejected (status: $UNAUTH_STATUS)"
+else
+  fail "Unauthenticated request was not rejected (status: $UNAUTH_STATUS)"
+fi
+
+# ─── Summary ─────────────────────────────────────────────────────────────────
+
+echo ""
+echo -e "${GREEN}═══════════════════════════════════════${NC}"
+echo -e "${GREEN}  All MCP proxy integration tests passed!${NC}"
+echo -e "${GREEN}═══════════════════════════════════════${NC}"
+echo ""
