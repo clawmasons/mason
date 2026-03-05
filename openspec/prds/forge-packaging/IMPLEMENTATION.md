@@ -28,6 +28,13 @@ Migrate component definitions from `example/` to a new `forge-core/` workspace p
 
 **Testable output:** `npm install` succeeds at root. `forge-core/package.json` is valid. All sub-component package.json files parse correctly. `npm pack` in forge-core produces a `.tgz` tarball containing all component directories. The tgz installs cleanly in a fresh directory via `npm install <path>/clawforge-forge-core-0.1.0.tgz`.
 
+**Implemented:** 2026-03-05
+- [Proposal](../../changes/archive/2026-03-05-create-forge-core-package/proposal.md)
+- [Design](../../changes/archive/2026-03-05-create-forge-core-package/design.md)
+- [Tasks](../../changes/archive/2026-03-05-create-forge-core-package/tasks.md)
+- [Specs: forge-core-package](../../changes/archive/2026-03-05-create-forge-core-package/specs/forge-core-package/spec.md)
+- [Main Spec: forge-core-package](../../specs/forge-core-package/spec.md)
+
 ---
 
 ### CHANGE 2: Discovery Enhancement — Scan node_modules Workspace Dirs

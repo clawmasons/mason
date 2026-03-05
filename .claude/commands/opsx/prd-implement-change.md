@@ -12,13 +12,14 @@ Before doing anything else, run these checks and **stop immediately** if any fai
 
 2. **Check branch name** — Run `git branch --show-current`. If the result is `main` or `master`, stop and tell the user: "You're on the main branch. Please create and checkout a feature branch first (e.g. `git checkout -b opsx/my-feature`)."
 
-3. **Determine the PR base branch** — Run `git log --oneline --decorate --all --graph` or `git config branch.<current>.merge` to determine what branch this was created from. The **base branch** is the branch this change PR should target:
-   - If the current branch was created from a PRD feature branch (not `main`/`master`), the base branch is that PRD feature branch.
-   - If the current branch was created from `main`/`master`, the base branch is `main`.
-   - Heuristic: run `git merge-base --fork-point <candidate> HEAD` for likely parent branches, or check `git log --oneline main..HEAD` vs `git log --oneline <prd-branch>..HEAD` — the base with fewer commits ahead is the parent.
-   - Save this base branch name for the PR step.
+3. **Find the Change to Implement** — Find the relevant PRD.md and IMPLEMENTATION.md in the openspec/prds/ directory. If no change was specified, find the first unimplemented change. The branch name should be a short summary of the change.
 
-4. **Find the Change to Implement** Find the relevant PRD.md and IMPLEMENTATION.md in the openspec/prds/ directory.  If no change was specified, find the first unimplemented change.  The branch name should be a short summary of the change.
+4. **Determine the PR base branch** — Using the PRD identified in step 3:
+   a. Check if a local branch named after the PRD directory exists (e.g., PRD at `openspec/prds/forge-packaging/` → check for branch `forge-packaging` via `git branch --list forge-packaging`).
+   b. If that branch exists and is not `main`/`master`, use it as the base branch.
+   c. If no PRD branch is found, fall back to heuristic: compare `git log --oneline main..HEAD` vs `git log --oneline <candidate>..HEAD` — the candidate with fewer commits ahead is the parent.
+   d. Default to `main` if no better candidate is found.
+   - Save this base branch name for the PR step.
 
 If checks pass, proceed.
 
@@ -54,7 +55,7 @@ After all steps complete successfully:
 2. Write a concise, descriptive commit message summarizing the spec and the code changes made. Use conventional commit format (e.g. `feat: implement user role provisioning per spec opsx-042`). Run `git commit -m "<message>"`.
 3. Push the branch: `git push -u origin HEAD`
 4. Create a pull request using `gh pr create` **targeting the correct base branch**:
-   - Use the **base branch** determined in pre-flight step 3.
+   - Use the **base branch** determined in pre-flight step 4.
    - If the base branch is NOT `main`/`master` (i.e., a PRD feature branch), use `--base <prd-branch>` to target it.
    - If the base branch is `main`, no `--base` flag is needed (it's the default).
    - **Title**: A clear one-liner describing the feature/change
