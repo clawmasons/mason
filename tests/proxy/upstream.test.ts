@@ -424,10 +424,10 @@ describe("proxy/upstream", () => {
           title: "fix",
         });
         expect(result.content).toHaveLength(1);
-        expect(mockCallTool).toHaveBeenCalledWith({
-          name: "create_pr",
-          arguments: { title: "fix" },
-        });
+        expect(mockCallTool).toHaveBeenCalledWith(
+          { name: "create_pr", arguments: { title: "fix" } },
+          expect.anything(),
+        );
       });
 
       it("passes undefined args through correctly", async () => {
@@ -438,10 +438,10 @@ describe("proxy/upstream", () => {
         await manager.initialize();
 
         await manager.callTool("github", "create_pr", undefined);
-        expect(mockCallTool).toHaveBeenCalledWith({
-          name: "create_pr",
-          arguments: undefined,
-        });
+        expect(mockCallTool).toHaveBeenCalledWith(
+          { name: "create_pr", arguments: undefined },
+          expect.anything(),
+        );
       });
 
       it("throws for unknown app", async () => {

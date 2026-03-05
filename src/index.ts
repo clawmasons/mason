@@ -38,10 +38,7 @@ export {
 export {
   computeToolFilters,
   getAppShortName,
-  generateProxyConfig,
   type ToolFilter,
-  type McpServerEntry,
-  type ProxyConfig,
 } from "./generator/index.js";
 
 export {

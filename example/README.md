@@ -84,9 +84,19 @@ Running `forge install @example/agent-note-taker` produces:
 
 ```
 .forge/agents/note-taker/
-├── docker-compose.yml     # Container orchestration for the MCP server
-├── .env                   # Environment variables
-├── mcp-proxy/             # MCP proxy configuration with tool filtering
+├── docker-compose.yml     # Container orchestration (forge proxy + runtime)
+├── .env                   # Proxy token, port, app credentials
+├── forge-proxy/           # Native forge proxy (Dockerfile + workspace copy)
 ├── claude-code/           # Claude Code settings (MCP servers, permissions)
+├── data/                  # SQLite database (audit log, approvals)
 └── forge.lock.json        # Resolved dependency graph snapshot
 ```
+
+## How the Proxy Works
+
+`forge proxy` starts a native MCP proxy server that connects to upstream app servers (like the filesystem MCP server above).
+
+- **Tool prefixing** — Tools are namespaced by app name to avoid collisions. For example, `read_file` from `@example/app-filesystem` becomes `filesystem_read_file`.
+- **Role permissions** — Only tools explicitly allowed in the role's `permissions` are exposed. Everything else is blocked.
+- **Audit logging** — All tool calls are logged to a SQLite database at `data/forge.db`.
+- **Approval gates** — Roles can declare `constraints.requireApprovalFor` to gate specific tools behind human approval before execution.
