@@ -223,7 +223,14 @@ Add the approval gate to the proxy's tool call pipeline.
 
 **Testable output:** Unit test: verify glob matching (`github_delete_*` matches `github_delete_repo`, `*_send_*` matches `slack_send_message`). Integration test: create approval request → verify it's pending in DB → update status to "approved" externally → verify hook returns "approved". Test TTL: create request with short TTL (2s) → verify auto-deny.
 
-**Not Implemented Yet**
+**Implemented** — [Archived Change](../../openspec/changes/archive/2026-03-05-approval-workflow-hook/)
+
+- **Proposal:** [proposal.md](../../openspec/changes/archive/2026-03-05-approval-workflow-hook/proposal.md)
+- **Design:** [design.md](../../openspec/changes/archive/2026-03-05-approval-workflow-hook/design.md)
+- **Tasks:** [tasks.md](../../openspec/changes/archive/2026-03-05-approval-workflow-hook/tasks.md)
+- **Spec:** [approval-workflow-hook/spec.md](../../openspec/specs/approval-workflow-hook/spec.md)
+- **Source:** `src/proxy/hooks/approval.ts`, `src/proxy/server.ts` (modified)
+- **Tests:** `tests/proxy/hooks/approval.test.ts` (18 tests), `tests/proxy/server.test.ts` (4 new approval tests)
 
 ---
 
