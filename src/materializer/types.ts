@@ -47,4 +47,7 @@ export interface RuntimeMaterializer {
 
   /** Generate a docker-compose service definition for this runtime. */
   generateComposeService(agent: ResolvedAgent): ComposeServiceDef;
+
+  /** Generate runtime-specific config JSON (e.g., OOBE bypass for Claude Code). */
+  generateConfigJson?(): string;
 }

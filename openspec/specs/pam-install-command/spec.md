@@ -1,4 +1,9 @@
-## ADDED Requirements
+# pam-install-command Specification
+
+## Purpose
+Orchestrates the full agent installation pipeline: discover, resolve, validate, generate, materialize, and write all deployment artifacts.
+
+## Requirements
 
 ### Requirement: pam install command is registered as a CLI command
 
@@ -16,15 +21,18 @@ When `pam install <agent>` is run, the command SHALL execute the following stage
 3. Validate the resolved graph via `validateAgent()` — abort with error if invalid
 4. Generate the mcp-proxy config via `generateProxyConfig()`
 5. Generate a random proxy auth token (before materialization so it can be baked into runtime configs)
-6. For each declared runtime with a registered materializer: materialize workspace (passing the token), generate Dockerfile, generate compose service
+6. For each declared runtime with a registered materializer: materialize workspace (passing the token), generate Dockerfile, generate config JSON (if supported), generate compose service
 7. Generate docker-compose.yml, .env template (with token injected), and pam.lock.json
 8. Write all artifacts to the output directory
+9. Create empty `.claude/` directories for runtimes that support config JSON (for volume mount)
 
 #### Scenario: Successful install creates complete directory structure
 - **WHEN** `pam install` is run with a valid agent that declares `claude-code` runtime
 - **THEN** the output directory SHALL contain:
   - `mcp-proxy/config.json`
   - `claude-code/Dockerfile`
+  - `claude-code/.claude.json` (OOBE bypass, seeded at install time)
+  - `claude-code/.claude/` (empty directory for volume mount)
   - `claude-code/workspace/.claude/settings.json`
   - `claude-code/workspace/.claude/commands/*.md` (one per task)
   - `claude-code/workspace/AGENTS.md`
@@ -88,13 +96,11 @@ The command SHALL print a success message listing:
 - The output directory path
 - The number of generated files
 - The runtimes that were materialized
-- Next steps: fill in `.env` credentials, then run with `pam run <agent>` (primary) or `docker compose` (manual alternative)
+- Next steps: fill in `.env` app credentials, run with `pam run <agent>`, and authenticate with `/login` on first run
 
 #### Scenario: Success output
 - **WHEN** install completes successfully
-- **THEN** the output SHALL contain the output directory path, mention `.env`, and show `pam run` as the primary command
-
-## MODIFIED Requirements
+- **THEN** the output SHALL contain the output directory path, mention `.env`, show `pam run` as the primary command, and mention `/login` for first-run authentication
 
 ### Requirement: cli-framework registers the install command
 

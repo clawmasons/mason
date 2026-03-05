@@ -1,7 +1,7 @@
 # claude-code-materializer Specification
 
 ## Purpose
-TBD - created by archiving change claude-code-materializer. Update Purpose after archive.
+Translates a resolved pam agent graph into Claude Code-specific runtime artifacts: workspace files, Dockerfile, and docker-compose service definition.
 ## Requirements
 ### Requirement: Claude Code materializer generates settings.json with per-server MCP entries
 
@@ -79,28 +79,30 @@ For each unique skill across all roles, the materializer SHALL generate a `skill
 The `generateDockerfile()` method SHALL return a Dockerfile string that:
 - Uses `node:22-slim` base image
 - Installs Claude Code CLI globally as root
-- Creates `/home/node/.claude` directory owned by `node:node`
-- Writes OOBE bypass to `/home/node/.claude.json` (not `/root/.claude.json`)
-- Creates an entrypoint script at `/home/node/entrypoint.sh` that writes `CLAUDE_AUTH_TOKEN` env var content to `/home/node/.claude/.credentials.json` if set, then execs the passed command
 - Sets `DISABLE_AUTOUPDATER=1`
 - Switches to `USER node`
 - Sets `WORKDIR /home/node/workspace`
 - Copies workspace directory to `/home/node/workspace/` with `node:node` ownership
-- Uses the entrypoint script as `ENTRYPOINT`
-- Defaults CMD to `["claude", "--dangerously-skip-permissions"]` to bypass all permission prompts in the isolated container
+- Defaults CMD to `["claude", "--dangerously-skip-permissions"]`
+
+The Dockerfile SHALL NOT:
+- Create `.claude.json` (this is now a host-mounted volume)
+- Create `/home/node/.claude` directory (this is now a host-mounted volume)
+- Create an entrypoint script for credential injection
+- Reference `CLAUDE_AUTH_TOKEN`
+- Use an `ENTRYPOINT` directive
 
 #### Scenario: Dockerfile runs as node user
 - **WHEN** `generateDockerfile()` is called
 - **THEN** the result SHALL contain `USER node`
 
-#### Scenario: Dockerfile sets up Claude config in node home
+#### Scenario: Dockerfile does not create Claude config
 - **WHEN** `generateDockerfile()` is called
-- **THEN** the result SHALL contain `/home/node/.claude` and `/home/node/.claude.json`
-- **AND** SHALL NOT contain `/root/.claude`
+- **THEN** the result SHALL NOT contain `.claude.json`, `mkdir -p /home/node/.claude`, `chown`, or `entrypoint`
 
-#### Scenario: Dockerfile creates entrypoint for credentials
+#### Scenario: Dockerfile does not handle credentials
 - **WHEN** `generateDockerfile()` is called
-- **THEN** the result SHALL contain an entrypoint script that writes `CLAUDE_AUTH_TOKEN` to `/home/node/.claude/.credentials.json`
+- **THEN** the result SHALL NOT contain `CLAUDE_AUTH_TOKEN`, `.credentials.json`, or `ENTRYPOINT`
 
 #### Scenario: Dockerfile workspace at /home/node/workspace
 - **WHEN** `generateDockerfile()` is called
@@ -120,22 +122,29 @@ The `generateDockerfile()` method SHALL return a Dockerfile string that:
 The `generateComposeService()` method SHALL return a `ComposeServiceDef` with:
 - `build` pointing to `./claude-code`
 - `restart` set to `"no"` (interactive containers should not auto-restart)
-- `volumes` bind-mounting workspace to `/home/node/workspace`
+- `volumes` bind-mounting workspace to `/home/node/workspace`, `.claude` directory to `/home/node/.claude`, and `.claude.json` to `/home/node/.claude.json`
 - `depends_on` including `mcp-proxy`
 - `stdin_open` and `tty` set to `true`
 - `networks` including `agent-net`
-- `environment` including `CLAUDE_AUTH_TOKEN` (not `ANTHROPIC_API_KEY`) and `PAM_ROLES`
+- `environment` including `PAM_ROLES` only (no `CLAUDE_AUTH_TOKEN`)
 - `working_dir` set to `/home/node/workspace`
 
-#### Scenario: Compose service uses CLAUDE_AUTH_TOKEN
+#### Scenario: Compose service mounts .claude directory and .claude.json
 - **WHEN** `generateComposeService()` is called
-- **THEN** the environment SHALL contain `CLAUDE_AUTH_TOKEN=${CLAUDE_AUTH_TOKEN}` and SHALL NOT contain `ANTHROPIC_API_KEY`
+- **THEN** volumes SHALL contain `./claude-code/.claude:/home/node/.claude`, `./claude-code/.claude.json:/home/node/.claude.json`, and `./claude-code/workspace:/home/node/workspace`
 
-#### Scenario: Compose service mounts workspace at /home/node/workspace
+#### Scenario: Compose service does not include CLAUDE_AUTH_TOKEN
 - **WHEN** `generateComposeService()` is called
-- **THEN** volumes SHALL contain `./claude-code/workspace:/home/node/workspace` and `working_dir` SHALL be `/home/node/workspace`
+- **THEN** the environment SHALL NOT contain `CLAUDE_AUTH_TOKEN`
 
 #### Scenario: Compose service has correct structure
 - **WHEN** `generateComposeService()` is called with an agent having roles `issue-manager` and `pr-reviewer`
 - **THEN** the result SHALL have `environment` containing `PAM_ROLES=issue-manager,pr-reviewer` and `depends_on` containing `mcp-proxy`
 
+### Requirement: Claude Code materializer generates config JSON for OOBE bypass
+
+The materializer SHALL provide a `generateConfigJson()` method that returns the JSON string for the OOBE bypass file containing `hasCompletedOnboarding: true` and `hasTrustDialogAccepted: true` for `/home/node/workspace`.
+
+#### Scenario: generateConfigJson returns valid OOBE bypass
+- **WHEN** `generateConfigJson()` is called
+- **THEN** the result SHALL be valid JSON containing `hasCompletedOnboarding: true` and `hasTrustDialogAccepted: true` for `/home/node/workspace`

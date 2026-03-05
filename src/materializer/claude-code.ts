@@ -301,38 +301,12 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
       "",
       "RUN npm install -g @anthropic-ai/claude-code",
       "",
-      "# Skip Claude Code OOBE setup wizard and workspace trust prompt",
-      "RUN cat <<'CLAUDE_JSON' > /home/node/.claude.json",
-      "{",
-      '  "hasCompletedOnboarding": true,',
-      '  "projects": {',
-      '    "/home/node/workspace": {',
-      '      "hasTrustDialogAccepted": true',
-      "    }",
-      "  }",
-      "}",
-      "CLAUDE_JSON",
-      "",
-      "# Create Claude config directory (used by entrypoint for credentials)",
-      "RUN mkdir -p /home/node/.claude \\",
-      "  && chown -R node:node /home/node/.claude /home/node/.claude.json",
-      "",
-      "# Entrypoint: inject credentials from env var if set",
-      "RUN printf '%s\\n' '#!/bin/sh' \\",
-      "  'if [ -n \"$CLAUDE_AUTH_TOKEN\" ]; then' \\",
-      "  '  mkdir -p /home/node/.claude' \\",
-      '  \'  printf "%s" "$CLAUDE_AUTH_TOKEN" > /home/node/.claude/.credentials.json\' \\',
-      "  'fi' \\",
-      "  'exec \"$@\"' > /home/node/entrypoint.sh \\",
-      "  && chmod +x /home/node/entrypoint.sh",
-      "",
       "ENV DISABLE_AUTOUPDATER=1",
       "",
       "USER node",
       "WORKDIR /home/node/workspace",
       "COPY --chown=node:node workspace/ /home/node/workspace/",
       "",
-      'ENTRYPOINT ["/home/node/entrypoint.sh"]',
       'CMD ["claude", "--dangerously-skip-permissions"]',
     ].join("\n");
   },
@@ -345,10 +319,13 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     return {
       build: "./claude-code",
       restart: "no",
-      volumes: ["./claude-code/workspace:/home/node/workspace"],
+      volumes: [
+        "./claude-code/workspace:/home/node/workspace",
+        "./claude-code/.claude:/home/node/.claude",
+        "./claude-code/.claude.json:/home/node/.claude.json",
+      ],
       working_dir: "/home/node/workspace",
       environment: [
-        "CLAUDE_AUTH_TOKEN=${CLAUDE_AUTH_TOKEN}",
         `PAM_ROLES=${roleNames}`,
       ],
       depends_on: ["mcp-proxy"],
@@ -356,5 +333,20 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
       tty: true,
       networks: ["agent-net"],
     };
+  },
+
+  generateConfigJson(): string {
+    return JSON.stringify(
+      {
+        hasCompletedOnboarding: true,
+        projects: {
+          "/home/node/workspace": {
+            hasTrustDialogAccepted: true,
+          },
+        },
+      },
+      null,
+      2,
+    );
   },
 };
