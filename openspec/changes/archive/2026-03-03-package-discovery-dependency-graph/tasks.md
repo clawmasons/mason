@@ -1,14 +1,14 @@
 ## 1. Resolved Types
 
 - [x] 1.1 Create `src/resolver/types.ts` with `ResolvedApp`, `ResolvedSkill`, `ResolvedTask`, `ResolvedRole`, `ResolvedAgent` interfaces and `DiscoveredPackage` type
-- [x] 1.2 Create `src/resolver/errors.ts` with typed error classes: `PackageNotFoundError`, `InvalidPamFieldError`, `CircularDependencyError`, `TypeMismatchError`
+- [x] 1.2 Create `src/resolver/errors.ts` with typed error classes: `PackageNotFoundError`, `InvalidForgeFieldError`, `CircularDependencyError`, `TypeMismatchError`
 - [x] 1.3 Create `src/resolver/index.ts` re-exporting types, errors, and functions
 
 ## 2. Package Discovery
 
 - [x] 2.1 Create `src/resolver/discover.ts` with `discoverPackages(rootDir: string): Map<string, DiscoveredPackage>` that scans workspace directories and node_modules
 - [x] 2.2 Handle scoped packages (@org/pkg) in node_modules scanning
-- [x] 2.3 Parse each package.json's `pam` field using existing `parsePamField()`, skip packages without valid pam fields
+- [x] 2.3 Parse each package.json's `forge` field using existing `parseForgeField()`, skip packages without valid forge fields
 - [x] 2.4 Handle workspace directory scanning (apps/, tasks/, skills/, roles/, agents/)
 
 ## 3. Dependency Graph Resolution
@@ -18,12 +18,12 @@
 - [x] 3.3 Implement task resolution: for each task, resolve required apps and skills from `requires` field
 - [x] 3.4 Implement composite task resolution: recursively resolve sub-tasks via `tasks` field
 - [x] 3.5 Implement circular dependency detection with traversal path tracking
-- [x] 3.6 Implement type enforcement: validate that dependencies match expected pam types (e.g., agent.roles must reference role-type packages)
+- [x] 3.6 Implement type enforcement: validate that dependencies match expected forge types (e.g., agent.roles must reference role-type packages)
 
 ## 4. Public API
 
 - [x] 4.1 Update `src/index.ts` to export resolver types and functions
-- [x] 4.2 Ensure all exported types are accessible from `@clawforge/pam`
+- [x] 4.2 Ensure all exported types are accessible from `@clawforge/forge`
 
 ## 5. Tests
 

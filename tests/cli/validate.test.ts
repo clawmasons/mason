@@ -42,7 +42,7 @@ describe("runValidate", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pam-validate-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-validate-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -63,7 +63,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -77,7 +77,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "skill",
         artifacts: ["./SKILL.md"],
         description: "Labeling taxonomy",
@@ -88,7 +88,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "task",
         taskType: "subagent",
         prompt: "./triage.md",
@@ -103,7 +103,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -120,7 +120,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "agents", "ops"), {
       name: "@test/agent-ops",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "agent",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
@@ -133,7 +133,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -147,7 +147,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "skill",
         artifacts: ["./SKILL.md"],
         description: "Labeling taxonomy",
@@ -158,7 +158,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "task",
         taskType: "subagent",
         requires: {
@@ -172,7 +172,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -189,7 +189,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "agents", "ops"), {
       name: "@test/agent-ops",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "agent",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],

@@ -41,7 +41,7 @@ The `generateComposeService()` method SHALL return a `ComposeServiceDef` with:
 - `depends_on` including `mcp-proxy`
 - `stdin_open` and `tty` set to `true`
 - `networks` including `agent-net`
-- `environment` including `CLAUDE_AUTH_TOKEN` (not `ANTHROPIC_API_KEY`) and `PAM_ROLES`
+- `environment` including `CLAUDE_AUTH_TOKEN` (not `ANTHROPIC_API_KEY`) and `FORGE_ROLES`
 - `working_dir` set to `/home/node/workspace`
 
 #### Scenario: Compose service uses CLAUDE_AUTH_TOKEN

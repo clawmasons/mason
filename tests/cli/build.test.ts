@@ -44,7 +44,7 @@ describe("runBuild", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pam-build-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-build-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -64,7 +64,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -77,7 +77,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "skill",
         artifacts: ["./SKILL.md"],
         description: "Labeling taxonomy",
@@ -87,7 +87,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "task",
         taskType: "subagent",
         prompt: "./triage.md",
@@ -101,7 +101,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -117,7 +117,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "agents", "ops"), {
       name: "@test/agent-ops",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "agent",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
@@ -131,7 +131,7 @@ describe("runBuild", () => {
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
-    const lockPath = path.join(tmpDir, "pam.lock.json");
+    const lockPath = path.join(tmpDir, "forge.lock.json");
     expect(fs.existsSync(lockPath)).toBe(true);
 
     const lock = JSON.parse(fs.readFileSync(lockPath, "utf-8"));
@@ -167,7 +167,7 @@ describe("runBuild", () => {
     expect(parsed.agent.name).toBe("@test/agent-ops");
 
     // Should NOT write a file
-    expect(fs.existsSync(path.join(tmpDir, "pam.lock.json"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "forge.lock.json"))).toBe(false);
   });
 
   it("exits 1 when agent is not found", async () => {
@@ -183,7 +183,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -196,13 +196,13 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      pam: { type: "skill", artifacts: ["./SKILL.md"], description: "Labeling" },
+      forge: { type: "skill", artifacts: ["./SKILL.md"], description: "Labeling" },
     });
 
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "task",
         taskType: "subagent",
         requires: { apps: ["@test/app-github"], skills: ["@test/skill-labeling"] },
@@ -213,7 +213,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -226,7 +226,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "agents", "ops"), {
       name: "@test/agent-ops",
       version: "1.0.0",
-      pam: { type: "agent", runtimes: ["claude-code"], roles: ["@test/role-manager"] },
+      forge: { type: "agent", runtimes: ["claude-code"], roles: ["@test/role-manager"] },
     });
 
     await runBuild(tmpDir, "@test/agent-ops", {});

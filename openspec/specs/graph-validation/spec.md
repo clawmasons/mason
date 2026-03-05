@@ -1,7 +1,7 @@
 # graph-validation Specification
 
 ## Purpose
-TBD - created by archiving change pam-validate-graph-validation. Update Purpose after archive.
+TBD - created by archiving change forge-validate-graph-validation. Update Purpose after archive.
 ## Requirements
 ### Requirement: Validate requirement coverage
 The system SHALL check that for every task in a role, each app listed in the task's `requires.apps` has a corresponding entry in the parent role's `permissions` object. A task cannot use an app that its role doesn't govern.
@@ -78,21 +78,21 @@ The `validateAgent()` function SHALL return a `ValidationResult` containing: `va
 - **THEN** the result has `valid: false` and `errors` contains one or more `ValidationError` objects with populated `category`, `message`, and `context` fields
 
 ### Requirement: CLI validate command
-The system SHALL provide a `pam validate <agent>` CLI command that discovers packages, resolves the agent graph, runs validation, and outputs results. The command SHALL exit with code 0 when the agent is valid and non-zero when validation fails. The command SHALL support a `--json` flag for machine-readable output.
+The system SHALL provide a `forge validate <agent>` CLI command that discovers packages, resolves the agent graph, runs validation, and outputs results. The command SHALL exit with code 0 when the agent is valid and non-zero when validation fails. The command SHALL support a `--json` flag for machine-readable output.
 
 #### Scenario: Valid agent CLI output
-- **WHEN** `pam validate @clawforge/agent-repo-ops` is run and the agent passes all checks
+- **WHEN** `forge validate @clawforge/agent-repo-ops` is run and the agent passes all checks
 - **THEN** the command prints a success message and exits with code 0
 
 #### Scenario: Invalid agent CLI output
-- **WHEN** `pam validate @clawforge/agent-repo-ops` is run and the agent has validation errors
+- **WHEN** `forge validate @clawforge/agent-repo-ops` is run and the agent has validation errors
 - **THEN** the command prints each error with its category and context, and exits with code 1
 
 #### Scenario: JSON output mode
-- **WHEN** `pam validate @clawforge/agent-repo-ops --json` is run
+- **WHEN** `forge validate @clawforge/agent-repo-ops --json` is run
 - **THEN** the command outputs the `ValidationResult` as JSON to stdout
 
 #### Scenario: Agent not found
-- **WHEN** `pam validate @clawforge/nonexistent` is run and the agent package cannot be discovered
+- **WHEN** `forge validate @clawforge/nonexistent` is run and the agent package cannot be discovered
 - **THEN** the command prints an error message and exits with non-zero code
 

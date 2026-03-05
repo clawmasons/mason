@@ -41,7 +41,7 @@ This makes first-run simpler (just `docker compose run claude-code` and login) a
 - `claude-code-materializer`: Dockerfile simplified (no config/credentials setup), compose service adds .claude volume mounts
 - `docker-compose-generation`: No direct changes (renders whatever ComposeServiceDef provides)
 - `env-generation`: `claude-code` runtime no longer maps to any auth token
-- `pam-install-command`: Generates .claude.json and empty .claude/ directory as install artifacts
+- `forge-install-command`: Generates .claude.json and empty .claude/ directory as install artifacts
 
 ## Impact
 

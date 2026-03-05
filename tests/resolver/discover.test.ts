@@ -7,7 +7,7 @@ import { discoverPackages } from "../../src/resolver/discover.js";
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pam-discover-"));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-discover-"));
 });
 
 afterEach(() => {
@@ -29,7 +29,7 @@ describe("discoverPackages", () => {
       writePackageJson("apps/github", {
         name: "@clawforge/app-github",
         version: "1.2.0",
-        pam: {
+        forge: {
           type: "app",
           transport: "stdio",
           command: "npx",
@@ -46,14 +46,14 @@ describe("discoverPackages", () => {
       expect(pkg).toBeDefined();
       expect(pkg?.name).toBe("@clawforge/app-github");
       expect(pkg?.version).toBe("1.2.0");
-      expect(pkg?.pamField.type).toBe("app");
+      expect(pkg?.forgeField.type).toBe("app");
     });
 
     it("discovers role packages in roles/ directory", () => {
       writePackageJson("roles/issue-manager", {
         name: "@clawforge/role-issue-manager",
         version: "2.0.0",
-        pam: {
+        forge: {
           type: "role",
           description: "Manages GitHub issues",
           permissions: {
@@ -70,34 +70,34 @@ describe("discoverPackages", () => {
 
       const pkg = result.get("@clawforge/role-issue-manager");
       expect(pkg).toBeDefined();
-      expect(pkg?.pamField.type).toBe("role");
+      expect(pkg?.forgeField.type).toBe("role");
     });
 
     it("discovers packages across all workspace directories", () => {
       writePackageJson("apps/github", {
         name: "@clawforge/app-github",
         version: "1.0.0",
-        pam: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
+        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
       });
       writePackageJson("skills/labeling", {
         name: "@clawforge/skill-labeling",
         version: "1.0.0",
-        pam: { type: "skill", artifacts: ["./SKILL.md"], description: "Labeling" },
+        forge: { type: "skill", artifacts: ["./SKILL.md"], description: "Labeling" },
       });
       writePackageJson("tasks/triage", {
         name: "@clawforge/task-triage",
         version: "1.0.0",
-        pam: { type: "task", taskType: "subagent" },
+        forge: { type: "task", taskType: "subagent" },
       });
       writePackageJson("roles/manager", {
         name: "@clawforge/role-manager",
         version: "1.0.0",
-        pam: { type: "role", permissions: { "@clawforge/app-github": { allow: ["t"], deny: [] } } },
+        forge: { type: "role", permissions: { "@clawforge/app-github": { allow: ["t"], deny: [] } } },
       });
       writePackageJson("agents/ops", {
         name: "@clawforge/agent-ops",
         version: "1.0.0",
-        pam: { type: "agent", runtimes: ["claude-code"], roles: ["@clawforge/role-manager"] },
+        forge: { type: "agent", runtimes: ["claude-code"], roles: ["@clawforge/role-manager"] },
       });
 
       const result = discoverPackages(tmpDir);
@@ -111,7 +111,7 @@ describe("discoverPackages", () => {
       expect(result.size).toBe(0);
     });
 
-    it("skips packages without pam field", () => {
+    it("skips packages without forge field", () => {
       writePackageJson("apps/plain-npm", {
         name: "plain-npm-package",
         version: "1.0.0",
@@ -121,11 +121,11 @@ describe("discoverPackages", () => {
       expect(result.size).toBe(0);
     });
 
-    it("skips packages with invalid pam field", () => {
+    it("skips packages with invalid forge field", () => {
       writePackageJson("apps/bad-schema", {
         name: "bad-schema",
         version: "1.0.0",
-        pam: { type: "app" }, // missing required fields
+        forge: { type: "app" }, // missing required fields
       });
 
       const result = discoverPackages(tmpDir);
@@ -144,7 +144,7 @@ describe("discoverPackages", () => {
       writePackageJson("node_modules/some-app", {
         name: "some-app",
         version: "1.0.0",
-        pam: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
+        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
       });
 
       const result = discoverPackages(tmpDir);
@@ -156,7 +156,7 @@ describe("discoverPackages", () => {
       writePackageJson("node_modules/@clawforge/app-github", {
         name: "@clawforge/app-github",
         version: "1.2.0",
-        pam: {
+        forge: {
           type: "app",
           transport: "stdio",
           command: "npx",
@@ -176,7 +176,7 @@ describe("discoverPackages", () => {
       expect(result.size).toBe(0);
     });
 
-    it("skips node_modules packages without pam field", () => {
+    it("skips node_modules packages without forge field", () => {
       writePackageJson("node_modules/express", {
         name: "express",
         version: "4.18.0",
@@ -192,12 +192,12 @@ describe("discoverPackages", () => {
       writePackageJson("apps/github", {
         name: "@clawforge/app-github",
         version: "2.0.0",
-        pam: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
+        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
       });
       writePackageJson("node_modules/@clawforge/app-github", {
         name: "@clawforge/app-github",
         version: "1.0.0",
-        pam: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
+        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
       });
 
       const result = discoverPackages(tmpDir);
@@ -212,7 +212,7 @@ describe("discoverPackages", () => {
       writePackageJson("apps/github", {
         name: "@clawforge/app-github",
         version: "1.2.0",
-        pam: {
+        forge: {
           type: "app",
           transport: "stdio",
           command: "npx",
@@ -229,13 +229,13 @@ describe("discoverPackages", () => {
       expect(pkg?.name).toBe("@clawforge/app-github");
       expect(pkg?.version).toBe("1.2.0");
       expect(pkg?.packagePath).toBe(path.join(tmpDir, "apps/github"));
-      expect(pkg?.pamField.type).toBe("app");
+      expect(pkg?.forgeField.type).toBe("app");
     });
 
     it("defaults version to 0.0.0 when missing", () => {
       writePackageJson("apps/github", {
         name: "@clawforge/app-github",
-        pam: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
+        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
       });
 
       const result = discoverPackages(tmpDir);

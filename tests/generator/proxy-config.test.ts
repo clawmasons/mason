@@ -101,7 +101,7 @@ describe("generateProxyConfig", () => {
 
       expect(config.mcpProxy.baseURL).toBe("http://mcp-proxy:9090");
       expect(config.mcpProxy.addr).toBe(":9090");
-      expect(config.mcpProxy.name).toBe("pam-proxy-repo-ops");
+      expect(config.mcpProxy.name).toBe("forge-proxy-repo-ops");
       expect(config.mcpProxy.version).toBe("1.0.0");
       expect(config.mcpProxy.type).toBe("sse");
       expect(config.mcpProxy.options.panicIfInvalid).toBe(false);
@@ -111,7 +111,7 @@ describe("generateProxyConfig", () => {
     it("includes auth token placeholder", () => {
       const agent = makeRepoOpsAgent();
       const config = generateProxyConfig(agent);
-      expect(config.mcpProxy.options.authTokens).toEqual(["${PAM_PROXY_TOKEN}"]);
+      expect(config.mcpProxy.options.authTokens).toEqual(["${FORGE_PROXY_TOKEN}"]);
     });
 
     it("uses custom port from agent proxy config", () => {
@@ -253,15 +253,15 @@ describe("generateProxyConfig", () => {
       const agent = makeRepoOpsAgent();
       const config = generateProxyConfig(agent);
 
-      expect(config.mcpProxy.options.authTokens[0]).toBe("${PAM_PROXY_TOKEN}");
+      expect(config.mcpProxy.options.authTokens[0]).toBe("${FORGE_PROXY_TOKEN}");
     });
   });
 
   describe("auth token", () => {
-    it("always uses PAM_PROXY_TOKEN placeholder for proxy config", () => {
+    it("always uses FORGE_PROXY_TOKEN placeholder for proxy config", () => {
       const agent = makeRepoOpsAgent();
       const config = generateProxyConfig(agent);
-      expect(config.mcpProxy.options.authTokens).toEqual(["${PAM_PROXY_TOKEN}"]);
+      expect(config.mcpProxy.options.authTokens).toEqual(["${FORGE_PROXY_TOKEN}"]);
     });
   });
 
@@ -287,7 +287,7 @@ describe("generateProxyConfig", () => {
       const config = generateProxyConfig(agent);
 
       // mcpProxy
-      expect(config.mcpProxy.name).toBe("pam-proxy-repo-ops");
+      expect(config.mcpProxy.name).toBe("forge-proxy-repo-ops");
       expect(config.mcpProxy.version).toBe("1.0.0");
       expect(config.mcpProxy.type).toBe("sse");
 

@@ -1,6 +1,6 @@
 ## Context
 
-pam is a TypeScript/Node.js project (ESM, Zod, Vitest, Commander.js) with validated schemas for all five pam package types (app, skill, task, role, agent) and a CLI entry point with `pam init`. The next step is the graph resolver — the core engine that reads installed packages, parses their `pam` fields, and walks the typed dependency graph to produce a `ResolvedAgent`.
+forge is a TypeScript/Node.js project (ESM, Zod, Vitest, Commander.js) with validated schemas for all five forge package types (app, skill, task, role, agent) and a CLI entry point with `forge init`. The next step is the graph resolver — the core engine that reads installed packages, parses their `forge` fields, and walks the typed dependency graph to produce a `ResolvedAgent`.
 
 The PRD defines a strict dependency hierarchy (§3.1): agent → role → task/app/skill, where higher-level types depend on lower-level types, never the reverse. The resolver must enforce this hierarchy and detect violations.
 
@@ -8,7 +8,7 @@ The PRD defines a strict dependency hierarchy (§3.1): agent → role → task/a
 
 **Goals:**
 - Define resolved types (`ResolvedAgent`, `ResolvedRole`, etc.) that downstream commands operate on
-- Discover pam packages from node_modules and workspace directories
+- Discover forge packages from node_modules and workspace directories
 - Resolve the full dependency graph from an agent name to a flattened `ResolvedAgent`
 - Detect circular dependencies in composite task chains
 - Produce actionable error messages for missing/invalid dependencies
@@ -24,7 +24,7 @@ The PRD defines a strict dependency hierarchy (§3.1): agent → role → task/a
 
 ### 1. Package discovery via filesystem scanning
 
-**Decision:** Discover packages by scanning `node_modules/` directories and workspace directories (`apps/`, `tasks/`, `skills/`, `roles/`, `agents/`), reading each `package.json`, and parsing the `pam` field with existing Zod schemas.
+**Decision:** Discover packages by scanning `node_modules/` directories and workspace directories (`apps/`, `tasks/`, `skills/`, `roles/`, `agents/`), reading each `package.json`, and parsing the `forge` field with existing Zod schemas.
 
 **Rationale:** npm already resolves and installs packages to disk. We read what npm wrote rather than reimplementing resolution. Workspace directories handle the monorepo case where packages aren't in node_modules yet (pre-install local packages). This is the same approach tools like `turbo` and `nx` use.
 
@@ -37,10 +37,10 @@ The PRD defines a strict dependency hierarchy (§3.1): agent → role → task/a
 ### 3. Two-phase resolution: discover then resolve
 
 **Decision:** Split into two phases:
-1. **Discover:** Scan filesystem, parse all pam packages into a `Map<string, DiscoveredPackage>` keyed by package name
+1. **Discover:** Scan filesystem, parse all forge packages into a `Map<string, DiscoveredPackage>` keyed by package name
 2. **Resolve:** Given an agent name and the discovery map, walk the dependency graph depth-first, building the resolved tree
 
-**Rationale:** Separating discovery from resolution allows caching (discover once, resolve many agents), better error messages (distinguish "package not installed" from "package has invalid pam field"), and testability (resolution can be tested with in-memory maps, no filesystem needed).
+**Rationale:** Separating discovery from resolution allows caching (discover once, resolve many agents), better error messages (distinguish "package not installed" from "package has invalid forge field"), and testability (resolution can be tested with in-memory maps, no filesystem needed).
 
 ### 4. Circular dependency detection via visited set
 
@@ -62,15 +62,15 @@ src/resolver/
 
 **Rationale:** Mirrors the schemas/ organization. Each file has a single responsibility. The errors module provides structured error types that downstream commands can pattern-match on for user-friendly messages.
 
-### 6. DiscoveredPackage includes both raw metadata and parsed pam field
+### 6. DiscoveredPackage includes both raw metadata and parsed forge field
 
-**Decision:** `DiscoveredPackage` includes `name`, `version`, `packagePath` (filesystem location), and the validated `PamField` (already parsed by Zod). Invalid packages are reported as warnings during discovery, not included in the map.
+**Decision:** `DiscoveredPackage` includes `name`, `version`, `packagePath` (filesystem location), and the validated `ForgeField` (already parsed by Zod). Invalid packages are reported as warnings during discovery, not included in the map.
 
-**Rationale:** Downstream code never deals with raw JSON — it always has validated pam fields. This pushes validation to the boundary (discovery time) and keeps the resolver clean.
+**Rationale:** Downstream code never deals with raw JSON — it always has validated forge fields. This pushes validation to the boundary (discovery time) and keeps the resolver clean.
 
 ## Risks / Trade-offs
 
 - **[Risk] Large node_modules scanning is slow** → Mitigation: Only scan direct subdirectories of node_modules (or scoped @org/ dirs) and workspace directories. Don't recurse into nested node_modules. The discovery function takes explicit paths to scan.
 - **[Risk] Workspace packages not yet installed** → Mitigation: Scan workspace directories (apps/, tasks/, etc.) in addition to node_modules. Workspace packages are found by their package.json in the workspace dir, even pre-install.
-- **[Trade-off] No caching across runs** → Acceptable for now. Each CLI invocation discovers fresh. A cache layer can be added later using pam.lock.json.
+- **[Trade-off] No caching across runs** → Acceptable for now. Each CLI invocation discovers fresh. A cache layer can be added later using forge.lock.json.
 - **[Trade-off] Diamond dependencies allowed** → By design. If role-A and role-B both depend on app-github, it's resolved once and referenced by both. Only cycles are errors.

@@ -138,6 +138,6 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# pam generated output
-example/.pam/
-example/.pam-bak/
+# forge generated output
+example/.forge/
+example/.forge-bak/

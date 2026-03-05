@@ -4,11 +4,11 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { runInit } from "../../src/cli/commands/init.js";
 
-describe("pam init", () => {
+describe("forge init", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pam-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-test-"));
     vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
@@ -21,7 +21,7 @@ describe("pam init", () => {
     it("creates all workspace directories", async () => {
       await runInit(tmpDir, {});
 
-      const expectedDirs = ["apps", "tasks", "skills", "roles", "agents", ".pam"];
+      const expectedDirs = ["apps", "tasks", "skills", "roles", "agents", ".forge"];
       for (const dir of expectedDirs) {
         const stat = fs.statSync(path.join(tmpDir, dir));
         expect(stat.isDirectory()).toBe(true);
@@ -52,18 +52,18 @@ describe("pam init", () => {
       expect(pkg.name).toBe(path.basename(tmpDir));
     });
 
-    it("creates .pam/config.json with defaults", async () => {
+    it("creates .forge/config.json with defaults", async () => {
       await runInit(tmpDir, {});
 
-      const configPath = path.join(tmpDir, ".pam", "config.json");
+      const configPath = path.join(tmpDir, ".forge", "config.json");
       const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       expect(config).toEqual({ version: "0.1.0" });
     });
 
-    it("creates .pam/.env.example with credential placeholders", async () => {
+    it("creates .forge/.env.example with credential placeholders", async () => {
       await runInit(tmpDir, {});
 
-      const envPath = path.join(tmpDir, ".pam", ".env.example");
+      const envPath = path.join(tmpDir, ".forge", ".env.example");
       const content = fs.readFileSync(envPath, "utf-8");
       expect(content).toContain("GITHUB_TOKEN");
       expect(content).toContain("ANTHROPIC_API_KEY");
@@ -77,14 +77,14 @@ describe("pam init", () => {
       expect(content).toContain("node_modules/");
       expect(content).toContain(".env");
       expect(content).toContain("dist/");
-      expect(content).toContain(".pam/.env");
+      expect(content).toContain(".forge/.env");
     });
 
     it("prints success output with created files", async () => {
       await runInit(tmpDir, {});
 
       const logCalls = vi.mocked(console.log).mock.calls.flat().join("\n");
-      expect(logCalls).toContain("pam workspace initialized");
+      expect(logCalls).toContain("forge workspace initialized");
       expect(logCalls).toContain("Created:");
       expect(logCalls).toContain("Next steps:");
     });
@@ -109,9 +109,9 @@ describe("pam init", () => {
   });
 
   describe("idempotency", () => {
-    it("warns and exits if .pam/ directory already exists", async () => {
-      // Create .pam directory to simulate existing workspace
-      fs.mkdirSync(path.join(tmpDir, ".pam"), { recursive: true });
+    it("warns and exits if .forge/ directory already exists", async () => {
+      // Create .forge directory to simulate existing workspace
+      fs.mkdirSync(path.join(tmpDir, ".forge"), { recursive: true });
 
       await runInit(tmpDir, {});
 
@@ -123,10 +123,10 @@ describe("pam init", () => {
     });
 
     it("does not modify existing files when workspace exists", async () => {
-      // Create .pam directory and a config file
-      fs.mkdirSync(path.join(tmpDir, ".pam"), { recursive: true });
+      // Create .forge directory and a config file
+      fs.mkdirSync(path.join(tmpDir, ".forge"), { recursive: true });
       fs.writeFileSync(
-        path.join(tmpDir, ".pam", "config.json"),
+        path.join(tmpDir, ".forge", "config.json"),
         '{"version":"0.0.1"}',
       );
 
@@ -134,7 +134,7 @@ describe("pam init", () => {
 
       // Config should be untouched
       const config = JSON.parse(
-        fs.readFileSync(path.join(tmpDir, ".pam", "config.json"), "utf-8"),
+        fs.readFileSync(path.join(tmpDir, ".forge", "config.json"), "utf-8"),
       );
       expect(config.version).toBe("0.0.1");
     });

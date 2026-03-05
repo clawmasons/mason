@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { rolePamFieldSchema } from "../../src/schemas/role.js";
+import { roleForgeFieldSchema } from "../../src/schemas/role.js";
 
-describe("rolePamFieldSchema", () => {
+describe("roleForgeFieldSchema", () => {
   it("validates a valid role with permissions", () => {
-    const result = rolePamFieldSchema.safeParse({
+    const result = roleForgeFieldSchema.safeParse({
       type: "role",
       permissions: {
         "@clawforge/app-github": {
@@ -22,7 +22,7 @@ describe("rolePamFieldSchema", () => {
   });
 
   it("validates role with deny wildcard", () => {
-    const result = rolePamFieldSchema.safeParse({
+    const result = roleForgeFieldSchema.safeParse({
       type: "role",
       permissions: {
         "@clawforge/app-slack": {
@@ -40,7 +40,7 @@ describe("rolePamFieldSchema", () => {
   });
 
   it("validates role with constraints", () => {
-    const result = rolePamFieldSchema.safeParse({
+    const result = roleForgeFieldSchema.safeParse({
       type: "role",
       permissions: {
         "@clawforge/app-github": {
@@ -63,14 +63,14 @@ describe("rolePamFieldSchema", () => {
   });
 
   it("rejects role without permissions", () => {
-    const result = rolePamFieldSchema.safeParse({
+    const result = roleForgeFieldSchema.safeParse({
       type: "role",
     });
     expect(result.success).toBe(false);
   });
 
   it("validates PRD example: @clawforge/role-issue-manager", () => {
-    const result = rolePamFieldSchema.safeParse({
+    const result = roleForgeFieldSchema.safeParse({
       type: "role",
       description: "Manages GitHub issues: triage, label, assign.",
       tasks: [

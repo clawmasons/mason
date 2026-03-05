@@ -11,7 +11,7 @@ Auto-detection: Parse the compose file for service names, filter out `mcp-proxy`
 
 ### Token Baking
 
-Claude Code reads `.claude/settings.json` as raw JSON with no environment variable interpolation. The `${PAM_PROXY_TOKEN}` placeholder in the Authorization header was never resolved. Solution: generate the token before materialization and pass it through so the actual hex value gets embedded in the JSON.
+Claude Code reads `.claude/settings.json` as raw JSON with no environment variable interpolation. The `${FORGE_PROXY_TOKEN}` placeholder in the Authorization header was never resolved. Solution: generate the token before materialization and pass it through so the actual hex value gets embedded in the JSON.
 
 ### OOBE Skip
 

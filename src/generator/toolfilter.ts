@@ -1,12 +1,12 @@
 import type { ResolvedAgent } from "../resolver/types.js";
 import type { ToolFilter } from "./types.js";
 
-/** Known pam package type prefixes. */
+/** Known forge package type prefixes. */
 const TYPE_PREFIXES = ["app-", "agent-", "role-", "task-", "skill-"];
 
 /**
- * Extract a short name from a pam package name.
- * Strips the npm scope and any known pam type prefix.
+ * Extract a short name from a forge package name.
+ * Strips the npm scope and any known forge type prefix.
  *
  * Examples:
  *   "@clawforge/app-github" → "github"

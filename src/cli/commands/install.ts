@@ -119,17 +119,17 @@ export async function runInstall(
 
     // 8. Generate .env with proxy token
     const envTemplate = generateEnvTemplate(agent);
-    const envContent = envTemplate.replace("PAM_PROXY_TOKEN=", `PAM_PROXY_TOKEN=${proxyToken}`);
+    const envContent = envTemplate.replace("FORGE_PROXY_TOKEN=", `FORGE_PROXY_TOKEN=${proxyToken}`);
     allFiles.set(".env", envContent);
 
     // 9. Generate lock file
     const lockFile = generateLockFile(agent, [...allFiles.keys()]);
-    allFiles.set("pam.lock.json", JSON.stringify(lockFile, null, 2));
+    allFiles.set("forge.lock.json", JSON.stringify(lockFile, null, 2));
 
     // 10. Write files to output directory
     const outputDir = options.outputDir
       ? path.resolve(rootDir, options.outputDir)
-      : path.join(rootDir, ".pam", "agents", agentShortName);
+      : path.join(rootDir, ".forge", "agents", agentShortName);
 
     console.log(`Writing files to ${outputDir}...`);
 
@@ -160,7 +160,7 @@ export async function runInstall(
     const runtimeName = materializedRuntimes[0] ?? "claude-code";
     console.log(`\n  Next steps:`);
     console.log(`    1. Fill in app credentials in ${path.join(outputDir, ".env")}`);
-    console.log(`    2. Run: pam run ${agentName}`);
+    console.log(`    2. Run: forge run ${agentName}`);
     console.log(`       Or manually:`);
     console.log(`         docker compose -f ${composePath} up -d mcp-proxy`);
     console.log(`         docker compose -f ${composePath} run --rm ${runtimeName}`);

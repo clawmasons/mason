@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { taskPamFieldSchema } from "../../src/schemas/task.js";
+import { taskForgeFieldSchema } from "../../src/schemas/task.js";
 
-describe("taskPamFieldSchema", () => {
+describe("taskForgeFieldSchema", () => {
   it("validates a valid subagent task", () => {
-    const result = taskPamFieldSchema.safeParse({
+    const result = taskForgeFieldSchema.safeParse({
       type: "task",
       taskType: "subagent",
       prompt: "./prompts/triage.md",
@@ -18,7 +18,7 @@ describe("taskPamFieldSchema", () => {
   });
 
   it("validates a composite task", () => {
-    const result = taskPamFieldSchema.safeParse({
+    const result = taskForgeFieldSchema.safeParse({
       type: "task",
       taskType: "composite",
     });
@@ -26,7 +26,7 @@ describe("taskPamFieldSchema", () => {
   });
 
   it("validates a script task", () => {
-    const result = taskPamFieldSchema.safeParse({
+    const result = taskForgeFieldSchema.safeParse({
       type: "task",
       taskType: "script",
     });
@@ -34,7 +34,7 @@ describe("taskPamFieldSchema", () => {
   });
 
   it("validates a human task", () => {
-    const result = taskPamFieldSchema.safeParse({
+    const result = taskForgeFieldSchema.safeParse({
       type: "task",
       taskType: "human",
       prompt: "./prompts/approval.md",
@@ -43,7 +43,7 @@ describe("taskPamFieldSchema", () => {
   });
 
   it("rejects task with invalid taskType", () => {
-    const result = taskPamFieldSchema.safeParse({
+    const result = taskForgeFieldSchema.safeParse({
       type: "task",
       taskType: "unknown",
     });
@@ -55,7 +55,7 @@ describe("taskPamFieldSchema", () => {
   });
 
   it("accepts task with partial requires", () => {
-    const result = taskPamFieldSchema.safeParse({
+    const result = taskForgeFieldSchema.safeParse({
       type: "task",
       taskType: "subagent",
       requires: { apps: ["@clawforge/app-github"] },
@@ -64,7 +64,7 @@ describe("taskPamFieldSchema", () => {
   });
 
   it("validates PRD example: @clawforge/task-triage-issue", () => {
-    const result = taskPamFieldSchema.safeParse({
+    const result = taskForgeFieldSchema.safeParse({
       type: "task",
       taskType: "subagent",
       prompt: "./prompts/triage.md",

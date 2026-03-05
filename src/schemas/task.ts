@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const taskPamFieldSchema = z.object({
+export const taskForgeFieldSchema = z.object({
   type: z.literal("task"),
   taskType: z.enum(["subagent", "script", "composite", "human"]),
   prompt: z.string().optional(),
@@ -15,4 +15,4 @@ export const taskPamFieldSchema = z.object({
   approval: z.enum(["auto", "confirm", "review"]).optional(),
 });
 
-export type TaskPamField = z.infer<typeof taskPamFieldSchema>;
+export type TaskForgeField = z.infer<typeof taskForgeFieldSchema>;

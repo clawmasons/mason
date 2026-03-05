@@ -71,7 +71,7 @@ describe("stopAgent", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pam-stop-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-stop-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -83,7 +83,7 @@ describe("stopAgent", () => {
   });
 
   function setupAgentDir(): string {
-    const agentDir = path.join(tmpDir, ".pam", "agents", "ops");
+    const agentDir = path.join(tmpDir, ".forge", "agents", "ops");
     fs.mkdirSync(agentDir, { recursive: true });
     fs.writeFileSync(
       path.join(agentDir, "docker-compose.yml"),
@@ -108,7 +108,7 @@ describe("stopAgent", () => {
   });
 
   it("exits 1 when docker-compose.yml is missing", async () => {
-    const agentDir = path.join(tmpDir, ".pam", "agents", "ops");
+    const agentDir = path.join(tmpDir, ".forge", "agents", "ops");
     fs.mkdirSync(agentDir, { recursive: true });
     // No docker-compose.yml created
 

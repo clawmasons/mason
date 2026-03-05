@@ -1,11 +1,11 @@
 ## Why
 
-After installing the example agent with `pam install`, the MCP proxy does not work correctly when started via Docker. There is no integration test that validates the full pipeline: install → docker compose up → proxy responds to MCP protocol requests. Without this, regressions in proxy config generation, docker-compose generation, or environment setup go undetected until a user tries to run an agent.
+After installing the example agent with `forge install`, the MCP proxy does not work correctly when started via Docker. There is no integration test that validates the full pipeline: install → docker compose up → proxy responds to MCP protocol requests. Without this, regressions in proxy config generation, docker-compose generation, or environment setup go undetected until a user tries to run an agent.
 
 ## What Changes
 
 - Add an MCP proxy integration test that:
-  1. Runs `pam install @example/agent-note-taker` against the example workspace
+  1. Runs `forge install @example/agent-note-taker` against the example workspace
   2. Starts the mcp-proxy service via `docker compose up`
   3. Sends MCP protocol requests (tools/list, tools/call) to the proxy endpoint using HTTP/curl
   4. Verifies the proxy responds correctly with expected tools and results
@@ -16,7 +16,7 @@ After installing the example agent with `pam install`, the MCP proxy does not wo
 ## Capabilities
 
 ### New Capabilities
-- `mcp-proxy-integration-test`: End-to-end integration test validating the full pam install → docker mcp-proxy → MCP protocol request cycle
+- `mcp-proxy-integration-test`: End-to-end integration test validating the full forge install → docker mcp-proxy → MCP protocol request cycle
 
 ### Modified Capabilities
 

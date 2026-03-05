@@ -10,4 +10,4 @@
 
 ### Requirement: Updated next steps instructions
 
-**Modified.** The "Next steps" output SHALL show `pam run <agent>` as the primary command, with `docker compose` as a manual alternative.
+**Modified.** The "Next steps" output SHALL show `forge run <agent>` as the primary command, with `docker compose` as a manual alternative.

@@ -12,10 +12,10 @@ const pkg = JSON.parse(
 const program = new Command();
 
 program
-  .name("pam")
+  .name("forge")
   .version(pkg.version)
   .description(
-    "Packaged Agent Manager — AI agent packaging, governance, and runtime orchestration",
+    "Agent Forge System — AI agent packaging, governance, and runtime orchestration",
   );
 
 registerCommands(program);

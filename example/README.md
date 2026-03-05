@@ -1,6 +1,6 @@
 # Example: Note-Taker Agent
 
-A complete PAM workspace demonstrating all 5 component types with a self-contained note-taking agent. No external API keys needed — it uses the MCP filesystem server to read and write local files.
+A complete Forge workspace demonstrating all 5 component types with a self-contained note-taking agent. No external API keys needed — it uses the MCP filesystem server to read and write local files.
 
 ## Component Overview
 
@@ -28,16 +28,16 @@ A complete PAM workspace demonstrating all 5 component types with a self-contain
 cd example
 
 # Validate the agent graph (all 4 checks should pass)
-node ../bin/pam.js validate @example/agent-note-taker
+node ../bin/forge.js validate @example/agent-note-taker
 
 # List all discovered packages
-node ../bin/pam.js list
+node ../bin/forge.js list
 
 # Install and generate deployment artifacts
-node ../bin/pam.js install @example/agent-note-taker
+node ../bin/forge.js install @example/agent-note-taker
 
 # Inspect the generated output
-ls .pam/agents/note-taker/
+ls .forge/agents/note-taker/
 ```
 
 ## Directory Structure
@@ -78,15 +78,15 @@ example/
 
 5. **Agent** (`@example/agent-note-taker`) — The top-level entry point. Uses the `claude-code` runtime and the writer role.
 
-## What `pam install` Generates
+## What `forge install` Generates
 
-Running `pam install @example/agent-note-taker` produces:
+Running `forge install @example/agent-note-taker` produces:
 
 ```
-.pam/agents/note-taker/
+.forge/agents/note-taker/
 ├── docker-compose.yml     # Container orchestration for the MCP server
 ├── .env                   # Environment variables
 ├── mcp-proxy/             # MCP proxy configuration with tool filtering
 ├── claude-code/           # Claude Code settings (MCP servers, permissions)
-└── pam.lock.json          # Resolved dependency graph snapshot
+└── forge.lock.json        # Resolved dependency graph snapshot
 ```

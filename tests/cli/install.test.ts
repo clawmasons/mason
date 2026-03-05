@@ -42,7 +42,7 @@ describe("runInstall", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pam-install-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-install-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -63,7 +63,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -78,7 +78,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "skill",
         artifacts: ["./SKILL.md"],
         description: "Labeling taxonomy",
@@ -89,7 +89,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "task",
         taskType: "subagent",
         prompt: "./triage.md",
@@ -104,7 +104,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -121,7 +121,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "agents", "ops"), {
       name: "@test/agent-ops",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "agent",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
@@ -134,7 +134,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -148,7 +148,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "skill",
         artifacts: ["./SKILL.md"],
         description: "Labeling taxonomy",
@@ -159,7 +159,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "task",
         taskType: "subagent",
         requires: {
@@ -173,7 +173,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -190,7 +190,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "agents", "ops"), {
       name: "@test/agent-ops",
       version: "1.0.0",
-      pam: {
+      forge: {
         type: "agent",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
@@ -212,7 +212,7 @@ describe("runInstall", () => {
     expect(fs.existsSync(path.join(outputDir, "claude-code/workspace/AGENTS.md"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "docker-compose.yml"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, ".env"))).toBe(true);
-    expect(fs.existsSync(path.join(outputDir, "pam.lock.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "forge.lock.json"))).toBe(true);
   });
 
   it("generates slash commands for tasks", async () => {
@@ -242,13 +242,13 @@ describe("runInstall", () => {
     expect(config.mcpServers.github.options.toolFilter.list).toContain("list_repos");
   });
 
-  it("generates .env with non-empty PAM_PROXY_TOKEN", async () => {
+  it("generates .env with non-empty FORGE_PROXY_TOKEN", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
     const envContent = fs.readFileSync(path.join(outputDir, ".env"), "utf-8");
-    const tokenMatch = envContent.match(/PAM_PROXY_TOKEN=(\S+)/);
+    const tokenMatch = envContent.match(/FORGE_PROXY_TOKEN=(\S+)/);
     expect(tokenMatch).not.toBeNull();
     expect(tokenMatch![1].length).toBe(64); // 32 bytes = 64 hex chars
   });
@@ -273,7 +273,7 @@ describe("runInstall", () => {
     const agentPkg = JSON.parse(
       fs.readFileSync(path.join(tmpDir, "agents", "ops", "package.json"), "utf-8"),
     );
-    agentPkg.pam.runtimes = ["claude-code", "codex"];
+    agentPkg.forge.runtimes = ["claude-code", "codex"];
     fs.writeFileSync(
       path.join(tmpDir, "agents", "ops", "package.json"),
       JSON.stringify(agentPkg, null, 2),
@@ -319,7 +319,7 @@ describe("runInstall", () => {
     setupValidAgent();
     await runInstall(tmpDir, "@test/agent-ops", {});
 
-    const defaultDir = path.join(tmpDir, ".pam", "agents", "ops");
+    const defaultDir = path.join(tmpDir, ".forge", "agents", "ops");
     expect(fs.existsSync(path.join(defaultDir, "mcp-proxy/config.json"))).toBe(true);
     expect(fs.existsSync(path.join(defaultDir, "docker-compose.yml"))).toBe(true);
   });
@@ -341,12 +341,12 @@ describe("runInstall", () => {
     expect(errorOutput).toContain("Install failed");
   });
 
-  it("generates pam.lock.json with correct structure", async () => {
+  it("generates forge.lock.json with correct structure", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
-    const lockPath = path.join(outputDir, "pam.lock.json");
+    const lockPath = path.join(outputDir, "forge.lock.json");
     const lock = JSON.parse(fs.readFileSync(lockPath, "utf-8"));
 
     expect(lock.lockVersion).toBe(1);
@@ -367,12 +367,12 @@ describe("runInstall", () => {
     expect(logOutput).toContain(".env");
   });
 
-  it("shows pam run as primary next step", async () => {
+  it("shows forge run as primary next step", async () => {
     setupValidAgent();
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("pam run");
+    expect(logOutput).toContain("forge run");
   });
 
   it("bakes proxy token into settings.json", async () => {
@@ -388,18 +388,18 @@ describe("runInstall", () => {
     const authHeader = settings.mcpServers[serverKeys[0]].headers.Authorization;
 
     // Should contain actual token, not the placeholder
-    expect(authHeader).not.toContain("${PAM_PROXY_TOKEN}");
+    expect(authHeader).not.toContain("${FORGE_PROXY_TOKEN}");
     expect(authHeader).toMatch(/^Bearer [a-f0-9]{64}$/);
   });
 
-  it("docker-compose.yml includes PAM_PROXY_TOKEN in mcp-proxy env", async () => {
+  it("docker-compose.yml includes FORGE_PROXY_TOKEN in mcp-proxy env", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
     const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
     const proxySection = composeContent.split("claude-code:")[0];
-    expect(proxySection).toContain("PAM_PROXY_TOKEN=${PAM_PROXY_TOKEN}");
+    expect(proxySection).toContain("FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}");
   });
 
   it("generates mcp-proxy/Dockerfile when agent has stdio apps", async () => {

@@ -29,7 +29,7 @@ export async function runList(
     // 2. Find all agent packages
     const agentNames: string[] = [];
     for (const [name, pkg] of packages) {
-      if (pkg.pamField.type === "agent") {
+      if (pkg.forgeField.type === "agent") {
         agentNames.push(name);
       }
     }

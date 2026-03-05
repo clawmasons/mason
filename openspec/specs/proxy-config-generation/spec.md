@@ -6,7 +6,7 @@ Generate a complete tbxark/mcp-proxy `config.json` from a resolved agent, includ
 ## Requirements
 
 ### Requirement: Generate complete mcpProxy section
-The system SHALL generate an `mcpProxy` section containing: `baseURL` (from agent proxy config or default `http://mcp-proxy:9090`), `addr` (default `:9090`), `name` (format `pam-proxy-{agent-short-name}`), `version` (agent version), `type` (from agent proxy config or default `sse`), and `options` with `panicIfInvalid: false`, `logEnabled: true`, and `authTokens` array.
+The system SHALL generate an `mcpProxy` section containing: `baseURL` (from agent proxy config or default `http://mcp-proxy:9090`), `addr` (default `:9090`), `name` (format `forge-proxy-{agent-short-name}`), `version` (agent version), `type` (from agent proxy config or default `sse`), and `options` with `panicIfInvalid: false`, `logEnabled: true`, and `authTokens` array.
 
 #### Scenario: Default proxy settings
 - **WHEN** `generateProxyConfig(agent)` is called and the agent has no `proxy` field overrides
@@ -31,18 +31,18 @@ For each app using sse or streamable-http transport, the system SHALL generate a
 - **THEN** the generated mcpServers entry for `amap` contains `url: "https://mcp.amap.com/sse?key=${AMAP_KEY}"` and the computed `toolFilter`
 
 ### Requirement: Generate proxy authentication token
-The system SHALL generate a `PAM_PROXY_TOKEN` using `crypto.randomUUID()` and include it in `mcpProxy.options.authTokens` as `"${PAM_PROXY_TOKEN}"`. Callers MAY override the token via `ProxyConfigOptions.authToken`.
+The system SHALL generate a `FORGE_PROXY_TOKEN` using `crypto.randomUUID()` and include it in `mcpProxy.options.authTokens` as `"${FORGE_PROXY_TOKEN}"`. Callers MAY override the token via `ProxyConfigOptions.authToken`.
 
 #### Scenario: Auto-generated token
 - **WHEN** `generateProxyConfig(agent)` is called without an explicit authToken option
-- **THEN** the config includes `authTokens: ["${PAM_PROXY_TOKEN}"]` and a generated token value is available on the result
+- **THEN** the config includes `authTokens: ["${FORGE_PROXY_TOKEN}"]` and a generated token value is available on the result
 
 #### Scenario: Caller-provided token
 - **WHEN** `generateProxyConfig(agent, { authToken: "my-custom-token" })` is called
 - **THEN** the config includes the caller's token in the authTokens
 
 ### Requirement: Preserve environment variable interpolation
-The generated config SHALL preserve `${VAR}` syntax in all `env` values and auth tokens. These are resolved by the mcp-proxy container at Docker runtime, not by pam at generation time.
+The generated config SHALL preserve `${VAR}` syntax in all `env` values and auth tokens. These are resolved by the mcp-proxy container at Docker runtime, not by forge at generation time.
 
 #### Scenario: Env vars with interpolation
 - **WHEN** an app has `env: { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }`
