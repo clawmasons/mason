@@ -137,6 +137,12 @@ Migrate all tests that reference `example/` to use `forge-core/` and remove the 
 
 **Testable output:** (1) `example/` directory does not exist. (2) All tests pass (`npx vitest run`). (3) No source file references `example/`.
 
+**Implemented:** 2026-03-05
+- [Proposal](../../changes/archive/2026-03-05-remove-example-directory/proposal.md)
+- [Design](../../changes/archive/2026-03-05-remove-example-directory/design.md)
+- [Tasks](../../changes/archive/2026-03-05-remove-example-directory/tasks.md)
+- [Specs: remove-example-directory](../../changes/archive/2026-03-05-remove-example-directory/specs/remove-example-directory/spec.md)
+
 ---
 
 ### CHANGE 6: End-to-End Install Flow Test (Local tgz)

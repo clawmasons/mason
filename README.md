@@ -24,16 +24,16 @@ forge init
 forge list
 
 # Validate an agent's dependency graph
-forge validate @example/agent-note-taker
+forge validate @clawforge/agent-note-taker
 
 # Install and generate deployment artifacts
-forge install @example/agent-note-taker
+forge install @clawforge/agent-note-taker
 
 # Run an installed agent
-forge run @example/agent-note-taker
+forge run @clawforge/agent-note-taker
 
 # Stop a running agent
-forge stop @example/agent-note-taker
+forge stop @clawforge/agent-note-taker
 ```
 
 ## Using a Local Build
@@ -95,9 +95,18 @@ import {
 } from "@clawforge/forge";
 ```
 
-## Example
+## Getting Started
 
-See the [`example/`](./example/) directory for a complete workspace demonstrating all 5 component types (app, skill, task, role, agent) with a self-contained note-taking agent.
+Bootstrap a new agent project with a template:
+
+```bash
+forge init --template note-taker
+forge list
+forge validate @my-project/agent-note-taker
+forge install @my-project/agent-note-taker
+```
+
+The `note-taker` template creates a working agent project that uses pre-built components from [`@clawforge/forge-core`](./forge-core/) (apps, tasks, skills, roles) as building blocks.
 
 ## Development
 

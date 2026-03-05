@@ -12,7 +12,7 @@ set -euo pipefail
 # ─── Configuration ───────────────────────────────────────────────────────────
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-EXAMPLE_DIR="$PROJECT_ROOT/example"
+WORKSPACE_DIR="$PROJECT_ROOT/forge-core"
 AGENT_DIR=""  # Set after install
 PROXY_PORT="${FORGE_PROXY_PORT:-9099}"  # Use non-default port to avoid conflicts
 PROXY_TOKEN=""  # Extracted from .env after install
@@ -50,8 +50,8 @@ cleanup() {
     (cd "$AGENT_DIR" && $COMPOSE_CMD down --remove-orphans 2>/dev/null) || true
   fi
   # Remove generated .forge directory
-  if [[ -d "$EXAMPLE_DIR/.forge" ]]; then
-    rm -rf "$EXAMPLE_DIR/.forge"
+  if [[ -d "$WORKSPACE_DIR/.forge" ]]; then
+    rm -rf "$WORKSPACE_DIR/.forge"
   fi
 }
 
@@ -77,14 +77,14 @@ pass "forge built"
 
 # ─── Step 3: Run forge install ───────────────────────────────────────────────
 
-info "Running forge install from example directory..."
+info "Running forge install from forge-core directory..."
 
 # Clean previous install
-rm -rf "$EXAMPLE_DIR/.forge"
+rm -rf "$WORKSPACE_DIR/.forge"
 
-(cd "$EXAMPLE_DIR" && node ../bin/forge.js install @example/agent-note-taker) || fail "forge install failed"
+(cd "$WORKSPACE_DIR" && node ../bin/forge.js install @clawforge/agent-note-taker) || fail "forge install failed"
 
-AGENT_DIR="$EXAMPLE_DIR/.forge/agents/note-taker"
+AGENT_DIR="$WORKSPACE_DIR/.forge/agents/note-taker"
 
 # Verify generated files exist
 [[ -f "$AGENT_DIR/mcp-proxy/config.json" ]] || fail "mcp-proxy/config.json not generated"
