@@ -27,7 +27,7 @@ const materializerRegistry = new Map<string, RuntimeMaterializer>([
 const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents"];
 
 /**
- * Resolve the forge project root directory (where package.json, src/, bin/ live).
+ * Resolve the forge project root directory (where package.json, dist/, bin/ live).
  * Uses import.meta.url to locate the forge installation.
  */
 function getForgeProjectRoot(): string {
@@ -40,11 +40,14 @@ function getForgeProjectRoot(): string {
 /**
  * Copy a directory tree into the allFiles map with a given prefix.
  * Only copies files (not directories), recursively.
+ *
+ * @param skipDirs - Directory names to skip (defaults to ["node_modules", ".git"])
  */
 function copyDirToFiles(
   srcDir: string,
   prefix: string,
   allFiles: Map<string, string>,
+  skipDirs: string[] = ["node_modules", ".git"],
 ): void {
   if (!fs.existsSync(srcDir)) return;
 
@@ -54,9 +57,8 @@ function copyDirToFiles(
     const destPath = `${prefix}/${entry.name}`;
 
     if (entry.isDirectory()) {
-      // Skip node_modules in forge source (will be installed via npm ci)
-      if (entry.name === "node_modules" || entry.name === "dist" || entry.name === ".git") continue;
-      copyDirToFiles(srcPath, destPath, allFiles);
+      if (skipDirs.includes(entry.name)) continue;
+      copyDirToFiles(srcPath, destPath, allFiles, skipDirs);
     } else {
       allFiles.set(destPath, fs.readFileSync(srcPath, "utf-8"));
     }
@@ -148,16 +150,18 @@ export async function runInstall(
     // 7. Generate forge-proxy build context
     allFiles.set("forge-proxy/Dockerfile", proxyDockerfile);
 
-    // Copy forge project source into forge-proxy/forge/ for Docker build
+    // Copy pre-built forge package into forge-proxy/forge/ for Docker build.
+    // Only dist/, bin/, package.json, and package-lock.json are needed.
+    // Production dependencies are installed via npm ci in the Dockerfile.
     const forgeRoot = getForgeProjectRoot();
-    copyDirToFiles(path.join(forgeRoot, "src"), "forge-proxy/forge/src", allFiles);
-    copyDirToFiles(path.join(forgeRoot, "bin"), "forge-proxy/forge/bin", allFiles);
+    copyDirToFiles(path.join(forgeRoot, "dist"), "forge-proxy/forge/dist", allFiles, [".git"]);
+    copyDirToFiles(path.join(forgeRoot, "bin"), "forge-proxy/forge/bin", allFiles, [".git"]);
 
-    // Copy essential config files for the forge build
-    for (const configFile of ["package.json", "package-lock.json", "tsconfig.json", "tsconfig.build.json"]) {
-      const configPath = path.join(forgeRoot, configFile);
-      if (fs.existsSync(configPath)) {
-        allFiles.set(`forge-proxy/forge/${configFile}`, fs.readFileSync(configPath, "utf-8"));
+    // Copy package.json and package-lock.json for dependency installation in Docker
+    for (const metaFile of ["package.json", "package-lock.json"]) {
+      const metaPath = path.join(forgeRoot, metaFile);
+      if (fs.existsSync(metaPath)) {
+        allFiles.set(`forge-proxy/forge/${metaFile}`, fs.readFileSync(metaPath, "utf-8"));
       }
     }
 
