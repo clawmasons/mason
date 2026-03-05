@@ -352,9 +352,16 @@ Replace the existing `tests/integration/mcp-proxy.sh` with a comprehensive test 
   7. Proxy shuts down cleanly on SIGTERM
 - Cleanup: remove temp DB after test
 
-**Testable output:** `npm run test:integration` passes. All 7 scenarios verified.
+**Testable output:** `npx vitest run tests/integration/forge-proxy.test.ts` passes. All 7 scenarios verified (9 tests total).
 
-**Not Implemented Yet**
+**Implemented** — [Archived Change](../../openspec/changes/archive/2026-03-05-e2e-integration-test/)
+
+- **Proposal:** [proposal.md](../../openspec/changes/archive/2026-03-05-e2e-integration-test/proposal.md)
+- **Design:** [design.md](../../openspec/changes/archive/2026-03-05-e2e-integration-test/design.md)
+- **Tasks:** [tasks.md](../../openspec/changes/archive/2026-03-05-e2e-integration-test/tasks.md)
+- **Spec:** [mcp-proxy-integration-test/spec.md](../../openspec/specs/mcp-proxy-integration-test/spec.md)
+- **Test:** `tests/integration/forge-proxy.test.ts` (9 tests)
+- **Deprecated:** `tests/integration/mcp-proxy.sh` (replaced by Vitest test)
 
 ---
 
