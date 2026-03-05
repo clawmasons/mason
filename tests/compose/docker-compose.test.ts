@@ -135,6 +135,23 @@ describe("generateDockerCompose", () => {
       expect(yaml).toContain("./forge-proxy/logs:/logs");
     });
 
+    it("mounts data directory for persistent DB", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services);
+
+      expect(yaml).toContain("./data:/home/node/data");
+    });
+
+    it("sets FORGE_DB_PATH environment variable", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services);
+
+      const proxySection = yaml.split("claude-code:")[0];
+      expect(proxySection).toContain("FORGE_DB_PATH=/home/node/data/forge.db");
+    });
+
     it("does not mount config.json", () => {
       const agent = makeRepoOpsAgent();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);

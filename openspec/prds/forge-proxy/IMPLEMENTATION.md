@@ -355,3 +355,28 @@ Replace the existing `tests/integration/mcp-proxy.sh` with a comprehensive test 
 **Testable output:** `npm run test:integration` passes. All 7 scenarios verified.
 
 **Not Implemented Yet**
+
+---
+
+### CHANGE 11: Persist forge.db & Run Proxy as Non-Root
+
+Make the proxy container production-ready by persisting the SQLite database across container restarts and running the proxy process as the non-root `node` user.
+
+**PRD refs:** REQ-008 (SQLite Database Schema — persistence), PRD §2 (reliability goals)
+
+**Summary:** Move the default database path from `~/.forge/forge.db` to `~/.forge/data/forge.db` (isolating it in a `data/` subdirectory). Add `FORGE_DB_PATH` env var override. Mount `./data:/home/node/data` in docker-compose with `FORGE_DB_PATH=/home/node/data/forge.db` so the DB survives container restarts. Add `USER node` to the Dockerfile so the proxy runs as non-root.
+
+**User Story:** As an agent operator, when my proxy container restarts, I don't lose my audit logs and approval requests. The container also runs as non-root for security best practices.
+
+**Scope:**
+- Modify: `src/proxy/db.ts` — `FORGE_DB_PATH` env var support, default to `~/.forge/data/forge.db`
+- Modify: `src/generator/proxy-dockerfile.ts` — `USER node`, `mkdir`/`chown` for `/home/node/data` and `/logs`
+- Modify: `src/compose/docker-compose.ts` — `./data:/home/node/data` volume, `FORGE_DB_PATH` env var
+- Update tests: `tests/proxy/db.test.ts`, `tests/generator/proxy-dockerfile.test.ts`, `tests/compose/docker-compose.test.ts`
+
+**Testable output:** All 529 tests pass. Dockerfile contains `USER node`. Docker-compose mounts data volume. DB opens at env var path when set.
+
+**Implemented** — [Archived Change](../../openspec/changes/archive/2026-03-05-active/)
+
+- **Source:** `src/proxy/db.ts`, `src/generator/proxy-dockerfile.ts`, `src/compose/docker-compose.ts` (all modified)
+- **Tests:** `tests/proxy/db.test.ts` (17 tests), `tests/generator/proxy-dockerfile.test.ts` (11 tests), `tests/compose/docker-compose.test.ts` (21 tests)

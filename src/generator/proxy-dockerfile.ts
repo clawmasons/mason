@@ -23,6 +23,8 @@ COPY --from=builder /build/forge/bin ./bin
 COPY --from=builder /build/forge/node_modules ./node_modules
 COPY --from=builder /build/forge/package.json ./
 COPY workspace/ ./workspace/
+RUN mkdir -p /home/node/data /logs && chown -R node:node /app /home/node/data /logs
+USER node
 WORKDIR /app/workspace
 ENTRYPOINT ["node", "/app/bin/forge.js"]
 CMD ["proxy", "--agent", "${agentName}"]

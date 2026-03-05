@@ -114,8 +114,10 @@ export function generateDockerCompose(
   lines.push(`      - "\${FORGE_PROXY_PORT:-${port}}:${port}"`);
   lines.push("    volumes:");
   lines.push("      - ./forge-proxy/logs:/logs");
+  lines.push("      - ./data:/home/node/data");
 
   lines.push("    environment:");
+  lines.push("      - FORGE_DB_PATH=/home/node/data/forge.db");
   lines.push("      - FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}");
   for (const varName of envVars) {
     lines.push(`      - ${varName}=\${${varName}}`);

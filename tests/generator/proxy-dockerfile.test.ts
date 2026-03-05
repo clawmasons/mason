@@ -58,6 +58,19 @@ describe("generateProxyDockerfile", () => {
     expect(result).toContain("@clawforge/agent-repo-ops");
   });
 
+  it("runs as non-root node user", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
+
+    expect(result).toContain("USER node");
+  });
+
+  it("creates and owns /home/node/data directory", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
+
+    expect(result).toContain("mkdir -p /home/node/data");
+    expect(result).toContain("chown -R node:node /app /home/node/data /logs");
+  });
+
   it("does not reference mcp-proxy binary", () => {
     const result = generateProxyDockerfile("@test/agent-test");
 
