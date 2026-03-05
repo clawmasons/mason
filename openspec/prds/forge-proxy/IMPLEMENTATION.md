@@ -189,7 +189,14 @@ Add audit logging to the proxy's tool call pipeline.
 
 **Testable output:** Start proxy, call a tool, query `audit_log` table — verify row exists with correct agent_name, app_name, tool_name, arguments, result, status="success", and duration_ms > 0. Call a filtered tool — verify row with status="denied".
 
-**Not Implemented Yet**
+**Implemented** — [Archived Change](../../openspec/changes/archive/2026-03-05-audit-logging-hook/)
+
+- **Proposal:** [proposal.md](../../openspec/changes/archive/2026-03-05-audit-logging-hook/proposal.md)
+- **Design:** [design.md](../../openspec/changes/archive/2026-03-05-audit-logging-hook/design.md)
+- **Tasks:** [tasks.md](../../openspec/changes/archive/2026-03-05-audit-logging-hook/tasks.md)
+- **Spec:** [audit-logging-hook/spec.md](../../openspec/specs/audit-logging-hook/spec.md)
+- **Source:** `src/proxy/hooks/audit.ts`, `src/proxy/server.ts` (modified)
+- **Tests:** `tests/proxy/hooks/audit.test.ts` (9 tests), `tests/proxy/server.test.ts` (4 new audit tests)
 
 ---
 
