@@ -178,3 +178,9 @@ This test proves the entire packaging + template + discovery + install pipeline 
 - Cleans up temp directory after (pass or fail)
 
 **Testable output:** Integration test passes. The full sequence — pack, install from tgz, init, validate, list, install — completes without errors in a clean directory with no registry access.
+
+**Implemented:** 2026-03-05
+- [Proposal](../../changes/archive/2026-03-05-e2e-install-flow-test/proposal.md)
+- [Design](../../changes/archive/2026-03-05-e2e-install-flow-test/design.md)
+- [Tasks](../../changes/archive/2026-03-05-e2e-install-flow-test/tasks.md)
+- [Specs: e2e-install-flow](../../changes/archive/2026-03-05-e2e-install-flow-test/specs/e2e-install-flow/spec.md)
