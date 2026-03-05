@@ -1,57 +1,77 @@
-# Spec: mcp-proxy-integration-test
+# Spec: forge-proxy-integration-test
 
 ## Purpose
 
-End-to-end integration test that validates the full FORGE pipeline: build → forge install → docker compose up → MCP protocol requests via HTTP, ensuring the mcp-proxy works correctly with stdio MCP servers.
+End-to-end integration test that validates the full native forge proxy pipeline with a real upstream MCP server: UpstreamManager → ToolRouter → ForgeProxyServer → MCP Client, including audit logging and approval workflows.
 
 ## Requirements
 
-### Requirement: Integration test installs example agent
-The system SHALL provide an integration test that runs `forge install @example/agent-note-taker` against the example workspace and verifies the generated output directory contains a valid mcp-proxy config and docker-compose.yml.
+### Requirement: Integration test starts proxy with real upstream
+The system SHALL provide a Vitest integration test (`tests/integration/forge-proxy.test.ts`) that programmatically wires UpstreamManager, ToolRouter, and ForgeProxyServer with a real `@modelcontextprotocol/server-filesystem` upstream via stdio transport.
 
-#### Scenario: Install produces valid proxy config
-- **WHEN** the integration test runs `node ../bin/forge.js install @example/agent-note-taker` from the example directory (after `npm run build`)
-- **THEN** the output directory `.forge/agents/note-taker/` SHALL contain `mcp-proxy/config.json`, `docker-compose.yml`, and `.env`
-- **AND** the `mcp-proxy/config.json` SHALL contain valid JSON with `mcpProxy` and `mcpServers` keys
+#### Scenario: Proxy starts and accepts MCP connections
+- **WHEN** the integration test creates an UpstreamManager with the filesystem server, builds a ToolRouter from discovered tools, and starts a ForgeProxyServer
+- **THEN** an MCP client SHALL be able to connect via streamable-http transport
+- **AND** `tools/list` SHALL return a non-empty list of tools
 
-### Requirement: Integration test starts mcp-proxy via Docker
-The system SHALL start the mcp-proxy service using `docker compose up -d mcp-proxy` from the generated output directory and wait for it to become healthy.
+### Requirement: Integration test verifies tool name prefixing and filtering
+The system SHALL verify that upstream tool names are correctly prefixed with the app short name.
 
-#### Scenario: Proxy container starts successfully
-- **WHEN** the integration test runs `docker compose up -d mcp-proxy` in the generated agent directory
-- **THEN** the mcp-proxy container SHALL start and begin listening on the configured port
-- **AND** the test SHALL retry health checks with exponential backoff until the proxy responds or a timeout is reached
+#### Scenario: Tools list returns prefixed filesystem tools
+- **WHEN** the test calls `tools/list` through the proxy
+- **THEN** all returned tool names SHALL be prefixed with `filesystem_`
+- **AND** the tools SHALL include `filesystem_read_file`, `filesystem_write_file`, and `filesystem_list_directory`
 
-### Requirement: Integration test verifies MCP protocol via HTTP
-The system SHALL send MCP protocol requests to the running proxy endpoint and verify correct responses, simulating what an agent client would do.
+### Requirement: Integration test verifies tool call forwarding
+The system SHALL verify that tool calls are correctly forwarded to the upstream server and return valid results.
 
-#### Scenario: Tools list request returns expected tools
-- **WHEN** the test sends an MCP `tools/list` request to the proxy SSE/HTTP endpoint with a valid auth token
-- **THEN** the proxy SHALL respond with a list of tools that includes the filesystem tools defined in the example app (read_file, write_file, list_directory, create_directory)
+#### Scenario: Read file returns correct content
+- **WHEN** the test calls `filesystem_read_file` with a path to a seeded test file
+- **THEN** the result SHALL contain the expected file content without errors
 
-#### Scenario: Tool call request executes successfully
-- **WHEN** the test sends an MCP `tools/call` request for `list_directory` with path `./` to the proxy
-- **THEN** the proxy SHALL execute the tool via the configured stdio server and return a valid result
+#### Scenario: Write + read round-trip succeeds
+- **WHEN** the test calls `filesystem_write_file` followed by `filesystem_read_file` on the same path
+- **THEN** the read result SHALL contain the written content
 
-#### Scenario: Unauthenticated request is rejected
-- **WHEN** the test sends a request without a valid auth token
-- **THEN** the proxy SHALL reject the request with an appropriate error status
+#### Scenario: Unknown tool returns error
+- **WHEN** the test calls a non-existent tool name
+- **THEN** the result SHALL have `isError: true` with an "Unknown tool" message
 
-### Requirement: Integration test cleans up Docker resources
-The system SHALL tear down all Docker resources (containers, networks) after test completion, regardless of test pass/fail.
+### Requirement: Integration test verifies audit logging
+The system SHALL verify that tool calls are logged to the SQLite audit_log table.
 
-#### Scenario: Cleanup on success
-- **WHEN** all test assertions pass
-- **THEN** the test SHALL run `docker compose down` to remove all containers and networks
+#### Scenario: Successful tool calls are logged
+- **WHEN** the test queries the audit_log table after successful tool calls
+- **THEN** entries SHALL exist with `status="success"`, correct `agent_name`, `app_name`, `tool_name`, and `duration_ms >= 0`
 
-#### Scenario: Cleanup on failure
-- **WHEN** any test assertion fails
-- **THEN** the test SHALL still run `docker compose down` in a finally/afterAll block
+#### Scenario: Denied tool calls are logged
+- **WHEN** the test calls an unknown tool and queries the audit_log
+- **THEN** an entry SHALL exist with `status="denied"` and the attempted tool name
 
-### Requirement: Integration test retries with backoff
-The system SHALL implement retry logic with backoff when connecting to the proxy, since Docker containers take time to start.
+### Requirement: Integration test verifies approval workflow
+The system SHALL verify that approval-required tools are blocked and auto-deny after TTL expiry.
 
-#### Scenario: Proxy not immediately available
-- **WHEN** the proxy container is starting and not yet responding
-- **THEN** the test SHALL retry the connection with increasing delays up to a maximum timeout (e.g., 30 seconds)
-- **AND** the test SHALL fail with a clear timeout error if the proxy never becomes available
+#### Scenario: Approval-required tool auto-denies after TTL
+- **WHEN** the test configures approval patterns matching `filesystem_write_*` with a short TTL
+- **AND** calls `filesystem_write_file`
+- **THEN** the call SHALL return `isError: true` with "timed out" in the message
+- **AND** the audit log SHALL show `status="timeout"`
+- **AND** the file SHALL NOT be written to disk
+
+#### Scenario: Non-matching tool proceeds without approval
+- **WHEN** a tool not matching approval patterns is called (e.g., `filesystem_read_file`)
+- **THEN** the call SHALL proceed normally and return correct results
+
+### Requirement: Integration test verifies clean shutdown
+The system SHALL verify that the proxy server shuts down cleanly.
+
+#### Scenario: Server stops accepting connections after shutdown
+- **WHEN** a proxy server is started, used, and then stopped via `server.stop()`
+- **THEN** subsequent connection attempts SHALL be rejected
+
+### Requirement: Integration test cleans up resources
+The system SHALL clean up all resources (temp directory, SQLite databases, upstream processes) after test completion.
+
+#### Scenario: Cleanup on success or failure
+- **WHEN** all tests complete (pass or fail)
+- **THEN** the `afterAll` hook SHALL close the MCP client, stop the server, shutdown the upstream manager, close the database, and remove the temp directory
