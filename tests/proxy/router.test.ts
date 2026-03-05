@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ToolRouter } from "../../src/proxy/router.js";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { ToolRouter, ResourceRouter, PromptRouter } from "../../src/proxy/router.js";
+import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolFilter } from "../../src/generator/types.js";
 
 // ── Fixtures ────────────────────────────────────────────────────────────
@@ -250,5 +250,199 @@ describe("ToolRouter.resolve", () => {
     const router = new ToolRouter(upstreamTools, filters);
 
     expect(router.resolve("")).toBeNull();
+  });
+});
+
+// ── ResourceRouter ──────────────────────────────────────────────────────
+
+function makeResource(name: string, uri: string, description?: string): Resource {
+  return {
+    name,
+    uri,
+    description: description ?? `Resource: ${name}`,
+  };
+}
+
+describe("ResourceRouter", () => {
+  it("prefixes resource names with app short name", () => {
+    const resources = new Map<string, Resource[]>([
+      ["@clawforge/app-github", [makeResource("repository", "repo://owner/name")]],
+    ]);
+
+    const router = new ResourceRouter(resources);
+    const listed = router.listResources();
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0]!.name).toBe("github_repository");
+    expect(listed[0]!.uri).toBe("repo://owner/name");
+    expect(listed[0]!.description).toBe("Resource: repository");
+  });
+
+  it("lists resources from multiple apps", () => {
+    const resources = new Map<string, Resource[]>([
+      ["@clawforge/app-github", [makeResource("repository", "repo://owner/name")]],
+      ["@clawforge/app-slack", [makeResource("channel", "slack://channel/general")]],
+    ]);
+
+    const router = new ResourceRouter(resources);
+    const listed = router.listResources();
+
+    expect(listed).toHaveLength(2);
+    expect(listed.map((r) => r.name).sort()).toEqual([
+      "github_repository",
+      "slack_channel",
+    ]);
+  });
+
+  it("returns empty array when no resources", () => {
+    const router = new ResourceRouter(new Map());
+    expect(router.listResources()).toHaveLength(0);
+  });
+
+  it("resolves known URI to app and original URI", () => {
+    const resources = new Map<string, Resource[]>([
+      ["@clawforge/app-github", [makeResource("repository", "repo://owner/name")]],
+    ]);
+
+    const router = new ResourceRouter(resources);
+    const result = router.resolveUri("repo://owner/name");
+
+    expect(result).not.toBeNull();
+    expect(result!.appName).toBe("@clawforge/app-github");
+    expect(result!.originalUri).toBe("repo://owner/name");
+  });
+
+  it("returns null for unknown URI", () => {
+    const resources = new Map<string, Resource[]>([
+      ["@clawforge/app-github", [makeResource("repository", "repo://owner/name")]],
+    ]);
+
+    const router = new ResourceRouter(resources);
+    expect(router.resolveUri("unknown://foo")).toBeNull();
+  });
+
+  it("preserves resource mimeType and annotations", () => {
+    const resource: Resource = {
+      name: "readme",
+      uri: "file://README.md",
+      mimeType: "text/markdown",
+      annotations: { audience: ["user"] },
+    };
+    const resources = new Map<string, Resource[]>([
+      ["@clawforge/app-github", [resource]],
+    ]);
+
+    const router = new ResourceRouter(resources);
+    const listed = router.listResources();
+
+    expect(listed[0]!.mimeType).toBe("text/markdown");
+    expect(listed[0]!.annotations).toEqual({ audience: ["user"] });
+  });
+
+  it("first app wins on duplicate URI", () => {
+    const resources = new Map<string, Resource[]>([
+      ["@clawforge/app-github", [makeResource("repo", "shared://data")]],
+      ["@clawforge/app-slack", [makeResource("data", "shared://data")]],
+    ]);
+
+    const router = new ResourceRouter(resources);
+    const result = router.resolveUri("shared://data");
+
+    expect(result!.appName).toBe("@clawforge/app-github");
+  });
+});
+
+// ── PromptRouter ────────────────────────────────────────────────────────
+
+function makePrompt(name: string, description?: string): Prompt {
+  return {
+    name,
+    description: description ?? `Prompt: ${name}`,
+  };
+}
+
+describe("PromptRouter", () => {
+  it("prefixes prompt names with app short name", () => {
+    const prompts = new Map<string, Prompt[]>([
+      ["@clawforge/app-github", [makePrompt("pr_review")]],
+    ]);
+
+    const router = new PromptRouter(prompts);
+    const listed = router.listPrompts();
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0]!.name).toBe("github_pr_review");
+    expect(listed[0]!.description).toBe("Prompt: pr_review");
+  });
+
+  it("lists prompts from multiple apps", () => {
+    const prompts = new Map<string, Prompt[]>([
+      ["@clawforge/app-github", [makePrompt("pr_review")]],
+      ["@clawforge/app-slack", [makePrompt("standup")]],
+    ]);
+
+    const router = new PromptRouter(prompts);
+    const listed = router.listPrompts();
+
+    expect(listed).toHaveLength(2);
+    expect(listed.map((p) => p.name).sort()).toEqual([
+      "github_pr_review",
+      "slack_standup",
+    ]);
+  });
+
+  it("returns empty array when no prompts", () => {
+    const router = new PromptRouter(new Map());
+    expect(router.listPrompts()).toHaveLength(0);
+  });
+
+  it("resolves known prefixed name to route entry", () => {
+    const prompts = new Map<string, Prompt[]>([
+      ["@clawforge/app-github", [makePrompt("pr_review")]],
+    ]);
+
+    const router = new PromptRouter(prompts);
+    const entry = router.resolve("github_pr_review");
+
+    expect(entry).not.toBeNull();
+    expect(entry!.appName).toBe("@clawforge/app-github");
+    expect(entry!.appShortName).toBe("github");
+    expect(entry!.originalName).toBe("pr_review");
+    expect(entry!.prefixedName).toBe("github_pr_review");
+  });
+
+  it("returns null for unknown prefixed name", () => {
+    const prompts = new Map<string, Prompt[]>([
+      ["@clawforge/app-github", [makePrompt("pr_review")]],
+    ]);
+
+    const router = new PromptRouter(prompts);
+    expect(router.resolve("github_unknown")).toBeNull();
+  });
+
+  it("returns null for empty string", () => {
+    const router = new PromptRouter(new Map());
+    expect(router.resolve("")).toBeNull();
+  });
+
+  it("preserves prompt arguments", () => {
+    const prompt: Prompt = {
+      name: "pr_review",
+      description: "Review a PR",
+      arguments: [
+        { name: "pr_number", description: "PR number", required: true },
+        { name: "style", description: "Review style" },
+      ],
+    };
+    const prompts = new Map<string, Prompt[]>([
+      ["@clawforge/app-github", [prompt]],
+    ]);
+
+    const router = new PromptRouter(prompts);
+    const listed = router.listPrompts();
+
+    expect(listed[0]!.arguments).toHaveLength(2);
+    expect(listed[0]!.arguments![0]!.name).toBe("pr_number");
+    expect(listed[0]!.arguments![0]!.required).toBe(true);
   });
 });

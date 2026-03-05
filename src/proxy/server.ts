@@ -5,9 +5,13 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type Database from "better-sqlite3";
-import type { ToolRouter } from "./router.js";
+import type { ToolRouter, ResourceRouter, PromptRouter } from "./router.js";
 import type { UpstreamManager } from "./upstream.js";
 import { auditPreHook, auditPostHook } from "./hooks/audit.js";
 import type { HookContext } from "./hooks/audit.js";
@@ -25,6 +29,8 @@ export interface ForgeProxyServerConfig {
   agentName?: string;
   approvalPatterns?: string[];
   approvalOptions?: ApprovalOptions;
+  resourceRouter?: ResourceRouter;
+  promptRouter?: PromptRouter;
 }
 
 // ── ForgeProxyServer ──────────────────────────────────────────────────
@@ -172,11 +178,15 @@ export class ForgeProxyServer {
   // ── MCP Server Factory ────────────────────────────────────────────
 
   private createMcpServer(): Server {
-    const { router, upstream, db, agentName, approvalPatterns, approvalOptions } = this.config;
+    const { router, upstream, db, agentName, approvalPatterns, approvalOptions, resourceRouter, promptRouter } = this.config;
+
+    const capabilities: Record<string, Record<string, never>> = { tools: {} };
+    if (resourceRouter) capabilities.resources = {};
+    if (promptRouter) capabilities.prompts = {};
 
     const server = new Server(
       { name: "forge", version: "0.1.0" },
-      { capabilities: { tools: {} } },
+      { capabilities },
     );
 
     server.setRequestHandler(ListToolsRequestSchema, () => ({
@@ -266,6 +276,38 @@ export class ForgeProxyServer {
         };
       }
     });
+
+    // ── Resource Handlers ──────────────────────────────────────────────
+    if (resourceRouter) {
+      server.setRequestHandler(ListResourcesRequestSchema, () => ({
+        resources: resourceRouter.listResources(),
+      }));
+
+      server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+        const { uri } = request.params;
+        const route = resourceRouter.resolveUri(uri);
+        if (!route) {
+          throw new Error(`Unknown resource: ${uri}`);
+        }
+        return upstream.readResource(route.appName, route.originalUri);
+      });
+    }
+
+    // ── Prompt Handlers ────────────────────────────────────────────────
+    if (promptRouter) {
+      server.setRequestHandler(ListPromptsRequestSchema, () => ({
+        prompts: promptRouter.listPrompts(),
+      }));
+
+      server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+        const { name, arguments: args } = request.params;
+        const route = promptRouter.resolve(name);
+        if (!route) {
+          throw new Error(`Unknown prompt: ${name}`);
+        }
+        return upstream.getPrompt(route.appName, route.originalName, args);
+      });
+    }
 
     return server;
   }

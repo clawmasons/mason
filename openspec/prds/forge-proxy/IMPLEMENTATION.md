@@ -253,7 +253,14 @@ Extend the proxy server to forward MCP resources and prompts from upstream serve
 
 **Testable output:** Start proxy with an upstream that exposes resources/prompts. Verify `resources/list` returns prefixed names. Call `resources/read` with prefixed name — verify correct data returned from upstream.
 
-**Not Implemented Yet**
+**Implemented** — [Archived Change](../../openspec/changes/archive/2026-03-05-resource-prompt-passthrough/)
+
+- **Proposal:** [proposal.md](../../openspec/changes/archive/2026-03-05-resource-prompt-passthrough/proposal.md)
+- **Design:** [design.md](../../openspec/changes/archive/2026-03-05-resource-prompt-passthrough/design.md)
+- **Tasks:** [tasks.md](../../openspec/changes/archive/2026-03-05-resource-prompt-passthrough/tasks.md)
+- **Spec:** [resource-prompt-passthrough/spec.md](../../openspec/specs/resource-prompt-passthrough/spec.md)
+- **Source:** `src/proxy/router.ts` (ResourceRouter, PromptRouter), `src/proxy/server.ts` (modified)
+- **Tests:** `tests/proxy/router.test.ts` (14 new tests), `tests/proxy/server.test.ts` (8 new tests)
 
 ---
 
