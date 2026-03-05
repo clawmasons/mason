@@ -218,7 +218,7 @@ export function resolveAgent(
 ): ResolvedAgent {
   const pkg = getPackage(agentName, packages);
   assertType(pkg, "agent", undefined);
-  const forge = pkg.forgeField as { type: "agent"; runtimes: string[]; roles: string[]; description?: string; resources?: Array<{ type: string; ref: string; access: string }>; proxy?: { image?: string; port?: number; type?: "sse" | "streamable-http" } };
+  const forge = pkg.forgeField as { type: "agent"; runtimes: string[]; roles: string[]; description?: string; resources?: Array<{ type: string; ref: string; access: string }>; proxy?: { port?: number; type?: "sse" | "streamable-http" } };
   const agentContext = `agent "${agentName}"`;
 
   // Resolve all roles

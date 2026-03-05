@@ -319,7 +319,15 @@ Update the install pipeline and Docker generation to use the native `forge proxy
 
 **Testable output:** Run `forge install @example/agent-note-taker`. Verify: no `mcp-proxy/config.json` generated, `docker-compose.yml` proxy service uses `forge proxy` command, Dockerfile builds forge image. Existing tests updated and passing.
 
-**Not Implemented Yet**
+**Implemented** — [Archived Change](../../openspec/changes/archive/2026-03-05-docker-install-pipeline/)
+
+- **Proposal:** [proposal.md](../../openspec/changes/archive/2026-03-05-docker-install-pipeline/proposal.md)
+- **Design:** [design.md](../../openspec/changes/archive/2026-03-05-docker-install-pipeline/design.md)
+- **Tasks:** [tasks.md](../../openspec/changes/archive/2026-03-05-docker-install-pipeline/tasks.md)
+- **Spec:** [docker-install-pipeline/spec.md](../../openspec/specs/docker-install-pipeline/spec.md)
+- **Source:** `src/schemas/agent.ts`, `src/resolver/types.ts`, `src/compose/docker-compose.ts`, `src/generator/proxy-dockerfile.ts`, `src/cli/commands/install.ts` (all modified)
+- **Deprecated:** `src/generator/proxy-config.ts` (no longer imported by install pipeline)
+- **Tests:** `tests/compose/docker-compose.test.ts` (19 tests), `tests/generator/proxy-dockerfile.test.ts` (9 tests), `tests/cli/install.test.ts` (26 tests)
 
 ---
 

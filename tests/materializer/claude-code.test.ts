@@ -116,7 +116,6 @@ function makeRepoOpsAgent(): ResolvedAgent {
     runtimes: ["claude-code", "codex"],
     roles: [issueManager, prReviewer],
     proxy: {
-      image: "ghcr.io/tbxark/mcp-proxy:latest",
       port: 9090,
       type: "sse",
     },

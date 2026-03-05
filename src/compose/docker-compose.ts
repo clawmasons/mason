@@ -91,16 +91,14 @@ function renderComposeService(service: ComposeServiceDef): string {
  * Generate a complete docker-compose.yml string from a resolved agent
  * and its runtime compose services.
  *
- * The proxy service aggregates all MCP app servers. Runtime services
+ * The proxy service runs `forge proxy` natively. Runtime services
  * are rendered from their ComposeServiceDef definitions.
  */
 export function generateDockerCompose(
   agent: ResolvedAgent,
   runtimeServices: Map<string, ComposeServiceDef>,
-  hasProxyDockerfile?: boolean,
 ): string {
   const port = agent.proxy?.port ?? 9090;
-  const image = agent.proxy?.image ?? "ghcr.io/tbxark/mcp-proxy:latest";
   const envVars = collectProxyEnvVars(agent);
 
   const lines: string[] = [];
@@ -108,23 +106,14 @@ export function generateDockerCompose(
   lines.push("services:");
   lines.push("");
 
-  // mcp-proxy service
+  // forge proxy service (service name kept as mcp-proxy for depends_on compatibility)
   lines.push("  mcp-proxy:");
-  if (hasProxyDockerfile) {
-    lines.push("    build: ./mcp-proxy");
-  } else {
-    lines.push(`    image: ${image}`);
-  }
-  lines.push('    entrypoint: ["/bin/sh", "-c"]');
-  lines.push(
-    '    command: ["mcp-proxy --config /config/config.json 2>&1 | tee -a /logs/mcp-proxy.log"]',
-  );
+  lines.push("    build: ./forge-proxy");
   lines.push("    restart: unless-stopped");
   lines.push("    ports:");
   lines.push(`      - "\${FORGE_PROXY_PORT:-${port}}:${port}"`);
   lines.push("    volumes:");
-  lines.push("      - ./mcp-proxy/config.json:/config/config.json:ro");
-  lines.push("      - ./mcp-proxy/logs:/logs");
+  lines.push("      - ./forge-proxy/logs:/logs");
 
   lines.push("    environment:");
   lines.push("      - FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}");

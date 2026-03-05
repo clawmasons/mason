@@ -206,13 +206,21 @@ describe("runInstall", () => {
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
     // Check all expected files exist
-    expect(fs.existsSync(path.join(outputDir, "mcp-proxy/config.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "forge-proxy/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "claude-code/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "claude-code/workspace/.claude/settings.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "claude-code/workspace/AGENTS.md"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "docker-compose.yml"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, ".env"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "forge.lock.json"))).toBe(true);
+  });
+
+  it("does not generate mcp-proxy config.json", async () => {
+    setupValidAgent();
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    expect(fs.existsSync(path.join(outputDir, "mcp-proxy/config.json"))).toBe(false);
   });
 
   it("generates slash commands for tasks", async () => {
@@ -226,20 +234,6 @@ describe("runInstall", () => {
     const content = fs.readFileSync(commandPath, "utf-8");
     expect(content).toContain("@test/task-triage");
     expect(content).toContain("manager");
-  });
-
-  it("generates proxy config with correct toolFilters", async () => {
-    setupValidAgent();
-    const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
-
-    const configPath = path.join(outputDir, "mcp-proxy/config.json");
-    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-
-    expect(config.mcpServers.github).toBeDefined();
-    expect(config.mcpServers.github.options.toolFilter.mode).toBe("allow");
-    expect(config.mcpServers.github.options.toolFilter.list).toContain("create_issue");
-    expect(config.mcpServers.github.options.toolFilter.list).toContain("list_repos");
   });
 
   it("generates .env with non-empty FORGE_PROXY_TOKEN", async () => {
@@ -312,7 +306,7 @@ describe("runInstall", () => {
     expect(firstToken).not.toBe(secondToken);
 
     // Files still exist
-    expect(fs.existsSync(path.join(outputDir, "mcp-proxy/config.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "forge-proxy/Dockerfile"))).toBe(true);
   });
 
   it("uses default output directory when --output-dir not specified", async () => {
@@ -320,7 +314,7 @@ describe("runInstall", () => {
     await runInstall(tmpDir, "@test/agent-ops", {});
 
     const defaultDir = path.join(tmpDir, ".forge", "agents", "ops");
-    expect(fs.existsSync(path.join(defaultDir, "mcp-proxy/config.json"))).toBe(true);
+    expect(fs.existsSync(path.join(defaultDir, "forge-proxy/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(defaultDir, "docker-compose.yml"))).toBe(true);
   });
 
@@ -329,7 +323,7 @@ describe("runInstall", () => {
     const customDir = path.join(tmpDir, "custom-output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: customDir });
 
-    expect(fs.existsSync(path.join(customDir, "mcp-proxy/config.json"))).toBe(true);
+    expect(fs.existsSync(path.join(customDir, "forge-proxy/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(customDir, "docker-compose.yml"))).toBe(true);
   });
 
@@ -392,7 +386,7 @@ describe("runInstall", () => {
     expect(authHeader).toMatch(/^Bearer [a-f0-9]{64}$/);
   });
 
-  it("docker-compose.yml includes FORGE_PROXY_TOKEN in mcp-proxy env", async () => {
+  it("docker-compose.yml includes FORGE_PROXY_TOKEN in proxy env", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
@@ -402,27 +396,48 @@ describe("runInstall", () => {
     expect(proxySection).toContain("FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}");
   });
 
-  it("generates mcp-proxy/Dockerfile when agent has stdio apps", async () => {
+  it("generates forge-proxy/Dockerfile with forge build", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
-    const dockerfilePath = path.join(outputDir, "mcp-proxy/Dockerfile");
+    const dockerfilePath = path.join(outputDir, "forge-proxy/Dockerfile");
     expect(fs.existsSync(dockerfilePath)).toBe(true);
 
     const dockerfile = fs.readFileSync(dockerfilePath, "utf-8");
     expect(dockerfile).toContain("FROM node:22-slim");
-    expect(dockerfile).toContain("COPY --from=proxy /main /usr/local/bin/mcp-proxy");
+    expect(dockerfile).toContain("forge.js");
+    expect(dockerfile).toContain('"proxy"');
+    expect(dockerfile).not.toContain("mcp-proxy");
   });
 
-  it("docker-compose.yml uses build: when stdio apps exist", async () => {
+  it("docker-compose.yml uses build: ./forge-proxy", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
     const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
-    expect(composeContent).toContain("build: ./mcp-proxy");
-    expect(composeContent).not.toContain("image: ghcr.io/tbxark/mcp-proxy:latest");
+    expect(composeContent).toContain("build: ./forge-proxy");
+    expect(composeContent).not.toContain("image: ghcr.io/tbxark/mcp-proxy");
+  });
+
+  it("copies forge source into forge-proxy/forge/ build context", async () => {
+    setupValidAgent();
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    // Forge source files should be in the build context
+    expect(fs.existsSync(path.join(outputDir, "forge-proxy/forge/package.json"))).toBe(true);
+  });
+
+  it("copies workspace directories into forge-proxy/workspace/", async () => {
+    setupValidAgent();
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    // Agent workspace should be in the build context
+    expect(fs.existsSync(path.join(outputDir, "forge-proxy/workspace/agents/ops/package.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "forge-proxy/workspace/apps/github/package.json"))).toBe(true);
   });
 
   it("Dockerfile includes DISABLE_AUTOUPDATER but not OOBE (externalized)", async () => {
@@ -468,4 +483,3 @@ describe("runInstall", () => {
     expect(claudeSection).toContain("restart: no");
   });
 });
-

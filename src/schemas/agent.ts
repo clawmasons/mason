@@ -7,7 +7,6 @@ const resourceSchema = z.object({
 });
 
 const proxySchema = z.object({
-  image: z.string().optional(),
   port: z.number().int().positive().optional(),
   type: z.enum(["sse", "streamable-http"]).optional(),
 });

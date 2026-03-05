@@ -121,7 +121,7 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
     runtimes: ["claude-code", "codex"],
     roles: ["@clawforge/role-issue-manager", "@clawforge/role-pr-reviewer"],
     resources: [{ type: "github-repo", ref: "clawforge/openclaw", access: "read-write" }],
-    proxy: { image: "ghcr.io/tbxark/mcp-proxy:latest", port: 9090, type: "sse" },
+    proxy: { port: 9090, type: "sse" },
   }));
 
   return packages;
@@ -225,7 +225,6 @@ describe("resolveAgent", () => {
         access: "read-write",
       });
       expect(resolved.proxy).toEqual({
-        image: "ghcr.io/tbxark/mcp-proxy:latest",
         port: 9090,
         type: "sse",
       });

@@ -2,8 +2,8 @@
 
 ### Requirement: generateDockerCompose produces a valid docker-compose.yml string
 
-The system SHALL provide a `generateDockerCompose(agent, proxyConfig, runtimeServices)` function that returns a YAML string for `docker-compose.yml`. The generated compose file SHALL contain:
-- An `mcp-proxy` service using the agent's configured proxy image (default: `ghcr.io/tbxark/mcp-proxy:latest`)
+The system SHALL provide a `generateDockerCompose(agent, runtimeServices)` function that returns a YAML string for `docker-compose.yml`. The generated compose file SHALL contain:
+- An `mcp-proxy` service built from `./forge-proxy` that runs the native forge proxy
 - One service per runtime, as provided by `runtimeServices` (a map of runtime name to `ComposeServiceDef`)
 - An `agent-net` bridge network connecting all services
 
@@ -11,21 +11,23 @@ The system SHALL provide a `generateDockerCompose(agent, proxyConfig, runtimeSer
 - **WHEN** `generateDockerCompose()` is called with a resolved agent having `runtimes: ["claude-code"]` and one `ComposeServiceDef` for claude-code
 - **THEN** the output SHALL contain an `mcp-proxy` service and a `claude-code` service, both on the `agent-net` network
 
-### Requirement: mcp-proxy service has correct configuration
+### Requirement: mcp-proxy service uses native forge proxy
 
 The `mcp-proxy` service SHALL include:
-- `image` from `agent.proxy.image` (default: `ghcr.io/tbxark/mcp-proxy:latest`)
+- `build: ./forge-proxy` (always builds from the forge-proxy Dockerfile)
 - `restart: unless-stopped`
 - Port mapping `${FORGE_PROXY_PORT:-<port>}:<port>` where port comes from `agent.proxy.port` (default: 9090)
-- Volume mount `./mcp-proxy/config.json:/config/config.json:ro`
-- `FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}` always present in environment (for proxy authentication)
+- Volume mount `./forge-proxy/logs:/logs` for log persistence
+- `FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}` always present in environment
 - Environment variables for all app credentials collected from resolved apps' `env` fields
 - `networks: [agent-net]`
 - JSON logging driver with `max-size: 10m` and `max-file: 5`
+- No `entrypoint:` or `command:` directives (uses Dockerfile ENTRYPOINT/CMD)
+- No `config.json` mount (forge proxy reads from workspace)
 
-#### Scenario: Proxy service has correct port and image
-- **WHEN** the agent has `proxy: { port: 8080, image: "custom/proxy:v2" }`
-- **THEN** the proxy service SHALL use `image: custom/proxy:v2` and port mapping `${FORGE_PROXY_PORT:-8080}:8080`
+#### Scenario: Proxy service has correct port and build
+- **WHEN** the agent has `proxy: { port: 8080 }`
+- **THEN** the proxy service SHALL use `build: ./forge-proxy` and port mapping `${FORGE_PROXY_PORT:-8080}:8080`
 
 #### Scenario: Proxy service always includes FORGE_PROXY_TOKEN
 - **WHEN** `generateDockerCompose()` is called

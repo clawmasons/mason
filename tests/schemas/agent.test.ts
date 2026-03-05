@@ -8,7 +8,6 @@ describe("agentForgeFieldSchema", () => {
       runtimes: ["claude-code", "codex"],
       roles: ["@clawforge/role-issue-manager"],
       proxy: {
-        image: "ghcr.io/tbxark/mcp-proxy:latest",
         port: 9090,
         type: "sse",
       },
@@ -78,7 +77,6 @@ describe("agentForgeFieldSchema", () => {
         },
       ],
       proxy: {
-        image: "ghcr.io/tbxark/mcp-proxy:latest",
         port: 9090,
         type: "sse",
       },
