@@ -84,6 +84,13 @@ For local testing, the template's `package.json` references `@clawforge/forge-co
 
 **Testable output:** (1) `forge init --template note-taker` in `/tmp/test-forge/` copies template files with `@test-forge/*` scoped names, creates .forge/, runs npm install. (2) `forge init --name @acme/my-agent --template note-taker` scopes local components as `@acme/*`. (3) `forge init` with no template lists available templates. (4) After init, `forge list` shows the agent tree with `@test-forge/agent-note-taker` referencing `@test-forge/role-writer` which references `@clawforge/task-take-notes`, `@clawforge/skill-markdown-conventions`, and `@clawforge/app-filesystem`.
 
+**Implemented:** 2026-03-05
+- [Proposal](../../changes/archive/2026-03-05-template-system-forge-init/proposal.md)
+- [Design](../../changes/archive/2026-03-05-template-system-forge-init/design.md)
+- [Tasks](../../changes/archive/2026-03-05-template-system-forge-init/tasks.md)
+- [Specs: workspace-init](../../changes/archive/2026-03-05-template-system-forge-init/specs/workspace-init/spec.md)
+- [Main Spec: workspace-init](../../specs/workspace-init/spec.md)
+
 ---
 
 ### CHANGE 4: Simplify Proxy Dockerfile
