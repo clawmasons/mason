@@ -27,7 +27,14 @@ Create `src/proxy/db.ts` — the shared SQLite database layer for audit logging 
 
 **Testable output:** Unit tests that create an in-memory (or temp file) database, verify both tables exist, insert rows, query them back, and verify WAL mode is active.
 
-**Not Implemented Yet**
+**Implemented** — [Archived Change](../../openspec/changes/archive/2026-03-04-sqlite-database-module/)
+
+- **Proposal:** [proposal.md](../../openspec/changes/archive/2026-03-04-sqlite-database-module/proposal.md)
+- **Design:** [design.md](../../openspec/changes/archive/2026-03-04-sqlite-database-module/design.md)
+- **Tasks:** [tasks.md](../../openspec/changes/archive/2026-03-04-sqlite-database-module/tasks.md)
+- **Spec:** [sqlite-database/spec.md](../../openspec/specs/sqlite-database/spec.md)
+- **Source:** `src/proxy/db.ts`
+- **Tests:** `tests/proxy/db.test.ts` (16 tests)
 
 ---
 
