@@ -54,6 +54,13 @@ Enhance `discoverPackages()` to scan inside node_modules packages that contain f
 
 **Testable output:** Unit tests: (1) `discoverPackages()` on a directory with `node_modules/forge-core/apps/filesystem/package.json` finds `@clawforge/app-filesystem`. (2) Local `apps/filesystem/` takes precedence over the same package in node_modules. (3) Packages without workspace dirs are unaffected.
 
+**Implemented:** 2026-03-05
+- [Proposal](../../changes/archive/2026-03-05-discovery-node-modules-workspace-dirs/proposal.md)
+- [Design](../../changes/archive/2026-03-05-discovery-node-modules-workspace-dirs/design.md)
+- [Tasks](../../changes/archive/2026-03-05-discovery-node-modules-workspace-dirs/tasks.md)
+- [Specs: node-modules-workspace-discovery](../../changes/archive/2026-03-05-discovery-node-modules-workspace-dirs/specs/node-modules-workspace-discovery/spec.md)
+- [Main Spec: package-discovery](../../specs/package-discovery/spec.md)
+
 ---
 
 ### CHANGE 3: Template System — `forge init --template`

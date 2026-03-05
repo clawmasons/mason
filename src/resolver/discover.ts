@@ -65,7 +65,37 @@ function scanWorkspaceDir(
 }
 
 /**
+ * Scan workspace directories inside a package for forge sub-packages.
+ * Used to discover components bundled inside library packages (e.g., forge-core).
+ * Only registers packages not already in the map (preserving workspace-local precedence).
+ */
+function scanPackageWorkspaceDirs(
+  pkgDir: string,
+  packages: Map<string, DiscoveredPackage>,
+): void {
+  for (const dirName of WORKSPACE_DIRS) {
+    const dirPath = path.join(pkgDir, dirName);
+    if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
+      continue;
+    }
+
+    for (const entry of fs.readdirSync(dirPath)) {
+      const entryPath = path.join(dirPath, entry);
+      if (!fs.statSync(entryPath).isDirectory()) {
+        continue;
+      }
+      const pkg = tryReadPackage(entryPath);
+      if (pkg && !packages.has(pkg.name)) {
+        packages.set(pkg.name, pkg);
+      }
+    }
+  }
+}
+
+/**
  * Scan node_modules for forge packages, including scoped packages.
+ * Also scans inside packages that contain workspace directories (apps/, tasks/, etc.)
+ * to discover bundled forge sub-components.
  */
 function scanNodeModules(
   rootDir: string,
@@ -90,6 +120,8 @@ function scanNodeModules(
         if (pkg && !packages.has(pkg.name)) {
           packages.set(pkg.name, pkg);
         }
+        // Scan for workspace dirs inside this scoped package
+        scanPackageWorkspaceDirs(scopedPath, packages);
       }
       continue;
     }
@@ -103,6 +135,8 @@ function scanNodeModules(
     if (pkg && !packages.has(pkg.name)) {
       packages.set(pkg.name, pkg);
     }
+    // Scan for workspace dirs inside this unscoped package
+    scanPackageWorkspaceDirs(entryPath, packages);
   }
 }
 
