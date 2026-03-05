@@ -64,9 +64,16 @@ Create `src/proxy/upstream.ts` — manages one MCP client connection per app (st
   - `shutdown(): Promise<void>` — close all clients
 - Reuses: `ResolvedApp` type from `src/resolver/types.ts`
 
-**Testable output:** Integration test that starts the example `@modelcontextprotocol/server-filesystem` as a stdio MCP server, connects via `UpstreamManager`, lists its tools (`read_file`, `write_file`, etc.), and calls one successfully.
+**Testable output:** Unit tests with mocked MCP SDK clients verifying: transport factory creates correct transport types, parallel initialization with timeout, tool/resource/prompt listing with pagination, tool call/resource read/prompt get forwarding, graceful shutdown with error tolerance.
 
-**Not Implemented Yet**
+**Implemented** — [Archived Change](../../openspec/changes/archive/2026-03-05-upstream-mcp-client-manager/)
+
+- **Proposal:** [proposal.md](../../openspec/changes/archive/2026-03-05-upstream-mcp-client-manager/proposal.md)
+- **Design:** [design.md](../../openspec/changes/archive/2026-03-05-upstream-mcp-client-manager/design.md)
+- **Tasks:** [tasks.md](../../openspec/changes/archive/2026-03-05-upstream-mcp-client-manager/tasks.md)
+- **Spec:** [upstream-mcp-client/spec.md](../../openspec/specs/upstream-mcp-client/spec.md)
+- **Source:** `src/proxy/upstream.ts`
+- **Tests:** `tests/proxy/upstream.test.ts` (24 tests)
 
 ---
 
