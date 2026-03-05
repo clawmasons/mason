@@ -1,4 +1,4 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolFilter } from "../generator/types.js";
 import { getAppShortName } from "../generator/toolfilter.js";
 
@@ -83,5 +83,99 @@ export class ToolRouter {
       return prefixedName.slice(prefix.length);
     }
     return prefixedName;
+  }
+}
+
+// ── ResourceRouter ──────────────────────────────────────────────────
+
+export interface ResourceRouteEntry {
+  appName: string;
+  appShortName: string;
+  originalName: string;
+  prefixedName: string;
+  originalUri: string;
+  resource: Resource;
+}
+
+export class ResourceRouter {
+  private entries: ResourceRouteEntry[] = [];
+  private uriMap = new Map<string, { appName: string; originalUri: string }>();
+
+  constructor(upstreamResources: Map<string, Resource[]>) {
+    for (const [appName, resources] of upstreamResources) {
+      const appShortName = getAppShortName(appName);
+
+      for (const resource of resources) {
+        const prefixedName = ToolRouter.prefixName(appShortName, resource.name);
+        const prefixedResource: Resource = { ...resource, name: prefixedName };
+
+        this.entries.push({
+          appName,
+          appShortName,
+          originalName: resource.name,
+          prefixedName,
+          originalUri: resource.uri,
+          resource: prefixedResource,
+        });
+
+        // Map URI → app for read routing (first app wins on collision)
+        if (!this.uriMap.has(resource.uri)) {
+          this.uriMap.set(resource.uri, { appName, originalUri: resource.uri });
+        }
+      }
+    }
+  }
+
+  /** Returns all prefixed MCP Resource objects. */
+  listResources(): Resource[] {
+    return this.entries.map((e) => e.resource);
+  }
+
+  /** Resolves a resource URI to its upstream app and original URI, or null if unknown. */
+  resolveUri(uri: string): { appName: string; originalUri: string } | null {
+    return this.uriMap.get(uri) ?? null;
+  }
+}
+
+// ── PromptRouter ────────────────────────────────────────────────────
+
+export interface PromptRouteEntry {
+  appName: string;
+  appShortName: string;
+  originalName: string;
+  prefixedName: string;
+  prompt: Prompt;
+}
+
+export class PromptRouter {
+  private routes = new Map<string, PromptRouteEntry>();
+
+  constructor(upstreamPrompts: Map<string, Prompt[]>) {
+    for (const [appName, prompts] of upstreamPrompts) {
+      const appShortName = getAppShortName(appName);
+
+      for (const prompt of prompts) {
+        const prefixedName = ToolRouter.prefixName(appShortName, prompt.name);
+        const prefixedPrompt: Prompt = { ...prompt, name: prefixedName };
+
+        this.routes.set(prefixedName, {
+          appName,
+          appShortName,
+          originalName: prompt.name,
+          prefixedName,
+          prompt: prefixedPrompt,
+        });
+      }
+    }
+  }
+
+  /** Returns all prefixed MCP Prompt objects. */
+  listPrompts(): Prompt[] {
+    return Array.from(this.routes.values()).map((e) => e.prompt);
+  }
+
+  /** Resolves a prefixed prompt name to its route entry, or null if unknown. */
+  resolve(prefixedName: string): PromptRouteEntry | null {
+    return this.routes.get(prefixedName) ?? null;
   }
 }

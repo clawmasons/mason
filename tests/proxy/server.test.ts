@@ -2,9 +2,9 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { Tool, CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool, Resource, Prompt, CallToolResult, ReadResourceResult, GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
 import { ForgeProxyServer } from "../../src/proxy/server.js";
-import type { ToolRouter, RouteEntry } from "../../src/proxy/router.js";
+import type { ToolRouter, RouteEntry, ResourceRouter, PromptRouter, PromptRouteEntry } from "../../src/proxy/router.js";
 import type { UpstreamManager } from "../../src/proxy/upstream.js";
 import { openDatabase, queryAuditLog, updateApprovalStatus } from "../../src/proxy/db.js";
 import type Database from "better-sqlite3";
@@ -54,7 +54,35 @@ function createMockUpstream(
       content: [{ type: "text" as const, text: "ok" }],
     };
   });
-  return { callTool } as unknown as UpstreamManager;
+  const readResource = vi.fn(async (): Promise<ReadResourceResult> => ({
+    contents: [{ uri: "repo://owner/name", text: "resource data" }],
+  }));
+  const getPrompt = vi.fn(async (): Promise<GetPromptResult> => ({
+    messages: [{ role: "user" as const, content: { type: "text" as const, text: "prompt result" } }],
+  }));
+  return { callTool, readResource, getPrompt } as unknown as UpstreamManager;
+}
+
+function makeResource(name: string, uri: string): Resource {
+  return { name, uri, description: `Resource: ${name}` };
+}
+
+function makePromptObj(name: string): Prompt {
+  return { name, description: `Prompt: ${name}` };
+}
+
+function createMockResourceRouter(resources: Resource[], uriMap: Map<string, { appName: string; originalUri: string }>): ResourceRouter {
+  return {
+    listResources: vi.fn(() => resources),
+    resolveUri: vi.fn((uri: string) => uriMap.get(uri) ?? null),
+  } as unknown as ResourceRouter;
+}
+
+function createMockPromptRouter(prompts: Prompt[], routes: Map<string, PromptRouteEntry>): PromptRouter {
+  return {
+    listPrompts: vi.fn(() => prompts),
+    resolve: vi.fn((name: string) => routes.get(name) ?? null),
+  } as unknown as PromptRouter;
 }
 
 // ── Helper: connect a client to the proxy ────────────────────────────
@@ -651,5 +679,172 @@ describe("ForgeProxyServer (approval workflow)", () => {
     // No approval requests should exist
     const approvalRows = db.prepare("SELECT * FROM approval_requests").all();
     expect(approvalRows).toHaveLength(0);
+  });
+});
+
+// ── Resource Passthrough Tests ──────────────────────────────────────
+
+describe("ForgeProxyServer (resources)", () => {
+  let server: ForgeProxyServer;
+  let client: Client;
+
+  afterEach(async () => {
+    try { await client?.close(); } catch { /* ignore */ }
+    try { await server?.stop(); } catch { /* ignore */ }
+  });
+
+  it("resources/list returns prefixed resources from router", async () => {
+    const port = getPort();
+    const resources = [makeResource("github_repository", "repo://owner/name")];
+    const resourceRouter = createMockResourceRouter(resources, new Map());
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ForgeProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+    const result = await client.listResources();
+
+    expect(result.resources).toHaveLength(1);
+    expect(result.resources[0]!.name).toBe("github_repository");
+    expect(result.resources[0]!.uri).toBe("repo://owner/name");
+  });
+
+  it("resources/read with valid URI forwards to upstream", async () => {
+    const port = getPort();
+    const uriMap = new Map([
+      ["repo://owner/name", { appName: "@clawforge/app-github", originalUri: "repo://owner/name" }],
+    ]);
+    const resourceRouter = createMockResourceRouter([], uriMap);
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ForgeProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+    const result = await client.readResource({ uri: "repo://owner/name" });
+
+    expect(result.contents).toHaveLength(1);
+    expect((result.contents[0] as { text: string }).text).toBe("resource data");
+    expect(upstream.readResource).toHaveBeenCalledWith("@clawforge/app-github", "repo://owner/name");
+  });
+
+  it("resources/read with unknown URI returns error", async () => {
+    const port = getPort();
+    const resourceRouter = createMockResourceRouter([], new Map());
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ForgeProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+    await expect(client.readResource({ uri: "unknown://foo" })).rejects.toThrow(/Unknown resource/);
+  });
+
+  it("resources work via streamable-http transport", async () => {
+    const port = getPort();
+    const resources = [makeResource("slack_channel", "slack://channel/general")];
+    const resourceRouter = createMockResourceRouter(resources, new Map());
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ForgeProxyServer({ port, transport: "streamable-http", router, upstream, resourceRouter });
+    await server.start();
+
+    client = await connectClient(port, "streamable-http");
+    const result = await client.listResources();
+
+    expect(result.resources).toHaveLength(1);
+    expect(result.resources[0]!.name).toBe("slack_channel");
+  });
+});
+
+// ── Prompt Passthrough Tests ────────────────────────────────────────
+
+describe("ForgeProxyServer (prompts)", () => {
+  let server: ForgeProxyServer;
+  let client: Client;
+
+  afterEach(async () => {
+    try { await client?.close(); } catch { /* ignore */ }
+    try { await server?.stop(); } catch { /* ignore */ }
+  });
+
+  it("prompts/list returns prefixed prompts from router", async () => {
+    const port = getPort();
+    const prompts = [makePromptObj("github_pr_review")];
+    const promptRouter = createMockPromptRouter(prompts, new Map());
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ForgeProxyServer({ port, transport: "sse", router, upstream, promptRouter });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+    const result = await client.listPrompts();
+
+    expect(result.prompts).toHaveLength(1);
+    expect(result.prompts[0]!.name).toBe("github_pr_review");
+  });
+
+  it("prompts/get with valid name forwards to upstream", async () => {
+    const port = getPort();
+    const entry: PromptRouteEntry = {
+      appName: "@clawforge/app-github",
+      appShortName: "github",
+      originalName: "pr_review",
+      prefixedName: "github_pr_review",
+      prompt: makePromptObj("github_pr_review"),
+    };
+    const routes = new Map([["github_pr_review", entry]]);
+    const promptRouter = createMockPromptRouter([entry.prompt], routes);
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ForgeProxyServer({ port, transport: "sse", router, upstream, promptRouter });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+    const result = await client.getPrompt({ name: "github_pr_review", arguments: { pr_number: "42" } });
+
+    expect(result.messages).toHaveLength(1);
+    expect(upstream.getPrompt).toHaveBeenCalledWith(
+      "@clawforge/app-github",
+      "pr_review",
+      { pr_number: "42" },
+    );
+  });
+
+  it("prompts/get with unknown name returns error", async () => {
+    const port = getPort();
+    const promptRouter = createMockPromptRouter([], new Map());
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ForgeProxyServer({ port, transport: "sse", router, upstream, promptRouter });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+    await expect(client.getPrompt({ name: "unknown_prompt" })).rejects.toThrow(/Unknown prompt/);
+  });
+
+  it("prompts work via streamable-http transport", async () => {
+    const port = getPort();
+    const prompts = [makePromptObj("slack_standup")];
+    const promptRouter = createMockPromptRouter(prompts, new Map());
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ForgeProxyServer({ port, transport: "streamable-http", router, upstream, promptRouter });
+    await server.start();
+
+    client = await connectClient(port, "streamable-http");
+    const result = await client.listPrompts();
+
+    expect(result.prompts).toHaveLength(1);
+    expect(result.prompts[0]!.name).toBe("slack_standup");
   });
 });
