@@ -396,7 +396,7 @@ describe("runInstall", () => {
     expect(proxySection).toContain("FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}");
   });
 
-  it("generates forge-proxy/Dockerfile with forge build", async () => {
+  it("generates single-stage forge-proxy/Dockerfile with pre-built forge", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
@@ -406,6 +406,9 @@ describe("runInstall", () => {
 
     const dockerfile = fs.readFileSync(dockerfilePath, "utf-8");
     expect(dockerfile).toContain("FROM node:22-slim");
+    expect(dockerfile).not.toContain("AS builder");
+    expect(dockerfile).not.toContain("npm run build");
+    expect(dockerfile).not.toContain("COPY --from=builder");
     expect(dockerfile).toContain("forge.js");
     expect(dockerfile).toContain('"proxy"');
     expect(dockerfile).not.toContain("mcp-proxy");
@@ -421,13 +424,20 @@ describe("runInstall", () => {
     expect(composeContent).not.toContain("image: ghcr.io/tbxark/mcp-proxy");
   });
 
-  it("copies forge source into forge-proxy/forge/ build context", async () => {
+  it("copies pre-built forge into forge-proxy/forge/ build context", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
-    // Forge source files should be in the build context
+    // Pre-built forge artifacts should be in the build context
     expect(fs.existsSync(path.join(outputDir, "forge-proxy/forge/package.json"))).toBe(true);
+
+    // Verify source files are NOT in the build context
+    const allFiles = fs.readdirSync(path.join(outputDir, "forge-proxy/forge"), { recursive: true }) as string[];
+    const srcFiles = allFiles.filter((f) => f.toString().startsWith("src"));
+    const tsconfigFiles = allFiles.filter((f) => f.toString().includes("tsconfig"));
+    expect(srcFiles).toHaveLength(0);
+    expect(tsconfigFiles).toHaveLength(0);
   });
 
   it("copies workspace directories into forge-proxy/workspace/", async () => {

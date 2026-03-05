@@ -99,16 +99,23 @@ Replace the multi-stage Dockerfile with a single-stage build that uses pre-built
 
 **PRD refs:** REQ-007 (Simplified Proxy Dockerfile)
 
-**Summary:** Rewrite `generateProxyDockerfile()` to produce a single-stage Dockerfile that copies the pre-built `@clawforge/forge` package instead of compiling from source. Update `forge install` (specifically `runInstall()`) to copy the installed forge package from `node_modules/@clawforge/forge/` (dist, bin, node_modules, package.json) instead of copying source files (src/, tsconfig*.json). Remove the `copyDirToFiles()` calls that copy forge source.
+**Summary:** Rewrote `generateProxyDockerfile()` to produce a single-stage Dockerfile that copies pre-built forge artifacts (`dist/`, `bin/`, `package.json`, `package-lock.json`) and installs production dependencies via `npm ci --omit=dev --ignore-scripts`. Updated `runInstall()` to copy only pre-built artifacts instead of source files (`src/`, `tsconfig*.json`). Added configurable `skipDirs` parameter to `copyDirToFiles()`.
 
 **User Story:** US-5 — Docker builds are fast and don't require TypeScript compilation.
 
 **Scope:**
-- Modify: `src/generator/proxy-dockerfile.ts` — single-stage Dockerfile, no `AS builder`
-- Modify: `src/cli/commands/install.ts` — copy pre-built forge from node_modules instead of source
+- Modify: `src/generator/proxy-dockerfile.ts` — single-stage Dockerfile, no `AS builder`, no `npm run build`
+- Modify: `src/cli/commands/install.ts` — copy pre-built forge (dist, bin, package.json, package-lock.json) instead of source; configurable `skipDirs` on `copyDirToFiles()`
 - Update tests: `tests/generator/proxy-dockerfile.test.ts`, `tests/cli/install.test.ts`
 
-**Testable output:** (1) Generated Dockerfile has no multi-stage build. (2) `forge install` output has `forge-proxy/forge/dist/` but NOT `forge-proxy/forge/src/`. (3) All existing tests pass with updated expectations.
+**Testable output:** (1) Generated Dockerfile has no multi-stage build. (2) `forge install` output has `forge-proxy/forge/dist/` but NOT `forge-proxy/forge/src/`. (3) All 550 tests pass with updated expectations.
+
+**Implemented:** 2026-03-05
+- [Proposal](../../changes/archive/2026-03-05-simplify-proxy-dockerfile/proposal.md)
+- [Design](../../changes/archive/2026-03-05-simplify-proxy-dockerfile/design.md)
+- [Tasks](../../changes/archive/2026-03-05-simplify-proxy-dockerfile/tasks.md)
+- [Specs: docker-install-pipeline](../../changes/archive/2026-03-05-simplify-proxy-dockerfile/specs/docker-install-pipeline/spec.md)
+- [Main Spec: docker-install-pipeline](../../specs/docker-install-pipeline/spec.md)
 
 ---
 
