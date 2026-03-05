@@ -192,6 +192,17 @@ describe("proxy/upstream", () => {
         expect(manager).toBeDefined();
         expect(mockConnect).not.toHaveBeenCalled();
       });
+
+      it("throws on duplicate app names", () => {
+        const configs: UpstreamAppConfig[] = [
+          { name: "github", app: makeStdioApp() },
+          { name: "slack", app: makeSseApp() },
+          { name: "github", app: makeStreamableApp() },
+        ];
+        expect(() => new UpstreamManager(configs)).toThrow(
+          "Duplicate app names: github",
+        );
+      });
     });
 
     describe("initialize", () => {
@@ -221,6 +232,48 @@ describe("proxy/upstream", () => {
         const manager = new UpstreamManager(configs);
         await expect(manager.initialize(100)).rejects.toThrow(
           /timed out after 100ms.*slow-app/,
+        );
+      });
+
+      it("throws on double initialize", async () => {
+        const configs: UpstreamAppConfig[] = [
+          { name: "github", app: makeStdioApp() },
+        ];
+        const manager = new UpstreamManager(configs);
+        await manager.initialize();
+        await expect(manager.initialize()).rejects.toThrow(
+          "UpstreamManager is already initialized. Call shutdown() first.",
+        );
+      });
+
+      it("allows re-initialize after shutdown", async () => {
+        const configs: UpstreamAppConfig[] = [
+          { name: "github", app: makeStdioApp() },
+        ];
+        const manager = new UpstreamManager(configs);
+        await manager.initialize();
+        await manager.shutdown();
+        await expect(manager.initialize()).resolves.toBeUndefined();
+      });
+
+      it("cleans up connected clients on partial failure", async () => {
+        // App #1 connects, app #2 fails
+        mockConnect
+          .mockResolvedValueOnce(undefined)
+          .mockRejectedValueOnce(new Error("Connection refused"));
+
+        const configs: UpstreamAppConfig[] = [
+          { name: "app-ok", app: makeStdioApp() },
+          { name: "app-fail", app: makeSseApp() },
+        ];
+        const manager = new UpstreamManager(configs);
+
+        await expect(manager.initialize()).rejects.toThrow("Connection refused");
+        // shutdown was called, so close was called for the one that connected
+        expect(mockClose).toHaveBeenCalled();
+        // After cleanup, no clients should remain — getTools should throw
+        await expect(manager.getTools("app-ok")).rejects.toThrow(
+          "Unknown app: app-ok",
         );
       });
     });
@@ -282,6 +335,30 @@ describe("proxy/upstream", () => {
         expect(resources[0].name).toBe("repository");
       });
 
+      it("handles pagination", async () => {
+        mockListResources
+          .mockResolvedValueOnce({
+            resources: [{ uri: "r://a", name: "res_a" }],
+            nextCursor: "page2",
+          })
+          .mockResolvedValueOnce({
+            resources: [{ uri: "r://b", name: "res_b" }],
+            nextCursor: undefined,
+          });
+
+        const configs: UpstreamAppConfig[] = [
+          { name: "paginated", app: makeStdioApp() },
+        ];
+        const manager = new UpstreamManager(configs);
+        await manager.initialize();
+
+        const resources = await manager.getResources("paginated");
+        expect(resources).toHaveLength(2);
+        expect(resources[0].name).toBe("res_a");
+        expect(resources[1].name).toBe("res_b");
+        expect(mockListResources).toHaveBeenCalledTimes(2);
+      });
+
       it("throws for unknown app", async () => {
         const manager = new UpstreamManager([]);
         await manager.initialize();
@@ -301,6 +378,30 @@ describe("proxy/upstream", () => {
         const prompts = await manager.getPrompts("github");
         expect(prompts).toHaveLength(1);
         expect(prompts[0].name).toBe("pr_review");
+      });
+
+      it("handles pagination", async () => {
+        mockListPrompts
+          .mockResolvedValueOnce({
+            prompts: [{ name: "prompt_a" }],
+            nextCursor: "page2",
+          })
+          .mockResolvedValueOnce({
+            prompts: [{ name: "prompt_b" }],
+            nextCursor: undefined,
+          });
+
+        const configs: UpstreamAppConfig[] = [
+          { name: "paginated", app: makeStdioApp() },
+        ];
+        const manager = new UpstreamManager(configs);
+        await manager.initialize();
+
+        const prompts = await manager.getPrompts("paginated");
+        expect(prompts).toHaveLength(2);
+        expect(prompts[0].name).toBe("prompt_a");
+        expect(prompts[1].name).toBe("prompt_b");
+        expect(mockListPrompts).toHaveBeenCalledTimes(2);
       });
 
       it("throws for unknown app", async () => {
@@ -326,6 +427,20 @@ describe("proxy/upstream", () => {
         expect(mockCallTool).toHaveBeenCalledWith({
           name: "create_pr",
           arguments: { title: "fix" },
+        });
+      });
+
+      it("passes undefined args through correctly", async () => {
+        const configs: UpstreamAppConfig[] = [
+          { name: "github", app: makeStdioApp() },
+        ];
+        const manager = new UpstreamManager(configs);
+        await manager.initialize();
+
+        await manager.callTool("github", "create_pr", undefined);
+        expect(mockCallTool).toHaveBeenCalledWith({
+          name: "create_pr",
+          arguments: undefined,
         });
       });
 

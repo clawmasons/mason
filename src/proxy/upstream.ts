@@ -15,6 +15,7 @@ import type { ResolvedApp } from "../resolver/types.js";
 // ── Types ──────────────────────────────────────────────────────────────
 
 export interface UpstreamAppConfig {
+  /** Full package name, e.g., "@clawforge/app-github". Used as lookup key. */
   name: string;
   app: ResolvedApp;
   env?: Record<string, string>;
@@ -27,12 +28,26 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 export class UpstreamManager {
   private configs: UpstreamAppConfig[];
   private clients = new Map<string, Client>();
+  private initialized = false;
 
   constructor(apps: UpstreamAppConfig[]) {
+    const names = apps.map((a) => a.name);
+    const dupes = names.filter((n, i) => names.indexOf(n) !== i);
+    if (dupes.length > 0) {
+      throw new Error(
+        `Duplicate app names: ${[...new Set(dupes)].join(", ")}`,
+      );
+    }
     this.configs = apps;
   }
 
   async initialize(timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<void> {
+    if (this.initialized) {
+      throw new Error(
+        "UpstreamManager is already initialized. Call shutdown() first.",
+      );
+    }
+
     const connectPromises = this.configs.map(async (config) => {
       const transport = createTransport(config);
       const client = new Client(
@@ -59,6 +74,10 @@ export class UpstreamManager {
 
     try {
       await Promise.race([Promise.all(connectPromises), timeout]);
+      this.initialized = true;
+    } catch (err) {
+      await this.shutdown();
+      throw err;
     } finally {
       clearTimeout(timer!);
     }
@@ -139,6 +158,7 @@ export class UpstreamManager {
     );
     await Promise.all(closePromises);
     this.clients.clear();
+    this.initialized = false;
   }
 
   private requireClient(appName: string): Client {
@@ -167,7 +187,16 @@ export function createTransport(
       return new StdioClientTransport({
         command: app.command,
         args: app.args,
-        env: env ? { ...process.env, ...env } as Record<string, string> : undefined,
+        env: env
+          ? {
+              ...Object.fromEntries(
+                Object.entries(process.env).filter(
+                  (e): e is [string, string] => e[1] != null,
+                ),
+              ),
+              ...env,
+            }
+          : undefined,
       });
     }
     case "sse": {
