@@ -111,7 +111,14 @@ Create `src/proxy/router.ts` — builds the routing table mapping prefixed tool 
 
 **Testable output:** Unit tests that build a router with mock upstream tools and filters, verify: (a) `listTools()` returns prefixed names, (b) filtered tools are excluded, (c) `resolve()` correctly maps back to app + original name, (d) unknown tools return null.
 
-**Not Implemented Yet**
+**Implemented** — [Archived Change](../../openspec/changes/archive/2026-03-05-tool-router/)
+
+- **Proposal:** [proposal.md](../../openspec/changes/archive/2026-03-05-tool-router/proposal.md)
+- **Design:** [design.md](../../openspec/changes/archive/2026-03-05-tool-router/design.md)
+- **Tasks:** [tasks.md](../../openspec/changes/archive/2026-03-05-tool-router/tasks.md)
+- **Spec:** [tool-router/spec.md](../../openspec/specs/tool-router/spec.md)
+- **Source:** `src/proxy/router.ts`
+- **Tests:** `tests/proxy/router.test.ts` (18 tests)
 
 ---
 
