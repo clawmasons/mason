@@ -57,7 +57,7 @@ export class UpstreamManager {
       this.clients.set(config.name, client);
     });
 
-    let timer: ReturnType<typeof setTimeout>;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
         const connected = new Set(this.clients.keys());
@@ -79,7 +79,7 @@ export class UpstreamManager {
       await this.shutdown();
       throw err;
     } finally {
-      clearTimeout(timer!);
+      if (timer) clearTimeout(timer);
     }
   }
 

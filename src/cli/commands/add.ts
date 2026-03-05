@@ -14,7 +14,7 @@ export function registerAddCommand(program: Command): void {
     .description("Add a forge package dependency (wraps npm install with forge validation)")
     .argument("<pkg>", "Package name to add")
     .argument("[npmArgs...]", "Additional arguments forwarded to npm install")
-    .action(async (pkg: string, npmArgs: string[], _options: Record<string, unknown>) => {
+    .action(async (pkg: string, npmArgs: string[]) => {
       await runAdd(process.cwd(), pkg, { npmArgs });
     });
 }
