@@ -11,6 +11,8 @@ import type { ToolRouter } from "./router.js";
 import type { UpstreamManager } from "./upstream.js";
 import { auditPreHook, auditPostHook } from "./hooks/audit.js";
 import type { HookContext } from "./hooks/audit.js";
+import { matchesApprovalPattern, requestApproval } from "./hooks/approval.js";
+import type { ApprovalOptions } from "./hooks/approval.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -21,6 +23,8 @@ export interface ForgeProxyServerConfig {
   upstream: UpstreamManager;
   db?: Database.Database;
   agentName?: string;
+  approvalPatterns?: string[];
+  approvalOptions?: ApprovalOptions;
 }
 
 // ── ForgeProxyServer ──────────────────────────────────────────────────
@@ -168,7 +172,7 @@ export class ForgeProxyServer {
   // ── MCP Server Factory ────────────────────────────────────────────
 
   private createMcpServer(): Server {
-    const { router, upstream, db, agentName } = this.config;
+    const { router, upstream, db, agentName, approvalPatterns, approvalOptions } = this.config;
 
     const server = new Server(
       { name: "forge", version: "0.1.0" },
@@ -213,6 +217,33 @@ export class ForgeProxyServer {
           }
         : undefined;
       const pre = ctx ? auditPreHook(ctx) : undefined;
+
+      // Approval check — between audit pre-hook and upstream call
+      if (db && ctx && approvalPatterns?.length && matchesApprovalPattern(route.prefixedToolName, approvalPatterns)) {
+        const approval = await requestApproval(ctx, db, approvalOptions);
+        if (approval === "denied") {
+          const msg = `Tool call denied: ${route.prefixedToolName} requires approval`;
+          if (pre) {
+            auditPostHook(ctx, pre, msg, "denied", db);
+          }
+          return {
+            content: [{ type: "text" as const, text: msg }],
+            isError: true,
+          };
+        }
+        if (approval === "timeout") {
+          const ttl = approvalOptions?.ttlSeconds ?? 300;
+          const msg = `Tool call timed out: ${route.prefixedToolName} approval expired after ${ttl} seconds`;
+          if (pre) {
+            auditPostHook(ctx, pre, msg, "timeout", db);
+          }
+          return {
+            content: [{ type: "text" as const, text: msg }],
+            isError: true,
+          };
+        }
+        // approval === "approved" — fall through to upstream call
+      }
 
       try {
         const result = await upstream.callTool(

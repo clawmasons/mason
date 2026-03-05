@@ -6,7 +6,7 @@ import type { Tool, CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { ForgeProxyServer } from "../../src/proxy/server.js";
 import type { ToolRouter, RouteEntry } from "../../src/proxy/router.js";
 import type { UpstreamManager } from "../../src/proxy/upstream.js";
-import { openDatabase, queryAuditLog } from "../../src/proxy/db.js";
+import { openDatabase, queryAuditLog, updateApprovalStatus } from "../../src/proxy/db.js";
 import type Database from "better-sqlite3";
 
 // ── Fixtures ────────────────────────────────────────────────────────────
@@ -467,5 +467,189 @@ describe("ForgeProxyServer (audit logging)", () => {
 
     expect(result.content).toEqual([{ type: "text", text: "ok" }]);
     // No assertion on db — it was never provided, so no logging happens
+  });
+});
+
+// ── Approval Workflow Integration Tests ──────────────────────────────
+
+describe("ForgeProxyServer (approval workflow)", () => {
+  let server: ForgeProxyServer;
+  let client: Client;
+  let db: Database.Database;
+
+  afterEach(async () => {
+    try { await client?.close(); } catch { /* ignore */ }
+    try { await server?.stop(); } catch { /* ignore */ }
+    try { db?.close(); } catch { /* ignore */ }
+  });
+
+  it("tool matching approval pattern is approved and call proceeds", async () => {
+    const port = getPort();
+    db = openDatabase(":memory:");
+    const route = makeRouteEntry("@clawforge/app-github", "github", "delete_repo");
+    const routes = new Map([["github_delete_repo", route]]);
+    const router = createMockRouter([route.tool], routes);
+    const upstream = createMockUpstream({
+      content: [{ type: "text", text: "Repo deleted" }],
+    });
+
+    server = new ForgeProxyServer({
+      port,
+      transport: "sse",
+      router,
+      upstream,
+      db,
+      agentName: "note-taker",
+      approvalPatterns: ["github_delete_*"],
+      approvalOptions: { ttlSeconds: 5, pollIntervalMs: 50 },
+    });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+
+    // Start the tool call (it will block waiting for approval)
+    const callPromise = client.callTool({
+      name: "github_delete_repo",
+      arguments: { repo: "test" },
+    });
+
+    // Approve after a short delay
+    setTimeout(() => {
+      const rows = db.prepare("SELECT id FROM approval_requests WHERE status = 'pending'").all() as Array<{ id: string }>;
+      if (rows.length > 0) {
+        updateApprovalStatus(db, rows[0].id, "approved", "operator");
+      }
+    }, 150);
+
+    const result = await callPromise;
+    expect(result.content).toEqual([{ type: "text", text: "Repo deleted" }]);
+    expect(upstream.callTool).toHaveBeenCalled();
+
+    // Verify audit log shows success
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].status).toBe("success");
+  });
+
+  it("tool matching approval pattern is denied and call is blocked", async () => {
+    const port = getPort();
+    db = openDatabase(":memory:");
+    const route = makeRouteEntry("@clawforge/app-github", "github", "delete_repo");
+    const routes = new Map([["github_delete_repo", route]]);
+    const router = createMockRouter([route.tool], routes);
+    const upstream = createMockUpstream();
+
+    server = new ForgeProxyServer({
+      port,
+      transport: "sse",
+      router,
+      upstream,
+      db,
+      agentName: "note-taker",
+      approvalPatterns: ["github_delete_*"],
+      approvalOptions: { ttlSeconds: 5, pollIntervalMs: 50 },
+    });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+
+    const callPromise = client.callTool({
+      name: "github_delete_repo",
+      arguments: { repo: "test" },
+    });
+
+    // Deny after a short delay
+    setTimeout(() => {
+      const rows = db.prepare("SELECT id FROM approval_requests WHERE status = 'pending'").all() as Array<{ id: string }>;
+      if (rows.length > 0) {
+        updateApprovalStatus(db, rows[0].id, "denied", "operator");
+      }
+    }, 150);
+
+    const result = await callPromise;
+    expect(result.isError).toBe(true);
+    expect(result.content).toEqual([
+      { type: "text", text: "Tool call denied: github_delete_repo requires approval" },
+    ]);
+    expect(upstream.callTool).not.toHaveBeenCalled();
+
+    // Verify audit log shows denied
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].status).toBe("denied");
+  });
+
+  it("tool matching approval pattern times out and auto-denies", async () => {
+    const port = getPort();
+    db = openDatabase(":memory:");
+    const route = makeRouteEntry("@clawforge/app-github", "github", "delete_repo");
+    const routes = new Map([["github_delete_repo", route]]);
+    const router = createMockRouter([route.tool], routes);
+    const upstream = createMockUpstream();
+
+    server = new ForgeProxyServer({
+      port,
+      transport: "sse",
+      router,
+      upstream,
+      db,
+      agentName: "note-taker",
+      approvalPatterns: ["github_delete_*"],
+      approvalOptions: { ttlSeconds: 0.2, pollIntervalMs: 50 },
+    });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+
+    const result = await client.callTool({
+      name: "github_delete_repo",
+      arguments: { repo: "test" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect((result.content as Array<{ text: string }>)[0].text).toContain("timed out");
+    expect(upstream.callTool).not.toHaveBeenCalled();
+
+    // Verify audit log shows timeout
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].status).toBe("timeout");
+  });
+
+  it("tool not matching approval patterns proceeds without approval", async () => {
+    const port = getPort();
+    db = openDatabase(":memory:");
+    const route = makeRouteEntry("@clawforge/app-github", "github", "list_repos");
+    const routes = new Map([["github_list_repos", route]]);
+    const router = createMockRouter([route.tool], routes);
+    const upstream = createMockUpstream({
+      content: [{ type: "text", text: "repos listed" }],
+    });
+
+    server = new ForgeProxyServer({
+      port,
+      transport: "sse",
+      router,
+      upstream,
+      db,
+      agentName: "note-taker",
+      approvalPatterns: ["github_delete_*"],
+      approvalOptions: { ttlSeconds: 5, pollIntervalMs: 50 },
+    });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+
+    const result = await client.callTool({
+      name: "github_list_repos",
+      arguments: {},
+    });
+
+    expect(result.content).toEqual([{ type: "text", text: "repos listed" }]);
+    expect(upstream.callTool).toHaveBeenCalled();
+
+    // No approval requests should exist
+    const approvalRows = db.prepare("SELECT * FROM approval_requests").all();
+    expect(approvalRows).toHaveLength(0);
   });
 });
