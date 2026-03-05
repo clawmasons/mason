@@ -12,8 +12,14 @@ Before doing anything else, run these checks and **stop immediately** if any fai
 
 2. **Check branch name** — Run `git branch --show-current`. If the result is `main` or `master`, stop and tell the user: "You're on the main branch. Please create and checkout a feature branch first (e.g. `git checkout -b opsx/my-feature`)."
 
-3. **Find the Change to Implement** Find the relevant PRD.md and IMPLEMENTATION.md in the openspce/prds/ directory.  If no change was specified, find the first unimplementated change.  The branch name should be a short summary of the change
-   
+3. **Determine the PR base branch** — Run `git log --oneline --decorate --all --graph` or `git config branch.<current>.merge` to determine what branch this was created from. The **base branch** is the branch this change PR should target:
+   - If the current branch was created from a PRD feature branch (not `main`/`master`), the base branch is that PRD feature branch.
+   - If the current branch was created from `main`/`master`, the base branch is `main`.
+   - Heuristic: run `git merge-base --fork-point <candidate> HEAD` for likely parent branches, or check `git log --oneline main..HEAD` vs `git log --oneline <prd-branch>..HEAD` — the base with fewer commits ahead is the parent.
+   - Save this base branch name for the PR step.
+
+4. **Find the Change to Implement** Find the relevant PRD.md and IMPLEMENTATION.md in the openspec/prds/ directory.  If no change was specified, find the first unimplemented change.  The branch name should be a short summary of the change.
+
 If checks pass, proceed.
 
 Confirm the change to implement.
@@ -42,12 +48,15 @@ After each step, briefly summarize what was done before moving to the next. If a
 
 ## Commit & PR
 
-After all four steps complete successfully:
+After all steps complete successfully:
 
 1. Run `git add -A`
 2. Write a concise, descriptive commit message summarizing the spec and the code changes made. Use conventional commit format (e.g. `feat: implement user role provisioning per spec opsx-042`). Run `git commit -m "<message>"`.
 3. Push the branch: `git push -u origin HEAD`
-4. Create a pull request using `gh pr create`. For the PR:
+4. Create a pull request using `gh pr create` **targeting the correct base branch**:
+   - Use the **base branch** determined in pre-flight step 3.
+   - If the base branch is NOT `main`/`master` (i.e., a PRD feature branch), use `--base <prd-branch>` to target it.
+   - If the base branch is `main`, no `--base` flag is needed (it's the default).
    - **Title**: A clear one-liner describing the feature/change
    - **Body**: A well-formatted summary including:
      - What the spec addressed (problem/goal)
@@ -56,9 +65,9 @@ After all four steps complete successfully:
      - Any follow-up items or known limitations
    - Use `--fill` only as a fallback. Prefer explicit `--title` and `--body` flags.
 
-Example:
+Example (PR targeting a PRD feature branch):
 ```
-gh pr create --title "feat: minimal credential provisioning for task agents" --body "## Summary
+gh pr create --base forge-proxy --title "feat: minimal credential provisioning for task agents" --body "## Summary
 Implemented spec opsx-042 covering minimal credential provisioning...
 
 ## Changes
@@ -67,6 +76,12 @@ Implemented spec opsx-042 covering minimal credential provisioning...
 
 ## Follow-up
 - [ ] Add integration tests for ..."
+```
+
+Example (PR targeting main — no --base needed):
+```
+gh pr create --title "feat: minimal credential provisioning for task agents" --body "## Summary
+..."
 ```
 
 Present the PR URL to the user when done.
