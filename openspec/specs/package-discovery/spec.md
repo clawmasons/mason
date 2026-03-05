@@ -34,6 +34,21 @@ The system SHALL scan `node_modules/` under the project root to find installed p
 - **WHEN** `discoverPackages(rootDir)` is called and no `node_modules/` directory exists
 - **THEN** discovery succeeds with an empty or partial result (workspace packages still discovered)
 
+### Requirement: Discover forge sub-packages inside node_modules packages with workspace dirs
+When a package in `node_modules/` contains any of the standard workspace directories (`apps/`, `tasks/`, `skills/`, `roles/`, `agents/`), the system SHALL scan those directories for forge sub-packages and register them. Sub-packages are only registered if no package with the same name already exists in the map (preserving workspace-local precedence).
+
+#### Scenario: Discover sub-components inside a node_modules package with workspace dirs
+- **WHEN** `discoverPackages(rootDir)` is called and `node_modules/@clawforge/forge-core/apps/filesystem/package.json` contains a valid app forge field, `node_modules/@clawforge/forge-core/tasks/take-notes/package.json` contains a valid task forge field, and `node_modules/@clawforge/forge-core/skills/markdown-conventions/package.json` contains a valid skill forge field
+- **THEN** the result map contains entries for `@clawforge/app-filesystem`, `@clawforge/task-take-notes`, and `@clawforge/skill-markdown-conventions`
+
+#### Scenario: Workspace-local packages take precedence over node_modules sub-components
+- **WHEN** `discoverPackages(rootDir)` is called and `apps/filesystem/package.json` exists locally with name `@clawforge/app-filesystem` version `2.0.0`, AND `node_modules/@clawforge/forge-core/apps/filesystem/package.json` also has name `@clawforge/app-filesystem` version `1.0.0`
+- **THEN** the result map contains `@clawforge/app-filesystem` with version `2.0.0` (the local version)
+
+#### Scenario: Package with both direct forge field and workspace dirs
+- **WHEN** `discoverPackages(rootDir)` is called and `node_modules/@org/lib/package.json` has a valid forge field AND `node_modules/@org/lib/apps/tool/package.json` also has a valid forge field
+- **THEN** both the library package and the sub-component are registered in the result map
+
 ### Requirement: DiscoveredPackage data structure
 Each discovered package SHALL be represented as a `DiscoveredPackage` containing: `name` (string), `version` (string), `packagePath` (absolute filesystem path), and `forgeField` (validated ForgeField from Zod parsing).
 
