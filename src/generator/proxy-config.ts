@@ -54,8 +54,8 @@ function buildServerEntry(
  * mcpServers entries for all apps (stdio and remote), and generates
  * proxy-level settings including authentication.
  *
- * The auth token in the config uses `${PAM_PROXY_TOKEN}` placeholder.
- * Callers (e.g., `pam install`) generate the actual token and write it
+ * The auth token in the config uses `${FORGE_PROXY_TOKEN}` placeholder.
+ * Callers (e.g., `forge install`) generate the actual token and write it
  * to `.env` for Docker runtime interpolation.
  */
 export function generateProxyConfig(
@@ -82,13 +82,13 @@ export function generateProxyConfig(
     mcpProxy: {
       baseURL: `http://mcp-proxy:${port}`,
       addr: `:${port}`,
-      name: `pam-proxy-${agentShortName}`,
+      name: `forge-proxy-${agentShortName}`,
       version: agent.version,
       type: proxyType,
       options: {
         panicIfInvalid: false,
         logEnabled: true,
-        authTokens: ["${PAM_PROXY_TOKEN}"],
+        authTokens: ["${FORGE_PROXY_TOKEN}"],
       },
     },
     mcpServers,

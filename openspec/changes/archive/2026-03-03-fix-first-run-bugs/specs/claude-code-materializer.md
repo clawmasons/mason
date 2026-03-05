@@ -12,4 +12,4 @@
 
 ### Requirement: materializeWorkspace accepts optional proxyToken
 
-**Modified.** `materializeWorkspace()` now accepts an optional third parameter `proxyToken?: string`. When provided, the actual token value is baked into the Authorization header in settings.json instead of using the `${PAM_PROXY_TOKEN}` placeholder.
+**Modified.** `materializeWorkspace()` now accepts an optional third parameter `proxyToken?: string`. When provided, the actual token value is baked into the Authorization header in settings.json instead of using the `${FORGE_PROXY_TOKEN}` placeholder.

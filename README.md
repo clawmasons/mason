@@ -1,2 +1,2 @@
-# pam
-Packaged Agent Manager
+# forge
+Agent Forge System

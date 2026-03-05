@@ -1,6 +1,6 @@
 ## Why
 
-After running `pam install`, the generated Claude Code container runs as root, uses `ANTHROPIC_API_KEY` for auth, and mounts the workspace at `/workspace`. This doesn't match how Claude Code is typically used in the `node:22-slim` Docker image:
+After running `forge install`, the generated Claude Code container runs as root, uses `ANTHROPIC_API_KEY` for auth, and mounts the workspace at `/workspace`. This doesn't match how Claude Code is typically used in the `node:22-slim` Docker image:
 
 1. The container should run as the `node` user (UID 1000), not root
 2. Claude config should live at `/home/node/.claude`, not `/root/.claude`

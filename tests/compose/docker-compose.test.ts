@@ -70,7 +70,7 @@ function makeClaudeCodeService(): ComposeServiceDef {
     restart: "no",
     volumes: ["./claude-code/workspace:/home/node/workspace"],
     working_dir: "/home/node/workspace",
-    environment: ["CLAUDE_AUTH_TOKEN=${CLAUDE_AUTH_TOKEN}", "PAM_ROLES=issue-manager"],
+    environment: ["CLAUDE_AUTH_TOKEN=${CLAUDE_AUTH_TOKEN}", "FORGE_ROLES=issue-manager"],
     depends_on: ["mcp-proxy"],
     stdin_open: true,
     tty: true,
@@ -84,7 +84,7 @@ function makeCodexService(): ComposeServiceDef {
     restart: "no",
     volumes: ["./codex/workspace:/workspace"],
     working_dir: "/workspace",
-    environment: ["OPENAI_API_KEY=${OPENAI_API_KEY}", "PAM_ROLES=issue-manager"],
+    environment: ["OPENAI_API_KEY=${OPENAI_API_KEY}", "FORGE_ROLES=issue-manager"],
     depends_on: ["mcp-proxy"],
     stdin_open: true,
     tty: true,
@@ -111,12 +111,12 @@ describe("generateDockerCompose", () => {
       expect(yaml).toContain("image: custom/proxy:v2");
     });
 
-    it("maps proxy port with PAM_PROXY_PORT default", () => {
+    it("maps proxy port with FORGE_PROXY_PORT default", () => {
       const agent = makeRepoOpsAgent();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      expect(yaml).toContain('"${PAM_PROXY_PORT:-9090}:9090"');
+      expect(yaml).toContain('"${FORGE_PROXY_PORT:-9090}:9090"');
     });
 
     it("uses custom port", () => {
@@ -125,7 +125,7 @@ describe("generateDockerCompose", () => {
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      expect(yaml).toContain('"${PAM_PROXY_PORT:-8080}:8080"');
+      expect(yaml).toContain('"${FORGE_PROXY_PORT:-8080}:8080"');
     });
 
     it("mounts mcp-proxy config as read-only", () => {
@@ -174,13 +174,13 @@ describe("generateDockerCompose", () => {
       expect(yaml).toContain("SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}");
     });
 
-    it("always includes PAM_PROXY_TOKEN in mcp-proxy environment", () => {
+    it("always includes FORGE_PROXY_TOKEN in mcp-proxy environment", () => {
       const agent = makeRepoOpsAgent();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
       const proxySection = yaml.split("claude-code:")[0];
-      expect(proxySection).toContain("PAM_PROXY_TOKEN=${PAM_PROXY_TOKEN}");
+      expect(proxySection).toContain("FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}");
     });
 
     it("includes JSON logging config", () => {
@@ -210,7 +210,7 @@ describe("generateDockerCompose", () => {
       const yaml = generateDockerCompose(agent, services);
 
       expect(yaml).toContain("image: ghcr.io/tbxark/mcp-proxy:latest");
-      expect(yaml).toContain('"${PAM_PROXY_PORT:-9090}:9090"');
+      expect(yaml).toContain('"${FORGE_PROXY_PORT:-9090}:9090"');
     });
   });
 

@@ -24,7 +24,7 @@ export interface ComposeServiceDef {
 /**
  * The contract all runtime materializers implement.
  *
- * A materializer translates the abstract pam dependency graph into
+ * A materializer translates the abstract forge dependency graph into
  * a specific runtime's native configuration format.
  */
 export interface RuntimeMaterializer {

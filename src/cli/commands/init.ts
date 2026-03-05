@@ -6,9 +6,9 @@ interface InitOptions {
   name?: string;
 }
 
-const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".pam"];
+const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".forge"];
 
-const ENV_EXAMPLE = `# Credential bindings for pam agent deployments
+const ENV_EXAMPLE = `# Credential bindings for forge agent deployments
 # Copy this file to .env and fill in your values
 # NEVER commit .env files to version control
 
@@ -21,13 +21,13 @@ const ENV_EXAMPLE = `# Credential bindings for pam agent deployments
 const GITIGNORE = `node_modules/
 dist/
 .env
-.pam/.env
+.forge/.env
 `;
 
 export function registerInitCommand(program: Command): void {
   program
     .command("init")
-    .description("Initialize a new pam workspace")
+    .description("Initialize a new forge workspace")
     .option("--name <name>", "Set the workspace package name")
     .action(async (options: InitOptions) => {
       await runInit(process.cwd(), options);
@@ -38,12 +38,12 @@ export async function runInit(
   targetDir: string,
   options: InitOptions,
 ): Promise<void> {
-  const pamDir = path.join(targetDir, ".pam");
+  const forgeDir = path.join(targetDir, ".forge");
 
   // Idempotency check
-  if (fs.existsSync(pamDir)) {
+  if (fs.existsSync(forgeDir)) {
     console.log(
-      "⚠ Workspace already initialized (.pam/ directory exists). Nothing to do.",
+      "⚠ Workspace already initialized (.forge/ directory exists). Nothing to do.",
     );
     return;
   }
@@ -76,16 +76,16 @@ export async function runInit(
     created.push("package.json");
   }
 
-  // Generate .pam/config.json
-  const configPath = path.join(pamDir, "config.json");
+  // Generate .forge/config.json
+  const configPath = path.join(forgeDir, "config.json");
   const config = { version: "0.1.0" };
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
-  created.push(".pam/config.json");
+  created.push(".forge/config.json");
 
-  // Generate .pam/.env.example
-  const envExamplePath = path.join(pamDir, ".env.example");
+  // Generate .forge/.env.example
+  const envExamplePath = path.join(forgeDir, ".env.example");
   fs.writeFileSync(envExamplePath, ENV_EXAMPLE);
-  created.push(".pam/.env.example");
+  created.push(".forge/.env.example");
 
   // Generate .gitignore (only if it doesn't exist)
   const gitignorePath = path.join(targetDir, ".gitignore");
@@ -97,13 +97,13 @@ export async function runInit(
   }
 
   // Success output
-  console.log("\n✔ pam workspace initialized!\n");
+  console.log("\n✔ forge workspace initialized!\n");
   console.log("Created:");
   for (const item of created) {
     console.log(`  ${item}`);
   }
   console.log("\nNext steps:");
-  console.log("  pam add <package>    Add an agent component");
-  console.log("  pam build <agent>    Build and validate an agent");
-  console.log("  pam install <agent>  Install and scaffold an agent\n");
+  console.log("  forge add <package>    Add an agent component");
+  console.log("  forge build <agent>    Build and validate an agent");
+  console.log("  forge install <agent>  Install and scaffold an agent\n");
 }

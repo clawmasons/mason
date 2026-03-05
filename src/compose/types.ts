@@ -10,7 +10,7 @@ export interface LockFileRole {
 }
 
 /**
- * The pam.lock.json structure.
+ * The forge.lock.json structure.
  */
 export interface LockFile {
   lockVersion: number;

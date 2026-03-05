@@ -16,7 +16,7 @@ The system SHALL provide a `generateDockerCompose(agent, proxyConfig, runtimeSer
 The `mcp-proxy` service SHALL include:
 - `image` from `agent.proxy.image` (default: `ghcr.io/tbxark/mcp-proxy:latest`)
 - `restart: unless-stopped`
-- Port mapping `${PAM_PROXY_PORT:-<port>}:<port>` where port comes from `agent.proxy.port` (default: 9090)
+- Port mapping `${FORGE_PROXY_PORT:-<port>}:<port>` where port comes from `agent.proxy.port` (default: 9090)
 - Volume mount `./mcp-proxy/config.json:/config/config.json:ro`
 - Environment variables for all app credentials collected from resolved apps' `env` fields
 - `networks: [agent-net]`
@@ -24,7 +24,7 @@ The `mcp-proxy` service SHALL include:
 
 #### Scenario: Proxy service has correct port and image
 - **WHEN** the agent has `proxy: { port: 8080, image: "custom/proxy:v2" }`
-- **THEN** the proxy service SHALL use `image: custom/proxy:v2` and port mapping `${PAM_PROXY_PORT:-8080}:8080`
+- **THEN** the proxy service SHALL use `image: custom/proxy:v2` and port mapping `${FORGE_PROXY_PORT:-8080}:8080`
 
 #### Scenario: Proxy service collects app environment variables
 - **WHEN** apps declare `env: { "GITHUB_TOKEN": "${GITHUB_TOKEN}", "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}" }`

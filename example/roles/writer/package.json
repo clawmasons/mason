@@ -2,7 +2,7 @@
   "name": "@example/role-writer",
   "version": "1.0.0",
   "description": "Writer role — permission boundary for filesystem note operations",
-  "pam": {
+  "forge": {
     "type": "role",
     "description": "Manages notes on the filesystem: read, write, list, and create directories.",
     "tasks": ["@example/task-take-notes"],

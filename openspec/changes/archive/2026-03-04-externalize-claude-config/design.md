@@ -59,7 +59,7 @@ Remove `claude-code` from `RUNTIME_API_KEYS`. This means:
 
 ### User Flow (After Change)
 
-1. `pam install @org/agent-name` — Generates all files including `.claude.json` and empty `.claude/`
+1. `forge install @org/agent-name` — Generates all files including `.claude.json` and empty `.claude/`
 2. `docker compose up -d mcp-proxy` — Start proxy
 3. `docker compose run --rm claude-code` — Start Claude Code container
 4. First run: Claude prompts for login, user authenticates, credentials saved to mounted `.claude/`

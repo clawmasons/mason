@@ -2,8 +2,8 @@
 
 ## ADDED Requirements
 
-### Requirement: CLI registration for pam remove
-The `pam remove` command SHALL be registered as a Commander.js command with a required `<pkg>` argument, a `--force` option, and optional variadic `[npmArgs...]` for forwarding to npm.
+### Requirement: CLI registration for forge remove
+The `forge remove` command SHALL be registered as a Commander.js command with a required `<pkg>` argument, a `--force` option, and optional variadic `[npmArgs...]` for forwarding to npm.
 
 #### Scenario: Command is registered
 - **WHEN** the CLI program is initialized
@@ -12,26 +12,26 @@ The `pam remove` command SHALL be registered as a Commander.js command with a re
 - **AND** it SHALL have a `--force` boolean option
 
 ### Requirement: Dependent package checking
-Before removing a package, the command SHALL scan all discovered pam packages in the workspace to find packages that reference the target package in their `pam` field.
+Before removing a package, the command SHALL scan all discovered forge packages in the workspace to find packages that reference the target package in their `forge` field.
 
 #### Scenario: No dependents found
-- **WHEN** `pam remove @clawforge/app-unused` is run and no other package references it
+- **WHEN** `forge remove @clawforge/app-unused` is run and no other package references it
 - **THEN** the command SHALL proceed with npm uninstall
 
 #### Scenario: Dependents found without --force
-- **WHEN** `pam remove @clawforge/app-github` is run and `@clawforge/role-manager` references it in `permissions`
+- **WHEN** `forge remove @clawforge/app-github` is run and `@clawforge/role-manager` references it in `permissions`
 - **THEN** the command SHALL NOT run npm uninstall
 - **AND** SHALL print an error listing the dependent packages
 - **AND** SHALL suggest using `--force` to override
 - **AND** SHALL exit with code 1
 
 #### Scenario: Dependents found with --force
-- **WHEN** `pam remove @clawforge/app-github --force` is run and dependents exist
+- **WHEN** `forge remove @clawforge/app-github --force` is run and dependents exist
 - **THEN** the command SHALL print a warning listing the dependent packages
 - **AND** SHALL proceed with npm uninstall despite the dependents
 
 ### Requirement: Dependency reference detection
-The dependent checker SHALL detect references to the target package in the following pam field locations:
+The dependent checker SHALL detect references to the target package in the following forge field locations:
 
 #### Scenario: Role permissions reference
 - **WHEN** a role has `permissions: { "@target/app": { allow: [...] } }`
@@ -71,5 +71,5 @@ When removal is permitted (no dependents or `--force`), the command SHALL delega
 - **AND** SHALL print an error message containing "Remove failed"
 
 #### Scenario: Remove with extra npm flags
-- **WHEN** `pam remove @clawforge/app-github --force -- --no-save` is run
+- **WHEN** `forge remove @clawforge/app-github --force -- --no-save` is run
 - **THEN** the command SHALL execute `npm uninstall @clawforge/app-github --no-save`

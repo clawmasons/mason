@@ -1,13 +1,13 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { parsePamField } from "../schemas/index.js";
+import { parseForgeField } from "../schemas/index.js";
 import type { DiscoveredPackage } from "./types.js";
 
 const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents"];
 
 /**
- * Try to read and parse a pam package from a directory.
- * Returns null if the directory doesn't contain a valid pam package.
+ * Try to read and parse a forge package from a directory.
+ * Returns null if the directory doesn't contain a valid forge package.
  */
 function tryReadPackage(dirPath: string): DiscoveredPackage | null {
   const pkgJsonPath = path.join(dirPath, "package.json");
@@ -15,18 +15,18 @@ function tryReadPackage(dirPath: string): DiscoveredPackage | null {
     return null;
   }
 
-  let pkgJson: { name?: string; version?: string; pam?: unknown };
+  let pkgJson: { name?: string; version?: string; forge?: unknown };
   try {
     pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
   } catch {
     return null;
   }
 
-  if (!pkgJson.name || !pkgJson.pam) {
+  if (!pkgJson.name || !pkgJson.forge) {
     return null;
   }
 
-  const result = parsePamField(pkgJson.pam);
+  const result = parseForgeField(pkgJson.forge);
   if (!result.success) {
     return null;
   }
@@ -35,12 +35,12 @@ function tryReadPackage(dirPath: string): DiscoveredPackage | null {
     name: pkgJson.name,
     version: pkgJson.version ?? "0.0.0",
     packagePath: dirPath,
-    pamField: result.data,
+    forgeField: result.data,
   };
 }
 
 /**
- * Scan a workspace type directory (e.g., apps/, tasks/) for pam packages.
+ * Scan a workspace type directory (e.g., apps/, tasks/) for forge packages.
  */
 function scanWorkspaceDir(
   rootDir: string,
@@ -65,7 +65,7 @@ function scanWorkspaceDir(
 }
 
 /**
- * Scan node_modules for pam packages, including scoped packages.
+ * Scan node_modules for forge packages, including scoped packages.
  */
 function scanNodeModules(
   rootDir: string,
@@ -107,7 +107,7 @@ function scanNodeModules(
 }
 
 /**
- * Discover all pam packages in the workspace and node_modules.
+ * Discover all forge packages in the workspace and node_modules.
  * Workspace packages take precedence over node_modules versions.
  */
 export function discoverPackages(rootDir: string): Map<string, DiscoveredPackage> {

@@ -14,7 +14,7 @@ interface BuildOptions {
 export function registerBuildCommand(program: Command): void {
   program
     .command("build")
-    .description("Resolve agent graph and generate pam.lock.json")
+    .description("Resolve agent graph and generate forge.lock.json")
     .argument("<agent>", "Agent package name to build")
     .option("--output <path>", "Output path for lock file")
     .option("--json", "Print lock file to stdout as JSON instead of writing to file")
@@ -54,7 +54,7 @@ export async function runBuild(
     } else {
       const outputPath = options.output
         ? path.resolve(rootDir, options.output)
-        : path.join(rootDir, "pam.lock.json");
+        : path.join(rootDir, "forge.lock.json");
 
       fs.mkdirSync(path.dirname(outputPath), { recursive: true });
       fs.writeFileSync(outputPath, JSON.stringify(lockFile, null, 2));

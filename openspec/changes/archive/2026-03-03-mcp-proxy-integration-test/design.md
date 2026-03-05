@@ -1,6 +1,6 @@
 ## Context
 
-PAM generates mcp-proxy config, docker-compose.yml, and .env files during `pam install`. The `pam run` command starts the proxy via Docker. Currently, all tests are unit tests that mock filesystem and child_process — no test actually starts Docker or verifies the proxy responds to MCP protocol requests. The example workspace exists but has never been validated end-to-end.
+FORGE generates mcp-proxy config, docker-compose.yml, and .env files during `forge install`. The `forge run` command starts the proxy via Docker. Currently, all tests are unit tests that mock filesystem and child_process — no test actually starts Docker or verifies the proxy responds to MCP protocol requests. The example workspace exists but has never been validated end-to-end.
 
 ## Goals / Non-Goals
 
@@ -25,7 +25,7 @@ The integration test will be a standalone shell script (`tests/integration/mcp-p
 The mcp-proxy supports SSE and streamable-http. We'll use the streamable-http endpoint (`/mcp`) with curl for request/response, which is simpler than SSE streaming for testing purposes. We'll send JSON-RPC requests (initialize, tools/list, tools/call) as POST requests with the auth token in the Authorization header.
 
 ### 3. Build before test
-The script will run `npm run build` from the project root before invoking `node ../bin/pam.js install`. This ensures the dist/ is up-to-date.
+The script will run `npm run build` from the project root before invoking `node ../bin/forge.js install`. This ensures the dist/ is up-to-date.
 
 ### 4. Retry with backoff for proxy readiness
 Docker containers take a few seconds to start. The script will poll the proxy endpoint with a retry loop (up to 30 seconds, 1-second intervals) before running assertions.
@@ -36,6 +36,6 @@ Use `trap` to ensure `docker compose down` runs on exit regardless of success/fa
 ## Risks / Trade-offs
 
 - **Docker required** → Tests won't run in environments without Docker. Mitigated by keeping this separate from `npm test`.
-- **Port conflicts** → The proxy uses port 9090 by default. If another service uses that port, the test will fail. Mitigated by using a random high port via PAM_PROXY_PORT override.
+- **Port conflicts** → The proxy uses port 9090 by default. If another service uses that port, the test will fail. Mitigated by using a random high port via FORGE_PROXY_PORT override.
 - **Network timing** → Container startup time varies. Mitigated by retry loop with timeout.
 - **mcp-proxy image pull** → First run may be slow due to image download. Acceptable for integration tests.

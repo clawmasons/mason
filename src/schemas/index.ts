@@ -1,6 +1,6 @@
-export { appPamFieldSchema, type AppPamField } from "./app.js";
-export { skillPamFieldSchema, type SkillPamField } from "./skill.js";
-export { taskPamFieldSchema, type TaskPamField } from "./task.js";
-export { rolePamFieldSchema, type RolePamField } from "./role.js";
-export { agentPamFieldSchema, type AgentPamField } from "./agent.js";
-export { parsePamField, type PamField } from "./pam-field.js";
+export { appForgeFieldSchema, type AppForgeField } from "./app.js";
+export { skillForgeFieldSchema, type SkillForgeField } from "./skill.js";
+export { taskForgeFieldSchema, type TaskForgeField } from "./task.js";
+export { roleForgeFieldSchema, type RoleForgeField } from "./role.js";
+export { agentForgeFieldSchema, type AgentForgeField } from "./agent.js";
+export { parseForgeField, type ForgeField } from "./forge-field.js";

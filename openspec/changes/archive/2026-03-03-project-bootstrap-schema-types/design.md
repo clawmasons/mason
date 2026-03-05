@@ -1,6 +1,6 @@
 ## Context
 
-pam is a greenfield TypeScript/Node.js project. No source code, configuration, or dependencies exist. The PRD defines five package types (app, skill, task, role, agent), each with a `pam` field in package.json containing type-specific metadata. All downstream functionality — CLI commands, graph resolution, proxy config generation, runtime materializers — depends on being able to parse and validate these `pam` fields.
+forge is a greenfield TypeScript/Node.js project. No source code, configuration, or dependencies exist. The PRD defines five package types (app, skill, task, role, agent), each with a `forge` field in package.json containing type-specific metadata. All downstream functionality — CLI commands, graph resolution, proxy config generation, runtime materializers — depends on being able to parse and validate these `forge` fields.
 
 ## Goals / Non-Goals
 
@@ -8,7 +8,7 @@ pam is a greenfield TypeScript/Node.js project. No source code, configuration, o
 - Establish a working TypeScript project with build, test, and lint tooling
 - Define Zod schemas that faithfully represent PRD §3 and Appendix A
 - Export TypeScript types inferred from Zod schemas (single source of truth)
-- Provide a top-level `parsePamField(input: unknown)` that returns a typed, discriminated result
+- Provide a top-level `parseForgeField(input: unknown)` that returns a typed, discriminated result
 - Comprehensive unit tests validating PRD example snippets
 
 **Non-Goals:**
@@ -27,8 +27,8 @@ pam is a greenfield TypeScript/Node.js project. No source code, configuration, o
 - **Yup**: Weaker TypeScript inference, designed for forms not data contracts
 - **Manual validation**: Error-prone, no type inference
 
-### 2. Discriminated union on `pam.type`
-**Decision:** Use Zod's `z.discriminatedUnion("type", [...])` to parse the `pam` field.
+### 2. Discriminated union on `forge.type`
+**Decision:** Use Zod's `z.discriminatedUnion("type", [...])` to parse the `forge` field.
 
 **Rationale:** The `type` field ("app" | "skill" | "task" | "role" | "agent") naturally discriminates which fields are valid. This gives precise TypeScript narrowing after validation.
 
@@ -41,9 +41,9 @@ pam is a greenfield TypeScript/Node.js project. No source code, configuration, o
 - **strict TypeScript**: catches more bugs, standard for library code
 
 ### 4. Package structure — single package at root
-**Decision:** Build `@clawforge/pam` as a single package at the project root, not a monorepo of sub-packages.
+**Decision:** Build `@clawforge/forge` as a single package at the project root, not a monorepo of sub-packages.
 
-**Rationale:** There's only one package to build. Monorepo structure can be introduced if/when pam itself needs workspace packages. The `src/` directory organizes by concern (schemas/, types/).
+**Rationale:** There's only one package to build. Monorepo structure can be introduced if/when forge itself needs workspace packages. The `src/` directory organizes by concern (schemas/, types/).
 
 ### 5. Source layout
 **Decision:**
@@ -55,7 +55,7 @@ src/
     task.ts
     role.ts
     agent.ts
-    pam-field.ts  # Discriminated union + parsePamField()
+    forge-field.ts  # Discriminated union + parseForgeField()
     index.ts      # Re-exports
   index.ts        # Public API entry point
 ```

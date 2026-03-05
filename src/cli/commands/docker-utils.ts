@@ -5,7 +5,7 @@ import { getAppShortName } from "../../generator/toolfilter.js";
 
 /**
  * Resolve the scaffolded agent directory.
- * Uses `.pam/agents/<short-name>/` by default, or a custom outputDir if provided.
+ * Uses `.forge/agents/<short-name>/` by default, or a custom outputDir if provided.
  */
 export function resolveAgentDir(
   rootDir: string,
@@ -16,7 +16,7 @@ export function resolveAgentDir(
     return path.resolve(rootDir, outputDir);
   }
   const shortName = getAppShortName(agentName);
-  return path.join(rootDir, ".pam", "agents", shortName);
+  return path.join(rootDir, ".forge", "agents", shortName);
 }
 
 /**
@@ -42,7 +42,7 @@ export function validateEnvFile(agentDir: string): string[] {
 
   if (!fs.existsSync(envPath)) {
     throw new Error(
-      `No .env file found at ${envPath}. Run pam install first to generate credentials template.`,
+      `No .env file found at ${envPath}. Run forge install first to generate credentials template.`,
     );
   }
 

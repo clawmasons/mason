@@ -15,15 +15,15 @@ export class PackageNotFoundError extends Error {
 }
 
 /**
- * Thrown when a package's pam field is invalid or cannot be parsed.
+ * Thrown when a package's forge field is invalid or cannot be parsed.
  */
-export class InvalidPamFieldError extends Error {
+export class InvalidForgeFieldError extends Error {
   constructor(
     public readonly packageName: string,
     public readonly reason: string,
   ) {
-    super(`Invalid pam field in package "${packageName}": ${reason}`);
-    this.name = "InvalidPamFieldError";
+    super(`Invalid forge field in package "${packageName}": ${reason}`);
+    this.name = "InvalidForgeFieldError";
   }
 }
 
@@ -38,7 +38,7 @@ export class CircularDependencyError extends Error {
 }
 
 /**
- * Thrown when a dependency has the wrong pam type (e.g., agent.roles
+ * Thrown when a dependency has the wrong forge type (e.g., agent.roles
  * references an app instead of a role).
  */
 export class TypeMismatchError extends Error {

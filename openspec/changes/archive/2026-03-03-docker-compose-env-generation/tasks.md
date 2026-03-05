@@ -13,7 +13,7 @@
 ## 3. Environment Template Generator
 
 - [x] 3.1 Create `src/compose/env.ts` implementing `generateEnvTemplate(agent)`
-- [x] 3.2 Implement proxy variable collection (PAM_PROXY_TOKEN, PAM_PROXY_PORT)
+- [x] 3.2 Implement proxy variable collection (FORGE_PROXY_TOKEN, FORGE_PROXY_PORT)
 - [x] 3.3 Implement app credential collection with deduplication and `${VAR}` interpolation extraction
 - [x] 3.4 Implement runtime API key mapping (claude-code → ANTHROPIC_API_KEY, codex → OPENAI_API_KEY)
 

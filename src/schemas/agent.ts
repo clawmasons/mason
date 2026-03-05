@@ -12,7 +12,7 @@ const proxySchema = z.object({
   type: z.enum(["sse", "streamable-http"]).optional(),
 });
 
-export const agentPamFieldSchema = z.object({
+export const agentForgeFieldSchema = z.object({
   type: z.literal("agent"),
   description: z.string().optional(),
   runtimes: z.array(z.string()).min(1),
@@ -21,4 +21,4 @@ export const agentPamFieldSchema = z.object({
   proxy: proxySchema.optional(),
 });
 
-export type AgentPamField = z.infer<typeof agentPamFieldSchema>;
+export type AgentForgeField = z.infer<typeof agentForgeFieldSchema>;

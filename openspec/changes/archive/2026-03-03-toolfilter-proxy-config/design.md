@@ -1,6 +1,6 @@
 ## Context
 
-pam is a TypeScript/Node.js project (ESM, Zod, Vitest, Commander.js) with validated schemas for all five pam package types, a package discovery and dependency graph resolution engine, and a semantic validation engine. The resolver produces `ResolvedAgent` objects with all roles, tasks, apps, and skills resolved. The validator checks the graph for correctness.
+forge is a TypeScript/Node.js project (ESM, Zod, Vitest, Commander.js) with validated schemas for all five forge package types, a package discovery and dependency graph resolution engine, and a semantic validation engine. The resolver produces `ResolvedAgent` objects with all roles, tasks, apps, and skills resolved. The validator checks the graph for correctness.
 
 The next step is generating the tbxark/mcp-proxy `config.json` — the runtime artifact that enforces governance at the network layer. The proxy config aggregates all app MCP servers behind a single endpoint and uses `toolFilter` entries to enforce least-privilege access.
 
@@ -12,12 +12,12 @@ PRD §6.3 defines the proxy config schema. PRD §6.3.1 defines the toolFilter ge
 - Implement the toolFilter generation algorithm: for each app, compute the union of all role allow-lists
 - Generate a complete mcp-proxy `config.json` from a resolved agent
 - Handle stdio transport (command+args+env) and remote transports (sse/streamable-http via url)
-- Generate random `PAM_PROXY_TOKEN` for proxy authentication
+- Generate random `FORGE_PROXY_TOKEN` for proxy authentication
 - Preserve `${VAR}` interpolation in output (resolved at Docker runtime)
 - Expose as a programmatic API (`computeToolFilters`, `generateProxyConfig`)
 
 **Non-Goals:**
-- CLI commands (`pam permissions`, `pam install`) — separate changes
+- CLI commands (`forge permissions`, `forge install`) — separate changes
 - Docker Compose generation — separate change
 - Runtime materializers (Claude Code, Codex workspaces) — separate change
 - Writing the config to disk or managing file paths — callers handle that
@@ -31,7 +31,7 @@ PRD §6.3 defines the proxy config schema. PRD §6.3.1 defines the toolFilter ge
 - `computeToolFilters(agent: ResolvedAgent): Map<string, ToolFilter>` — computes per-app toolFilter from role permission unions
 - `generateProxyConfig(agent: ResolvedAgent, options?: ProxyConfigOptions): ProxyConfig` — generates the complete mcp-proxy config.json structure
 
-**Rationale:** Separation of concerns. `computeToolFilters` is useful independently (for `pam permissions` display). `generateProxyConfig` composes it internally but callers can also use the raw filters. Both operate on the already-resolved agent — no filesystem I/O.
+**Rationale:** Separation of concerns. `computeToolFilters` is useful independently (for `forge permissions` display). `generateProxyConfig` composes it internally but callers can also use the raw filters. Both operate on the already-resolved agent — no filesystem I/O.
 
 ### 2. Generator source layout
 
@@ -66,7 +66,7 @@ src/generator/
 
 ### 6. Token generation uses crypto.randomUUID
 
-**Decision:** `PAM_PROXY_TOKEN` is generated via `crypto.randomUUID()` at config generation time. It's included in the `mcpProxy.options.authTokens` array. Callers (e.g., `pam install`) can override via `ProxyConfigOptions.authToken`.
+**Decision:** `FORGE_PROXY_TOKEN` is generated via `crypto.randomUUID()` at config generation time. It's included in the `mcpProxy.options.authTokens` array. Callers (e.g., `forge install`) can override via `ProxyConfigOptions.authToken`.
 
 **Rationale:** Simple, standard, no external dependencies. UUID v4 provides sufficient entropy for a local proxy token. Callers can supply their own token for deterministic testing or external secret management.
 
@@ -74,7 +74,7 @@ src/generator/
 
 **Decision:** The generator preserves `${VAR}` syntax in env values and the authTokens array. The output JSON contains literal strings like `"${GITHUB_TOKEN}"` — these are resolved by the mcp-proxy container at runtime via its own env interpolation.
 
-**Rationale:** pam generates config at install time, not run time. Credential values aren't known during generation. The mcp-proxy natively supports `${}` interpolation in its config.
+**Rationale:** forge generates config at install time, not run time. Credential values aren't known during generation. The mcp-proxy natively supports `${}` interpolation in its config.
 
 ## Risks / Trade-offs
 

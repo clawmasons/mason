@@ -47,7 +47,7 @@ function collectAppEnvVars(agent: ResolvedAgent): string[] {
  * for the agent stack.
  *
  * Variables are grouped by source:
- * - Proxy (PAM_PROXY_TOKEN, PAM_PROXY_PORT)
+ * - Proxy (FORGE_PROXY_TOKEN, FORGE_PROXY_PORT)
  * - App Credentials (from app env fields)
  * - Runtime API Keys (per declared runtime)
  */
@@ -57,8 +57,8 @@ export function generateEnvTemplate(agent: ResolvedAgent): string {
 
   // Proxy section
   lines.push("# Proxy");
-  lines.push("PAM_PROXY_TOKEN=");
-  lines.push(`PAM_PROXY_PORT=${port}`);
+  lines.push("FORGE_PROXY_TOKEN=");
+  lines.push(`FORGE_PROXY_PORT=${port}`);
 
   // App credentials section
   const appVars = collectAppEnvVars(agent);

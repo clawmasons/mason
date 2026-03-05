@@ -1,6 +1,6 @@
 ## 1. Project Setup
 
-- [x] 1.1 Create root package.json with name "@clawforge/pam", TypeScript dependencies (typescript, zod, vitest, eslint, typescript-eslint), and build/test scripts
+- [x] 1.1 Create root package.json with name "@clawforge/forge", TypeScript dependencies (typescript, zod, vitest, eslint, typescript-eslint), and build/test scripts
 - [x] 1.2 Create tsconfig.json with strict mode, ESM output, and src/tests paths
 - [x] 1.3 Create vitest.config.ts
 - [x] 1.4 Create eslint.config.js with flat config and typescript-eslint
@@ -8,12 +8,12 @@
 
 ## 2. Schema Implementation
 
-- [x] 2.1 Create src/schemas/app.ts — Zod schema for app pam fields (transport discriminated: stdio requires command+args, sse/streamable-http requires url)
-- [x] 2.2 Create src/schemas/skill.ts — Zod schema for skill pam fields (artifacts, description)
-- [x] 2.3 Create src/schemas/task.ts — Zod schema for task pam fields (taskType enum, optional prompt/requires/timeout/approval)
-- [x] 2.4 Create src/schemas/role.ts — Zod schema for role pam fields (permissions map with allow/deny, optional tasks/skills/constraints)
-- [x] 2.5 Create src/schemas/agent.ts — Zod schema for agent pam fields (runtimes, roles, optional resources/proxy)
-- [x] 2.6 Create src/schemas/pam-field.ts — Discriminated union on type field + parsePamField() function
+- [x] 2.1 Create src/schemas/app.ts — Zod schema for app forge fields (transport discriminated: stdio requires command+args, sse/streamable-http requires url)
+- [x] 2.2 Create src/schemas/skill.ts — Zod schema for skill forge fields (artifacts, description)
+- [x] 2.3 Create src/schemas/task.ts — Zod schema for task forge fields (taskType enum, optional prompt/requires/timeout/approval)
+- [x] 2.4 Create src/schemas/role.ts — Zod schema for role forge fields (permissions map with allow/deny, optional tasks/skills/constraints)
+- [x] 2.5 Create src/schemas/agent.ts — Zod schema for agent forge fields (runtimes, roles, optional resources/proxy)
+- [x] 2.6 Create src/schemas/forge-field.ts — Discriminated union on type field + parseForgeField() function
 - [x] 2.7 Create src/schemas/index.ts — Re-export all schemas and types
 - [x] 2.8 Create src/index.ts — Public API entry point re-exporting from schemas
 
@@ -24,7 +24,7 @@
 - [x] 3.3 Create tests/schemas/task.test.ts — Test valid subagent/composite tasks, invalid taskType per spec scenarios
 - [x] 3.4 Create tests/schemas/role.test.ts — Test valid role with permissions, deny wildcard, constraints per spec scenarios
 - [x] 3.5 Create tests/schemas/agent.test.ts — Test valid agent, resources, missing runtimes per spec scenarios
-- [x] 3.6 Create tests/schemas/pam-field.test.ts — Test discriminated union parsing, unknown type, missing type per spec scenarios
+- [x] 3.6 Create tests/schemas/forge-field.test.ts — Test discriminated union parsing, unknown type, missing type per spec scenarios
 - [x] 3.7 Validate all PRD example package.json snippets pass schema validation
 
 ## 4. Verification

@@ -51,7 +51,7 @@ The `generateComposeService()` method SHALL return a `ComposeServiceDef` with:
 - `depends_on` including `mcp-proxy`
 - `stdin_open` and `tty` set to `true`
 - `networks` including `agent-net`
-- `environment` including `PAM_ROLES` only (no `CLAUDE_AUTH_TOKEN`)
+- `environment` including `FORGE_ROLES` only (no `CLAUDE_AUTH_TOKEN`)
 - `working_dir` set to `/home/node/workspace`
 
 #### Scenario: Compose service mounts .claude directory and .claude.json
@@ -64,7 +64,7 @@ The `generateComposeService()` method SHALL return a `ComposeServiceDef` with:
 
 #### Scenario: Compose service has correct structure
 - **WHEN** `generateComposeService()` is called with an agent having roles `issue-manager` and `pr-reviewer`
-- **THEN** the result SHALL have `environment` containing `PAM_ROLES=issue-manager,pr-reviewer` and `depends_on` containing `mcp-proxy`
+- **THEN** the result SHALL have `environment` containing `FORGE_ROLES=issue-manager,pr-reviewer` and `depends_on` containing `mcp-proxy`
 
 ## NEW Requirements
 

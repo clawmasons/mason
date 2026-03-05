@@ -2,7 +2,7 @@ import type { ResolvedAgent } from "../resolver/types.js";
 import type { LockFile, LockFileRole } from "./types.js";
 
 /**
- * Generate a pam.lock.json object from a resolved agent and
+ * Generate a forge.lock.json object from a resolved agent and
  * the list of generated file paths.
  *
  * The lock file captures exact versions for reproducibility.

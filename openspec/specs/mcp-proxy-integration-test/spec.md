@@ -2,16 +2,16 @@
 
 ## Purpose
 
-End-to-end integration test that validates the full PAM pipeline: build → pam install → docker compose up → MCP protocol requests via HTTP, ensuring the mcp-proxy works correctly with stdio MCP servers.
+End-to-end integration test that validates the full FORGE pipeline: build → forge install → docker compose up → MCP protocol requests via HTTP, ensuring the mcp-proxy works correctly with stdio MCP servers.
 
 ## Requirements
 
 ### Requirement: Integration test installs example agent
-The system SHALL provide an integration test that runs `pam install @example/agent-note-taker` against the example workspace and verifies the generated output directory contains a valid mcp-proxy config and docker-compose.yml.
+The system SHALL provide an integration test that runs `forge install @example/agent-note-taker` against the example workspace and verifies the generated output directory contains a valid mcp-proxy config and docker-compose.yml.
 
 #### Scenario: Install produces valid proxy config
-- **WHEN** the integration test runs `node ../bin/pam.js install @example/agent-note-taker` from the example directory (after `npm run build`)
-- **THEN** the output directory `.pam/agents/note-taker/` SHALL contain `mcp-proxy/config.json`, `docker-compose.yml`, and `.env`
+- **WHEN** the integration test runs `node ../bin/forge.js install @example/agent-note-taker` from the example directory (after `npm run build`)
+- **THEN** the output directory `.forge/agents/note-taker/` SHALL contain `mcp-proxy/config.json`, `docker-compose.yml`, and `.env`
 - **AND** the `mcp-proxy/config.json` SHALL contain valid JSON with `mcpProxy` and `mcpServers` keys
 
 ### Requirement: Integration test starts mcp-proxy via Docker

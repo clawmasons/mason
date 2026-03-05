@@ -1,6 +1,6 @@
 ## Context
 
-The pam pipeline currently handles: schema validation → package discovery → dependency resolution → graph validation → toolFilter computation → proxy config generation → runtime materialization. The next step is assembling the Docker Compose orchestration layer that ties the proxy and runtime containers together into a deployable stack.
+The forge pipeline currently handles: schema validation → package discovery → dependency resolution → graph validation → toolFilter computation → proxy config generation → runtime materialization. The next step is assembling the Docker Compose orchestration layer that ties the proxy and runtime containers together into a deployable stack.
 
 The Docker Compose generator consumes the proxy config, runtime materializer compose services, and agent metadata to produce a complete `docker-compose.yml`. The `.env` generator collects all environment variables required by the proxy (from app `env` fields) and runtimes (API keys). The lock file generator snapshots the resolved graph for reproducibility.
 
@@ -9,16 +9,16 @@ The Docker Compose generator consumes the proxy config, runtime materializer com
 **Goals:**
 - Generate a valid `docker-compose.yml` matching PRD §6.2.3 structure with mcp-proxy service, one service per runtime, and agent-net network
 - Generate `.env` template with all required environment variables (proxy token, app credentials, runtime API keys) as placeholders
-- Generate `pam.lock.json` with resolved agent graph, exact versions, and generated file inventory
+- Generate `forge.lock.json` with resolved agent graph, exact versions, and generated file inventory
 - Support configurable proxy port (default 9090) and image (default `ghcr.io/tbxark/mcp-proxy:latest`)
 - Include structured JSON logging config on the proxy service
 
 **Non-Goals:**
-- `pam install` orchestration (separate change — wires all generators together)
-- `pam run` / `pam stop` commands (separate change)
+- `forge install` orchestration (separate change — wires all generators together)
+- `forge run` / `forge stop` commands (separate change)
 - Strict per-role isolation mode with multiple proxy instances (separate change)
 - Secrets manager integration (future)
-- Credential prompting UX (part of `pam install` change)
+- Credential prompting UX (part of `forge install` change)
 
 ## Decisions
 
@@ -40,11 +40,11 @@ The `.env` template writes `VAR=` (empty value) for each required variable, with
 
 ### 4. Lock file is JSON with sorted keys
 
-`pam.lock.json` is JSON for easy parsing. Keys are sorted for deterministic diffs. Contains the resolved agent tree with exact versions, plus a `generatedFiles` section listing all produced artifacts.
+`forge.lock.json` is JSON for easy parsing. Keys are sorted for deterministic diffs. Contains the resolved agent tree with exact versions, plus a `generatedFiles` section listing all produced artifacts.
 
 ### 5. Pure functions returning strings/objects
 
-All generators return strings or plain objects — no file I/O. The caller (`pam install`) handles writing files. Consistent with the materializer pattern.
+All generators return strings or plain objects — no file I/O. The caller (`forge install`) handles writing files. Consistent with the materializer pattern.
 
 ### 6. Proxy environment variables collected from app `env` fields
 

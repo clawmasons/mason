@@ -121,13 +121,13 @@ export function generateDockerCompose(
   );
   lines.push("    restart: unless-stopped");
   lines.push("    ports:");
-  lines.push(`      - "\${PAM_PROXY_PORT:-${port}}:${port}"`);
+  lines.push(`      - "\${FORGE_PROXY_PORT:-${port}}:${port}"`);
   lines.push("    volumes:");
   lines.push("      - ./mcp-proxy/config.json:/config/config.json:ro");
   lines.push("      - ./mcp-proxy/logs:/logs");
 
   lines.push("    environment:");
-  lines.push("      - PAM_PROXY_TOKEN=${PAM_PROXY_TOKEN}");
+  lines.push("      - FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}");
   for (const varName of envVars) {
     lines.push(`      - ${varName}=\${${varName}}`);
   }

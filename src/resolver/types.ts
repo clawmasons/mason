@@ -1,13 +1,13 @@
-import type { PamField } from "../schemas/index.js";
+import type { ForgeField } from "../schemas/index.js";
 
 /**
- * A pam package discovered on the filesystem.
+ * A forge package discovered on the filesystem.
  */
 export interface DiscoveredPackage {
   name: string;
   version: string;
   packagePath: string;
-  pamField: PamField;
+  forgeField: ForgeField;
 }
 
 /**

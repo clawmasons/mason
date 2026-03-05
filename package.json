@@ -1,10 +1,10 @@
 {
-  "name": "@clawforge/pam",
+  "name": "@clawforge/forge",
   "version": "0.1.0",
-  "description": "Packaged Agent Manager — npm-native packaging, governance, and runtime portability for AI agents",
+  "description": "Agent Forge System — npm-native packaging, governance, and runtime portability for AI agents",
   "type": "module",
   "bin": {
-    "pam": "./bin/pam.js"
+    "forge": "./bin/forge.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
