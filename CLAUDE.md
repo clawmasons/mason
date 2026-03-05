@@ -19,6 +19,7 @@
 - Review lessons at session start for relevant project
 
 ### 4. Verification Before Done
+- **Every code change must**: compile (`npx tsc --noEmit`), pass the linter (`npx eslint src/ tests/`), and pass tests (`npx vitest run`)
 - Never mark a task complete without proving it works
 - Diff behavior between main and your changes when relevant
 - Ask yourself: "Would a staff engineer approve this?"

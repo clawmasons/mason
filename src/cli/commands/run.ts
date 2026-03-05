@@ -45,7 +45,7 @@ function parseServiceNames(composePath: string): string[] {
     }
     // Service names are indented exactly 2 spaces followed by name:
     if (inServices) {
-      const match = line.match(/^  (\S+):\s*$/);
+      const match = line.match(/^ {2}(\S+):\s*$/);
       if (match) {
         services.push(match[1]);
       }
