@@ -28,6 +28,11 @@
     "npm",
     "governance"
   ],
+  "files": [
+    "dist",
+    "bin",
+    "templates"
+  ],
   "license": "MIT",
   "workspaces": ["forge-core"],
   "devDependencies": {
