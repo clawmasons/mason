@@ -6,8 +6,11 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import type Database from "better-sqlite3";
 import type { ToolRouter } from "./router.js";
 import type { UpstreamManager } from "./upstream.js";
+import { auditPreHook, auditPostHook } from "./hooks/audit.js";
+import type { HookContext } from "./hooks/audit.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -16,6 +19,8 @@ export interface ForgeProxyServerConfig {
   transport: "sse" | "streamable-http";
   router: ToolRouter;
   upstream: UpstreamManager;
+  db?: Database.Database;
+  agentName?: string;
 }
 
 // ── ForgeProxyServer ──────────────────────────────────────────────────
@@ -163,7 +168,7 @@ export class ForgeProxyServer {
   // ── MCP Server Factory ────────────────────────────────────────────
 
   private createMcpServer(): Server {
-    const { router, upstream } = this.config;
+    const { router, upstream, db, agentName } = this.config;
 
     const server = new Server(
       { name: "forge", version: "0.1.0" },
@@ -179,20 +184,51 @@ export class ForgeProxyServer {
 
       const route = router.resolve(name);
       if (!route) {
+        if (db) {
+          const ctx: HookContext = {
+            agentName: agentName ?? "unknown",
+            roleName: "unknown",
+            appName: "unknown",
+            toolName: name,
+            prefixedToolName: name,
+            arguments: args,
+          };
+          const pre = auditPreHook(ctx);
+          auditPostHook(ctx, pre, `Unknown tool: ${name}`, "denied", db);
+        }
         return {
           content: [{ type: "text" as const, text: `Unknown tool: ${name}` }],
           isError: true,
         };
       }
 
+      const ctx: HookContext | undefined = db
+        ? {
+            agentName: agentName ?? "unknown",
+            roleName: "unknown",
+            appName: route.appName,
+            toolName: route.originalToolName,
+            prefixedToolName: route.prefixedToolName,
+            arguments: args,
+          }
+        : undefined;
+      const pre = ctx ? auditPreHook(ctx) : undefined;
+
       try {
-        return await upstream.callTool(
+        const result = await upstream.callTool(
           route.appName,
           route.originalToolName,
           args as Record<string, unknown> | undefined,
         );
+        if (db && ctx && pre) {
+          auditPostHook(ctx, pre, result, "success", db);
+        }
+        return result;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        if (db && ctx && pre) {
+          auditPostHook(ctx, pre, message, "error", db);
+        }
         return {
           content: [{ type: "text" as const, text: message }],
           isError: true,

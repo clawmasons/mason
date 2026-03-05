@@ -6,6 +6,8 @@ import type { Tool, CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { ForgeProxyServer } from "../../src/proxy/server.js";
 import type { ToolRouter, RouteEntry } from "../../src/proxy/router.js";
 import type { UpstreamManager } from "../../src/proxy/upstream.js";
+import { openDatabase, queryAuditLog } from "../../src/proxy/db.js";
+import type Database from "better-sqlite3";
 
 // ── Fixtures ────────────────────────────────────────────────────────────
 
@@ -340,5 +342,130 @@ describe("ForgeProxyServer (streamable-http)", () => {
     expect(result.content).toEqual([
       { type: "text", text: "Timeout waiting for response" },
     ]);
+  });
+});
+
+// ── Audit Logging Integration Tests ──────────────────────────────────
+
+describe("ForgeProxyServer (audit logging)", () => {
+  let server: ForgeProxyServer;
+  let client: Client;
+  let db: Database.Database;
+
+  afterEach(async () => {
+    try { await client?.close(); } catch { /* ignore */ }
+    try { await server?.stop(); } catch { /* ignore */ }
+    try { db?.close(); } catch { /* ignore */ }
+  });
+
+  it("logs successful tool call to audit_log", async () => {
+    const port = getPort();
+    db = openDatabase(":memory:");
+    const route = makeRouteEntry("@clawforge/app-github", "github", "create_pr");
+    const routes = new Map([["github_create_pr", route]]);
+    const router = createMockRouter([route.tool], routes);
+    const upstream = createMockUpstream({
+      content: [{ type: "text", text: "PR #42 created" }],
+    });
+
+    server = new ForgeProxyServer({
+      port,
+      transport: "sse",
+      router,
+      upstream,
+      db,
+      agentName: "note-taker",
+    });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+    await client.callTool({
+      name: "github_create_pr",
+      arguments: { title: "Fix bug" },
+    });
+
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].agent_name).toBe("note-taker");
+    expect(entries[0].app_name).toBe("@clawforge/app-github");
+    expect(entries[0].tool_name).toBe("create_pr");
+    expect(entries[0].status).toBe("success");
+    expect(entries[0].duration_ms).toBeGreaterThanOrEqual(0);
+    expect(JSON.parse(entries[0].arguments!)).toEqual({ title: "Fix bug" });
+  });
+
+  it("logs denied tool call to audit_log", async () => {
+    const port = getPort();
+    db = openDatabase(":memory:");
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ForgeProxyServer({
+      port,
+      transport: "sse",
+      router,
+      upstream,
+      db,
+      agentName: "note-taker",
+    });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+    await client.callTool({ name: "github_delete_repo" });
+
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].status).toBe("denied");
+    expect(entries[0].tool_name).toBe("github_delete_repo");
+  });
+
+  it("logs error tool call to audit_log", async () => {
+    const port = getPort();
+    db = openDatabase(":memory:");
+    const route = makeRouteEntry("@clawforge/app-github", "github", "create_pr");
+    const routes = new Map([["github_create_pr", route]]);
+    const router = createMockRouter([route.tool], routes);
+    const upstream = createMockUpstream(undefined, new Error("Connection refused"));
+
+    server = new ForgeProxyServer({
+      port,
+      transport: "sse",
+      router,
+      upstream,
+      db,
+      agentName: "note-taker",
+    });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+    await client.callTool({ name: "github_create_pr", arguments: {} });
+
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].status).toBe("error");
+    expect(entries[0].result).toContain("Connection refused");
+  });
+
+  it("does not log when db is not configured", async () => {
+    const port = getPort();
+    const route = makeRouteEntry("@clawforge/app-github", "github", "create_pr");
+    const routes = new Map([["github_create_pr", route]]);
+    const router = createMockRouter([route.tool], routes);
+    const upstream = createMockUpstream({
+      content: [{ type: "text", text: "ok" }],
+    });
+
+    // No db provided
+    server = new ForgeProxyServer({ port, transport: "sse", router, upstream });
+    await server.start();
+
+    client = await connectClient(port, "sse");
+    const result = await client.callTool({
+      name: "github_create_pr",
+      arguments: {},
+    });
+
+    expect(result.content).toEqual([{ type: "text", text: "ok" }]);
+    // No assertion on db — it was never provided, so no logging happens
   });
 });
