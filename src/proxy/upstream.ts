@@ -2,13 +2,14 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type {
-  Tool,
-  Resource,
-  Prompt,
-  CallToolResult,
-  ReadResourceResult,
-  GetPromptResult,
+import {
+  CallToolResultSchema,
+  type Tool,
+  type Resource,
+  type Prompt,
+  type CallToolResult,
+  type ReadResourceResult,
+  type GetPromptResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { ResolvedApp } from "../resolver/types.js";
 
@@ -125,7 +126,7 @@ export class UpstreamManager {
     args?: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const client = this.requireClient(appName);
-    return client.callTool({ name: toolName, arguments: args });
+    return client.callTool({ name: toolName, arguments: args }, CallToolResultSchema) as Promise<CallToolResult>;
   }
 
   async readResource(
