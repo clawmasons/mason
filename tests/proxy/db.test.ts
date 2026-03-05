@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type Database from "better-sqlite3";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -37,6 +37,18 @@ describe("proxy/db", () => {
       const names = tables.map((t) => t.name);
       expect(names).toContain("audit_log");
       expect(names).toContain("approval_requests");
+    });
+
+    it("creates the database in a subdirectory when given a path", () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), "forge-db-subdir-"));
+      const subPath = join(tmpDir, "data", "forge.db");
+      const subDb = openDatabase(subPath);
+      try {
+        expect(existsSync(subPath)).toBe(true);
+      } finally {
+        subDb.close();
+        rmSync(tmpDir, { recursive: true });
+      }
     });
 
     it("enables WAL mode", () => {

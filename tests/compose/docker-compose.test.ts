@@ -57,7 +57,6 @@ function makeRepoOpsAgent(): ResolvedAgent {
     runtimes: ["claude-code"],
     roles: [issueManager],
     proxy: {
-      image: "ghcr.io/tbxark/mcp-proxy:latest",
       port: 9090,
       type: "sse",
     },
@@ -93,22 +92,22 @@ function makeCodexService(): ComposeServiceDef {
 }
 
 describe("generateDockerCompose", () => {
-  describe("mcp-proxy service", () => {
-    it("uses default proxy image", () => {
+  describe("forge proxy service", () => {
+    it("always uses build: ./forge-proxy", () => {
       const agent = makeRepoOpsAgent();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      expect(yaml).toContain("image: ghcr.io/tbxark/mcp-proxy:latest");
+      expect(yaml).toContain("build: ./forge-proxy");
     });
 
-    it("uses custom proxy image", () => {
+    it("does not reference mcp-proxy image or binary", () => {
       const agent = makeRepoOpsAgent();
-      agent.proxy = { image: "custom/proxy:v2", port: 9090, type: "sse" };
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      expect(yaml).toContain("image: custom/proxy:v2");
+      expect(yaml).not.toContain("ghcr.io/tbxark/mcp-proxy");
+      expect(yaml).not.toContain("image:");
     });
 
     it("maps proxy port with FORGE_PROXY_PORT default", () => {
@@ -128,31 +127,46 @@ describe("generateDockerCompose", () => {
       expect(yaml).toContain('"${FORGE_PROXY_PORT:-8080}:8080"');
     });
 
-    it("mounts mcp-proxy config as read-only", () => {
+    it("mounts forge-proxy logs directory", () => {
       const agent = makeRepoOpsAgent();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      expect(yaml).toContain("./mcp-proxy/config.json:/config/config.json:ro");
+      expect(yaml).toContain("./forge-proxy/logs:/logs");
     });
 
-    it("mounts mcp-proxy logs directory", () => {
+    it("mounts data directory for persistent DB", () => {
       const agent = makeRepoOpsAgent();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      expect(yaml).toContain("./mcp-proxy/logs:/logs");
+      expect(yaml).toContain("./data:/home/node/data");
     });
 
-    it("wraps mcp-proxy command with tee to write logs to mounted volume", () => {
+    it("sets FORGE_DB_PATH environment variable", () => {
       const agent = makeRepoOpsAgent();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      expect(yaml).toContain('entrypoint: ["/bin/sh", "-c"]');
-      expect(yaml).toContain(
-        'command: ["mcp-proxy --config /config/config.json 2>&1 | tee -a /logs/mcp-proxy.log"]',
-      );
+      const proxySection = yaml.split("claude-code:")[0];
+      expect(proxySection).toContain("FORGE_DB_PATH=/home/node/data/forge.db");
+    });
+
+    it("does not mount config.json", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services);
+
+      expect(yaml).not.toContain("config.json");
+    });
+
+    it("does not have mcp-proxy entrypoint or command", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services);
+
+      expect(yaml).not.toContain("entrypoint:");
+      expect(yaml).not.toContain("command:");
     });
 
     it("has restart unless-stopped", () => {
@@ -160,7 +174,6 @@ describe("generateDockerCompose", () => {
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      // The proxy service should have restart: unless-stopped
       const proxySection = yaml.split("claude-code:")[0];
       expect(proxySection).toContain("restart: unless-stopped");
     });
@@ -174,7 +187,7 @@ describe("generateDockerCompose", () => {
       expect(yaml).toContain("SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}");
     });
 
-    it("always includes FORGE_PROXY_TOKEN in mcp-proxy environment", () => {
+    it("always includes FORGE_PROXY_TOKEN in environment", () => {
       const agent = makeRepoOpsAgent();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
@@ -198,7 +211,6 @@ describe("generateDockerCompose", () => {
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      // Proxy section should reference agent-net
       const proxySection = yaml.split("claude-code:")[0];
       expect(proxySection).toContain("agent-net");
     });
@@ -209,7 +221,7 @@ describe("generateDockerCompose", () => {
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      expect(yaml).toContain("image: ghcr.io/tbxark/mcp-proxy:latest");
+      expect(yaml).toContain("build: ./forge-proxy");
       expect(yaml).toContain('"${FORGE_PROXY_PORT:-9090}:9090"');
     });
   });
@@ -245,7 +257,6 @@ describe("generateDockerCompose", () => {
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      // After the claude-code service starts, check depends_on is rendered
       const claudeSection = yaml.split("claude-code:")[1];
       expect(claudeSection).toContain("depends_on:");
       expect(claudeSection).toContain("- mcp-proxy");
@@ -270,35 +281,6 @@ describe("generateDockerCompose", () => {
       expect(yaml).toContain("networks:");
       expect(yaml).toContain("agent-net:");
       expect(yaml).toContain("driver: bridge");
-    });
-  });
-
-  describe("proxy Dockerfile support", () => {
-    it("uses build: ./mcp-proxy when hasProxyDockerfile is true", () => {
-      const agent = makeRepoOpsAgent();
-      const services = new Map([["claude-code", makeClaudeCodeService()]]);
-      const yaml = generateDockerCompose(agent, services, true);
-
-      expect(yaml).toContain("build: ./mcp-proxy");
-      expect(yaml).not.toContain("image: ghcr.io/tbxark/mcp-proxy:latest");
-    });
-
-    it("uses image: when hasProxyDockerfile is false", () => {
-      const agent = makeRepoOpsAgent();
-      const services = new Map([["claude-code", makeClaudeCodeService()]]);
-      const yaml = generateDockerCompose(agent, services, false);
-
-      expect(yaml).toContain("image: ghcr.io/tbxark/mcp-proxy:latest");
-      expect(yaml).not.toContain("build: ./mcp-proxy");
-    });
-
-    it("uses image: when hasProxyDockerfile is undefined (backward compatible)", () => {
-      const agent = makeRepoOpsAgent();
-      const services = new Map([["claude-code", makeClaudeCodeService()]]);
-      const yaml = generateDockerCompose(agent, services);
-
-      expect(yaml).toContain("image: ghcr.io/tbxark/mcp-proxy:latest");
-      expect(yaml).not.toContain("build: ./mcp-proxy");
     });
   });
 

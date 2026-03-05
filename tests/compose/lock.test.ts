@@ -124,18 +124,18 @@ describe("generateLockFile", () => {
   describe("generated files", () => {
     it("includes provided file paths", () => {
       const agent = makeRepoOpsAgent();
-      const files = ["docker-compose.yml", "mcp-proxy/config.json", ".env"];
+      const files = ["docker-compose.yml", "forge-proxy/Dockerfile", ".env"];
       const lock = generateLockFile(agent, files);
       expect(lock.generatedFiles).toContain("docker-compose.yml");
-      expect(lock.generatedFiles).toContain("mcp-proxy/config.json");
+      expect(lock.generatedFiles).toContain("forge-proxy/Dockerfile");
       expect(lock.generatedFiles).toContain(".env");
     });
 
     it("sorts generated files", () => {
       const agent = makeRepoOpsAgent();
-      const files = ["docker-compose.yml", ".env", "mcp-proxy/config.json"];
+      const files = ["docker-compose.yml", ".env", "forge-proxy/Dockerfile"];
       const lock = generateLockFile(agent, files);
-      expect(lock.generatedFiles).toEqual([".env", "docker-compose.yml", "mcp-proxy/config.json"]);
+      expect(lock.generatedFiles).toEqual([".env", "docker-compose.yml", "forge-proxy/Dockerfile"]);
     });
   });
 

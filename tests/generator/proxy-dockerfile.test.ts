@@ -1,96 +1,81 @@
 import { describe, expect, it } from "vitest";
 import { generateProxyDockerfile } from "../../src/generator/proxy-dockerfile.js";
-import type { ResolvedAgent, ResolvedApp, ResolvedRole } from "../../src/resolver/types.js";
-
-function makeStdioApp(): ResolvedApp {
-  return {
-    name: "@test/app-filesystem",
-    version: "1.0.0",
-    transport: "stdio",
-    command: "npx",
-    args: ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
-    tools: ["read_file", "write_file"],
-    capabilities: ["tools"],
-  };
-}
-
-function makeRemoteApp(): ResolvedApp {
-  return {
-    name: "@test/app-remote",
-    version: "1.0.0",
-    transport: "sse",
-    url: "http://remote-server:8080/sse",
-    tools: ["search"],
-    capabilities: ["tools"],
-  };
-}
-
-function makeAgent(apps: ResolvedApp[], proxyImage?: string): ResolvedAgent {
-  const role: ResolvedRole = {
-    name: "@test/role-worker",
-    version: "1.0.0",
-    permissions: {},
-    tasks: [],
-    apps,
-    skills: [],
-  };
-
-  return {
-    name: "@test/agent-test",
-    version: "1.0.0",
-    runtimes: ["claude-code"],
-    roles: [role],
-    proxy: proxyImage ? { image: proxyImage, port: 9090, type: "sse" } : undefined,
-  };
-}
 
 describe("generateProxyDockerfile", () => {
-  it("returns Dockerfile string when agent has stdio apps", () => {
-    const agent = makeAgent([makeStdioApp()]);
-    const result = generateProxyDockerfile(agent);
+  it("returns a Dockerfile string", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).not.toBeNull();
+    expect(result).toBeTypeOf("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("uses Node.js 22-slim as base image", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
+
+    expect(result).toContain("FROM node:22-slim AS builder");
     expect(result).toContain("FROM node:22-slim");
-    expect(result).toContain("COPY --from=proxy /main /usr/local/bin/mcp-proxy");
   });
 
-  it("returns null when all apps are remote", () => {
-    const agent = makeAgent([makeRemoteApp()]);
-    const result = generateProxyDockerfile(agent);
+  it("builds forge from source in builder stage", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toBeNull();
+    expect(result).toContain("COPY forge/ ./forge/");
+    expect(result).toContain("npm ci --ignore-scripts");
+    expect(result).toContain("npm run build");
   });
 
-  it("returns Dockerfile when mix of stdio and remote apps", () => {
-    const agent = makeAgent([makeStdioApp(), makeRemoteApp()]);
-    const result = generateProxyDockerfile(agent);
+  it("copies forge build artifacts to runtime stage", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).not.toBeNull();
+    expect(result).toContain("COPY --from=builder /build/forge/dist ./dist");
+    expect(result).toContain("COPY --from=builder /build/forge/bin ./bin");
+    expect(result).toContain("COPY --from=builder /build/forge/node_modules ./node_modules");
+    expect(result).toContain("COPY --from=builder /build/forge/package.json ./");
   });
 
-  it("contains multi-stage build with correct proxy image", () => {
-    const agent = makeAgent([makeStdioApp()]);
-    const result = generateProxyDockerfile(agent)!;
+  it("copies workspace into the image", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toContain("FROM ghcr.io/tbxark/mcp-proxy:latest AS proxy");
-    expect(result).toContain("FROM node:22-slim");
-    expect(result).toContain('ENTRYPOINT ["mcp-proxy"]');
-    expect(result).toContain('CMD ["--config", "/config/config.json"]');
+    expect(result).toContain("COPY workspace/ ./workspace/");
   });
 
-  it("respects custom agent.proxy.image", () => {
-    const agent = makeAgent([makeStdioApp()], "custom/proxy:v2");
-    const result = generateProxyDockerfile(agent)!;
+  it("uses forge proxy as entrypoint with agent name", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toContain("FROM custom/proxy:v2 AS proxy");
-    expect(result).not.toContain("ghcr.io/tbxark/mcp-proxy");
+    expect(result).toContain('ENTRYPOINT ["node", "/app/bin/forge.js"]');
+    expect(result).toContain('CMD ["proxy", "--agent", "@test/agent-test"]');
   });
 
-  it("uses default image when agent has no proxy field", () => {
-    const agent = makeAgent([makeStdioApp()]);
-    delete agent.proxy;
-    const result = generateProxyDockerfile(agent)!;
+  it("sets working directory to workspace", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toContain("FROM ghcr.io/tbxark/mcp-proxy:latest AS proxy");
+    expect(result).toContain("WORKDIR /app/workspace");
+  });
+
+  it("embeds the provided agent name in CMD", () => {
+    const result = generateProxyDockerfile("@clawforge/agent-repo-ops");
+
+    expect(result).toContain("@clawforge/agent-repo-ops");
+  });
+
+  it("runs as non-root node user", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
+
+    expect(result).toContain("USER node");
+  });
+
+  it("creates and owns /home/node/data directory", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
+
+    expect(result).toContain("mkdir -p /home/node/data");
+    expect(result).toContain("chown -R node:node /app /home/node/data /logs");
+  });
+
+  it("does not reference mcp-proxy binary", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
+
+    expect(result).not.toContain("mcp-proxy");
+    expect(result).not.toContain("tbxark");
+    expect(result).not.toContain("/main");
   });
 });

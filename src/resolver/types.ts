@@ -81,7 +81,6 @@ export interface ResolvedAgent {
   roles: ResolvedRole[];
   resources?: Array<{ type: string; ref: string; access: string }>;
   proxy?: {
-    image?: string;
     port?: number;
     type?: "sse" | "streamable-http";
   };

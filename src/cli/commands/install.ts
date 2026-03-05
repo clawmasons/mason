@@ -2,10 +2,10 @@ import type { Command } from "commander";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { validateAgent } from "../../validator/validate.js";
-import { generateProxyConfig } from "../../generator/proxy-config.js";
 import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
 import { getAppShortName } from "../../generator/toolfilter.js";
 import { claudeCodeMaterializer } from "../../materializer/claude-code.js";
@@ -22,6 +22,46 @@ interface InstallOptions {
 const materializerRegistry = new Map<string, RuntimeMaterializer>([
   ["claude-code", claudeCodeMaterializer],
 ]);
+
+/** Workspace directories that contain agent packages. */
+const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents"];
+
+/**
+ * Resolve the forge project root directory (where package.json, src/, bin/ live).
+ * Uses import.meta.url to locate the forge installation.
+ */
+function getForgeProjectRoot(): string {
+  // This file is at src/cli/commands/install.ts (or dist/cli/commands/install.js)
+  // The project root is 3 levels up from the file's directory.
+  const thisFile = fileURLToPath(import.meta.url);
+  return path.resolve(path.dirname(thisFile), "..", "..", "..");
+}
+
+/**
+ * Copy a directory tree into the allFiles map with a given prefix.
+ * Only copies files (not directories), recursively.
+ */
+function copyDirToFiles(
+  srcDir: string,
+  prefix: string,
+  allFiles: Map<string, string>,
+): void {
+  if (!fs.existsSync(srcDir)) return;
+
+  const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(srcDir, entry.name);
+    const destPath = `${prefix}/${entry.name}`;
+
+    if (entry.isDirectory()) {
+      // Skip node_modules in forge source (will be installed via npm ci)
+      if (entry.name === "node_modules" || entry.name === "dist" || entry.name === ".git") continue;
+      copyDirToFiles(srcPath, destPath, allFiles);
+    } else {
+      allFiles.set(destPath, fs.readFileSync(srcPath, "utf-8"));
+    }
+  }
+}
 
 export function registerInstallCommand(program: Command): void {
   program
@@ -61,10 +101,9 @@ export async function runInstall(
       return;
     }
 
-    // 4. Generate mcp-proxy config
-    console.log("Generating mcp-proxy config...");
-    const proxyConfig = generateProxyConfig(agent);
-    const proxyDockerfile = generateProxyDockerfile(agent);
+    // 4. Generate proxy Dockerfile
+    console.log("Generating forge proxy Dockerfile...");
+    const proxyDockerfile = generateProxyDockerfile(agentName);
 
     // 5. Generate proxy auth token (before materialization so it can be baked in)
     const proxyToken = crypto.randomBytes(32).toString("hex");
@@ -106,27 +145,43 @@ export async function runInstall(
       runtimeServices.set(runtime, service);
     }
 
-    // 6. Generate proxy config file
-    allFiles.set("mcp-proxy/config.json", JSON.stringify(proxyConfig, null, 2));
-    if (proxyDockerfile !== null) {
-      allFiles.set("mcp-proxy/Dockerfile", proxyDockerfile);
+    // 7. Generate forge-proxy build context
+    allFiles.set("forge-proxy/Dockerfile", proxyDockerfile);
+
+    // Copy forge project source into forge-proxy/forge/ for Docker build
+    const forgeRoot = getForgeProjectRoot();
+    copyDirToFiles(path.join(forgeRoot, "src"), "forge-proxy/forge/src", allFiles);
+    copyDirToFiles(path.join(forgeRoot, "bin"), "forge-proxy/forge/bin", allFiles);
+
+    // Copy essential config files for the forge build
+    for (const configFile of ["package.json", "package-lock.json", "tsconfig.json", "tsconfig.build.json"]) {
+      const configPath = path.join(forgeRoot, configFile);
+      if (fs.existsSync(configPath)) {
+        allFiles.set(`forge-proxy/forge/${configFile}`, fs.readFileSync(configPath, "utf-8"));
+      }
     }
 
-    // 7. Generate docker-compose.yml
+    // Copy agent workspace directories into forge-proxy/workspace/
+    for (const wsDir of WORKSPACE_DIRS) {
+      const wsDirPath = path.join(rootDir, wsDir);
+      copyDirToFiles(wsDirPath, `forge-proxy/workspace/${wsDir}`, allFiles);
+    }
+
+    // 8. Generate docker-compose.yml
     console.log("Generating docker-compose.yml...");
-    const composeYaml = generateDockerCompose(agent, runtimeServices, proxyDockerfile !== null);
+    const composeYaml = generateDockerCompose(agent, runtimeServices);
     allFiles.set("docker-compose.yml", composeYaml);
 
-    // 8. Generate .env with proxy token
+    // 9. Generate .env with proxy token
     const envTemplate = generateEnvTemplate(agent);
     const envContent = envTemplate.replace("FORGE_PROXY_TOKEN=", `FORGE_PROXY_TOKEN=${proxyToken}`);
     allFiles.set(".env", envContent);
 
-    // 9. Generate lock file
+    // 10. Generate lock file
     const lockFile = generateLockFile(agent, [...allFiles.keys()]);
     allFiles.set("forge.lock.json", JSON.stringify(lockFile, null, 2));
 
-    // 10. Write files to output directory
+    // 11. Write files to output directory
     const outputDir = options.outputDir
       ? path.resolve(rootDir, options.outputDir)
       : path.join(rootDir, ".forge", "agents", agentShortName);

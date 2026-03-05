@@ -1,57 +1,32 @@
-import type { ResolvedAgent, ResolvedApp } from "../resolver/types.js";
-
 /**
- * Collect all unique apps from a resolved agent's roles.
- */
-function collectAllApps(agent: ResolvedAgent): Map<string, ResolvedApp> {
-  const apps = new Map<string, ResolvedApp>();
-  for (const role of agent.roles) {
-    for (const app of role.apps) {
-      if (!apps.has(app.name)) {
-        apps.set(app.name, app);
-      }
-    }
-  }
-  return apps;
-}
-
-/**
- * Check whether any app in the agent uses stdio transport.
- */
-function hasStdioApps(agent: ResolvedAgent): boolean {
-  const apps = collectAllApps(agent);
-  for (const [, app] of apps) {
-    if (app.transport === "stdio") {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Generate a multi-stage Dockerfile for the mcp-proxy container.
+ * Generate a multi-stage Dockerfile for the forge proxy container.
  *
- * When any app uses stdio transport (e.g. `npx @modelcontextprotocol/server-*`),
- * the proxy container needs Node.js installed. This generates a Dockerfile that
- * copies the mcp-proxy binary into a Node.js base image.
+ * The Dockerfile builds forge from source in a builder stage, then
+ * creates a slim runtime image with the forge CLI, agent workspace,
+ * and `forge proxy` as the entrypoint.
  *
- * Returns `null` when all apps are remote (SSE/streamable-http) — no custom
- * image needed, the stock proxy image works as-is.
+ * Always returns a Dockerfile string — the forge proxy always needs
+ * Node.js regardless of whether apps are stdio or remote.
  */
 export function generateProxyDockerfile(
-  agent: ResolvedAgent,
-): string | null {
-  if (!hasStdioApps(agent)) {
-    return null;
-  }
-
-  const proxyImage = agent.proxy?.image ?? "ghcr.io/tbxark/mcp-proxy:latest";
-
-  return `FROM ${proxyImage} AS proxy
+  agentName: string,
+): string {
+  return `FROM node:22-slim AS builder
+WORKDIR /build
+COPY forge/ ./forge/
+RUN cd forge && npm ci --ignore-scripts && npm run build
 
 FROM node:22-slim
-COPY --from=proxy /main /usr/local/bin/mcp-proxy
-ENTRYPOINT ["mcp-proxy"]
-CMD ["--config", "/config/config.json"]
+WORKDIR /app
+COPY --from=builder /build/forge/dist ./dist
+COPY --from=builder /build/forge/bin ./bin
+COPY --from=builder /build/forge/node_modules ./node_modules
+COPY --from=builder /build/forge/package.json ./
+COPY workspace/ ./workspace/
+RUN mkdir -p /home/node/data /logs && chown -R node:node /app /home/node/data /logs
+USER node
+WORKDIR /app/workspace
+ENTRYPOINT ["node", "/app/bin/forge.js"]
+CMD ["proxy", "--agent", "${agentName}"]
 `;
 }
