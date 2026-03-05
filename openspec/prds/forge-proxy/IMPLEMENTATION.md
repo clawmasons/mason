@@ -288,7 +288,14 @@ Create the `forge proxy` CLI command that ties everything together.
 
 **Testable output:** Run `forge proxy --agent note-taker` in the example workspace. Verify: proxy starts, logs "forge proxy ready", accepts MCP connections on port 9090, tools are prefixed and filtered. Ctrl-C shuts down cleanly.
 
-**Not Implemented Yet**
+**Implemented** — [Archived Change](../../openspec/changes/archive/2026-03-05-proxy-cli-credential-loading/)
+
+- **Proposal:** [proposal.md](../../openspec/changes/archive/2026-03-05-proxy-cli-credential-loading/proposal.md)
+- **Design:** [design.md](../../openspec/changes/archive/2026-03-05-proxy-cli-credential-loading/design.md)
+- **Tasks:** [tasks.md](../../openspec/changes/archive/2026-03-05-proxy-cli-credential-loading/tasks.md)
+- **Specs:** [proxy-cli/spec.md](../../openspec/specs/proxy-cli/spec.md), [credential-loading/spec.md](../../openspec/specs/credential-loading/spec.md)
+- **Source:** `src/cli/commands/proxy.ts`, `src/proxy/credentials.ts`, `src/cli/commands/index.ts` (modified)
+- **Tests:** `tests/cli/proxy.test.ts` (13 tests), `tests/proxy/credentials.test.ts` (16 tests)
 
 ---
 
