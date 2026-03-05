@@ -147,7 +147,14 @@ Create `src/proxy/server.ts` — the downstream-facing MCP server that wires tog
 
 **Testable output:** Start the proxy with the example filesystem app as upstream. Connect an MCP client to the proxy. Verify `tools/list` returns `filesystem_read_file`, `filesystem_write_file`, etc. Call `filesystem_read_file` and get a result. Verify unknown tool call returns an error.
 
-**Not Implemented Yet**
+**Implemented** — [Archived Change](../../openspec/changes/archive/2026-03-05-core-proxy-server/)
+
+- **Proposal:** [proposal.md](../../openspec/changes/archive/2026-03-05-core-proxy-server/proposal.md)
+- **Design:** [design.md](../../openspec/changes/archive/2026-03-05-core-proxy-server/design.md)
+- **Tasks:** [tasks.md](../../openspec/changes/archive/2026-03-05-core-proxy-server/tasks.md)
+- **Spec:** [proxy-server/spec.md](../../openspec/specs/proxy-server/spec.md)
+- **Source:** `src/proxy/server.ts`
+- **Tests:** `tests/proxy/server.test.ts` (12 tests)
 
 ---
 

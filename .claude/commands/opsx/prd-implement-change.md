@@ -30,7 +30,7 @@ Execute each step in order, completing each fully before moving to the next:
 
 4. **Test** - Run all tests (run-tests.sh) for the project to make sure there were no unexpected regressions with the change. Include unit and UI tests. Fix the tests.  Confirm completion before proceeding but do not ask user.  check yourself.
 
-5. **Verify** — Execute the instructions from `/opsx:verify`. To verify new requirements were implemented. Confirm completion before proceeding but do not ask user.  check yourself.
+5. **Verify** — Execute the instructions from `/opsx:verify`. To verify new requirements were implemented and check that implementation will work with future changes planned for the PRD. Check for coding best practices.  Confirm completion before proceeding but do not ask user.  check yourself.
 
 6. **Sync** — Execute the instructions from `/opsx:sync`. Synchronize the spec with the codebase. Confirm completion before proceeding but do not ask user.  check yourself.
 
