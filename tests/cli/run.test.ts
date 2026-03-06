@@ -4,6 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { program } from "../../src/cli/index.js";
 import { runAgent } from "../../src/cli/commands/run.js";
+import { addMember } from "../../src/registry/members.js";
+import type { MemberEntry } from "../../src/registry/types.js";
 
 // Mock docker-utils to avoid real docker compose checks
 vi.mock("../../src/cli/commands/docker-utils.js", async () => {
@@ -200,5 +202,49 @@ describe("runAgent", () => {
     );
     await runAgent(tmpDir, "@test/member-ops", { runtime: "claude-code" });
     expect(exitSpy).not.toHaveBeenCalledWith(1);
+  });
+
+  it("exits 1 when member is disabled in registry", async () => {
+    setupMemberDir("GITHUB_TOKEN=abc\nCHAPTER_PROXY_TOKEN=xyz\n");
+    const chapterDir = path.join(tmpDir, ".chapter");
+    const disabledEntry: MemberEntry = {
+      package: "@test/member-ops",
+      memberType: "agent",
+      status: "disabled",
+      installedAt: "2026-03-06T10:30:00.000Z",
+    };
+    addMember(chapterDir, "ops", disabledEntry);
+
+    await runAgent(tmpDir, "@test/member-ops", {});
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const errorOutput = errorSpy.mock.calls.flat().join("\n");
+    expect(errorOutput).toContain("disabled");
+    expect(errorOutput).toContain("chapter enable");
+  });
+
+  it("proceeds normally when member is enabled in registry", async () => {
+    setupMemberDir("GITHUB_TOKEN=abc\nCHAPTER_PROXY_TOKEN=xyz\n");
+    const chapterDir = path.join(tmpDir, ".chapter");
+    const enabledEntry: MemberEntry = {
+      package: "@test/member-ops",
+      memberType: "agent",
+      status: "enabled",
+      installedAt: "2026-03-06T10:30:00.000Z",
+    };
+    addMember(chapterDir, "ops", enabledEntry);
+
+    await runAgent(tmpDir, "@test/member-ops", {});
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("session complete");
+  });
+
+  it("proceeds normally when member is not in registry (lenient)", async () => {
+    setupMemberDir("GITHUB_TOKEN=abc\nCHAPTER_PROXY_TOKEN=xyz\n");
+    // No registry entry at all — should still work
+    await runAgent(tmpDir, "@test/member-ops", {});
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("session complete");
   });
 });

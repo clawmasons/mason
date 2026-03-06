@@ -1,6 +1,8 @@
 import type { Command } from "commander";
 import { registerAddCommand } from "./add.js";
 import { registerBuildCommand } from "./build.js";
+import { registerDisableCommand } from "./disable.js";
+import { registerEnableCommand } from "./enable.js";
 import { registerInitCommand } from "./init.js";
 import { registerInstallCommand } from "./install.js";
 import { registerListCommand } from "./list.js";
@@ -14,6 +16,8 @@ import { registerValidateCommand } from "./validate.js";
 export function registerCommands(program: Command): void {
   registerAddCommand(program);
   registerBuildCommand(program);
+  registerDisableCommand(program);
+  registerEnableCommand(program);
   registerInitCommand(program);
   registerInstallCommand(program);
   registerListCommand(program);

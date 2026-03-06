@@ -323,9 +323,19 @@ Implement the enable and disable CLI commands for managing member lifecycle.
 - New test: `tests/cli/disable.test.ts`
 - ~50-80 lines new code per command
 
-**Testable output:** `chapter enable @note-taker` sets status to `"enabled"` in `members.json`. `chapter disable @note-taker` sets status to `"disabled"`. Running enable/disable on non-installed member shows error. `chapter run` on a disabled member shows error. All tests pass.
+**Testable output:** `chapter enable @note-taker` sets status to `"enabled"` in `members.json`. `chapter disable @note-taker` sets status to `"disabled"`. Running enable/disable on non-installed member shows error. `chapter run` on a disabled member shows error. All 627 tests pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-06-chapter-enable-disable-commands/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-06-chapter-enable-disable-commands/proposal.md)
+- [Design](../../changes/archive/2026-03-06-chapter-enable-disable-commands/design.md)
+- [Tasks](../../changes/archive/2026-03-06-chapter-enable-disable-commands/tasks.md)
+
+**Specs updated:**
+- [enable-disable-commands](../../specs/enable-disable-commands/spec.md) -- new spec for enable/disable CLI commands
+- [run-command](../../specs/run-command/spec.md) -- added requirement for disabled member rejection
+- [cli-framework](../../specs/cli-framework/spec.md) -- added enable/disable to registered commands list
 
 ---
 
