@@ -361,12 +361,12 @@ describe("runInstall", () => {
     expect(logOutput).toContain(".env");
   });
 
-  it("shows forge run as primary next step", async () => {
+  it("shows chapter run as primary next step", async () => {
     setupValidAgent();
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("forge run");
+    expect(logOutput).toContain("chapter run");
   });
 
   it("bakes proxy token into .mcp.json", async () => {

@@ -92,7 +92,7 @@ function renderComposeService(service: ComposeServiceDef): string {
  * Generate a complete docker-compose.yml string from a resolved agent
  * and its runtime compose services.
  *
- * The proxy service runs `forge proxy` natively. Runtime services
+ * The proxy service runs `chapter proxy` natively. Runtime services
  * are rendered from their ComposeServiceDef definitions.
  */
 export function generateDockerCompose(

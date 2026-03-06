@@ -77,7 +77,7 @@ export async function runAgent(
 
     if (!fs.existsSync(agentDir)) {
       console.error(
-        `\n✘ Agent directory not found: ${agentDir}\n  Run "forge install ${agentName}" first.\n`,
+        `\n✘ Agent directory not found: ${agentDir}\n  Run "chapter install ${agentName}" first.\n`,
       );
       process.exit(1);
       return;
@@ -85,7 +85,7 @@ export async function runAgent(
 
     if (!fs.existsSync(composePath)) {
       console.error(
-        `\n✘ docker-compose.yml not found in ${agentDir}\n  The agent may need to be reinstalled with "forge install ${agentName}".\n`,
+        `\n✘ docker-compose.yml not found in ${agentDir}\n  The agent may need to be reinstalled with "chapter install ${agentName}".\n`,
       );
       process.exit(1);
       return;

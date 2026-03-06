@@ -1,7 +1,7 @@
 # sqlite-database Specification
 
 ## Purpose
-Provide a shared SQLite database layer for the forge proxy, supporting audit logging of all tool calls and approval request workflows. The module handles connection management, schema creation, and typed CRUD operations.
+Provide a shared SQLite database layer for the chapter proxy, supporting audit logging of all tool calls and approval request workflows. The module handles connection management, schema creation, and typed CRUD operations.
 
 ## Requirements
 

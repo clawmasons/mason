@@ -254,7 +254,7 @@ export async function runInstall(
     const runtimeName = materializedRuntimes[0] ?? "claude-code";
     console.log(`\n  Next steps:`);
     console.log(`    1. Fill in app credentials in ${path.join(outputDir, ".env")}`);
-    console.log(`    2. Run: forge run ${agentName}`);
+    console.log(`    2. Run: chapter run ${agentName}`);
     console.log(`       Or manually:`);
     console.log(`         docker compose -f ${composePath} up -d mcp-proxy`);
     console.log(`         docker compose -f ${composePath} run --rm ${runtimeName}`);

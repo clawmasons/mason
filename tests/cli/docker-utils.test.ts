@@ -33,7 +33,7 @@ describe("validateEnvFile", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-env-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-env-test-"));
   });
 
   afterEach(() => {

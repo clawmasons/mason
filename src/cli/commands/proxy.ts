@@ -25,7 +25,7 @@ interface ProxyOptions {
 export function registerProxyCommand(program: Command): void {
   program
     .command("proxy")
-    .description("Start the forge MCP proxy server for an agent")
+    .description("Start the chapter MCP proxy server for an agent")
     .option("--port <number>", "Port to listen on (default: from agent config or 9090)")
     .option("--startup-timeout <seconds>", "Upstream server startup timeout in seconds (default: 60)")
     .option("--agent <name>", "Agent package name (auto-detected if only one agent)")
@@ -46,7 +46,7 @@ export async function startProxy(
 
   // Graceful shutdown handler
   const shutdown = async () => {
-    console.log("\nShutting down forge proxy...");
+    console.log("\nShutting down chapter proxy...");
     try {
       if (server) await server.stop();
     } catch { /* best-effort */ }
@@ -181,7 +181,7 @@ function resolveAgentName(
   if (agents.length === 0) {
     throw new Error(
       "No agent packages found in this workspace. " +
-      "Make sure you're in a forge workspace root with an agents/ directory.",
+      "Make sure you're in a chapter workspace root with an agents/ directory.",
     );
   }
 

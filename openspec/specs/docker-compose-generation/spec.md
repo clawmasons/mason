@@ -3,7 +3,7 @@
 ### Requirement: generateDockerCompose produces a valid docker-compose.yml string
 
 The system SHALL provide a `generateDockerCompose(agent, runtimeServices)` function that returns a YAML string for `docker-compose.yml`. The generated compose file SHALL contain:
-- An `mcp-proxy` service built from `./chapter-proxy` that runs the native forge proxy
+- An `mcp-proxy` service built from `./chapter-proxy` that runs the native chapter proxy
 - One service per runtime, as provided by `runtimeServices` (a map of runtime name to `ComposeServiceDef`)
 - An `chapter-net` bridge network connecting all services
 
@@ -11,7 +11,7 @@ The system SHALL provide a `generateDockerCompose(agent, runtimeServices)` funct
 - **WHEN** `generateDockerCompose()` is called with a resolved agent having `runtimes: ["claude-code"]` and one `ComposeServiceDef` for claude-code
 - **THEN** the output SHALL contain an `mcp-proxy` service and a `claude-code` service, both on the `chapter-net` network
 
-### Requirement: mcp-proxy service uses native forge proxy
+### Requirement: mcp-proxy service uses native chapter proxy
 
 The `mcp-proxy` service SHALL include:
 - `build: ./chapter-proxy` (always builds from the chapter-proxy Dockerfile)
@@ -23,7 +23,7 @@ The `mcp-proxy` service SHALL include:
 - `networks: [chapter-net]`
 - JSON logging driver with `max-size: 10m` and `max-file: 5`
 - No `entrypoint:` or `command:` directives (uses Dockerfile ENTRYPOINT/CMD)
-- No `config.json` mount (forge proxy reads from workspace)
+- No `config.json` mount (chapter proxy reads from workspace)
 
 #### Scenario: Proxy service has correct port and build
 - **WHEN** the agent has `proxy: { port: 8080 }`

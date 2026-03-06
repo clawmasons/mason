@@ -1,8 +1,8 @@
-# Spec: forge-proxy-integration-test
+# Spec: chapter-proxy-integration-test
 
 ## Purpose
 
-End-to-end integration test that validates the full native forge proxy pipeline with a real upstream MCP server: UpstreamManager → ToolRouter → ChapterProxyServer → MCP Client, including audit logging and approval workflows.
+End-to-end integration test that validates the full native chapter proxy pipeline with a real upstream MCP server: UpstreamManager → ToolRouter → ChapterProxyServer → MCP Client, including audit logging and approval workflows.
 
 ## Requirements
 

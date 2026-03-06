@@ -2,7 +2,7 @@
 
 ## Overview
 
-Credential loading module that parses `.env` files and resolves `${VAR}` references in app environment configurations. Used by the `forge proxy` command to pass credentials to upstream MCP server processes.
+Credential loading module that parses `.env` files and resolves `${VAR}` references in app environment configurations. Used by the `chapter proxy` command to pass credentials to upstream MCP server processes.
 
 ## Source
 

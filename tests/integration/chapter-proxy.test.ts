@@ -1,5 +1,5 @@
 /**
- * End-to-End Integration Test — Native Forge Proxy
+ * End-to-End Integration Test — Native Chapter Proxy
  *
  * Exercises the full proxy pipeline with a real upstream MCP server:
  *   UpstreamManager → ToolRouter → ChapterProxyServer → MCP Client
@@ -44,13 +44,13 @@ beforeAll(async () => {
   // 1. Create temp workspace for the filesystem server
   // Use realpathSync to resolve macOS /tmp → /private/var/folders symlinks
   // so paths match what the filesystem server considers "allowed"
-  tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "forge-integration-")));
+  tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "chapter-integration-")));
 
   // Seed a test file so we can verify reads
-  writeFileSync(join(tmpDir, "hello.txt"), "Hello from forge integration test");
+  writeFileSync(join(tmpDir, "hello.txt"), "Hello from chapter integration test");
 
   // 2. Open temp SQLite database
-  dbPath = join(tmpDir, "forge-test.db");
+  dbPath = join(tmpDir, "chapter-test.db");
   db = openDatabase(dbPath);
 
   // 3. Configure UpstreamManager with real filesystem server
@@ -110,7 +110,7 @@ afterAll(async () => {
 
 // ── Tests ──────────────────────────────────────────────────────────────
 
-describe("Forge Proxy Integration", () => {
+describe("Chapter Proxy Integration", () => {
 
   // Scenario 1: Proxy starts and accepts connections
   it("proxy accepts MCP connections and lists tools", async () => {
@@ -146,7 +146,7 @@ describe("Forge Proxy Integration", () => {
       .filter((c) => c.type === "text")
       .map((c) => c.text)
       .join("");
-    expect(text).toContain("Hello from forge integration test");
+    expect(text).toContain("Hello from chapter integration test");
   });
 
   // Scenario 3b: Write + read round-trip
@@ -210,7 +210,7 @@ describe("Forge Proxy Integration", () => {
 
 // ── Approval Workflow Tests (separate server instance) ─────────────────
 
-describe("Forge Proxy Integration — Approval Workflow", () => {
+describe("Chapter Proxy Integration — Approval Workflow", () => {
   let approvalServer: ChapterProxyServer;
   let approvalClient: Client;
   let approvalDb: Database.Database;
@@ -218,7 +218,7 @@ describe("Forge Proxy Integration — Approval Workflow", () => {
 
   beforeAll(async () => {
     // Use a separate DB for approval tests to avoid interference
-    const approvalDbPath = join(tmpDir, "forge-approval-test.db");
+    const approvalDbPath = join(tmpDir, "chapter-approval-test.db");
     approvalDb = openDatabase(approvalDbPath);
 
     approvalServer = new ChapterProxyServer({
@@ -279,7 +279,7 @@ describe("Forge Proxy Integration — Approval Workflow", () => {
       .filter((c) => c.type === "text")
       .map((c) => c.text)
       .join("");
-    expect(text).toContain("Hello from forge integration test");
+    expect(text).toContain("Hello from chapter integration test");
   });
 
   // Scenario 7 (partial): Clean shutdown

@@ -19,7 +19,7 @@ The resolver SHALL resolve each package name in the agent's `roles` array to a `
 - **THEN** the resolved role contains the resolved task and the permissions object
 
 #### Scenario: Role references non-role package
-- **WHEN** an agent's `roles` array contains `@clawmasons/app-github` (which has `forge.type: "app"`, not `"role"`)
+- **WHEN** an agent's `roles` array contains `@clawmasons/app-github` (which has `chapter.type: "app"`, not `"role"`)
 - **THEN** a `TypeMismatchError` is thrown indicating expected type "role" but got "app"
 
 ### Requirement: Resolve tasks from roles

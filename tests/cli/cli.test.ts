@@ -3,7 +3,7 @@ import { program } from "../../src/cli/index.js";
 
 describe("CLI entry point", () => {
   it("has the correct program name", () => {
-    expect(program.name()).toBe("forge");
+    expect(program.name()).toBe("chapter");
   });
 
   it("has a version matching package.json", () => {
@@ -11,7 +11,7 @@ describe("CLI entry point", () => {
   });
 
   it("has a description", () => {
-    expect(program.description()).toContain("Agent Forge System");
+    expect(program.description()).toContain("Clawmasons Chapter");
   });
 
   it("has the init command registered", () => {

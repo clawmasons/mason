@@ -42,7 +42,7 @@ export function validateEnvFile(agentDir: string): string[] {
 
   if (!fs.existsSync(envPath)) {
     throw new Error(
-      `No .env file found at ${envPath}. Run forge install first to generate credentials template.`,
+      `No .env file found at ${envPath}. Run chapter install first to generate credentials template.`,
     );
   }
 

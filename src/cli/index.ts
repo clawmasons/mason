@@ -12,10 +12,10 @@ const pkg = JSON.parse(
 const program = new Command();
 
 program
-  .name("forge")
+  .name("chapter")
   .version(pkg.version)
   .description(
-    "Agent Forge System — AI agent packaging, governance, and runtime orchestration",
+    "Clawmasons Chapter — AI agent packaging, governance, and runtime orchestration",
   );
 
 registerCommands(program);

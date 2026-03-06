@@ -12,7 +12,7 @@
  *   - Simplified Dockerfile (Change 4)
  *   - Example removal (Change 5)
  *
- * PRD refs: forge-packaging PRD Section 2 (Measurable Outcomes)
+ * PRD refs: chapter-members PRD Section 2 (Measurable Outcomes)
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
