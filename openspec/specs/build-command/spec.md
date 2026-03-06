@@ -17,11 +17,11 @@ When `forge build <agent>` is run, the command SHALL:
 2. Resolve the agent's dependency graph via `resolveAgent()`
 3. Validate the resolved graph via `validateAgent()`
 4. Generate a lock file via `generateLockFile()` with an empty generated files list
-5. Write `forge.lock.json` to the output path
+5. Write `chapter.lock.json` to the output path
 
 #### Scenario: Successful build writes lock file
 - **WHEN** `forge build` is run with a valid agent name
-- **THEN** a `forge.lock.json` file SHALL be written to the current working directory (or `--output` path)
+- **THEN** a `chapter.lock.json` file SHALL be written to the current working directory (or `--output` path)
 - **AND** the lock file SHALL contain the agent name, version, runtimes, and all resolved roles with their tasks, apps, and skills
 
 #### Scenario: Custom output path

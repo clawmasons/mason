@@ -22,7 +22,7 @@ When `forge install <agent>` is run, the command SHALL execute the following sta
 4. Generate the mcp-proxy config via `generateProxyConfig()`
 5. Generate a random proxy auth token (before materialization so it can be baked into runtime configs)
 6. For each declared runtime with a registered materializer: materialize workspace (passing the token), generate Dockerfile, generate config JSON (if supported), generate compose service
-7. Generate docker-compose.yml, .env template (with token injected), and forge.lock.json
+7. Generate docker-compose.yml, .env template (with token injected), and chapter.lock.json
 8. Write all artifacts to the output directory
 9. Create empty `.claude/` directories for runtimes that support config JSON (for volume mount)
 
@@ -38,7 +38,7 @@ When `forge install <agent>` is run, the command SHALL execute the following sta
   - `claude-code/workspace/AGENTS.md`
   - `docker-compose.yml`
   - `.env`
-  - `forge.lock.json`
+  - `chapter.lock.json`
 
 #### Scenario: Validation errors abort install
 - **WHEN** `forge install` is run with an agent that fails validation
@@ -47,12 +47,12 @@ When `forge install <agent>` is run, the command SHALL execute the following sta
 ### Requirement: forge install generates a proxy auth token and bakes it into runtime configs
 
 The install command SHALL generate a cryptographically random token using `crypto.randomBytes(32)` before materialization. The token SHALL be:
-- Injected into the `.env` file as the `FORGE_PROXY_TOKEN` value
+- Injected into the `.env` file as the `CHAPTER_PROXY_TOKEN` value
 - Passed to `materializeWorkspace()` so runtimes can bake the actual token value into their settings (e.g., Claude Code's `settings.json` Authorization header)
 
 #### Scenario: Token is present in .env
 - **WHEN** install completes successfully
-- **THEN** the `.env` file SHALL contain `FORGE_PROXY_TOKEN=<64-char-hex-string>` where the value is non-empty
+- **THEN** the `.env` file SHALL contain `CHAPTER_PROXY_TOKEN=<64-char-hex-string>` where the value is non-empty
 
 #### Scenario: Token is baked into runtime settings
 - **WHEN** install completes successfully for a claude-code runtime
@@ -72,11 +72,11 @@ The install command SHALL maintain a registry mapping runtime names to `RuntimeM
 
 ### Requirement: forge install supports custom output directory
 
-The `--output-dir` option SHALL override the default output location. When not specified, the output directory SHALL default to `.forge/agents/{agent-short-name}/` relative to the working directory.
+The `--output-dir` option SHALL override the default output location. When not specified, the output directory SHALL default to `.chapter/agents/{agent-short-name}/` relative to the working directory.
 
 #### Scenario: Default output directory
 - **WHEN** `forge install @clawmasons/agent-repo-ops` is run without `--output-dir`
-- **THEN** files SHALL be written to `.forge/agents/repo-ops/`
+- **THEN** files SHALL be written to `.chapter/agents/repo-ops/`
 
 #### Scenario: Custom output directory
 - **WHEN** `forge install @clawmasons/agent-repo-ops --output-dir ./my-output` is run

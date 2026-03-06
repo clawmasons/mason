@@ -213,17 +213,17 @@ export async function runInstall(
 
     // 9. Generate .env with proxy token
     const envTemplate = generateEnvTemplate(agent);
-    const envContent = envTemplate.replace("FORGE_PROXY_TOKEN=", `FORGE_PROXY_TOKEN=${proxyToken}`);
+    const envContent = envTemplate.replace("CHAPTER_PROXY_TOKEN=", `CHAPTER_PROXY_TOKEN=${proxyToken}`);
     allFiles.set(".env", envContent);
 
     // 10. Generate lock file
     const lockFile = generateLockFile(agent, [...allFiles.keys()]);
-    allFiles.set("forge.lock.json", JSON.stringify(lockFile, null, 2));
+    allFiles.set("chapter.lock.json", JSON.stringify(lockFile, null, 2));
 
     // 11. Write files to output directory
     const outputDir = options.outputDir
       ? path.resolve(rootDir, options.outputDir)
-      : path.join(rootDir, ".forge", "agents", agentShortName);
+      : path.join(rootDir, ".chapter", "agents", agentShortName);
 
     console.log(`Writing files to ${outputDir}...`);
 

@@ -131,7 +131,7 @@ describe("runBuild", () => {
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
-    const lockPath = path.join(tmpDir, "forge.lock.json");
+    const lockPath = path.join(tmpDir, "chapter.lock.json");
     expect(fs.existsSync(lockPath)).toBe(true);
 
     const lock = JSON.parse(fs.readFileSync(lockPath, "utf-8"));
@@ -167,7 +167,7 @@ describe("runBuild", () => {
     expect(parsed.agent.name).toBe("@test/agent-ops");
 
     // Should NOT write a file
-    expect(fs.existsSync(path.join(tmpDir, "forge.lock.json"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "chapter.lock.json"))).toBe(false);
   });
 
   it("exits 1 when agent is not found", async () => {

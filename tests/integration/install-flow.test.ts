@@ -124,14 +124,14 @@ describe("E2E Install Flow (Local tgz)", () => {
 
     // Run chapter init --template note-taker
     // This will copy template files (including package.json with @clawmasons/chapter-core dep),
-    // create .forge/ scaffold, and attempt npm install. The npm install inside init
+    // create .chapter/ scaffold, and attempt npm install. The npm install inside init
     // may warn about @clawmasons/chapter-core not being on the registry — that's expected
     // for local tgz testing. The template files are still copied correctly.
     chapterCli(["init", "--template", "note-taker"], tmpDir);
 
     // Verify scaffold was created
-    expect(existsSync(join(tmpDir, ".forge"))).toBe(true);
-    expect(existsSync(join(tmpDir, ".forge", "config.json"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".chapter"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".chapter", "config.json"))).toBe(true);
 
     // Verify template files were copied (still uses members/ directory from template)
     expect(existsSync(join(tmpDir, "members", "note-taker", "package.json"))).toBe(true);
@@ -215,7 +215,7 @@ describe("E2E Install Flow (Local tgz)", () => {
     chapterCli(["install", agentName], tmpDir);
 
     // Verify output directory was created
-    const installDir = join(tmpDir, ".forge", "agents", "note-taker");
+    const installDir = join(tmpDir, ".chapter", "agents", "note-taker");
     expect(existsSync(installDir)).toBe(true);
 
     // Verify Dockerfile exists and is single-stage

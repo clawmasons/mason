@@ -9,9 +9,9 @@ export interface InitOptions {
   template?: string;
 }
 
-const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".forge"];
+const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".chapter"];
 
-const ENV_EXAMPLE = `# Credential bindings for forge agent deployments
+const ENV_EXAMPLE = `# Credential bindings for chapter member deployments
 # Copy this file to .env and fill in your values
 # NEVER commit .env files to version control
 
@@ -24,14 +24,14 @@ const ENV_EXAMPLE = `# Credential bindings for forge agent deployments
 const GITIGNORE = `node_modules/
 dist/
 .env
-.forge/.env
+.chapter/.env
 `;
 
 /**
- * Resolve the forge project root directory (where package.json, src/, bin/ live).
+ * Resolve the chapter project root directory (where package.json, src/, bin/ live).
  * The templates/ directory lives at the project root.
  */
-function getForgeProjectRoot(): string {
+function getChapterProjectRoot(): string {
   // This file is at src/cli/commands/init.ts (or dist/cli/commands/init.js)
   // The project root is 3 levels up from the file's directory.
   const thisFile = fileURLToPath(import.meta.url);
@@ -42,7 +42,7 @@ function getForgeProjectRoot(): string {
  * Get the path to the templates directory inside the forge package.
  */
 export function getTemplatesDir(): string {
-  return path.join(getForgeProjectRoot(), "templates");
+  return path.join(getChapterProjectRoot(), "templates");
 }
 
 /**
@@ -122,12 +122,12 @@ export async function runInit(
   options: InitOptions,
   deps?: { templatesDir?: string; skipNpmInstall?: boolean },
 ): Promise<void> {
-  const forgeDir = path.join(targetDir, ".forge");
+  const chapterDir = path.join(targetDir, ".chapter");
 
   // Idempotency check
-  if (fs.existsSync(forgeDir)) {
+  if (fs.existsSync(chapterDir)) {
     console.log(
-      "⚠ Workspace already initialized (.forge/ directory exists). Nothing to do.",
+      "⚠ Workspace already initialized (.chapter/ directory exists). Nothing to do.",
     );
     return;
   }
@@ -204,16 +204,16 @@ export async function runInit(
     created.push("package.json");
   }
 
-  // Generate .forge/config.json
-  const configPath = path.join(forgeDir, "config.json");
+  // Generate .chapter/config.json
+  const configPath = path.join(chapterDir, "config.json");
   const config = { version: "0.1.0" };
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
-  created.push(".forge/config.json");
+  created.push(".chapter/config.json");
 
-  // Generate .forge/.env.example
-  const envExamplePath = path.join(forgeDir, ".env.example");
+  // Generate .chapter/.env.example
+  const envExamplePath = path.join(chapterDir, ".env.example");
   fs.writeFileSync(envExamplePath, ENV_EXAMPLE);
-  created.push(".forge/.env.example");
+  created.push(".chapter/.env.example");
 
   // Generate .gitignore (only if it doesn't exist)
   const gitignorePath = path.join(targetDir, ".gitignore");

@@ -5,31 +5,31 @@ Translates a resolved forge agent graph into Claude Code-specific runtime artifa
 ## Requirements
 ### Requirement: Claude Code materializer generates settings.json with single forge MCP entry
 
-The Claude Code materializer SHALL generate a `.claude/settings.json` file containing a single `mcpServers` entry keyed as `"forge"`, pointing at the proxy's unified endpoint. The proxy handles tool prefixing internally (e.g. `github_create_pr`), so per-app routing is unnecessary. The entry SHALL have:
+The Claude Code materializer SHALL generate a `.claude/settings.json` file containing a single `mcpServers` entry keyed as `"chapter"`, pointing at the proxy's unified endpoint. The proxy handles tool prefixing internally (e.g. `github_create_pr`), so per-app routing is unnecessary. The entry SHALL have:
 - `type` set to the agent's proxy type (default `"sse"`)
 - `url` set to `{proxyEndpoint}/sse` (for SSE) or `{proxyEndpoint}/mcp` (for streamable-http)
-- `headers.Authorization` set to `"Bearer <actual-token>"` when a `proxyToken` is provided, or `"Bearer ${FORGE_PROXY_TOKEN}"` as a fallback placeholder
-- A `permissions` block with `allow: ["mcp__forge__*"]` and `deny: []`
+- `headers.Authorization` set to `"Bearer <actual-token>"` when a `proxyToken` is provided, or `"Bearer ${CHAPTER_PROXY_TOKEN}"` as a fallback placeholder
+- A `permissions` block with `allow: ["mcp__chapter__*"]` and `deny: []`
 
 #### Scenario: Default SSE proxy settings
 - **WHEN** materializeWorkspace is called with a resolved agent using default SSE proxy on port 9090
-- **THEN** the result SHALL contain key `.claude/settings.json` with a JSON object having a single `mcpServers.forge` entry with `url` equal to `"http://mcp-proxy:9090/sse"` and `type` equal to `"sse"`
+- **THEN** the result SHALL contain key `.claude/settings.json` with a JSON object having a single `mcpServers.chapter` entry with `url` equal to `"http://mcp-proxy:9090/sse"` and `type` equal to `"sse"`
 
 #### Scenario: Custom proxy port and streamable-http
 - **WHEN** the agent has `proxy.port` of 8080 and `proxy.type` of `"streamable-http"`
-- **THEN** the settings SHALL have `mcpServers.forge.url` equal to `"http://mcp-proxy:8080/mcp"` and `mcpServers.forge.type` equal to `"streamable-http"`
+- **THEN** the settings SHALL have `mcpServers.chapter.url` equal to `"http://mcp-proxy:8080/mcp"` and `mcpServers.chapter.type` equal to `"streamable-http"`
 
 #### Scenario: Auth header with baked token
 - **WHEN** settings.json is generated with a `proxyToken` of `"abc123"`
-- **THEN** `mcpServers.forge.headers.Authorization` SHALL equal `"Bearer abc123"`
+- **THEN** `mcpServers.chapter.headers.Authorization` SHALL equal `"Bearer abc123"`
 
 #### Scenario: Auth header placeholder fallback
 - **WHEN** settings.json is generated without a `proxyToken`
-- **THEN** `mcpServers.forge.headers.Authorization` SHALL equal `"Bearer ${FORGE_PROXY_TOKEN}"`
+- **THEN** `mcpServers.chapter.headers.Authorization` SHALL equal `"Bearer ${CHAPTER_PROXY_TOKEN}"`
 
 #### Scenario: Single forge permission
 - **WHEN** settings.json is generated for any agent
-- **THEN** `permissions.allow` SHALL equal `["mcp__forge__*"]`
+- **THEN** `permissions.allow` SHALL equal `["mcp__chapter__*"]`
 
 ### Requirement: Claude Code materializer generates slash commands from tasks
 
@@ -125,8 +125,8 @@ The `generateComposeService()` method SHALL return a `ComposeServiceDef` with:
 - `volumes` bind-mounting workspace to `/home/node/workspace`, `.claude` directory to `/home/node/.claude`, and `.claude.json` to `/home/node/.claude.json`
 - `depends_on` including `mcp-proxy`
 - `stdin_open` and `tty` set to `true`
-- `networks` including `agent-net`
-- `environment` including `FORGE_ROLES` only (no `CLAUDE_AUTH_TOKEN`)
+- `networks` including `chapter-net`
+- `environment` including `CHAPTER_ROLES` only (no `CLAUDE_AUTH_TOKEN`)
 - `working_dir` set to `/home/node/workspace`
 
 #### Scenario: Compose service mounts .claude directory and .claude.json
@@ -139,7 +139,7 @@ The `generateComposeService()` method SHALL return a `ComposeServiceDef` with:
 
 #### Scenario: Compose service has correct structure
 - **WHEN** `generateComposeService()` is called with an agent having roles `issue-manager` and `pr-reviewer`
-- **THEN** the result SHALL have `environment` containing `FORGE_ROLES=issue-manager,pr-reviewer` and `depends_on` containing `mcp-proxy`
+- **THEN** the result SHALL have `environment` containing `CHAPTER_ROLES=issue-manager,pr-reviewer` and `depends_on` containing `mcp-proxy`
 
 ### Requirement: Claude Code materializer generates config JSON for OOBE bypass
 

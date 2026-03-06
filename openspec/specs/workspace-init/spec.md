@@ -11,14 +11,14 @@ The `forge init` command SHALL create the following directory structure in the t
 - `skills/` — for skill packages
 - `roles/` — for role packages
 - `members/` — for agent packages
-- `.forge/` — for forge workspace configuration
+- `.chapter/` — for forge workspace configuration
 
 #### Scenario: Init in empty directory
 - **WHEN** `forge init` is run in an empty directory
-- **THEN** all six directories (`apps/`, `tasks/`, `skills/`, `roles/`, `members/`, `.forge/`) are created
+- **THEN** all six directories (`apps/`, `tasks/`, `skills/`, `roles/`, `members/`, `.chapter/`) are created
 
 #### Scenario: Init in directory with existing files
-- **WHEN** `forge init` is run in a directory that already has files but no `.forge/` directory
+- **WHEN** `forge init` is run in a directory that already has files but no `.chapter/` directory
 - **THEN** the workspace directories are created alongside existing files without overwriting anything
 
 ### Requirement: Generate root package.json with workspaces
@@ -39,39 +39,39 @@ When a template provides a `package.json`, the template's version is used instea
 - **THEN** the generated package.json has `"name": "@myorg/agent-workspace"`
 
 #### Scenario: Existing package.json not overwritten
-- **WHEN** `forge init` is run in a directory that already has a `package.json` but no `.forge/` directory
+- **WHEN** `forge init` is run in a directory that already has a `package.json` but no `.chapter/` directory
 - **THEN** the existing `package.json` is NOT overwritten, the workspaces field is NOT added, and a warning is displayed telling the user to add the workspaces configuration manually
 
-### Requirement: Generate .forge/config.json
-The `forge init` command SHALL create `.forge/config.json` with default workspace configuration: `{ "version": "0.1.0" }`.
+### Requirement: Generate .chapter/config.json
+The `forge init` command SHALL create `.chapter/config.json` with default workspace configuration: `{ "version": "0.1.0" }`.
 
 #### Scenario: Config file created with defaults
 - **WHEN** `forge init` is run
-- **THEN** `.forge/config.json` exists and contains `{ "version": "0.1.0" }`
+- **THEN** `.chapter/config.json` exists and contains `{ "version": "0.1.0" }`
 
-### Requirement: Generate .forge/.env.example
-The `forge init` command SHALL create `.forge/.env.example` as a template for credential bindings with commented placeholder entries for common environment variables.
+### Requirement: Generate .chapter/.env.example
+The `forge init` command SHALL create `.chapter/.env.example` as a template for credential bindings with commented placeholder entries for common environment variables.
 
 #### Scenario: Env template created
 - **WHEN** `forge init` is run
-- **THEN** `.forge/.env.example` exists and contains commented placeholder lines (e.g., `# GITHUB_TOKEN=`, `# ANTHROPIC_API_KEY=`)
+- **THEN** `.chapter/.env.example` exists and contains commented placeholder lines (e.g., `# GITHUB_TOKEN=`, `# ANTHROPIC_API_KEY=`)
 
 ### Requirement: Generate .gitignore
-The `forge init` command SHALL create a `.gitignore` file with entries for `node_modules/`, `.env`, `dist/`, and `.forge/.env` if no `.gitignore` already exists. If a `.gitignore` exists, it SHALL NOT be overwritten.
+The `forge init` command SHALL create a `.gitignore` file with entries for `node_modules/`, `.env`, `dist/`, and `.chapter/.env` if no `.gitignore` already exists. If a `.gitignore` exists, it SHALL NOT be overwritten.
 
 #### Scenario: Gitignore created in new workspace
 - **WHEN** `forge init` is run in a directory without `.gitignore`
-- **THEN** a `.gitignore` file is created with entries for `node_modules/`, `.env`, `dist/`, `.forge/.env`
+- **THEN** a `.gitignore` file is created with entries for `node_modules/`, `.env`, `dist/`, `.chapter/.env`
 
 #### Scenario: Existing gitignore preserved
 - **WHEN** `forge init` is run in a directory with an existing `.gitignore`
 - **THEN** the existing `.gitignore` is NOT overwritten
 
 ### Requirement: Idempotency detection
-The `forge init` command SHALL detect an existing forge workspace by the presence of a `.forge/` directory. If detected, it SHALL print a warning message and exit with code 0 without modifying any files.
+The `forge init` command SHALL detect an existing forge workspace by the presence of a `.chapter/` directory. If detected, it SHALL print a warning message and exit with code 0 without modifying any files.
 
 #### Scenario: Init on existing workspace
-- **WHEN** `forge init` is run in a directory that already contains a `.forge/` directory
+- **WHEN** `forge init` is run in a directory that already contains a `.chapter/` directory
 - **THEN** the command prints a warning like "Workspace already initialized" and exits with code 0 without creating or modifying any files
 
 ### Requirement: Name flag for workspace name
@@ -116,7 +116,7 @@ The `forge init` command SHALL accept a `--template <name>` option. When specifi
 
 #### Scenario: Init with template in empty directory
 - **WHEN** `forge init --template note-taker` is run in an empty directory
-- **THEN** template files are copied (package.json, members/, roles/), `.forge/` is created, and `npm install` is run
+- **THEN** template files are copied (package.json, members/, roles/), `.chapter/` is created, and `npm install` is run
 
 #### Scenario: Init with template and custom name
 - **WHEN** `forge init --template note-taker --name @acme/my-agent` is run

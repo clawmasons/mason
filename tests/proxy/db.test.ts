@@ -41,7 +41,7 @@ describe("proxy/db", () => {
 
     it("creates the database in a subdirectory when given a path", () => {
       const tmpDir = mkdtempSync(join(tmpdir(), "forge-db-subdir-"));
-      const subPath = join(tmpDir, "data", "forge.db");
+      const subPath = join(tmpDir, "data", "chapter.db");
       const subDb = openDatabase(subPath);
       try {
         expect(existsSync(subPath)).toBe(true);

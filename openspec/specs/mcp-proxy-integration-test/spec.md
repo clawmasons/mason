@@ -2,15 +2,15 @@
 
 ## Purpose
 
-End-to-end integration test that validates the full native forge proxy pipeline with a real upstream MCP server: UpstreamManager → ToolRouter → ForgeProxyServer → MCP Client, including audit logging and approval workflows.
+End-to-end integration test that validates the full native forge proxy pipeline with a real upstream MCP server: UpstreamManager → ToolRouter → ChapterProxyServer → MCP Client, including audit logging and approval workflows.
 
 ## Requirements
 
 ### Requirement: Integration test starts proxy with real upstream
-The system SHALL provide a Vitest integration test (`tests/integration/forge-proxy.test.ts`) that programmatically wires UpstreamManager, ToolRouter, and ForgeProxyServer with a real `@modelcontextprotocol/server-filesystem` upstream via stdio transport.
+The system SHALL provide a Vitest integration test (`tests/integration/chapter-proxy.test.ts`) that programmatically wires UpstreamManager, ToolRouter, and ChapterProxyServer with a real `@modelcontextprotocol/server-filesystem` upstream via stdio transport.
 
 #### Scenario: Proxy starts and accepts MCP connections
-- **WHEN** the integration test creates an UpstreamManager with the filesystem server, builds a ToolRouter from discovered tools, and starts a ForgeProxyServer
+- **WHEN** the integration test creates an UpstreamManager with the filesystem server, builds a ToolRouter from discovered tools, and starts a ChapterProxyServer
 - **THEN** an MCP client SHALL be able to connect via streamable-http transport
 - **AND** `tools/list` SHALL return a non-empty list of tools
 

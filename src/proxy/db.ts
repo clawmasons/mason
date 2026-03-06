@@ -74,8 +74,8 @@ CREATE TABLE IF NOT EXISTS approval_requests (
 
 // ── Database ───────────────────────────────────────────────────────────
 
-const DEFAULT_DB_PATH = process.env.FORGE_DB_PATH
-  ?? join(homedir(), ".forge", "data", "forge.db");
+const DEFAULT_DB_PATH = process.env.CHAPTER_DB_PATH
+  ?? join(homedir(), ".chapter", "data", "chapter.db");
 
 export function openDatabase(dbPath: string = DEFAULT_DB_PATH): Database.Database {
   if (dbPath !== ":memory:") {

@@ -91,11 +91,11 @@ function generateMcpJson(
   const pathSuffix = proxyType === "sse" ? "/sse" : "/mcp";
   const bearerValue = proxyToken
     ? `Bearer ${proxyToken}`
-    : "Bearer ${FORGE_PROXY_TOKEN}";
+    : "Bearer ${CHAPTER_PROXY_TOKEN}";
 
   const mcpConfig = {
     mcpServers: {
-      forge: {
+      chapter: {
         type: proxyType,
         url: `${proxyEndpoint}${pathSuffix}`,
         headers: {
@@ -116,7 +116,7 @@ function generateMcpJson(
 function generateSettingsJson(): string {
   const settings = {
     permissions: {
-      allow: ["mcp__forge__*"],
+      allow: ["mcp__chapter__*"],
       deny: [],
     },
   };
@@ -321,13 +321,13 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
       ],
       working_dir: "/home/node/workspace",
       environment: [
-        `FORGE_ROLES=${roleNames}`,
+        `CHAPTER_ROLES=${roleNames}`,
       ],
       depends_on: ["mcp-proxy"],
       stdin_open: true,
       tty: true,
       init: true,
-      networks: ["agent-net"],
+      networks: ["chapter-net"],
     };
   },
 

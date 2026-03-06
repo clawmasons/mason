@@ -109,9 +109,9 @@ The `PromptRouter` SHALL prefix all prompt `name` fields using `<appShortName>_<
 ### Requirement: MCP server declares resources and prompts capabilities
 
 #### Scenario: Routers provided
-- **WHEN** the `ForgeProxyServer` is created with `resourceRouter` and `promptRouter`
+- **WHEN** the `ChapterProxyServer` is created with `resourceRouter` and `promptRouter`
 - **THEN** the MCP server capabilities include `resources: {}` and `prompts: {}`
 
 #### Scenario: Routers not provided
-- **WHEN** the `ForgeProxyServer` is created without resource/prompt routers
+- **WHEN** the `ChapterProxyServer` is created without resource/prompt routers
 - **THEN** the MCP server capabilities only include `tools: {}`

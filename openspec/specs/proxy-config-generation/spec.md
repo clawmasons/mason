@@ -31,11 +31,11 @@ For each app using sse or streamable-http transport, the system SHALL generate a
 - **THEN** the generated mcpServers entry for `amap` contains `url: "https://mcp.amap.com/sse?key=${AMAP_KEY}"` and the computed `toolFilter`
 
 ### Requirement: Generate proxy authentication token
-The system SHALL generate a `FORGE_PROXY_TOKEN` using `crypto.randomUUID()` and include it in `mcpProxy.options.authTokens` as `"${FORGE_PROXY_TOKEN}"`. Callers MAY override the token via `ProxyConfigOptions.authToken`.
+The system SHALL generate a `CHAPTER_PROXY_TOKEN` using `crypto.randomUUID()` and include it in `mcpProxy.options.authTokens` as `"${CHAPTER_PROXY_TOKEN}"`. Callers MAY override the token via `ProxyConfigOptions.authToken`.
 
 #### Scenario: Auto-generated token
 - **WHEN** `generateProxyConfig(agent)` is called without an explicit authToken option
-- **THEN** the config includes `authTokens: ["${FORGE_PROXY_TOKEN}"]` and a generated token value is available on the result
+- **THEN** the config includes `authTokens: ["${CHAPTER_PROXY_TOKEN}"]` and a generated token value is available on the result
 
 #### Scenario: Caller-provided token
 - **WHEN** `generateProxyConfig(agent, { authToken: "my-custom-token" })` is called

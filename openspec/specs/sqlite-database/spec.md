@@ -6,10 +6,10 @@ Provide a shared SQLite database layer for the forge proxy, supporting audit log
 ## Requirements
 
 ### Requirement: Open database with WAL mode and auto-schema
-The system SHALL open (or create) a SQLite database at the specified path (default `~/.forge/forge.db`), enable WAL journal mode, and create the `audit_log` and `approval_requests` tables if they do not exist.
+The system SHALL open (or create) a SQLite database at the specified path (default `~/.chapter/data/chapter.db`), enable WAL journal mode, and create the `audit_log` and `approval_requests` tables if they do not exist.
 
 #### Scenario: First-time database creation
-- **WHEN** `openDatabase()` is called and `~/.forge/forge.db` does not exist
+- **WHEN** `openDatabase()` is called and `~/.chapter/data/chapter.db` does not exist
 - **THEN** the file is created, WAL mode is enabled, and both `audit_log` and `approval_requests` tables exist
 
 #### Scenario: Existing database

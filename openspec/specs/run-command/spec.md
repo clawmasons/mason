@@ -12,18 +12,18 @@ The CLI SHALL register a `run` command that accepts a required `<agent>` argumen
 
 ### Requirement: forge run resolves the agent directory
 
-The run command SHALL resolve the agent's scaffolded directory at `.forge/agents/<short-name>/` relative to the current working directory by default. If `--output-dir` is specified, it SHALL use that path instead. The short name is derived from the agent package name by stripping the scope prefix and `agent-` prefix (matching `getAppShortName` behavior).
+The run command SHALL resolve the agent's scaffolded directory at `.chapter/agents/<short-name>/` relative to the current working directory by default. If `--output-dir` is specified, it SHALL use that path instead. The short name is derived from the agent package name by stripping the scope prefix and `agent-` prefix (matching `getAppShortName` behavior).
 
 #### Scenario: Default agent directory resolution
-- **WHEN** `forge run my-agent` is executed in a workspace where `.forge/agents/my-agent/docker-compose.yml` exists
-- **THEN** the command SHALL use `.forge/agents/my-agent/` as the agent directory
+- **WHEN** `forge run my-agent` is executed in a workspace where `.chapter/agents/my-agent/docker-compose.yml` exists
+- **THEN** the command SHALL use `.chapter/agents/my-agent/` as the agent directory
 
 #### Scenario: Custom output directory
 - **WHEN** `forge run my-agent --output-dir ./custom/path` is executed
 - **THEN** the command SHALL use `./custom/path` as the agent directory
 
 #### Scenario: Agent directory not found
-- **WHEN** `forge run my-agent` is executed but `.forge/agents/my-agent/` does not exist
+- **WHEN** `forge run my-agent` is executed but `.chapter/agents/my-agent/` does not exist
 - **THEN** the command SHALL print an error message indicating the agent is not installed and exit with code 1
 
 #### Scenario: docker-compose.yml missing
