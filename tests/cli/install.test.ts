@@ -14,13 +14,13 @@ describe("CLI install command", () => {
     }
   });
 
-  it("install command accepts an agent argument", () => {
+  it("install command accepts a member argument", () => {
     const installCmd = program.commands.find((cmd) => cmd.name() === "install");
     expect(installCmd).toBeDefined();
     if (installCmd) {
       const args = installCmd.registeredArguments;
       expect(args).toHaveLength(1);
-      expect(args[0].name()).toBe("agent");
+      expect(args[0].name()).toBe("member");
       expect(args[0].required).toBe(true);
     }
   });
@@ -58,7 +58,7 @@ describe("runInstall", () => {
     fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify(pkg, null, 2));
   }
 
-  function setupValidAgent(): void {
+  function setupValidMember(): void {
     // App
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
@@ -117,19 +117,23 @@ describe("runInstall", () => {
       },
     });
 
-    // Agent
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
+    // Member
+    writePackage(path.join(tmpDir, "members", "ops"), {
+      name: "@test/member-ops",
       version: "1.0.0",
       chapter: {
-        type: "agent",
+        type: "member",
+        memberType: "agent",
+        name: "Ops",
+        slug: "ops",
+        email: "ops@chapter.local",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
     });
   }
 
-  function setupInvalidAgent(): void {
+  function setupInvalidMember(): void {
     // App
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
@@ -169,7 +173,7 @@ describe("runInstall", () => {
       },
     });
 
-    // Role — allows a tool that doesn't exist on the app
+    // Role -- allows a tool that doesn't exist on the app
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
@@ -186,12 +190,16 @@ describe("runInstall", () => {
       },
     });
 
-    // Agent
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
+    // Member
+    writePackage(path.join(tmpDir, "members", "ops"), {
+      name: "@test/member-ops",
       version: "1.0.0",
       chapter: {
-        type: "agent",
+        type: "member",
+        memberType: "agent",
+        name: "Ops",
+        slug: "ops",
+        email: "ops@chapter.local",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
@@ -199,9 +207,9 @@ describe("runInstall", () => {
   }
 
   it("creates complete directory structure for valid agent", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
@@ -216,17 +224,17 @@ describe("runInstall", () => {
   });
 
   it("does not generate mcp-proxy config.json", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     expect(fs.existsSync(path.join(outputDir, "mcp-proxy/config.json"))).toBe(false);
   });
 
   it("generates slash commands for tasks", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const commandPath = path.join(outputDir, "claude-code/workspace/.claude/commands/triage.md");
     expect(fs.existsSync(commandPath)).toBe(true);
@@ -237,9 +245,9 @@ describe("runInstall", () => {
   });
 
   it("generates .env with non-empty CHAPTER_PROXY_TOKEN", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const envContent = fs.readFileSync(path.join(outputDir, ".env"), "utf-8");
     const tokenMatch = envContent.match(/CHAPTER_PROXY_TOKEN=(\S+)/);
@@ -248,9 +256,9 @@ describe("runInstall", () => {
   });
 
   it("aborts with non-zero exit on validation errors", async () => {
-    setupInvalidAgent();
+    setupInvalidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -262,19 +270,19 @@ describe("runInstall", () => {
   });
 
   it("warns on unknown runtimes but continues", async () => {
-    setupValidAgent();
-    // Add an unknown runtime to the agent
-    const agentPkg = JSON.parse(
-      fs.readFileSync(path.join(tmpDir, "agents", "ops", "package.json"), "utf-8"),
+    setupValidMember();
+    // Add an unknown runtime to the member
+    const memberPkg = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, "members", "ops", "package.json"), "utf-8"),
     );
-    agentPkg.chapter.runtimes = ["claude-code", "codex"];
+    memberPkg.chapter.runtimes = ["claude-code", "codex"];
     fs.writeFileSync(
-      path.join(tmpDir, "agents", "ops", "package.json"),
-      JSON.stringify(agentPkg, null, 2),
+      path.join(tmpDir, "members", "ops", "package.json"),
+      JSON.stringify(memberPkg, null, 2),
     );
 
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
@@ -288,15 +296,15 @@ describe("runInstall", () => {
   });
 
   it("is idempotent — re-running overwrites existing files", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
 
     // First run
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
     const firstToken = fs.readFileSync(path.join(outputDir, ".env"), "utf-8");
 
     // Second run
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
     const secondToken = fs.readFileSync(path.join(outputDir, ".env"), "utf-8");
 
     // Both runs succeeded
@@ -310,24 +318,24 @@ describe("runInstall", () => {
   });
 
   it("uses default output directory when --output-dir not specified", async () => {
-    setupValidAgent();
-    await runInstall(tmpDir, "@test/agent-ops", {});
+    setupValidMember();
+    await runInstall(tmpDir, "@test/member-ops", {});
 
-    const defaultDir = path.join(tmpDir, ".chapter", "agents", "ops");
+    const defaultDir = path.join(tmpDir, ".chapter", "members", "ops");
     expect(fs.existsSync(path.join(defaultDir, "chapter-proxy/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(defaultDir, "docker-compose.yml"))).toBe(true);
   });
 
   it("uses custom output directory with --output-dir", async () => {
-    setupValidAgent();
+    setupValidMember();
     const customDir = path.join(tmpDir, "custom-output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: customDir });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: customDir });
 
     expect(fs.existsSync(path.join(customDir, "chapter-proxy/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(customDir, "docker-compose.yml"))).toBe(true);
   });
 
-  it("exits 1 when agent is not found", async () => {
+  it("exits 1 when member is not found", async () => {
     await runInstall(tmpDir, "@test/nonexistent", {});
 
     expect(exitSpy).toHaveBeenCalledWith(1);
@@ -336,24 +344,24 @@ describe("runInstall", () => {
   });
 
   it("generates chapter.lock.json with correct structure", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const lockPath = path.join(outputDir, "chapter.lock.json");
     const lock = JSON.parse(fs.readFileSync(lockPath, "utf-8"));
 
     expect(lock.lockVersion).toBe(1);
-    expect(lock.agent.name).toBe("@test/agent-ops");
-    expect(lock.agent.runtimes).toContain("claude-code");
+    expect(lock.member.name).toBe("@test/member-ops");
+    expect(lock.member.runtimes).toContain("claude-code");
     expect(lock.roles).toHaveLength(1);
     expect(lock.roles[0].name).toBe("@test/role-manager");
     expect(lock.generatedFiles.length).toBeGreaterThan(0);
   });
 
   it("prints success summary on completion", async () => {
-    setupValidAgent();
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    setupValidMember();
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("installed successfully");
@@ -362,17 +370,17 @@ describe("runInstall", () => {
   });
 
   it("shows chapter run as primary next step", async () => {
-    setupValidAgent();
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    setupValidMember();
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("chapter run");
   });
 
   it("bakes proxy token into .mcp.json", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const mcpPath = path.join(outputDir, "claude-code/workspace/.mcp.json");
     const mcp = JSON.parse(fs.readFileSync(mcpPath, "utf-8"));
@@ -386,9 +394,9 @@ describe("runInstall", () => {
   });
 
   it("docker-compose.yml includes CHAPTER_PROXY_TOKEN in proxy env", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
     const proxySection = composeContent.split("claude-code:")[0];
@@ -396,9 +404,9 @@ describe("runInstall", () => {
   });
 
   it("generates single-stage chapter-proxy/Dockerfile with pre-built chapter", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const dockerfilePath = path.join(outputDir, "chapter-proxy/Dockerfile");
     expect(fs.existsSync(dockerfilePath)).toBe(true);
@@ -414,9 +422,9 @@ describe("runInstall", () => {
   });
 
   it("docker-compose.yml uses build: ./chapter-proxy", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
     expect(composeContent).toContain("build: ./chapter-proxy");
@@ -424,9 +432,9 @@ describe("runInstall", () => {
   });
 
   it("copies pre-built chapter into chapter-proxy/chapter/ build context", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     // Pre-built chapter artifacts should be in the build context
     expect(fs.existsSync(path.join(outputDir, "chapter-proxy/chapter/package.json"))).toBe(true);
@@ -440,19 +448,19 @@ describe("runInstall", () => {
   });
 
   it("copies workspace directories into chapter-proxy/workspace/", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
-    // Agent workspace should be in the build context
-    expect(fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/agents/ops/package.json"))).toBe(true);
+    // Member workspace should be in the build context
+    expect(fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/members/ops/package.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/apps/github/package.json"))).toBe(true);
   });
 
   it("Dockerfile includes DISABLE_AUTOUPDATER but not OOBE (externalized)", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const dockerfile = fs.readFileSync(path.join(outputDir, "claude-code/Dockerfile"), "utf-8");
     expect(dockerfile).not.toContain("hasCompletedOnboarding");
@@ -460,9 +468,9 @@ describe("runInstall", () => {
   });
 
   it("generates .claude.json with OOBE bypass alongside workspace", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const claudeJsonPath = path.join(outputDir, "claude-code/.claude.json");
     expect(fs.existsSync(claudeJsonPath)).toBe(true);
@@ -473,9 +481,9 @@ describe("runInstall", () => {
   });
 
   it("creates empty .claude/ directory for volume mount", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const claudeDir = path.join(outputDir, "claude-code/.claude");
     expect(fs.existsSync(claudeDir)).toBe(true);
@@ -483,7 +491,7 @@ describe("runInstall", () => {
   });
 
   it("copies node_modules chapter packages into chapter-proxy/workspace/", async () => {
-    setupValidAgent();
+    setupValidMember();
 
     // Simulate a chapter-core package in node_modules that bundles a task sub-component
     const nmTaskDir = path.join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "tasks", "take-notes");
@@ -510,7 +518,7 @@ describe("runInstall", () => {
     );
 
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
@@ -524,42 +532,46 @@ describe("runInstall", () => {
 
     // Local workspace packages should still be there too
     expect(
-      fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/agents/ops/package.json")),
+      fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/members/ops/package.json")),
     ).toBe(true);
   });
 
   it("does not copy non-local packages outside the resolved dependency graph", async () => {
-    setupValidAgent();
+    setupValidMember();
 
-    // Simulate an unrelated agent in node_modules with the same basename as our local agent
-    const nmAgentDir = path.join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "agents", "ops");
-    writePackage(nmAgentDir, {
-      name: "@clawmasons/agent-ops",
+    // Simulate an unrelated member in node_modules with the same basename as our local member
+    const nmMemberDir = path.join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "members", "ops");
+    writePackage(nmMemberDir, {
+      name: "@clawmasons/member-ops",
       version: "1.0.0",
       chapter: {
-        type: "agent",
+        type: "member",
+        memberType: "agent",
+        name: "Ops",
+        slug: "ops",
+        email: "ops@chapter.local",
         runtimes: ["claude-code"],
         roles: [],
       },
     });
 
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
-    // The local agent package.json should be preserved (not overwritten by the node_modules one)
-    const agentPkg = JSON.parse(
-      fs.readFileSync(path.join(outputDir, "chapter-proxy/workspace/agents/ops/package.json"), "utf-8"),
+    // The local member package.json should be preserved (not overwritten by the node_modules one)
+    const memberPkg = JSON.parse(
+      fs.readFileSync(path.join(outputDir, "chapter-proxy/workspace/members/ops/package.json"), "utf-8"),
     );
-    expect(agentPkg.name).toBe("@test/agent-ops");
-    expect(agentPkg.name).not.toBe("@clawmasons/agent-ops");
+    expect(memberPkg.name).toBe("@test/member-ops");
+    expect(memberPkg.name).not.toBe("@clawmasons/member-ops");
   });
 
   it("claude-code compose service has restart no", async () => {
-    setupValidAgent();
+    setupValidMember();
     const outputDir = path.join(tmpDir, "output");
-    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
     const claudeSection = composeContent.split("claude-code:")[1];

@@ -4,25 +4,25 @@
 
 ### Requirement: chapter build command is registered as a CLI command
 
-The CLI SHALL register a `build` command that accepts a required `<agent>` argument (agent package name), an optional `--output <path>` option, and a `--json` flag.
+The CLI SHALL register a `build` command that accepts a required `<member>` argument (member package name), an optional `--output <path>` option, and a `--json` flag.
 
 #### Scenario: Command registration
 - **WHEN** the CLI program is initialized
-- **THEN** the `build` command SHALL be available with argument `<agent>`, option `--output`, and flag `--json`
+- **THEN** the `build` command SHALL be available with argument `<member>`, option `--output`, and flag `--json`
 
-### Requirement: chapter build resolves the agent graph and generates a lock file
+### Requirement: chapter build resolves the member graph and generates a lock file
 
-When `chapter build <agent>` is run, the command SHALL:
+When `chapter build <member>` is run, the command SHALL:
 1. Discover packages in the workspace via `discoverPackages()`
-2. Resolve the agent's dependency graph via `resolveAgent()`
-3. Validate the resolved graph via `validateAgent()`
+2. Resolve the member's dependency graph via `resolveMember()`
+3. Validate the resolved graph via `validateMember()`
 4. Generate a lock file via `generateLockFile()` with an empty generated files list
 5. Write `chapter.lock.json` to the output path
 
 #### Scenario: Successful build writes lock file
-- **WHEN** `chapter build` is run with a valid agent name
+- **WHEN** `chapter build` is run with a valid member name
 - **THEN** a `chapter.lock.json` file SHALL be written to the current working directory (or `--output` path)
-- **AND** the lock file SHALL contain the agent name, version, runtimes, and all resolved roles with their tasks, apps, and skills
+- **AND** the lock file SHALL contain the member name, version, memberType, runtimes, and all resolved roles with their tasks, apps, and skills
 
 #### Scenario: Custom output path
 - **WHEN** `chapter build` is run with `--output ./custom/path.json`

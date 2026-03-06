@@ -3,28 +3,28 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
-  resolveAgentDir,
+  resolveMemberDir,
   validateEnvFile,
 } from "../../src/cli/commands/docker-utils.js";
 
-describe("resolveAgentDir", () => {
+describe("resolveMemberDir", () => {
   it("returns default path using short name", () => {
-    const result = resolveAgentDir("/workspace", "@test/agent-ops");
-    expect(result).toBe(path.join("/workspace", ".chapter", "agents", "ops"));
+    const result = resolveMemberDir("/workspace", "@test/member-ops");
+    expect(result).toBe(path.join("/workspace", ".chapter", "members", "ops"));
   });
 
-  it("strips scope and agent- prefix", () => {
-    const result = resolveAgentDir("/workspace", "@clawmasons/agent-repo-ops");
-    expect(result).toBe(path.join("/workspace", ".chapter", "agents", "repo-ops"));
+  it("strips scope and member- prefix", () => {
+    const result = resolveMemberDir("/workspace", "@clawmasons/member-repo-ops");
+    expect(result).toBe(path.join("/workspace", ".chapter", "members", "repo-ops"));
   });
 
   it("uses custom outputDir when provided", () => {
-    const result = resolveAgentDir("/workspace", "@test/agent-ops", "./custom/dir");
+    const result = resolveMemberDir("/workspace", "@test/member-ops", "./custom/dir");
     expect(result).toBe(path.resolve("/workspace", "./custom/dir"));
   });
 
   it("uses absolute custom outputDir as-is", () => {
-    const result = resolveAgentDir("/workspace", "@test/agent-ops", "/absolute/path");
+    const result = resolveMemberDir("/workspace", "@test/member-ops", "/absolute/path");
     expect(result).toBe("/absolute/path");
   });
 });

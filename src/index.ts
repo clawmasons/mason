@@ -7,15 +7,15 @@ export {
   type TaskChapterField,
   roleChapterFieldSchema,
   type RoleChapterField,
-  agentChapterFieldSchema,
-  type AgentChapterField,
+  memberChapterFieldSchema,
+  type MemberChapterField,
   parseChapterField,
   type ChapterField,
 } from "./schemas/index.js";
 
 export {
   type DiscoveredPackage,
-  type ResolvedAgent,
+  type ResolvedMember,
   type ResolvedApp,
   type ResolvedRole,
   type ResolvedSkill,
@@ -25,11 +25,11 @@ export {
   CircularDependencyError,
   TypeMismatchError,
   discoverPackages,
-  resolveAgent,
+  resolveMember,
 } from "./resolver/index.js";
 
 export {
-  validateAgent,
+  validateMember,
   type ValidationResult,
   type ValidationError,
   type ValidationErrorCategory,

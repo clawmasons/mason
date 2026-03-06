@@ -57,11 +57,11 @@ describe("generateProxyDockerfile", () => {
     expect(result).toContain("COPY workspace/ ./workspace/");
   });
 
-  it("uses chapter proxy as entrypoint with agent name", () => {
-    const result = generateProxyDockerfile("@test/agent-test");
+  it("uses chapter proxy as entrypoint with member name", () => {
+    const result = generateProxyDockerfile("@test/member-test");
 
     expect(result).toContain('ENTRYPOINT ["node", "/app/chapter/bin/chapter.js"]');
-    expect(result).toContain('CMD ["proxy", "--agent", "@test/agent-test"]');
+    expect(result).toContain('CMD ["proxy", "--member", "@test/member-test"]');
   });
 
   it("sets working directory to workspace", () => {

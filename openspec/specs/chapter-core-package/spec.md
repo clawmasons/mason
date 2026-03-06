@@ -42,7 +42,7 @@ The `chapter-core/` package SHALL contain sub-directories for all five chapter c
 
 #### Scenario: Member component exists
 - **WHEN** `chapter-core/members/note-taker/package.json` is read
-- **THEN** it has `name: "@clawmasons/member-note-taker"` and a valid `chapter` field with `type: "agent"`
+- **THEN** it has `name: "@clawmasons/member-note-taker"` and a valid `chapter` field with `type: "member"` and `memberType: "agent"`
 
 ### Requirement: All chapter field cross-references use @clawmasons scope
 Every chapter field reference within `chapter-core/` components SHALL use `@clawmasons/*` package names — not `@example/*`.

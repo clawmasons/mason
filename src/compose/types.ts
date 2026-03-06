@@ -14,9 +14,10 @@ export interface LockFileRole {
  */
 export interface LockFile {
   lockVersion: number;
-  agent: {
+  member: {
     name: string;
     version: string;
+    memberType: "human" | "agent";
     runtimes: string[];
   };
   roles: LockFileRole[];

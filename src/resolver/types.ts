@@ -71,11 +71,17 @@ export interface ResolvedRole {
 }
 
 /**
- * A fully-resolved agent — the top-level deployable unit.
+ * A fully-resolved member — the top-level deployable unit.
+ * Replaces the former ResolvedAgent. Members can be human or agent type.
  */
-export interface ResolvedAgent {
+export interface ResolvedMember {
   name: string;
   version: string;
+  memberType: "human" | "agent";
+  memberName: string;
+  slug: string;
+  email: string;
+  authProviders: string[];
   description?: string;
   runtimes: string[];
   roles: ResolvedRole[];

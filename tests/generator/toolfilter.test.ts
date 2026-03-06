@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { computeToolFilters, getAppShortName } from "../../src/generator/toolfilter.js";
-import type { ResolvedAgent } from "../../src/resolver/types.js";
+import type { ResolvedMember } from "../../src/resolver/types.js";
 
-function makeAgent(overrides: Partial<ResolvedAgent> = {}): ResolvedAgent {
+function makeMember(overrides: Partial<ResolvedMember> = {}): ResolvedMember {
   return {
-    name: "@clawmasons/agent-repo-ops",
+    name: "@clawmasons/member-repo-ops",
     version: "1.0.0",
+    memberType: "agent",
+    memberName: "Repo Ops",
+    slug: "repo-ops",
+    email: "repo-ops@chapter.local",
+    authProviders: [],
     runtimes: ["claude-code"],
     roles: [],
     ...overrides,
@@ -43,14 +48,14 @@ describe("getAppShortName", () => {
 });
 
 describe("computeToolFilters", () => {
-  it("returns empty map for agent with no roles", () => {
-    const agent = makeAgent({ roles: [] });
-    const filters = computeToolFilters(agent);
+  it("returns empty map for member with no roles", () => {
+    const member = makeMember({ roles: [] });
+    const filters = computeToolFilters(member);
     expect(filters.size).toBe(0);
   });
 
   it("computes toolFilter for single role with one app", () => {
-    const agent = makeAgent({
+    const member = makeMember({
       roles: [
         {
           name: "@clawmasons/role-issue-manager",
@@ -68,7 +73,7 @@ describe("computeToolFilters", () => {
       ],
     });
 
-    const filters = computeToolFilters(agent);
+    const filters = computeToolFilters(member);
     expect(filters.size).toBe(1);
 
     const github = filters.get("@clawmasons/app-github");
@@ -78,7 +83,7 @@ describe("computeToolFilters", () => {
   });
 
   it("computes union of allow-lists across multiple roles for same app", () => {
-    const agent = makeAgent({
+    const member = makeMember({
       roles: [
         {
           name: "@clawmasons/role-issue-manager",
@@ -109,7 +114,7 @@ describe("computeToolFilters", () => {
       ],
     });
 
-    const filters = computeToolFilters(agent);
+    const filters = computeToolFilters(member);
     const github = filters.get("@clawmasons/app-github");
     expect(github).toBeDefined();
     expect(github?.mode).toBe("allow");
@@ -120,7 +125,7 @@ describe("computeToolFilters", () => {
   });
 
   it("handles multiple apps across roles", () => {
-    const agent = makeAgent({
+    const member = makeMember({
       roles: [
         {
           name: "@clawmasons/role-issue-manager",
@@ -155,7 +160,7 @@ describe("computeToolFilters", () => {
       ],
     });
 
-    const filters = computeToolFilters(agent);
+    const filters = computeToolFilters(member);
     expect(filters.size).toBe(2);
 
     const github = filters.get("@clawmasons/app-github");
@@ -170,7 +175,7 @@ describe("computeToolFilters", () => {
   });
 
   it("excludes tools not in any role's allow-list", () => {
-    const agent = makeAgent({
+    const member = makeMember({
       roles: [
         {
           name: "@clawmasons/role-issue-manager",
@@ -188,7 +193,7 @@ describe("computeToolFilters", () => {
       ],
     });
 
-    const filters = computeToolFilters(agent);
+    const filters = computeToolFilters(member);
     const github = filters.get("@clawmasons/app-github");
     expect(github).toBeDefined();
     expect(github?.list).not.toContain("delete_repo");
@@ -197,7 +202,7 @@ describe("computeToolFilters", () => {
   });
 
   it("deduplicates tools in the union", () => {
-    const agent = makeAgent({
+    const member = makeMember({
       roles: [
         {
           name: "role-a",
@@ -222,7 +227,7 @@ describe("computeToolFilters", () => {
       ],
     });
 
-    const filters = computeToolFilters(agent);
+    const filters = computeToolFilters(member);
     const x = filters.get("app-x");
     expect(x).toBeDefined();
     expect(x?.list).toHaveLength(3);
@@ -230,7 +235,7 @@ describe("computeToolFilters", () => {
   });
 
   it("all toolFilters have mode: allow", () => {
-    const agent = makeAgent({
+    const member = makeMember({
       roles: [
         {
           name: "role-a",
@@ -246,7 +251,7 @@ describe("computeToolFilters", () => {
       ],
     });
 
-    const filters = computeToolFilters(agent);
+    const filters = computeToolFilters(member);
     for (const [, filter] of filters) {
       expect(filter.mode).toBe("allow");
     }

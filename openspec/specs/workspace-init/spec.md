@@ -105,7 +105,7 @@ The `@clawmasons/chapter` package SHALL contain a `templates/` directory with at
 
 #### Scenario: Template member references local role
 - **WHEN** `templates/note-taker/members/note-taker/package.json` is read
-- **THEN** the chapter field has `type: "agent"` and `roles` contains `@{{projectScope}}/role-writer`
+- **THEN** the chapter field has `type: "member"`, `memberType: "agent"`, and `roles` contains `@{{projectScope}}/role-writer`
 
 #### Scenario: Template role references chapter-core components
 - **WHEN** `templates/note-taker/roles/writer/package.json` is read

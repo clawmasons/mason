@@ -1,8 +1,8 @@
 import type { Command } from "commander";
 import { join } from "node:path";
 import { discoverPackages } from "../../resolver/discover.js";
-import { resolveAgent } from "../../resolver/resolve.js";
-import type { ResolvedAgent } from "../../resolver/types.js";
+import { resolveMember } from "../../resolver/resolve.js";
+import type { ResolvedMember } from "../../resolver/types.js";
 import { computeToolFilters } from "../../generator/toolfilter.js";
 import { loadEnvFile, resolveEnvVars } from "../../proxy/credentials.js";
 import { openDatabase } from "../../proxy/db.js";
@@ -17,7 +17,7 @@ import type Database from "better-sqlite3";
 interface ProxyOptions {
   port?: string;
   startupTimeout?: string;
-  agent?: string;
+  member?: string;
 }
 
 // ── Command Registration ──────────────────────────────────────────────
@@ -25,10 +25,10 @@ interface ProxyOptions {
 export function registerProxyCommand(program: Command): void {
   program
     .command("proxy")
-    .description("Start the chapter MCP proxy server for an agent")
-    .option("--port <number>", "Port to listen on (default: from agent config or 9090)")
+    .description("Start the chapter MCP proxy server for a member")
+    .option("--port <number>", "Port to listen on (default: from member config or 9090)")
     .option("--startup-timeout <seconds>", "Upstream server startup timeout in seconds (default: 60)")
-    .option("--agent <name>", "Agent package name (auto-detected if only one agent)")
+    .option("--member <name>", "Member package name (auto-detected if only one member)")
     .action(async (options: ProxyOptions) => {
       await startProxy(process.cwd(), options);
     });
@@ -67,13 +67,13 @@ export async function startProxy(
     console.log("Discovering packages...");
     const packages = discoverPackages(rootDir);
 
-    // ── Step 2: Resolve agent ──────────────────────────────────────────
-    const agentName = resolveAgentName(options.agent, packages);
-    console.log(`Resolving agent "${agentName}"...`);
-    const agent = resolveAgent(agentName, packages);
+    // ── Step 2: Resolve member ──────────────────────────────────────────
+    const memberName = resolveMemberName(options.member, packages);
+    console.log(`Resolving member "${memberName}"...`);
+    const member = resolveMember(memberName, packages);
 
     // ── Step 3: Compute tool filters ───────────────────────────────────
-    const toolFilters = computeToolFilters(agent);
+    const toolFilters = computeToolFilters(member);
 
     // ── Step 4: Load credentials from .env ─────────────────────────────
     const envPath = join(rootDir, ".env");
@@ -83,7 +83,7 @@ export async function startProxy(
     db = openDatabase();
 
     // ── Step 6: Start upstream MCP clients ─────────────────────────────
-    const appConfigs = collectApps(agent, loadedEnv);
+    const appConfigs = collectApps(member, loadedEnv);
     upstream = new UpstreamManager(appConfigs);
 
     const timeoutMs = options.startupTimeout
@@ -114,13 +114,13 @@ export async function startProxy(
     const promptRouter = new PromptRouter(upstreamPrompts);
 
     // ── Step 8: Collect approval patterns ──────────────────────────────
-    const approvalPatterns = collectApprovalPatterns(agent);
+    const approvalPatterns = collectApprovalPatterns(member);
 
     // ── Step 9: Start MCP server ───────────────────────────────────────
     const port = options.port
       ? parseInt(options.port, 10)
-      : agent.proxy?.port ?? 9090;
-    const transport = agent.proxy?.type ?? "sse";
+      : member.proxy?.port ?? 9090;
+    const transport = member.proxy?.type ?? "sse";
 
     server = new ChapterProxyServer({
       port,
@@ -128,7 +128,7 @@ export async function startProxy(
       router,
       upstream,
       db,
-      agentName: agent.name,
+      agentName: member.name,
       approvalPatterns: approvalPatterns.length > 0 ? approvalPatterns : undefined,
       resourceRouter,
       promptRouter,
@@ -143,7 +143,7 @@ export async function startProxy(
 
     console.log(
       `\nchapter proxy ready\n` +
-      `  Agent:     ${agent.name}\n` +
+      `  Member:    ${member.name}\n` +
       `  Port:      ${port}\n` +
       `  Transport: ${transport}\n` +
       `  Tools:     ${toolCount}\n` +
@@ -163,48 +163,48 @@ export async function startProxy(
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /**
- * Resolve the agent name from --agent flag or auto-detect from packages.
+ * Resolve the member name from --member flag or auto-detect from packages.
  */
-function resolveAgentName(
-  agentFlag: string | undefined,
+function resolveMemberName(
+  memberFlag: string | undefined,
   packages: Map<string, import("../../resolver/types.js").DiscoveredPackage>,
 ): string {
-  if (agentFlag) return agentFlag;
+  if (memberFlag) return memberFlag;
 
-  const agents: string[] = [];
+  const members: string[] = [];
   for (const [name, pkg] of packages) {
-    if (pkg.chapterField.type === "agent") {
-      agents.push(name);
+    if (pkg.chapterField.type === "member") {
+      members.push(name);
     }
   }
 
-  if (agents.length === 0) {
+  if (members.length === 0) {
     throw new Error(
-      "No agent packages found in this workspace. " +
-      "Make sure you're in a chapter workspace root with an agents/ directory.",
+      "No member packages found in this workspace. " +
+      "Make sure you're in a chapter workspace root with a members/ directory.",
     );
   }
 
-  if (agents.length > 1) {
+  if (members.length > 1) {
     throw new Error(
-      `Multiple agent packages found: ${agents.join(", ")}. ` +
-      "Use --agent <name> to specify which agent to run.",
+      `Multiple member packages found: ${members.join(", ")}. ` +
+      "Use --member <name> to specify which member to run.",
     );
   }
 
-  return agents[0];
+  return members[0];
 }
 
 /**
  * Collect unique apps from all roles, resolving env vars with loaded credentials.
  */
 function collectApps(
-  agent: ResolvedAgent,
+  member: ResolvedMember,
   loadedEnv: Record<string, string>,
 ): UpstreamAppConfig[] {
   const seen = new Map<string, UpstreamAppConfig>();
 
-  for (const role of agent.roles) {
+  for (const role of member.roles) {
     for (const app of role.apps) {
       if (seen.has(app.name)) continue;
 
@@ -226,10 +226,10 @@ function collectApps(
 /**
  * Collect all requireApprovalFor patterns from all roles (deduplicated).
  */
-function collectApprovalPatterns(agent: ResolvedAgent): string[] {
+function collectApprovalPatterns(member: ResolvedMember): string[] {
   const patterns = new Set<string>();
 
-  for (const role of agent.roles) {
+  for (const role of member.roles) {
     if (role.constraints?.requireApprovalFor) {
       for (const pattern of role.constraints.requireApprovalFor) {
         patterns.add(pattern);

@@ -1,6 +1,6 @@
 ## Purpose
 
-Zod-based schema validators for the `chapter` field in package.json across all five chapter package types (app, skill, task, role, agent). Provides runtime validation with TypeScript type inference, a discriminated `parseChapterField()` entry point, and clear error messages for invalid metadata.
+Zod-based schema validators for the `chapter` field in package.json across all five chapter package types (app, skill, task, role, member). Provides runtime validation with TypeScript type inference, a discriminated `parseChapterField()` entry point, and clear error messages for invalid metadata.
 
 ## Requirements
 
@@ -64,19 +64,23 @@ The system SHALL validate `chapter` fields of type `"role"` against a Zod schema
 - **WHEN** a chapter field with `type: "role"` includes `constraints: { maxConcurrentTasks: 3, requireApprovalFor: ["assign_issue"] }`
 - **THEN** validation succeeds and returns the constraints object
 
-### Requirement: Agent schema validation
-The system SHALL validate `chapter` fields of type `"agent"` against a Zod schema requiring `type`, `runtimes` (string array), and `roles` (string array), with optional fields: `description`, `resources` (array of objects with `type`, `ref`, `access`), `proxy` (object with `port`, `type`).
+### Requirement: Member schema validation
+The system SHALL validate `chapter` fields of type `"member"` against a Zod discriminated union schema on `memberType`. Agent members (`memberType: "agent"`) require `name`, `slug`, `email`, `runtimes` (string array min 1), and `roles` (string array min 1), with optional fields: `description`, `authProviders` (string array, defaults to []), `resources` (array of objects with `type`, `ref`, `access`, defaults to []), `proxy` (object with `port`, `type`). Human members (`memberType: "human"`) require `name`, `slug`, `email`, and `roles`, with optional `description` and `authProviders`.
 
-#### Scenario: Valid agent
-- **WHEN** a chapter field with `type: "agent"`, `runtimes: ["claude-code", "codex"]`, `roles: ["@clawmasons/role-issue-manager"]`, `proxy: { port: 9090, type: "sse" }` is validated
-- **THEN** validation succeeds and returns a typed `AgentChapterField` object
+#### Scenario: Valid agent member
+- **WHEN** a chapter field with `type: "member"`, `memberType: "agent"`, `name: "Ops"`, `slug: "ops"`, `email: "ops@chapter.local"`, `runtimes: ["claude-code", "codex"]`, `roles: ["@clawmasons/role-issue-manager"]`, `proxy: { port: 9090, type: "sse" }` is validated
+- **THEN** validation succeeds and returns a typed `MemberChapterField` object
 
-#### Scenario: Agent with resources
-- **WHEN** a chapter field with `type: "agent"` includes `resources: [{ type: "github-repo", ref: "clawmasons/openclaw", access: "read-write" }]`
+#### Scenario: Valid human member
+- **WHEN** a chapter field with `type: "member"`, `memberType: "human"`, `name: "Alice"`, `slug: "alice"`, `email: "alice@example.com"`, `roles: ["@clawmasons/role-reviewer"]` is validated
+- **THEN** validation succeeds and returns a typed `MemberChapterField` object
+
+#### Scenario: Agent member with resources
+- **WHEN** a chapter field with `type: "member"`, `memberType: "agent"` includes `resources: [{ type: "github-repo", ref: "clawmasons/openclaw", access: "read-write" }]`
 - **THEN** validation succeeds and returns the resources array
 
-#### Scenario: Agent missing runtimes
-- **WHEN** a chapter field with `type: "agent"` but no `runtimes` is validated
+#### Scenario: Agent member missing runtimes
+- **WHEN** a chapter field with `type: "member"`, `memberType: "agent"` but no `runtimes` is validated
 - **THEN** validation fails with a clear error indicating `runtimes` is required
 
 ### Requirement: Discriminated union parsing

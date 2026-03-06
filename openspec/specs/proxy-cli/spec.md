@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `chapter proxy` CLI command orchestrates the full proxy startup sequence: discovers packages in the workspace, resolves the agent dependency graph, computes tool filters, loads credentials, opens the SQLite database, connects to upstream MCP servers, builds routing tables, and starts the downstream MCP server.
+The `chapter proxy` CLI command orchestrates the full proxy startup sequence: discovers packages in the workspace, resolves the member dependency graph, computes tool filters, loads credentials, opens the SQLite database, connects to upstream MCP servers, builds routing tables, and starts the downstream MCP server.
 
 ## Source
 
@@ -20,7 +20,7 @@ Registers the `chapter proxy` command on the Commander.js program instance.
 Main startup orchestrator. Follows PRD §6.2 startup sequence:
 
 1. Discover packages via `discoverPackages(rootDir)`
-2. Resolve agent (auto-detect single agent or use `--agent` flag)
+2. Resolve member (auto-detect single member or use `--member` flag)
 3. Compute tool filters from role permissions
 4. Load `.env` credentials and resolve `${VAR}` references
 5. Open SQLite database (`~/.chapter/data/chapter.db`)
@@ -34,13 +34,13 @@ Main startup orchestrator. Follows PRD §6.2 startup sequence:
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--port <number>` | Port to listen on | Agent config or 9090 |
+| `--port <number>` | Port to listen on | Member config or 9090 |
 | `--startup-timeout <seconds>` | Upstream initialization timeout | 60 |
-| `--agent <name>` | Agent package name | Auto-detect if single agent |
+| `--member <name>` | Member package name | Auto-detect if single member |
 
 ## Behavior
 
-- **Auto-detection:** If `--agent` not provided, discovers all agent packages. Uses the single agent if exactly one exists. Errors with descriptive message if zero or multiple found.
+- **Auto-detection:** If `--member` not provided, discovers all member packages. Uses the single member if exactly one exists. Errors with descriptive message if zero or multiple found.
 - **Graceful shutdown:** Handles SIGINT/SIGTERM. Closes server, upstream clients, and database in order.
 - **Startup failure:** Cleans up resources and exits with code 1 and descriptive error message.
 - **App deduplication:** Apps referenced by multiple roles get a single upstream connection.
@@ -49,7 +49,7 @@ Main startup orchestrator. Follows PRD §6.2 startup sequence:
 ## Dependencies
 
 - `src/resolver/discover.ts` — `discoverPackages()`
-- `src/resolver/resolve.ts` — `resolveAgent()`
+- `src/resolver/resolve.ts` — `resolveMember()`
 - `src/generator/toolfilter.ts` — `computeToolFilters()`
 - `src/proxy/credentials.ts` — `loadEnvFile()`, `resolveEnvVars()`
 - `src/proxy/db.ts` — `openDatabase()`

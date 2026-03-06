@@ -1,6 +1,6 @@
 export type {
   DiscoveredPackage,
-  ResolvedAgent,
+  ResolvedMember,
   ResolvedApp,
   ResolvedRole,
   ResolvedSkill,
@@ -15,4 +15,4 @@ export {
 } from "./errors.js";
 
 export { discoverPackages } from "./discover.js";
-export { resolveAgent } from "./resolve.js";
+export { resolveMember } from "./resolve.js";

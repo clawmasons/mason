@@ -8,7 +8,7 @@ vi.mock("../../src/resolver/discover.js", () => ({
 }));
 
 vi.mock("../../src/resolver/resolve.js", () => ({
-  resolveAgent: vi.fn(),
+  resolveMember: vi.fn(),
 }));
 
 vi.mock("../../src/generator/toolfilter.js", () => ({
@@ -84,9 +84,9 @@ describe("chapter proxy command", () => {
     expect(opt).toBeDefined();
   });
 
-  it("has --agent option", () => {
+  it("has --member option", () => {
     const proxyCmd = program.commands.find((cmd) => cmd.name() === "proxy");
-    const opt = proxyCmd?.options.find((o) => o.long === "--agent");
+    const opt = proxyCmd?.options.find((o) => o.long === "--member");
     expect(opt).toBeDefined();
   });
 });
@@ -95,16 +95,21 @@ describe("chapter proxy command", () => {
 
 import { startProxy } from "../../src/cli/commands/proxy.js";
 import { discoverPackages } from "../../src/resolver/discover.js";
-import { resolveAgent } from "../../src/resolver/resolve.js";
+import { resolveMember } from "../../src/resolver/resolve.js";
 import { computeToolFilters } from "../../src/generator/toolfilter.js";
 import { UpstreamManager } from "../../src/proxy/upstream.js";
 import { ChapterProxyServer } from "../../src/proxy/server.js";
-import type { DiscoveredPackage, ResolvedAgent } from "../../src/resolver/types.js";
+import type { DiscoveredPackage, ResolvedMember } from "../../src/resolver/types.js";
 
-function makeAgent(name: string): ResolvedAgent {
+function makeMember(name: string): ResolvedMember {
   return {
     name,
     version: "1.0.0",
+    memberType: "agent",
+    memberName: name.split("/").pop()?.replace("member-", "") ?? name,
+    slug: name.split("/").pop()?.replace("member-", "") ?? name,
+    email: "test@chapter.local",
+    authProviders: [],
     runtimes: ["claude-code"],
     roles: [
       {
@@ -133,16 +138,22 @@ function makeAgent(name: string): ResolvedAgent {
   };
 }
 
-function makePackages(agentName: string): Map<string, DiscoveredPackage> {
+function makePackages(memberName: string): Map<string, DiscoveredPackage> {
   const map = new Map<string, DiscoveredPackage>();
-  map.set(agentName, {
-    name: agentName,
+  map.set(memberName, {
+    name: memberName,
     version: "1.0.0",
     packagePath: "/fake/path",
     chapterField: {
-      type: "agent",
+      type: "member",
+      memberType: "agent",
+      name: "Test Member",
+      slug: "test",
+      email: "test@chapter.local",
+      authProviders: [],
       runtimes: ["claude-code"],
       roles: ["@test/role-dev"],
+      resources: [],
     },
   });
   return map;
@@ -161,7 +172,7 @@ describe("startProxy", () => {
     process.exit = originalExit;
   });
 
-  it("fails with no agents found", async () => {
+  it("fails with no members found", async () => {
     vi.mocked(discoverPackages).mockReturnValue(new Map());
 
     await startProxy("/fake/root", {});
@@ -169,19 +180,19 @@ describe("startProxy", () => {
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 
-  it("fails with multiple agents and no --agent flag", async () => {
+  it("fails with multiple members and no --member flag", async () => {
     const packages = new Map<string, DiscoveredPackage>();
-    packages.set("@test/agent-a", {
-      name: "@test/agent-a",
+    packages.set("@test/member-a", {
+      name: "@test/member-a",
       version: "1.0.0",
       packagePath: "/fake/a",
-      chapterField: { type: "agent", runtimes: ["claude-code"], roles: ["@test/role"] },
+      chapterField: { type: "member", memberType: "agent", name: "A", slug: "a", email: "a@chapter.local", authProviders: [], runtimes: ["claude-code"], roles: ["@test/role"], resources: [] },
     });
-    packages.set("@test/agent-b", {
-      name: "@test/agent-b",
+    packages.set("@test/member-b", {
+      name: "@test/member-b",
       version: "1.0.0",
       packagePath: "/fake/b",
-      chapterField: { type: "agent", runtimes: ["claude-code"], roles: ["@test/role"] },
+      chapterField: { type: "member", memberType: "agent", name: "B", slug: "b", email: "b@chapter.local", authProviders: [], runtimes: ["claude-code"], roles: ["@test/role"], resources: [] },
     });
     vi.mocked(discoverPackages).mockReturnValue(packages);
 
@@ -190,36 +201,36 @@ describe("startProxy", () => {
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 
-  it("auto-detects single agent", async () => {
-    const agentName = "@test/agent-note-taker";
-    vi.mocked(discoverPackages).mockReturnValue(makePackages(agentName));
-    vi.mocked(resolveAgent).mockReturnValue(makeAgent(agentName));
+  it("auto-detects single member", async () => {
+    const memberName = "@test/member-note-taker";
+    vi.mocked(discoverPackages).mockReturnValue(makePackages(memberName));
+    vi.mocked(resolveMember).mockReturnValue(makeMember(memberName));
     vi.mocked(computeToolFilters).mockReturnValue(new Map());
 
     await startProxy("/fake/root", {});
 
-    expect(resolveAgent).toHaveBeenCalledWith(agentName, expect.any(Map));
+    expect(resolveMember).toHaveBeenCalledWith(memberName, expect.any(Map));
     expect(ChapterProxyServer).toHaveBeenCalled();
   });
 
-  it("uses --agent flag to select agent", async () => {
-    const agentName = "@test/agent-specific";
-    vi.mocked(discoverPackages).mockReturnValue(makePackages(agentName));
-    vi.mocked(resolveAgent).mockReturnValue(makeAgent(agentName));
+  it("uses --member flag to select member", async () => {
+    const memberName = "@test/member-specific";
+    vi.mocked(discoverPackages).mockReturnValue(makePackages(memberName));
+    vi.mocked(resolveMember).mockReturnValue(makeMember(memberName));
     vi.mocked(computeToolFilters).mockReturnValue(new Map());
 
-    await startProxy("/fake/root", { agent: agentName });
+    await startProxy("/fake/root", { member: memberName });
 
-    expect(resolveAgent).toHaveBeenCalledWith(agentName, expect.any(Map));
+    expect(resolveMember).toHaveBeenCalledWith(memberName, expect.any(Map));
   });
 
   it("passes --port to server config", async () => {
-    const agentName = "@test/agent-port";
-    vi.mocked(discoverPackages).mockReturnValue(makePackages(agentName));
-    vi.mocked(resolveAgent).mockReturnValue(makeAgent(agentName));
+    const memberName = "@test/member-port";
+    vi.mocked(discoverPackages).mockReturnValue(makePackages(memberName));
+    vi.mocked(resolveMember).mockReturnValue(makeMember(memberName));
     vi.mocked(computeToolFilters).mockReturnValue(new Map());
 
-    await startProxy("/fake/root", { agent: agentName, port: "8080" });
+    await startProxy("/fake/root", { member: memberName, port: "8080" });
 
     expect(ChapterProxyServer).toHaveBeenCalledWith(
       expect.objectContaining({ port: 8080 }),
@@ -227,24 +238,24 @@ describe("startProxy", () => {
   });
 
   it("passes --startup-timeout to upstream initialize", async () => {
-    const agentName = "@test/agent-timeout";
-    vi.mocked(discoverPackages).mockReturnValue(makePackages(agentName));
-    vi.mocked(resolveAgent).mockReturnValue(makeAgent(agentName));
+    const memberName = "@test/member-timeout";
+    vi.mocked(discoverPackages).mockReturnValue(makePackages(memberName));
+    vi.mocked(resolveMember).mockReturnValue(makeMember(memberName));
     vi.mocked(computeToolFilters).mockReturnValue(new Map());
 
-    await startProxy("/fake/root", { agent: agentName, startupTimeout: "30" });
+    await startProxy("/fake/root", { member: memberName, startupTimeout: "30" });
 
     const mockUpstreamInstance = vi.mocked(UpstreamManager).mock.results[0]?.value;
     expect(mockUpstreamInstance.initialize).toHaveBeenCalledWith(30000);
   });
 
   it("creates upstream configs with resolved env vars", async () => {
-    const agentName = "@test/agent-env";
-    vi.mocked(discoverPackages).mockReturnValue(makePackages(agentName));
-    vi.mocked(resolveAgent).mockReturnValue(makeAgent(agentName));
+    const memberName = "@test/member-env";
+    vi.mocked(discoverPackages).mockReturnValue(makePackages(memberName));
+    vi.mocked(resolveMember).mockReturnValue(makeMember(memberName));
     vi.mocked(computeToolFilters).mockReturnValue(new Map());
 
-    await startProxy("/fake/root", { agent: agentName });
+    await startProxy("/fake/root", { member: memberName });
 
     expect(UpstreamManager).toHaveBeenCalledWith(
       expect.arrayContaining([
@@ -257,15 +268,15 @@ describe("startProxy", () => {
   });
 
   it("collects approval patterns from roles", async () => {
-    const agentName = "@test/agent-approval";
-    const agent = makeAgent(agentName);
-    agent.roles[0].constraints = { requireApprovalFor: ["github_delete_*"] };
+    const memberName = "@test/member-approval";
+    const member = makeMember(memberName);
+    member.roles[0].constraints = { requireApprovalFor: ["github_delete_*"] };
 
-    vi.mocked(discoverPackages).mockReturnValue(makePackages(agentName));
-    vi.mocked(resolveAgent).mockReturnValue(agent);
+    vi.mocked(discoverPackages).mockReturnValue(makePackages(memberName));
+    vi.mocked(resolveMember).mockReturnValue(member);
     vi.mocked(computeToolFilters).mockReturnValue(new Map());
 
-    await startProxy("/fake/root", { agent: agentName });
+    await startProxy("/fake/root", { member: memberName });
 
     expect(ChapterProxyServer).toHaveBeenCalledWith(
       expect.objectContaining({
