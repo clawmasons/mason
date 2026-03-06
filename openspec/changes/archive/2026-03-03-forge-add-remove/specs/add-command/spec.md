@@ -12,13 +12,13 @@ The `forge add` command SHALL be registered as a Commander.js command with a req
 The `forge add` command SHALL delegate package installation to npm by executing `npm install <pkg> [npmArgs...]` in the workspace root directory using `child_process.execFileSync`.
 
 #### Scenario: Successful npm install
-- **WHEN** `forge add @clawforge/app-github` is run in a valid workspace
-- **THEN** the command SHALL execute `npm install @clawforge/app-github` with `stdio: "inherit"`
+- **WHEN** `forge add @clawmasons/app-github` is run in a valid workspace
+- **THEN** the command SHALL execute `npm install @clawmasons/app-github` with `stdio: "inherit"`
 - **AND** npm output SHALL stream directly to the terminal
 
 #### Scenario: npm install with extra flags
-- **WHEN** `forge add @clawforge/app-github --save-dev --legacy-peer-deps` is run
-- **THEN** the command SHALL execute `npm install @clawforge/app-github --save-dev --legacy-peer-deps`
+- **WHEN** `forge add @clawmasons/app-github --save-dev --legacy-peer-deps` is run
+- **THEN** the command SHALL execute `npm install @clawmasons/app-github --save-dev --legacy-peer-deps`
 
 #### Scenario: npm install failure
 - **WHEN** npm install fails (non-zero exit code)
@@ -49,8 +49,8 @@ After successful npm install, the command SHALL read the installed package's `pa
 The command SHALL resolve the installed package location by checking `node_modules/<pkg>/package.json` (handling both scoped and unscoped packages).
 
 #### Scenario: Scoped package resolution
-- **WHEN** `forge add @clawforge/app-github` is run
-- **THEN** the command SHALL look for the package at `node_modules/@clawforge/app-github/package.json`
+- **WHEN** `forge add @clawmasons/app-github` is run
+- **THEN** the command SHALL look for the package at `node_modules/@clawmasons/app-github/package.json`
 
 #### Scenario: Unscoped package resolution
 - **WHEN** `forge add my-app` is run

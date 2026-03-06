@@ -6,7 +6,7 @@ Creating a template system lets users run `forge init --template note-taker` and
 
 ## What Changes
 
-- Create `templates/note-taker/` directory with template files: root `package.json` (depends on `@clawforge/forge-core`), local agent definition, and local role definition
+- Create `templates/note-taker/` directory with template files: root `package.json` (depends on `@clawmasons/forge-core`), local agent definition, and local role definition
 - Enhance `src/cli/commands/init.ts` with `--template <name>` option to copy template files and apply `{{projectName}}` placeholder substitution
 - When `--template` is specified, copy template files first, then apply forge scaffold (`.forge/`, config, .env.example, .gitignore)
 - When `--template` is not specified, list available templates for the user to choose from

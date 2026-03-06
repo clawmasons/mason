@@ -4,7 +4,7 @@ import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedT
 
 function makeGithubApp(): ResolvedApp {
   return {
-    name: "@clawforge/app-github",
+    name: "@clawmasons/app-github",
     version: "1.2.0",
     transport: "stdio",
     command: "npx",
@@ -16,7 +16,7 @@ function makeGithubApp(): ResolvedApp {
 
 function makeLabelingSkill(): ResolvedSkill {
   return {
-    name: "@clawforge/skill-labeling",
+    name: "@clawmasons/skill-labeling",
     version: "1.0.0",
     artifacts: ["./SKILL.md"],
     description: "Issue labeling taxonomy",
@@ -25,7 +25,7 @@ function makeLabelingSkill(): ResolvedSkill {
 
 function makeTriageTask(): ResolvedTask {
   return {
-    name: "@clawforge/task-triage-issue",
+    name: "@clawmasons/task-triage-issue",
     version: "0.3.1",
     taskType: "subagent",
     prompt: "./prompts/triage.md",
@@ -37,10 +37,10 @@ function makeTriageTask(): ResolvedTask {
 
 function makeRepoOpsAgent(): ResolvedAgent {
   const issueManager: ResolvedRole = {
-    name: "@clawforge/role-issue-manager",
+    name: "@clawmasons/role-issue-manager",
     version: "2.0.0",
     permissions: {
-      "@clawforge/app-github": {
+      "@clawmasons/app-github": {
         allow: ["create_issue", "list_repos"],
         deny: [],
       },
@@ -51,7 +51,7 @@ function makeRepoOpsAgent(): ResolvedAgent {
   };
 
   return {
-    name: "@clawforge/agent-repo-ops",
+    name: "@clawmasons/agent-repo-ops",
     version: "1.0.0",
     runtimes: ["claude-code", "codex"],
     roles: [issueManager],
@@ -71,7 +71,7 @@ describe("generateLockFile", () => {
     it("captures agent name", () => {
       const agent = makeRepoOpsAgent();
       const lock = generateLockFile(agent, []);
-      expect(lock.agent.name).toBe("@clawforge/agent-repo-ops");
+      expect(lock.agent.name).toBe("@clawmasons/agent-repo-ops");
     });
 
     it("captures agent version", () => {
@@ -92,7 +92,7 @@ describe("generateLockFile", () => {
       const agent = makeRepoOpsAgent();
       const lock = generateLockFile(agent, []);
       expect(lock.roles).toHaveLength(1);
-      expect(lock.roles[0].name).toBe("@clawforge/role-issue-manager");
+      expect(lock.roles[0].name).toBe("@clawmasons/role-issue-manager");
       expect(lock.roles[0].version).toBe("2.0.0");
     });
 
@@ -100,7 +100,7 @@ describe("generateLockFile", () => {
       const agent = makeRepoOpsAgent();
       const lock = generateLockFile(agent, []);
       expect(lock.roles[0].tasks).toEqual([
-        { name: "@clawforge/task-triage-issue", version: "0.3.1" },
+        { name: "@clawmasons/task-triage-issue", version: "0.3.1" },
       ]);
     });
 
@@ -108,7 +108,7 @@ describe("generateLockFile", () => {
       const agent = makeRepoOpsAgent();
       const lock = generateLockFile(agent, []);
       expect(lock.roles[0].apps).toEqual([
-        { name: "@clawforge/app-github", version: "1.2.0" },
+        { name: "@clawmasons/app-github", version: "1.2.0" },
       ]);
     });
 
@@ -116,7 +116,7 @@ describe("generateLockFile", () => {
       const agent = makeRepoOpsAgent();
       const lock = generateLockFile(agent, []);
       expect(lock.roles[0].skills).toEqual([
-        { name: "@clawforge/skill-labeling", version: "1.0.0" },
+        { name: "@clawmasons/skill-labeling", version: "1.0.0" },
       ]);
     });
   });

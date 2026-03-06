@@ -23,7 +23,7 @@
 ## 4. Public API
 
 - [x] 4.1 Update `src/index.ts` to export resolver types and functions
-- [x] 4.2 Ensure all exported types are accessible from `@clawforge/forge`
+- [x] 4.2 Ensure all exported types are accessible from `@clawmasons/forge`
 
 ## 5. Tests
 

@@ -74,7 +74,7 @@ describe("appForgeFieldSchema", () => {
     }
   });
 
-  it("validates PRD example: @clawforge/app-github", () => {
+  it("validates PRD example: @clawmasons/app-github", () => {
     const result = appForgeFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
@@ -98,7 +98,7 @@ describe("appForgeFieldSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("validates PRD example: @clawforge/app-amap", () => {
+  it("validates PRD example: @clawmasons/app-amap", () => {
     const result = appForgeFieldSchema.safeParse({
       type: "app",
       transport: "sse",

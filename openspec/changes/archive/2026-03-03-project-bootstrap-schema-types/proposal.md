@@ -24,5 +24,5 @@ forge has no codebase yet — just a PRD and implementation plan. Before any CLI
 - Creates `src/schemas/` with Zod validators for each package type
 - Creates `src/types/` with exported TypeScript interfaces
 - Creates `tests/schemas/` with unit tests
-- Establishes the `@clawforge/forge` package name and initial exports
+- Establishes the `@clawmasons/forge` package name and initial exports
 - All subsequent changes (CLI, graph resolver, materializers) will import from these schemas

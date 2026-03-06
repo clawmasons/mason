@@ -6,17 +6,17 @@ describe("roleForgeFieldSchema", () => {
     const result = roleForgeFieldSchema.safeParse({
       type: "role",
       permissions: {
-        "@clawforge/app-github": {
+        "@clawmasons/app-github": {
           allow: ["create_issue", "list_repos"],
           deny: ["delete_repo"],
         },
       },
-      tasks: ["@clawforge/task-triage-issue"],
+      tasks: ["@clawmasons/task-triage-issue"],
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(
-        result.data.permissions["@clawforge/app-github"].allow,
+        result.data.permissions["@clawmasons/app-github"].allow,
       ).toContain("create_issue");
     }
   });
@@ -25,7 +25,7 @@ describe("roleForgeFieldSchema", () => {
     const result = roleForgeFieldSchema.safeParse({
       type: "role",
       permissions: {
-        "@clawforge/app-slack": {
+        "@clawmasons/app-slack": {
           allow: ["send_message"],
           deny: ["*"],
         },
@@ -33,7 +33,7 @@ describe("roleForgeFieldSchema", () => {
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.permissions["@clawforge/app-slack"].deny).toEqual([
+      expect(result.data.permissions["@clawmasons/app-slack"].deny).toEqual([
         "*",
       ]);
     }
@@ -43,7 +43,7 @@ describe("roleForgeFieldSchema", () => {
     const result = roleForgeFieldSchema.safeParse({
       type: "role",
       permissions: {
-        "@clawforge/app-github": {
+        "@clawmasons/app-github": {
           allow: ["create_issue"],
           deny: [],
         },
@@ -69,21 +69,21 @@ describe("roleForgeFieldSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("validates PRD example: @clawforge/role-issue-manager", () => {
+  it("validates PRD example: @clawmasons/role-issue-manager", () => {
     const result = roleForgeFieldSchema.safeParse({
       type: "role",
       description: "Manages GitHub issues: triage, label, assign.",
       tasks: [
-        "@clawforge/task-triage-issue",
-        "@clawforge/task-assign-issue",
+        "@clawmasons/task-triage-issue",
+        "@clawmasons/task-assign-issue",
       ],
-      skills: ["@clawforge/skill-labeling"],
+      skills: ["@clawmasons/skill-labeling"],
       permissions: {
-        "@clawforge/app-github": {
+        "@clawmasons/app-github": {
           allow: ["create_issue", "list_repos", "add_label"],
           deny: ["delete_repo", "transfer_repo"],
         },
-        "@clawforge/app-slack": {
+        "@clawmasons/app-slack": {
           allow: ["send_message"],
           deny: ["*"],
         },

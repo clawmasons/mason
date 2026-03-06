@@ -6,7 +6,7 @@ One new module: `src/proxy/router.ts`. No changes to existing modules.
 
 ```typescript
 interface RouteEntry {
-  appName: string;         // Full package name, e.g., "@clawforge/app-github"
+  appName: string;         // Full package name, e.g., "@clawmasons/app-github"
   appShortName: string;    // e.g., "github"
   originalToolName: string; // e.g., "create_pr"
   prefixedToolName: string; // e.g., "github_create_pr"

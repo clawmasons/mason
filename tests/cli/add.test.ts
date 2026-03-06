@@ -193,8 +193,8 @@ describe("runAdd", () => {
   it("resolves scoped package path correctly", async () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === "npm" && (args as string[])[0] === "install") {
-        writeNodeModulesPackage("@clawforge/app-github", {
-          name: "@clawforge/app-github",
+        writeNodeModulesPackage("@clawmasons/app-github", {
+          name: "@clawmasons/app-github",
           version: "1.0.0",
           forge: {
             type: "app",
@@ -209,12 +209,12 @@ describe("runAdd", () => {
       return Buffer.from("");
     });
 
-    await runAdd(tmpDir, "@clawforge/app-github", { npmArgs: [] });
+    await runAdd(tmpDir, "@clawmasons/app-github", { npmArgs: [] });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
-    // Verify the scoped package was found at node_modules/@clawforge/app-github
-    const pkgPath = path.join(tmpDir, "node_modules", "@clawforge", "app-github", "package.json");
+    // Verify the scoped package was found at node_modules/@clawmasons/app-github
+    const pkgPath = path.join(tmpDir, "node_modules", "@clawmasons", "app-github", "package.json");
     expect(fs.existsSync(pkgPath)).toBe(true);
   });
 });

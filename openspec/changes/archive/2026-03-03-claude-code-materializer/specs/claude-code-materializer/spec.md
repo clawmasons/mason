@@ -29,15 +29,15 @@ For each task in each role, the materializer SHALL generate a file at `.claude/c
 - A "Task" section with a placeholder for the task prompt content
 
 #### Scenario: Single-role task generates slash command
-- **WHEN** role `issue-manager` has task `@clawforge/task-triage-issue` with permitted tools `github: [create_issue, list_repos, add_label]` and `slack: [send_message]`
+- **WHEN** role `issue-manager` has task `@clawmasons/task-triage-issue` with permitted tools `github: [create_issue, list_repos, add_label]` and `slack: [send_message]`
 - **THEN** the result SHALL contain key `.claude/commands/triage-issue.md` with content including `role: issue-manager` and listing those tools
 
 #### Scenario: Task with skills includes skill reference
-- **WHEN** a task requires skill `@clawforge/skill-labeling`
+- **WHEN** a task requires skill `@clawmasons/skill-labeling`
 - **THEN** the slash command SHALL include a reference to `skills/labeling/` in its Required Skills section
 
 #### Scenario: Task short name derived from package name
-- **WHEN** a task is named `@clawforge/task-triage-issue`
+- **WHEN** a task is named `@clawmasons/task-triage-issue`
 - **THEN** the command file SHALL be named `triage-issue.md` (scope and `task-` prefix stripped)
 
 ### Requirement: Claude Code materializer generates AGENTS.md with role documentation
@@ -60,7 +60,7 @@ The materializer SHALL generate an `AGENTS.md` file containing:
 For each unique skill across all roles, the materializer SHALL generate a `skills/{skill-short-name}/README.md` file containing the skill's description and listing its artifact paths.
 
 #### Scenario: Skill with artifacts
-- **WHEN** skill `@clawforge/skill-labeling` has artifacts `["./SKILL.md", "./examples/", "./schemas/"]` and description `"Issue labeling taxonomy and heuristics"`
+- **WHEN** skill `@clawmasons/skill-labeling` has artifacts `["./SKILL.md", "./examples/", "./schemas/"]` and description `"Issue labeling taxonomy and heuristics"`
 - **THEN** the result SHALL contain key `skills/labeling/README.md` with the description and artifact listing
 
 ### Requirement: Claude Code materializer generates a Dockerfile

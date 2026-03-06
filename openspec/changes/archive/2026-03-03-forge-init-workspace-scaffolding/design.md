@@ -1,6 +1,6 @@
 ## Context
 
-forge is a TypeScript/Node.js project (ESM, Zod schemas, Vitest) with validated package type schemas but no CLI. The next step is adding the CLI entry point and the first command (`forge init`). The project uses `@clawforge/forge` as its npm name, targets ES2022/Node16, and has no runtime dependencies beyond Zod.
+forge is a TypeScript/Node.js project (ESM, Zod schemas, Vitest) with validated package type schemas but no CLI. The next step is adding the CLI entry point and the first command (`forge init`). The project uses `@clawmasons/forge` as its npm name, targets ES2022/Node16, and has no runtime dependencies beyond Zod.
 
 The PRD specifies Commander.js for CLI parsing (§5.1) and defines the `forge init` output in §5.2 and §4. The workspace structure uses npm workspaces with type-organized directories.
 

@@ -4,7 +4,7 @@ import type { ResolvedAgent } from "../../src/resolver/types.js";
 
 function makeAgent(overrides: Partial<ResolvedAgent> = {}): ResolvedAgent {
   return {
-    name: "@clawforge/agent-repo-ops",
+    name: "@clawmasons/agent-repo-ops",
     version: "1.0.0",
     runtimes: ["claude-code"],
     roles: [],
@@ -14,11 +14,11 @@ function makeAgent(overrides: Partial<ResolvedAgent> = {}): ResolvedAgent {
 
 describe("getAppShortName", () => {
   it("strips scope and app- prefix", () => {
-    expect(getAppShortName("@clawforge/app-github")).toBe("github");
+    expect(getAppShortName("@clawmasons/app-github")).toBe("github");
   });
 
   it("strips scope but preserves name without app- prefix", () => {
-    expect(getAppShortName("@clawforge/slack-server")).toBe("slack-server");
+    expect(getAppShortName("@clawmasons/slack-server")).toBe("slack-server");
   });
 
   it("strips app- prefix from unscoped package", () => {
@@ -30,11 +30,11 @@ describe("getAppShortName", () => {
   });
 
   it("strips agent- prefix from scoped package", () => {
-    expect(getAppShortName("@clawforge/agent-repo-ops")).toBe("repo-ops");
+    expect(getAppShortName("@clawmasons/agent-repo-ops")).toBe("repo-ops");
   });
 
   it("strips role- prefix from scoped package", () => {
-    expect(getAppShortName("@clawforge/role-issue-manager")).toBe("issue-manager");
+    expect(getAppShortName("@clawmasons/role-issue-manager")).toBe("issue-manager");
   });
 });
 
@@ -49,10 +49,10 @@ describe("computeToolFilters", () => {
     const agent = makeAgent({
       roles: [
         {
-          name: "@clawforge/role-issue-manager",
+          name: "@clawmasons/role-issue-manager",
           version: "1.0.0",
           permissions: {
-            "@clawforge/app-github": {
+            "@clawmasons/app-github": {
               allow: ["create_issue", "list_repos", "add_label"],
               deny: ["delete_repo"],
             },
@@ -67,7 +67,7 @@ describe("computeToolFilters", () => {
     const filters = computeToolFilters(agent);
     expect(filters.size).toBe(1);
 
-    const github = filters.get("@clawforge/app-github");
+    const github = filters.get("@clawmasons/app-github");
     expect(github).toBeDefined();
     expect(github?.mode).toBe("allow");
     expect(github?.list).toEqual(["create_issue", "list_repos", "add_label"]);
@@ -77,10 +77,10 @@ describe("computeToolFilters", () => {
     const agent = makeAgent({
       roles: [
         {
-          name: "@clawforge/role-issue-manager",
+          name: "@clawmasons/role-issue-manager",
           version: "1.0.0",
           permissions: {
-            "@clawforge/app-github": {
+            "@clawmasons/app-github": {
               allow: ["create_issue", "list_repos", "add_label"],
               deny: [],
             },
@@ -90,10 +90,10 @@ describe("computeToolFilters", () => {
           skills: [],
         },
         {
-          name: "@clawforge/role-pr-reviewer",
+          name: "@clawmasons/role-pr-reviewer",
           version: "1.0.0",
           permissions: {
-            "@clawforge/app-github": {
+            "@clawmasons/app-github": {
               allow: ["list_repos", "get_pr", "create_review"],
               deny: [],
             },
@@ -106,7 +106,7 @@ describe("computeToolFilters", () => {
     });
 
     const filters = computeToolFilters(agent);
-    const github = filters.get("@clawforge/app-github");
+    const github = filters.get("@clawmasons/app-github");
     expect(github).toBeDefined();
     expect(github?.mode).toBe("allow");
     expect(github?.list).toHaveLength(5);
@@ -119,14 +119,14 @@ describe("computeToolFilters", () => {
     const agent = makeAgent({
       roles: [
         {
-          name: "@clawforge/role-issue-manager",
+          name: "@clawmasons/role-issue-manager",
           version: "1.0.0",
           permissions: {
-            "@clawforge/app-github": {
+            "@clawmasons/app-github": {
               allow: ["create_issue", "list_repos", "add_label"],
               deny: [],
             },
-            "@clawforge/app-slack": {
+            "@clawmasons/app-slack": {
               allow: ["send_message"],
               deny: ["*"],
             },
@@ -136,10 +136,10 @@ describe("computeToolFilters", () => {
           skills: [],
         },
         {
-          name: "@clawforge/role-pr-reviewer",
+          name: "@clawmasons/role-pr-reviewer",
           version: "1.0.0",
           permissions: {
-            "@clawforge/app-github": {
+            "@clawmasons/app-github": {
               allow: ["list_repos", "get_pr", "create_review"],
               deny: [],
             },
@@ -154,13 +154,13 @@ describe("computeToolFilters", () => {
     const filters = computeToolFilters(agent);
     expect(filters.size).toBe(2);
 
-    const github = filters.get("@clawforge/app-github");
+    const github = filters.get("@clawmasons/app-github");
     expect(github).toBeDefined();
     expect(new Set(github?.list)).toEqual(
       new Set(["create_issue", "list_repos", "add_label", "get_pr", "create_review"]),
     );
 
-    const slack = filters.get("@clawforge/app-slack");
+    const slack = filters.get("@clawmasons/app-slack");
     expect(slack).toBeDefined();
     expect(slack?.list).toEqual(["send_message"]);
   });
@@ -169,10 +169,10 @@ describe("computeToolFilters", () => {
     const agent = makeAgent({
       roles: [
         {
-          name: "@clawforge/role-issue-manager",
+          name: "@clawmasons/role-issue-manager",
           version: "1.0.0",
           permissions: {
-            "@clawforge/app-github": {
+            "@clawmasons/app-github": {
               allow: ["create_issue", "list_repos", "add_label"],
               deny: ["delete_repo", "transfer_repo"],
             },
@@ -185,7 +185,7 @@ describe("computeToolFilters", () => {
     });
 
     const filters = computeToolFilters(agent);
-    const github = filters.get("@clawforge/app-github");
+    const github = filters.get("@clawmasons/app-github");
     expect(github).toBeDefined();
     expect(github?.list).not.toContain("delete_repo");
     expect(github?.list).not.toContain("transfer_repo");

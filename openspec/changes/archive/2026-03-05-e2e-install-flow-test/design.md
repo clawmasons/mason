@@ -7,8 +7,8 @@ npm run build
 npm pack                          # forge tgz
 cd forge-core && npm pack         # forge-core tgz
 mkdir /tmp/test-forge && cd /tmp/test-forge
-npm install <path>/clawforge-forge-0.1.0.tgz
-npm install <path>/clawforge-forge-core-0.1.0.tgz
+npm install <path>/clawmasons-forge-0.1.0.tgz
+npm install <path>/clawmasons-forge-core-0.1.0.tgz
 npx forge init --template note-taker
 npx forge validate @test-forge/agent-note-taker
 npx forge list

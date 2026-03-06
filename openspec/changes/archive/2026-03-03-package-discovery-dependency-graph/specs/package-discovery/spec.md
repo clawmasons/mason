@@ -20,11 +20,11 @@ The system SHALL scan workspace directories (`apps/`, `tasks/`, `skills/`, `role
 - **THEN** that package is skipped and not included in the result
 
 ### Requirement: Discover forge packages from node_modules
-The system SHALL scan `node_modules/` under the project root to find installed packages with valid `forge` fields, including scoped packages (e.g., `node_modules/@clawforge/app-github/`).
+The system SHALL scan `node_modules/` under the project root to find installed packages with valid `forge` fields, including scoped packages (e.g., `node_modules/@clawmasons/app-github/`).
 
 #### Scenario: Discover packages in node_modules
-- **WHEN** `discoverPackages(rootDir)` is called and `node_modules/@clawforge/app-github/package.json` contains a valid app forge field
-- **THEN** the result map contains an entry for `@clawforge/app-github` with the parsed forge field
+- **WHEN** `discoverPackages(rootDir)` is called and `node_modules/@clawmasons/app-github/package.json` contains a valid app forge field
+- **THEN** the result map contains an entry for `@clawmasons/app-github` with the parsed forge field
 
 #### Scenario: Handle scoped packages
 - **WHEN** `discoverPackages(rootDir)` is called and `node_modules/@org/` contains multiple packages with forge fields
@@ -38,12 +38,12 @@ The system SHALL scan `node_modules/` under the project root to find installed p
 Each discovered package SHALL be represented as a `DiscoveredPackage` containing: `name` (string), `version` (string), `packagePath` (absolute filesystem path), and `forgeField` (validated ForgeField from Zod parsing).
 
 #### Scenario: DiscoveredPackage contains all fields
-- **WHEN** a valid forge package is discovered at `apps/github/package.json` with name `@clawforge/app-github` and version `1.2.0`
-- **THEN** the `DiscoveredPackage` has `name: "@clawforge/app-github"`, `version: "1.2.0"`, `packagePath` pointing to the package directory, and `forgeField` containing the validated app forge field
+- **WHEN** a valid forge package is discovered at `apps/github/package.json` with name `@clawmasons/app-github` and version `1.2.0`
+- **THEN** the `DiscoveredPackage` has `name: "@clawmasons/app-github"`, `version: "1.2.0"`, `packagePath` pointing to the package directory, and `forgeField` containing the validated app forge field
 
 ### Requirement: Workspace packages take precedence over node_modules
 When the same package name exists in both a workspace directory and node_modules, the workspace version SHALL take precedence (matching npm workspace behavior).
 
 #### Scenario: Workspace package overrides node_modules
-- **WHEN** `@clawforge/app-github` exists in both `apps/github/` and `node_modules/@clawforge/app-github/`
+- **WHEN** `@clawmasons/app-github` exists in both `apps/github/` and `node_modules/@clawmasons/app-github/`
 - **THEN** the discovery result contains only the workspace version

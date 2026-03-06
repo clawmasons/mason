@@ -8,37 +8,37 @@ Validate a resolved agent dependency graph for semantic correctness. Checks requ
 The system SHALL check that for every task in a role, each app listed in the task's `requires.apps` has a corresponding entry in the parent role's `permissions` object. A task cannot use an app that its role doesn't govern.
 
 #### Scenario: Task requires an app covered by role permissions
-- **WHEN** role `@clawforge/role-issue-manager` has `permissions: { "@clawforge/app-github": { allow: ["create_issue"], deny: [] } }` and task `@clawforge/task-triage-issue` has `requires: { apps: ["@clawforge/app-github"] }`
+- **WHEN** role `@clawmasons/role-issue-manager` has `permissions: { "@clawmasons/app-github": { allow: ["create_issue"], deny: [] } }` and task `@clawmasons/task-triage-issue` has `requires: { apps: ["@clawmasons/app-github"] }`
 - **THEN** validation passes with no requirement coverage errors
 
 #### Scenario: Task requires an app not in role permissions
-- **WHEN** role `@clawforge/role-issue-manager` has `permissions: { "@clawforge/app-github": { allow: ["create_issue"], deny: [] } }` and task `@clawforge/task-triage-issue` has `requires: { apps: ["@clawforge/app-github", "@clawforge/app-slack"] }` but the role has no permissions entry for `@clawforge/app-slack`
-- **THEN** validation fails with a requirement coverage error identifying role `@clawforge/role-issue-manager`, task `@clawforge/task-triage-issue`, and uncovered app `@clawforge/app-slack`
+- **WHEN** role `@clawmasons/role-issue-manager` has `permissions: { "@clawmasons/app-github": { allow: ["create_issue"], deny: [] } }` and task `@clawmasons/task-triage-issue` has `requires: { apps: ["@clawmasons/app-github", "@clawmasons/app-slack"] }` but the role has no permissions entry for `@clawmasons/app-slack`
+- **THEN** validation fails with a requirement coverage error identifying role `@clawmasons/role-issue-manager`, task `@clawmasons/task-triage-issue`, and uncovered app `@clawmasons/app-slack`
 
 ### Requirement: Validate tool existence
 The system SHALL check that every tool in a role's `permissions[app].allow` list exists in the corresponding resolved app's `tools` array. A role cannot allow a tool that the app doesn't expose.
 
 #### Scenario: All allowed tools exist in app
-- **WHEN** role allows tools `["create_issue", "list_repos"]` on `@clawforge/app-github` and the app's `tools` list includes both `create_issue` and `list_repos`
+- **WHEN** role allows tools `["create_issue", "list_repos"]` on `@clawmasons/app-github` and the app's `tools` list includes both `create_issue` and `list_repos`
 - **THEN** validation passes with no tool existence errors
 
 #### Scenario: Role allows a tool not exposed by app
-- **WHEN** role allows tools `["create_issue", "nonexistent_tool"]` on `@clawforge/app-github` and the app's `tools` list does not include `nonexistent_tool`
+- **WHEN** role allows tools `["create_issue", "nonexistent_tool"]` on `@clawmasons/app-github` and the app's `tools` list does not include `nonexistent_tool`
 - **THEN** validation fails with a tool existence error identifying the role, app, and the missing tool `nonexistent_tool`
 
 ### Requirement: Validate skill availability
 The system SHALL check that every skill in a task's `requires.skills` is available — either directly resolved in the task's own skills, or present in the parent role's resolved skills.
 
 #### Scenario: Task skill available via task resolution
-- **WHEN** task `@clawforge/task-triage-issue` requires skill `@clawforge/skill-labeling` and the resolved task's `skills` array contains a skill with name `@clawforge/skill-labeling`
+- **WHEN** task `@clawmasons/task-triage-issue` requires skill `@clawmasons/skill-labeling` and the resolved task's `skills` array contains a skill with name `@clawmasons/skill-labeling`
 - **THEN** validation passes with no skill availability errors
 
 #### Scenario: Task skill available via parent role
-- **WHEN** task `@clawforge/task-triage-issue` requires skill `@clawforge/skill-labeling`, the task's own resolved skills do not include it, but the parent role's resolved `skills` array includes it
+- **WHEN** task `@clawmasons/task-triage-issue` requires skill `@clawmasons/skill-labeling`, the task's own resolved skills do not include it, but the parent role's resolved `skills` array includes it
 - **THEN** validation passes with no skill availability errors
 
 #### Scenario: Task skill not available anywhere
-- **WHEN** task `@clawforge/task-triage-issue` requires skill `@clawforge/skill-missing`, the task's resolved skills do not include it, and the parent role's resolved skills do not include it
+- **WHEN** task `@clawmasons/task-triage-issue` requires skill `@clawmasons/skill-missing`, the task's resolved skills do not include it, and the parent role's resolved skills do not include it
 - **THEN** validation fails with a skill availability error identifying the task and the missing skill
 
 ### Requirement: Validate app launch config
@@ -82,17 +82,17 @@ The `validateAgent()` function SHALL return a `ValidationResult` containing: `va
 The system SHALL provide a `forge validate <agent>` CLI command that discovers packages, resolves the agent graph, runs validation, and outputs results. The command SHALL exit with code 0 when the agent is valid and non-zero when validation fails. The command SHALL support a `--json` flag for machine-readable output.
 
 #### Scenario: Valid agent CLI output
-- **WHEN** `forge validate @clawforge/agent-repo-ops` is run and the agent passes all checks
+- **WHEN** `forge validate @clawmasons/agent-repo-ops` is run and the agent passes all checks
 - **THEN** the command prints a success message and exits with code 0
 
 #### Scenario: Invalid agent CLI output
-- **WHEN** `forge validate @clawforge/agent-repo-ops` is run and the agent has validation errors
+- **WHEN** `forge validate @clawmasons/agent-repo-ops` is run and the agent has validation errors
 - **THEN** the command prints each error with its category and context, and exits with code 1
 
 #### Scenario: JSON output mode
-- **WHEN** `forge validate @clawforge/agent-repo-ops --json` is run
+- **WHEN** `forge validate @clawmasons/agent-repo-ops --json` is run
 - **THEN** the command outputs the `ValidationResult` as JSON to stdout
 
 #### Scenario: Agent not found
-- **WHEN** `forge validate @clawforge/nonexistent` is run and the agent package cannot be discovered
+- **WHEN** `forge validate @clawmasons/nonexistent` is run and the agent package cannot be discovered
 - **THEN** the command prints an error message and exits with non-zero code

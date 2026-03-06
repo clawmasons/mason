@@ -5,7 +5,7 @@ import { getAppShortName } from "../generator/toolfilter.js";
 // ── Types ──────────────────────────────────────────────────────────────
 
 export interface RouteEntry {
-  /** Full package name, e.g., "@clawforge/app-github". */
+  /** Full package name, e.g., "@clawmasons/app-github". */
   appName: string;
   /** Short name derived from package name, e.g., "github". */
   appShortName: string;

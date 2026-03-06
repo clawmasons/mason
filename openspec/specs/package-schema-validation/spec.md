@@ -38,7 +38,7 @@ The system SHALL validate `forge` fields of type `"skill"` against a Zod schema 
 The system SHALL validate `forge` fields of type `"task"` against a Zod schema requiring `type` and `taskType` (enum: subagent, script, composite, human), with optional fields: `prompt`, `requires` (object with `apps` and `skills` arrays), `timeout`, `approval` (enum: auto, confirm, review).
 
 #### Scenario: Valid subagent task
-- **WHEN** a forge field with `type: "task"`, `taskType: "subagent"`, `prompt: "./prompts/triage.md"`, `requires: { apps: ["@clawforge/app-github"], skills: ["@clawforge/skill-labeling"] }`, `timeout: "5m"`, `approval: "auto"` is validated
+- **WHEN** a forge field with `type: "task"`, `taskType: "subagent"`, `prompt: "./prompts/triage.md"`, `requires: { apps: ["@clawmasons/app-github"], skills: ["@clawmasons/skill-labeling"] }`, `timeout: "5m"`, `approval: "auto"` is validated
 - **THEN** validation succeeds and returns a typed `TaskForgeField` object
 
 #### Scenario: Task with invalid taskType
@@ -53,11 +53,11 @@ The system SHALL validate `forge` fields of type `"task"` against a Zod schema r
 The system SHALL validate `forge` fields of type `"role"` against a Zod schema requiring `type` and `permissions` (object mapping app names to `{ allow: string[], deny: string[] }`), with optional fields: `description`, `tasks`, `skills`, `constraints`.
 
 #### Scenario: Valid role with permissions
-- **WHEN** a forge field with `type: "role"`, `permissions: { "@clawforge/app-github": { allow: ["create_issue", "list_repos"], deny: ["delete_repo"] } }`, `tasks: ["@clawforge/task-triage-issue"]` is validated
+- **WHEN** a forge field with `type: "role"`, `permissions: { "@clawmasons/app-github": { allow: ["create_issue", "list_repos"], deny: ["delete_repo"] } }`, `tasks: ["@clawmasons/task-triage-issue"]` is validated
 - **THEN** validation succeeds and returns a typed `RoleForgeField` object
 
 #### Scenario: Role with deny wildcard
-- **WHEN** a forge field with `type: "role"` includes `permissions: { "@clawforge/app-slack": { allow: ["send_message"], deny: ["*"] } }`
+- **WHEN** a forge field with `type: "role"` includes `permissions: { "@clawmasons/app-slack": { allow: ["send_message"], deny: ["*"] } }`
 - **THEN** validation succeeds and preserves the wildcard deny entry
 
 #### Scenario: Role with constraints
@@ -68,11 +68,11 @@ The system SHALL validate `forge` fields of type `"role"` against a Zod schema r
 The system SHALL validate `forge` fields of type `"agent"` against a Zod schema requiring `type`, `runtimes` (string array), and `roles` (string array), with optional fields: `description`, `resources` (array of objects with `type`, `ref`, `access`), `proxy` (object with `image`, `port`, `type`).
 
 #### Scenario: Valid agent
-- **WHEN** a forge field with `type: "agent"`, `runtimes: ["claude-code", "codex"]`, `roles: ["@clawforge/role-issue-manager"]`, `proxy: { image: "ghcr.io/tbxark/mcp-proxy:latest", port: 9090, type: "sse" }` is validated
+- **WHEN** a forge field with `type: "agent"`, `runtimes: ["claude-code", "codex"]`, `roles: ["@clawmasons/role-issue-manager"]`, `proxy: { image: "ghcr.io/tbxark/mcp-proxy:latest", port: 9090, type: "sse" }` is validated
 - **THEN** validation succeeds and returns a typed `AgentForgeField` object
 
 #### Scenario: Agent with resources
-- **WHEN** a forge field with `type: "agent"` includes `resources: [{ type: "github-repo", ref: "clawforge/openclaw", access: "read-write" }]`
+- **WHEN** a forge field with `type: "agent"` includes `resources: [{ type: "github-repo", ref: "clawmasons/openclaw", access: "read-write" }]`
 - **THEN** validation succeeds and returns the resources array
 
 #### Scenario: Agent missing runtimes

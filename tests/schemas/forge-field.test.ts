@@ -44,7 +44,7 @@ describe("parseForgeField", () => {
     const result = parseForgeField({
       type: "role",
       permissions: {
-        "@clawforge/app-github": {
+        "@clawmasons/app-github": {
           allow: ["create_issue"],
           deny: [],
         },
@@ -60,7 +60,7 @@ describe("parseForgeField", () => {
     const result = parseForgeField({
       type: "agent",
       runtimes: ["claude-code"],
-      roles: ["@clawforge/role-issue-manager"],
+      roles: ["@clawmasons/role-issue-manager"],
     });
     expect(result.success).toBe(true);
     if (result.success) {

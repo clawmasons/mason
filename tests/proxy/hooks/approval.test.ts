@@ -10,7 +10,7 @@ function makeContext(overrides?: Partial<HookContext>): HookContext {
   return {
     agentName: "note-taker",
     roleName: "writer",
-    appName: "@clawforge/app-github",
+    appName: "@clawmasons/app-github",
     toolName: "delete_repo",
     prefixedToolName: "github_delete_repo",
     arguments: { repo: "test" },
@@ -110,7 +110,7 @@ describe("requestApproval", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].agent_name).toBe("note-taker");
     expect(rows[0].role_name).toBe("writer");
-    expect(rows[0].app_name).toBe("@clawforge/app-github");
+    expect(rows[0].app_name).toBe("@clawmasons/app-github");
     expect(rows[0].tool_name).toBe("github_delete_repo");
     expect(JSON.parse(rows[0].arguments)).toEqual({ repo: "test" });
     expect(rows[0].status).toBe("pending");

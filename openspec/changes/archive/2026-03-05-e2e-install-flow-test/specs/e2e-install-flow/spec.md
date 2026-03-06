@@ -15,8 +15,8 @@ An automated integration test that validates the complete forge packaging pipeli
 ## Preconditions (beforeAll)
 
 1. Run `npm run build` from the forge repo root to compile TypeScript
-2. Run `npm pack --json` from the forge repo root to produce `@clawforge/forge` tgz; capture the filename from JSON output
-3. Run `npm pack --json` from `forge-core/` to produce `@clawforge/forge-core` tgz; capture the filename from JSON output
+2. Run `npm pack --json` from the forge repo root to produce `@clawmasons/forge` tgz; capture the filename from JSON output
+3. Run `npm pack --json` from `forge-core/` to produce `@clawmasons/forge-core` tgz; capture the filename from JSON output
 4. Create a temp directory with a deterministic prefix: `/tmp/test-forge-<random>/`
 5. Store paths to both tgz files and the temp directory for use in tests
 
@@ -28,9 +28,9 @@ Run `npm install <path-to-forge.tgz> <path-to-forge-core.tgz>` in the temp direc
 
 **Assertions:**
 - Command exits with code 0
-- `node_modules/@clawforge/forge/` exists
-- `node_modules/@clawforge/forge-core/` exists
-- `node_modules/@clawforge/forge-core/apps/filesystem/package.json` exists
+- `node_modules/@clawmasons/forge/` exists
+- `node_modules/@clawmasons/forge-core/` exists
+- `node_modules/@clawmasons/forge-core/apps/filesystem/package.json` exists
 
 ### Step 2: Run forge init with template
 
@@ -42,7 +42,7 @@ Run `forge init --template note-taker` in the temp directory via the locally-ins
 - `.forge/config.json` exists
 - `agents/note-taker/package.json` exists with `@<scope>/agent-note-taker` name
 - `roles/writer/package.json` exists with `@<scope>/role-writer` name
-- `node_modules/@clawforge/forge-core/` exists (npm install ran)
+- `node_modules/@clawmasons/forge-core/` exists (npm install ran)
 
 ### Step 3: Run forge validate
 
@@ -59,8 +59,8 @@ Run `forge list --json` in the temp directory.
 - Command exits with code 0
 - JSON output contains agent name `@<scope>/agent-note-taker`
 - Agent has a role referencing `@<scope>/role-writer`
-- Role references `@clawforge/task-take-notes`, `@clawforge/skill-markdown-conventions`
-- Role has app permission for `@clawforge/app-filesystem`
+- Role references `@clawmasons/task-take-notes`, `@clawmasons/skill-markdown-conventions`
+- Role has app permission for `@clawmasons/app-filesystem`
 
 ### Step 5: Run forge install
 
@@ -85,7 +85,7 @@ Run `forge install @<scope>/agent-note-taker` in the temp directory.
 
 ## Implementation Note
 
-The test invokes the forge CLI via `node_modules/.bin/forge` rather than `npx forge`. This is because `npx forge` resolves to an unrelated npm package named `forge` on the public registry. Using the local binary path ensures the correct `@clawforge/forge` CLI is used.
+The test invokes the forge CLI via `node_modules/.bin/forge` rather than `npx forge`. This is because `npx forge` resolves to an unrelated npm package named `forge` on the public registry. Using the local binary path ensures the correct `@clawmasons/forge` CLI is used.
 
 ## Dependencies
 

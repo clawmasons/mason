@@ -41,7 +41,7 @@ forge is a greenfield TypeScript/Node.js project. No source code, configuration,
 - **strict TypeScript**: catches more bugs, standard for library code
 
 ### 4. Package structure — single package at root
-**Decision:** Build `@clawforge/forge` as a single package at the project root, not a monorepo of sub-packages.
+**Decision:** Build `@clawmasons/forge` as a single package at the project root, not a monorepo of sub-packages.
 
 **Rationale:** There's only one package to build. Monorepo structure can be introduced if/when forge itself needs workspace packages. The `src/` directory organizes by concern (schemas/, types/).
 

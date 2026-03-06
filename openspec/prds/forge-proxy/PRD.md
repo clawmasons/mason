@@ -95,8 +95,8 @@ Acceptance criteria:
 All tools from upstream servers are exposed with the naming convention `<appname>_<toolname>`, where `<appname>` is the app's short name (npm scope and type prefix stripped). The original tool description is preserved. The tool's input schema is passed through unchanged.
 
 Acceptance criteria:
-- Given app `@clawforge/app-github` exposes tool `create_pr`, when a runtime calls `tools/list`, then the tool appears as `github_create_pr`.
-- Given app `@clawforge/app-slack` exposes tool `send_message`, when a runtime calls `tools/list`, then the tool appears as `slack_send_message`.
+- Given app `@clawmasons/app-github` exposes tool `create_pr`, when a runtime calls `tools/list`, then the tool appears as `github_create_pr`.
+- Given app `@clawmasons/app-slack` exposes tool `send_message`, when a runtime calls `tools/list`, then the tool appears as `slack_send_message`.
 - Given a runtime calls `tools/call` with name `github_create_pr`, then the proxy strips the prefix and forwards `create_pr` to the github upstream server.
 
 **REQ-004: Role-Based Tool Filtering**

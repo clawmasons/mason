@@ -22,7 +22,7 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
   const packages = new Map<string, DiscoveredPackage>();
 
   // Apps
-  packages.set("@clawforge/app-github", makePkg("@clawforge/app-github", "1.2.0", {
+  packages.set("@clawmasons/app-github", makePkg("@clawmasons/app-github", "1.2.0", {
     type: "app",
     transport: "stdio",
     command: "npx",
@@ -32,7 +32,7 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
     capabilities: ["resources", "tools"],
   }));
 
-  packages.set("@clawforge/app-slack", makePkg("@clawforge/app-slack", "1.0.0", {
+  packages.set("@clawmasons/app-slack", makePkg("@clawmasons/app-slack", "1.0.0", {
     type: "app",
     transport: "stdio",
     command: "npx",
@@ -43,55 +43,55 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
   }));
 
   // Skills
-  packages.set("@clawforge/skill-labeling", makePkg("@clawforge/skill-labeling", "1.0.0", {
+  packages.set("@clawmasons/skill-labeling", makePkg("@clawmasons/skill-labeling", "1.0.0", {
     type: "skill",
     artifacts: ["./SKILL.md", "./examples/", "./schemas/"],
     description: "Issue labeling taxonomy and heuristics",
   }));
 
   // Tasks
-  packages.set("@clawforge/task-triage-issue", makePkg("@clawforge/task-triage-issue", "0.3.1", {
+  packages.set("@clawmasons/task-triage-issue", makePkg("@clawmasons/task-triage-issue", "0.3.1", {
     type: "task",
     taskType: "subagent",
     prompt: "./prompts/triage.md",
     requires: {
-      apps: ["@clawforge/app-github"],
-      skills: ["@clawforge/skill-labeling"],
+      apps: ["@clawmasons/app-github"],
+      skills: ["@clawmasons/skill-labeling"],
     },
     timeout: "5m",
     approval: "auto",
   }));
 
-  packages.set("@clawforge/task-assign-issue", makePkg("@clawforge/task-assign-issue", "1.0.0", {
+  packages.set("@clawmasons/task-assign-issue", makePkg("@clawmasons/task-assign-issue", "1.0.0", {
     type: "task",
     taskType: "subagent",
     prompt: "./prompts/assign.md",
     requires: {
-      apps: ["@clawforge/app-github"],
+      apps: ["@clawmasons/app-github"],
     },
   }));
 
-  packages.set("@clawforge/task-review-pr", makePkg("@clawforge/task-review-pr", "1.0.0", {
+  packages.set("@clawmasons/task-review-pr", makePkg("@clawmasons/task-review-pr", "1.0.0", {
     type: "task",
     taskType: "subagent",
     prompt: "./prompts/review.md",
     requires: {
-      apps: ["@clawforge/app-github"],
+      apps: ["@clawmasons/app-github"],
     },
   }));
 
   // Roles
-  packages.set("@clawforge/role-issue-manager", makePkg("@clawforge/role-issue-manager", "2.0.0", {
+  packages.set("@clawmasons/role-issue-manager", makePkg("@clawmasons/role-issue-manager", "2.0.0", {
     type: "role",
     description: "Manages GitHub issues: triage, label, assign.",
-    tasks: ["@clawforge/task-triage-issue", "@clawforge/task-assign-issue"],
-    skills: ["@clawforge/skill-labeling"],
+    tasks: ["@clawmasons/task-triage-issue", "@clawmasons/task-assign-issue"],
+    skills: ["@clawmasons/skill-labeling"],
     permissions: {
-      "@clawforge/app-github": {
+      "@clawmasons/app-github": {
         allow: ["create_issue", "list_repos", "add_label"],
         deny: ["delete_repo", "transfer_repo"],
       },
-      "@clawforge/app-slack": {
+      "@clawmasons/app-slack": {
         allow: ["send_message"],
         deny: ["*"],
       },
@@ -102,12 +102,12 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
     },
   }));
 
-  packages.set("@clawforge/role-pr-reviewer", makePkg("@clawforge/role-pr-reviewer", "1.0.0", {
+  packages.set("@clawmasons/role-pr-reviewer", makePkg("@clawmasons/role-pr-reviewer", "1.0.0", {
     type: "role",
     description: "Reviews pull requests and provides feedback.",
-    tasks: ["@clawforge/task-review-pr"],
+    tasks: ["@clawmasons/task-review-pr"],
     permissions: {
-      "@clawforge/app-github": {
+      "@clawmasons/app-github": {
         allow: ["list_repos", "get_pr", "create_review"],
         deny: ["delete_repo", "transfer_repo"],
       },
@@ -115,12 +115,12 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
   }));
 
   // Agent
-  packages.set("@clawforge/agent-repo-ops", makePkg("@clawforge/agent-repo-ops", "1.0.0", {
+  packages.set("@clawmasons/agent-repo-ops", makePkg("@clawmasons/agent-repo-ops", "1.0.0", {
     type: "agent",
     description: "Repository operations agent for GitHub.",
     runtimes: ["claude-code", "codex"],
-    roles: ["@clawforge/role-issue-manager", "@clawforge/role-pr-reviewer"],
-    resources: [{ type: "github-repo", ref: "clawforge/openclaw", access: "read-write" }],
+    roles: ["@clawmasons/role-issue-manager", "@clawmasons/role-pr-reviewer"],
+    resources: [{ type: "github-repo", ref: "clawmasons/openclaw", access: "read-write" }],
     proxy: { port: 9090, type: "sse" },
   }));
 
@@ -131,9 +131,9 @@ describe("resolveAgent", () => {
   describe("PRD repo-ops agent example", () => {
     it("resolves the full agent with 2 roles", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveAgent("@clawforge/agent-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      expect(resolved.name).toBe("@clawforge/agent-repo-ops");
+      expect(resolved.name).toBe("@clawmasons/agent-repo-ops");
       expect(resolved.version).toBe("1.0.0");
       expect(resolved.description).toBe("Repository operations agent for GitHub.");
       expect(resolved.runtimes).toEqual(["claude-code", "codex"]);
@@ -142,23 +142,23 @@ describe("resolveAgent", () => {
 
     it("resolves issue-manager role with tasks, apps, skills", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveAgent("@clawforge/agent-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      const issueManager = resolved.roles.find(r => r.name === "@clawforge/role-issue-manager");
+      const issueManager = resolved.roles.find(r => r.name === "@clawmasons/role-issue-manager");
       expect(issueManager).toBeDefined();
       expect(issueManager?.description).toBe("Manages GitHub issues: triage, label, assign.");
       expect(issueManager?.tasks).toHaveLength(2);
       expect(issueManager?.skills).toHaveLength(1);
       expect(issueManager?.apps).toHaveLength(2); // github + slack from permissions
-      expect(issueManager?.permissions).toHaveProperty("@clawforge/app-github");
+      expect(issueManager?.permissions).toHaveProperty("@clawmasons/app-github");
       expect(issueManager?.constraints?.maxConcurrentTasks).toBe(3);
     });
 
     it("resolves pr-reviewer role", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveAgent("@clawforge/agent-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      const prReviewer = resolved.roles.find(r => r.name === "@clawforge/role-pr-reviewer");
+      const prReviewer = resolved.roles.find(r => r.name === "@clawmasons/role-pr-reviewer");
       expect(prReviewer).toBeDefined();
       expect(prReviewer?.tasks).toHaveLength(1);
       expect(prReviewer?.apps).toHaveLength(1); // github from permissions
@@ -167,11 +167,11 @@ describe("resolveAgent", () => {
 
     it("resolves task with required apps and skills", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveAgent("@clawforge/agent-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      const issueManager = resolved.roles.find(r => r.name === "@clawforge/role-issue-manager");
+      const issueManager = resolved.roles.find(r => r.name === "@clawmasons/role-issue-manager");
       expect(issueManager).toBeDefined();
-      const triageTask = issueManager?.tasks.find(t => t.name === "@clawforge/task-triage-issue");
+      const triageTask = issueManager?.tasks.find(t => t.name === "@clawmasons/task-triage-issue");
       expect(triageTask).toBeDefined();
 
       expect(triageTask?.taskType).toBe("subagent");
@@ -179,18 +179,18 @@ describe("resolveAgent", () => {
       expect(triageTask?.timeout).toBe("5m");
       expect(triageTask?.approval).toBe("auto");
       expect(triageTask?.apps).toHaveLength(1);
-      expect(triageTask?.apps[0].name).toBe("@clawforge/app-github");
+      expect(triageTask?.apps[0].name).toBe("@clawmasons/app-github");
       expect(triageTask?.skills).toHaveLength(1);
-      expect(triageTask?.skills[0].name).toBe("@clawforge/skill-labeling");
+      expect(triageTask?.skills[0].name).toBe("@clawmasons/skill-labeling");
     });
 
     it("resolves app with full details", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveAgent("@clawforge/agent-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      const issueManager = resolved.roles.find(r => r.name === "@clawforge/role-issue-manager");
+      const issueManager = resolved.roles.find(r => r.name === "@clawmasons/role-issue-manager");
       expect(issueManager).toBeDefined();
-      const github = issueManager?.apps.find(a => a.name === "@clawforge/app-github");
+      const github = issueManager?.apps.find(a => a.name === "@clawmasons/app-github");
       expect(github).toBeDefined();
 
       expect(github?.transport).toBe("stdio");
@@ -202,26 +202,26 @@ describe("resolveAgent", () => {
 
     it("resolves skill with full details", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveAgent("@clawforge/agent-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      const issueManager = resolved.roles.find(r => r.name === "@clawforge/role-issue-manager");
+      const issueManager = resolved.roles.find(r => r.name === "@clawmasons/role-issue-manager");
       expect(issueManager).toBeDefined();
       const skill = issueManager?.skills[0];
       expect(skill).toBeDefined();
 
-      expect(skill?.name).toBe("@clawforge/skill-labeling");
+      expect(skill?.name).toBe("@clawmasons/skill-labeling");
       expect(skill?.artifacts).toEqual(["./SKILL.md", "./examples/", "./schemas/"]);
       expect(skill?.description).toBe("Issue labeling taxonomy and heuristics");
     });
 
     it("includes resources and proxy config", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveAgent("@clawforge/agent-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
       expect(resolved.resources).toHaveLength(1);
       expect(resolved.resources?.[0]).toEqual({
         type: "github-repo",
-        ref: "clawforge/openclaw",
+        ref: "clawmasons/openclaw",
         access: "read-write",
       });
       expect(resolved.proxy).toEqual({
@@ -232,11 +232,11 @@ describe("resolveAgent", () => {
 
     it("produces serializable output", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveAgent("@clawforge/agent-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
       const json = JSON.stringify(resolved);
       const parsed = JSON.parse(json);
-      expect(parsed.name).toBe("@clawforge/agent-repo-ops");
+      expect(parsed.name).toBe("@clawmasons/agent-repo-ops");
       expect(parsed.roles).toHaveLength(2);
     });
   });
@@ -244,14 +244,14 @@ describe("resolveAgent", () => {
   describe("diamond dependencies", () => {
     it("same app referenced by multiple roles resolves correctly", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveAgent("@clawforge/agent-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      // Both roles reference @clawforge/app-github
-      const issueManager = resolved.roles.find(r => r.name === "@clawforge/role-issue-manager");
-      const prReviewer = resolved.roles.find(r => r.name === "@clawforge/role-pr-reviewer");
+      // Both roles reference @clawmasons/app-github
+      const issueManager = resolved.roles.find(r => r.name === "@clawmasons/role-issue-manager");
+      const prReviewer = resolved.roles.find(r => r.name === "@clawmasons/role-pr-reviewer");
 
-      const imGithub = issueManager?.apps.find(a => a.name === "@clawforge/app-github");
-      const prGithub = prReviewer?.apps.find(a => a.name === "@clawforge/app-github");
+      const imGithub = issueManager?.apps.find(a => a.name === "@clawmasons/app-github");
+      const prGithub = prReviewer?.apps.find(a => a.name === "@clawmasons/app-github");
 
       expect(imGithub).toBeDefined();
       expect(prGithub).toBeDefined();
@@ -263,20 +263,20 @@ describe("resolveAgent", () => {
     it("throws PackageNotFoundError when agent is not found", () => {
       const packages = new Map<string, DiscoveredPackage>();
 
-      expect(() => resolveAgent("@clawforge/nonexistent", packages))
+      expect(() => resolveAgent("@clawmasons/nonexistent", packages))
         .toThrow(PackageNotFoundError);
-      expect(() => resolveAgent("@clawforge/nonexistent", packages))
-        .toThrow('Package "@clawforge/nonexistent" not found');
+      expect(() => resolveAgent("@clawmasons/nonexistent", packages))
+        .toThrow('Package "@clawmasons/nonexistent" not found');
     });
 
     it("throws TypeMismatchError when agent references non-role package", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@clawforge/agent-bad", makePkg("@clawforge/agent-bad", "1.0.0", {
+      packages.set("@clawmasons/agent-bad", makePkg("@clawmasons/agent-bad", "1.0.0", {
         type: "agent",
         runtimes: ["claude-code"],
-        roles: ["@clawforge/app-github"],
+        roles: ["@clawmasons/app-github"],
       }));
-      packages.set("@clawforge/app-github", makePkg("@clawforge/app-github", "1.0.0", {
+      packages.set("@clawmasons/app-github", makePkg("@clawmasons/app-github", "1.0.0", {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -285,9 +285,9 @@ describe("resolveAgent", () => {
         capabilities: ["tools"],
       }));
 
-      expect(() => resolveAgent("@clawforge/agent-bad", packages))
+      expect(() => resolveAgent("@clawmasons/agent-bad", packages))
         .toThrow(TypeMismatchError);
-      expect(() => resolveAgent("@clawforge/agent-bad", packages))
+      expect(() => resolveAgent("@clawmasons/agent-bad", packages))
         .toThrow('type "app" but expected "role"');
     });
 

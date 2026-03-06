@@ -11,12 +11,12 @@ The proxy SHALL forward MCP resource and prompt operations from upstream servers
 The `ResourceRouter` SHALL prefix all resource `name` fields using `<appShortName>_<originalName>`.
 
 #### Scenario: Resource from single app
-- **WHEN** app `@clawforge/app-github` exposes resource with name `repository`
+- **WHEN** app `@clawmasons/app-github` exposes resource with name `repository`
 - **THEN** `listResources()` returns resource with name `github_repository`
 - **AND** the original `uri`, `description`, and `mimeType` are preserved
 
 #### Scenario: Resources from multiple apps
-- **WHEN** app `@clawforge/app-github` exposes `repository` and app `@clawforge/app-slack` exposes `channel`
+- **WHEN** app `@clawmasons/app-github` exposes `repository` and app `@clawmasons/app-slack` exposes `channel`
 - **THEN** `listResources()` returns `github_repository` and `slack_channel`
 
 #### Scenario: No resources from any app
@@ -29,8 +29,8 @@ The `ResourceRouter` SHALL map resource URIs back to the originating app for `re
 
 #### Scenario: Known URI
 - **WHEN** `resolveUri("repo://owner/name")` is called
-- **AND** app `@clawforge/app-github` exposed a resource with that URI
-- **THEN** it returns `{ appName: "@clawforge/app-github", originalUri: "repo://owner/name" }`
+- **AND** app `@clawmasons/app-github` exposed a resource with that URI
+- **THEN** it returns `{ appName: "@clawmasons/app-github", originalUri: "repo://owner/name" }`
 
 #### Scenario: Unknown URI
 - **WHEN** `resolveUri("unknown://foo")` is called
@@ -46,19 +46,19 @@ The `ResourceRouter` SHALL map resource URIs back to the originating app for `re
 The `PromptRouter` SHALL prefix all prompt `name` fields using `<appShortName>_<originalName>`.
 
 #### Scenario: Prompt from single app
-- **WHEN** app `@clawforge/app-github` exposes prompt with name `pr_review`
+- **WHEN** app `@clawmasons/app-github` exposes prompt with name `pr_review`
 - **THEN** `listPrompts()` returns prompt with name `github_pr_review`
 - **AND** the original `description` and `arguments` are preserved
 
 #### Scenario: Prompts from multiple apps
-- **WHEN** app `@clawforge/app-github` exposes `pr_review` and app `@clawforge/app-slack` exposes `standup`
+- **WHEN** app `@clawmasons/app-github` exposes `pr_review` and app `@clawmasons/app-slack` exposes `standup`
 - **THEN** `listPrompts()` returns `github_pr_review` and `slack_standup`
 
 ### Requirement: PromptRouter resolves prefixed name to upstream app
 
 #### Scenario: Known prefixed name
 - **WHEN** `resolve("github_pr_review")` is called
-- **THEN** it returns a `PromptRouteEntry` with `appName: "@clawforge/app-github"` and `originalName: "pr_review"`
+- **THEN** it returns a `PromptRouteEntry` with `appName: "@clawmasons/app-github"` and `originalName: "pr_review"`
 
 #### Scenario: Unknown prefixed name
 - **WHEN** `resolve("unknown_prompt")` is called
@@ -79,8 +79,8 @@ The `PromptRouter` SHALL prefix all prompt `name` fields using `<appShortName>_<
 
 #### Scenario: Valid resource URI
 - **WHEN** a runtime calls `resources/read` with URI `repo://owner/name`
-- **AND** the URI maps to app `@clawforge/app-github`
-- **THEN** the proxy calls `upstream.readResource("@clawforge/app-github", "repo://owner/name")`
+- **AND** the URI maps to app `@clawmasons/app-github`
+- **THEN** the proxy calls `upstream.readResource("@clawmasons/app-github", "repo://owner/name")`
 - **AND** returns the result to the runtime
 
 #### Scenario: Unknown resource URI
@@ -98,8 +98,8 @@ The `PromptRouter` SHALL prefix all prompt `name` fields using `<appShortName>_<
 
 #### Scenario: Valid prompt name
 - **WHEN** a runtime calls `prompts/get` with name `github_pr_review` and arguments `{ "pr_number": "42" }`
-- **AND** the name maps to app `@clawforge/app-github` with original name `pr_review`
-- **THEN** the proxy calls `upstream.getPrompt("@clawforge/app-github", "pr_review", { "pr_number": "42" })`
+- **AND** the name maps to app `@clawmasons/app-github` with original name `pr_review`
+- **THEN** the proxy calls `upstream.getPrompt("@clawmasons/app-github", "pr_review", { "pr_number": "42" })`
 - **AND** returns the result to the runtime
 
 #### Scenario: Unknown prompt name

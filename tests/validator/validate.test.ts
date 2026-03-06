@@ -6,7 +6,7 @@ import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedT
 
 function makeApp(overrides: Partial<ResolvedApp> = {}): ResolvedApp {
   return {
-    name: "@clawforge/app-github",
+    name: "@clawmasons/app-github",
     version: "1.0.0",
     transport: "stdio",
     command: "npx",
@@ -19,7 +19,7 @@ function makeApp(overrides: Partial<ResolvedApp> = {}): ResolvedApp {
 
 function makeSkill(overrides: Partial<ResolvedSkill> = {}): ResolvedSkill {
   return {
-    name: "@clawforge/skill-labeling",
+    name: "@clawmasons/skill-labeling",
     version: "1.0.0",
     artifacts: ["./SKILL.md"],
     description: "Issue labeling taxonomy",
@@ -29,12 +29,12 @@ function makeSkill(overrides: Partial<ResolvedSkill> = {}): ResolvedSkill {
 
 function makeTask(overrides: Partial<ResolvedTask> = {}): ResolvedTask {
   return {
-    name: "@clawforge/task-triage-issue",
+    name: "@clawmasons/task-triage-issue",
     version: "1.0.0",
     taskType: "subagent",
     prompt: "./prompts/triage.md",
-    requiredApps: ["@clawforge/app-github"],
-    requiredSkills: ["@clawforge/skill-labeling"],
+    requiredApps: ["@clawmasons/app-github"],
+    requiredSkills: ["@clawmasons/skill-labeling"],
     apps: [makeApp()],
     skills: [makeSkill()],
     subTasks: [],
@@ -44,11 +44,11 @@ function makeTask(overrides: Partial<ResolvedTask> = {}): ResolvedTask {
 
 function makeRole(overrides: Partial<ResolvedRole> = {}): ResolvedRole {
   return {
-    name: "@clawforge/role-issue-manager",
+    name: "@clawmasons/role-issue-manager",
     version: "1.0.0",
     description: "Manages GitHub issues",
     permissions: {
-      "@clawforge/app-github": {
+      "@clawmasons/app-github": {
         allow: ["create_issue", "list_repos", "add_label"],
         deny: ["delete_repo", "transfer_repo"],
       },
@@ -62,7 +62,7 @@ function makeRole(overrides: Partial<ResolvedRole> = {}): ResolvedRole {
 
 function makeAgent(overrides: Partial<ResolvedAgent> = {}): ResolvedAgent {
   return {
-    name: "@clawforge/agent-repo-ops",
+    name: "@clawmasons/agent-repo-ops",
     version: "1.0.0",
     description: "Repository operations agent",
     runtimes: ["claude-code"],
@@ -83,12 +83,12 @@ describe("validateAgent", () => {
 
     it("validates PRD repo-ops agent example", () => {
       const githubApp = makeApp({
-        name: "@clawforge/app-github",
+        name: "@clawmasons/app-github",
         tools: ["create_issue", "list_repos", "create_pr", "get_pr", "create_review", "add_label", "delete_repo", "transfer_repo"],
       });
 
       const slackApp = makeApp({
-        name: "@clawforge/app-slack",
+        name: "@clawmasons/app-slack",
         transport: "stdio",
         command: "npx",
         args: ["-y", "@modelcontextprotocol/server-slack"],
@@ -99,22 +99,22 @@ describe("validateAgent", () => {
       const skill = makeSkill();
 
       const issueManagerRole = makeRole({
-        name: "@clawforge/role-issue-manager",
+        name: "@clawmasons/role-issue-manager",
         permissions: {
-          "@clawforge/app-github": {
+          "@clawmasons/app-github": {
             allow: ["create_issue", "list_repos", "add_label"],
             deny: ["delete_repo", "transfer_repo"],
           },
-          "@clawforge/app-slack": {
+          "@clawmasons/app-slack": {
             allow: ["send_message"],
             deny: ["*"],
           },
         },
         tasks: [
           makeTask({
-            name: "@clawforge/task-triage-issue",
-            requiredApps: ["@clawforge/app-github"],
-            requiredSkills: ["@clawforge/skill-labeling"],
+            name: "@clawmasons/task-triage-issue",
+            requiredApps: ["@clawmasons/app-github"],
+            requiredSkills: ["@clawmasons/skill-labeling"],
             apps: [githubApp],
             skills: [skill],
           }),
@@ -124,9 +124,9 @@ describe("validateAgent", () => {
       });
 
       const prReviewerRole = makeRole({
-        name: "@clawforge/role-pr-reviewer",
+        name: "@clawmasons/role-pr-reviewer",
         permissions: {
-          "@clawforge/app-github": {
+          "@clawmasons/app-github": {
             allow: ["list_repos", "get_pr", "create_review"],
             deny: [],
           },
@@ -157,7 +157,7 @@ describe("validateAgent", () => {
   describe("requirement coverage", () => {
     it("fails when task requires app not in role permissions", () => {
       const slackApp = makeApp({
-        name: "@clawforge/app-slack",
+        name: "@clawmasons/app-slack",
         tools: ["send_message"],
       });
 
@@ -174,19 +174,19 @@ describe("validateAgent", () => {
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].category).toBe("requirement-coverage");
-      expect(result.errors[0].context.app).toBe("@clawforge/app-slack");
-      expect(result.errors[0].context.task).toBe("@clawforge/task-triage-issue");
-      expect(result.errors[0].context.role).toBe("@clawforge/role-issue-manager");
+      expect(result.errors[0].context.app).toBe("@clawmasons/app-slack");
+      expect(result.errors[0].context.task).toBe("@clawmasons/task-triage-issue");
+      expect(result.errors[0].context.role).toBe("@clawmasons/role-issue-manager");
     });
 
     it("checks sub-task requirement coverage recursively", () => {
       const slackApp = makeApp({
-        name: "@clawforge/app-slack",
+        name: "@clawmasons/app-slack",
         tools: ["send_message"],
       });
 
       const subTask = makeTask({
-        name: "@clawforge/task-notify",
+        name: "@clawmasons/task-notify",
         apps: [slackApp],
         skills: [],
         requiredSkills: [],
@@ -194,7 +194,7 @@ describe("validateAgent", () => {
       });
 
       const compositeTask = makeTask({
-        name: "@clawforge/task-triage-and-notify",
+        name: "@clawmasons/task-triage-and-notify",
         taskType: "composite",
         apps: [],
         skills: [],
@@ -212,8 +212,8 @@ describe("validateAgent", () => {
       expect(result.valid).toBe(false);
       const coverageErrors = result.errors.filter((e) => e.category === "requirement-coverage");
       expect(coverageErrors).toHaveLength(1);
-      expect(coverageErrors[0].context.app).toBe("@clawforge/app-slack");
-      expect(coverageErrors[0].context.task).toBe("@clawforge/task-notify");
+      expect(coverageErrors[0].context.app).toBe("@clawmasons/app-slack");
+      expect(coverageErrors[0].context.task).toBe("@clawmasons/task-notify");
     });
 
     it("passes when task requires app covered by role permissions", () => {
@@ -227,7 +227,7 @@ describe("validateAgent", () => {
     it("fails when role allows a tool not exposed by app", () => {
       const role = makeRole({
         permissions: {
-          "@clawforge/app-github": {
+          "@clawmasons/app-github": {
             allow: ["create_issue", "nonexistent_tool"],
             deny: [],
           },
@@ -239,14 +239,14 @@ describe("validateAgent", () => {
       const toolErrors = result.errors.filter((e) => e.category === "tool-existence");
       expect(toolErrors).toHaveLength(1);
       expect(toolErrors[0].context.tool).toBe("nonexistent_tool");
-      expect(toolErrors[0].context.app).toBe("@clawforge/app-github");
-      expect(toolErrors[0].context.role).toBe("@clawforge/role-issue-manager");
+      expect(toolErrors[0].context.app).toBe("@clawmasons/app-github");
+      expect(toolErrors[0].context.role).toBe("@clawmasons/role-issue-manager");
     });
 
     it("reports multiple missing tools", () => {
       const role = makeRole({
         permissions: {
-          "@clawforge/app-github": {
+          "@clawmasons/app-github": {
             allow: ["fake_tool_1", "fake_tool_2", "create_issue"],
             deny: [],
           },
@@ -276,7 +276,7 @@ describe("validateAgent", () => {
     it("passes when task skill is available via parent role", () => {
       const skill = makeSkill();
       const task = makeTask({
-        requiredSkills: ["@clawforge/skill-labeling"],
+        requiredSkills: ["@clawmasons/skill-labeling"],
         skills: [], // NOT in task's resolved skills
       });
       const role = makeRole({
@@ -291,7 +291,7 @@ describe("validateAgent", () => {
 
     it("fails when required skill is not available in task or role", () => {
       const task = makeTask({
-        requiredSkills: ["@clawforge/skill-missing"],
+        requiredSkills: ["@clawmasons/skill-missing"],
         skills: [], // not resolved in task
       });
       const role = makeRole({
@@ -303,9 +303,9 @@ describe("validateAgent", () => {
       expect(result.valid).toBe(false);
       const skillErrors = result.errors.filter((e) => e.category === "skill-availability");
       expect(skillErrors).toHaveLength(1);
-      expect(skillErrors[0].context.skill).toBe("@clawforge/skill-missing");
-      expect(skillErrors[0].context.task).toBe("@clawforge/task-triage-issue");
-      expect(skillErrors[0].context.role).toBe("@clawforge/role-issue-manager");
+      expect(skillErrors[0].context.skill).toBe("@clawmasons/skill-missing");
+      expect(skillErrors[0].context.task).toBe("@clawmasons/task-triage-issue");
+      expect(skillErrors[0].context.role).toBe("@clawmasons/role-issue-manager");
     });
 
     it("passes when task has no required skills", () => {
@@ -327,7 +327,7 @@ describe("validateAgent", () => {
   describe("app launch config", () => {
     it("fails when stdio app is missing command", () => {
       const badApp = makeApp({
-        name: "@clawforge/app-broken",
+        name: "@clawmasons/app-broken",
         transport: "stdio",
         command: undefined,
         args: ["-y", "some-package"],
@@ -335,7 +335,7 @@ describe("validateAgent", () => {
 
       const role = makeRole({
         permissions: {
-          "@clawforge/app-broken": { allow: ["create_issue"], deny: [] },
+          "@clawmasons/app-broken": { allow: ["create_issue"], deny: [] },
         },
         apps: [badApp],
         tasks: [makeTask({ apps: [badApp] })],
@@ -349,7 +349,7 @@ describe("validateAgent", () => {
 
     it("fails when stdio app is missing args", () => {
       const badApp = makeApp({
-        name: "@clawforge/app-broken",
+        name: "@clawmasons/app-broken",
         transport: "stdio",
         command: "npx",
         args: undefined,
@@ -357,7 +357,7 @@ describe("validateAgent", () => {
 
       const role = makeRole({
         permissions: {
-          "@clawforge/app-broken": { allow: ["create_issue"], deny: [] },
+          "@clawmasons/app-broken": { allow: ["create_issue"], deny: [] },
         },
         apps: [badApp],
         tasks: [makeTask({ apps: [badApp] })],
@@ -371,7 +371,7 @@ describe("validateAgent", () => {
 
     it("fails when SSE app is missing url", () => {
       const badApp = makeApp({
-        name: "@clawforge/app-remote",
+        name: "@clawmasons/app-remote",
         transport: "sse",
         command: undefined,
         args: undefined,
@@ -380,7 +380,7 @@ describe("validateAgent", () => {
 
       const role = makeRole({
         permissions: {
-          "@clawforge/app-remote": { allow: ["search"], deny: [] },
+          "@clawmasons/app-remote": { allow: ["search"], deny: [] },
         },
         apps: [badApp],
         tasks: [makeTask({ apps: [badApp] })],
@@ -400,7 +400,7 @@ describe("validateAgent", () => {
 
     it("passes for valid SSE app", () => {
       const sseApp = makeApp({
-        name: "@clawforge/app-amap",
+        name: "@clawmasons/app-amap",
         transport: "sse",
         command: undefined,
         args: undefined,
@@ -410,7 +410,7 @@ describe("validateAgent", () => {
 
       const role = makeRole({
         permissions: {
-          "@clawforge/app-amap": { allow: ["get_directions"], deny: [] },
+          "@clawmasons/app-amap": { allow: ["get_directions"], deny: [] },
         },
         apps: [sseApp],
         tasks: [],
@@ -426,7 +426,7 @@ describe("validateAgent", () => {
   describe("collect all errors", () => {
     it("collects errors from multiple categories", () => {
       const badApp = makeApp({
-        name: "@clawforge/app-broken",
+        name: "@clawmasons/app-broken",
         transport: "stdio",
         command: undefined, // launch config error
         args: undefined,    // launch config error
@@ -434,17 +434,17 @@ describe("validateAgent", () => {
       });
 
       const slackApp = makeApp({
-        name: "@clawforge/app-slack",
+        name: "@clawmasons/app-slack",
         tools: ["send_message"],
       });
 
       const role = makeRole({
         permissions: {
-          "@clawforge/app-github": {
+          "@clawmasons/app-github": {
             allow: ["create_issue", "phantom_tool"], // tool existence error
             deny: [],
           },
-          "@clawforge/app-broken": {
+          "@clawmasons/app-broken": {
             allow: ["real_tool"],
             deny: [],
           },

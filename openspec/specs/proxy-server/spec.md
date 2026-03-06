@@ -63,8 +63,8 @@ For denied calls (resolve returns null): if `db` is configured, call `auditPreHo
 
 #### Scenario: Successful tool call
 - **WHEN** a runtime calls `tools/call` with name `github_create_pr` and arguments `{ title: "Fix bug" }`
-- **AND** `router.resolve("github_create_pr")` returns `{ appName: "@clawforge/app-github", originalToolName: "create_pr", ... }`
-- **THEN** the proxy calls `upstream.callTool("@clawforge/app-github", "create_pr", { title: "Fix bug" })`
+- **AND** `router.resolve("github_create_pr")` returns `{ appName: "@clawmasons/app-github", originalToolName: "create_pr", ... }`
+- **THEN** the proxy calls `upstream.callTool("@clawmasons/app-github", "create_pr", { title: "Fix bug" })`
 - **AND** returns the upstream result to the runtime
 
 #### Scenario: Successful tool call with audit logging

@@ -5,7 +5,7 @@
 
 ## 2. Add tests for node_modules workspace dir scanning
 
-- [x] 2.1 Add test: `discoverPackages()` finds sub-components inside a node_modules package that has workspace dirs (e.g., `node_modules/@clawforge/forge-core/apps/filesystem/package.json`)
+- [x] 2.1 Add test: `discoverPackages()` finds sub-components inside a node_modules package that has workspace dirs (e.g., `node_modules/@clawmasons/forge-core/apps/filesystem/package.json`)
 - [x] 2.2 Add test: workspace-local packages take precedence over sub-components found in node_modules workspace dirs
 - [x] 2.3 Add test: node_modules packages without workspace dirs are unaffected (existing behavior preserved)
 - [x] 2.4 Add test: a package with both a direct forge field AND workspace dirs has both registered

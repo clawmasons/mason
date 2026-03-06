@@ -20,14 +20,14 @@ The system SHALL generate an `mcpProxy` section containing: `baseURL` (from agen
 For each app using stdio transport, the system SHALL generate an `mcpServers` entry with the app's short name as key, containing `command`, `args`, `env` (with `${VAR}` interpolation preserved), and `options` with `logEnabled: true` and the computed `toolFilter`.
 
 #### Scenario: Stdio app entry
-- **WHEN** app `@clawforge/app-github` has `transport: "stdio"`, `command: "npx"`, `args: ["-y", "@modelcontextprotocol/server-github"]`, `env: { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }`
+- **WHEN** app `@clawmasons/app-github` has `transport: "stdio"`, `command: "npx"`, `args: ["-y", "@modelcontextprotocol/server-github"]`, `env: { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }`
 - **THEN** the generated mcpServers entry for `github` contains `command: "npx"`, `args: ["-y", "@modelcontextprotocol/server-github"]`, `env: { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }`, and the computed `toolFilter`
 
 ### Requirement: Generate mcpServers entries for remote apps
 For each app using sse or streamable-http transport, the system SHALL generate an `mcpServers` entry with the app's short name as key, containing `url` and `options` with `logEnabled: true` and the computed `toolFilter`.
 
 #### Scenario: Remote SSE app entry
-- **WHEN** app `@clawforge/app-amap` has `transport: "sse"` and `url: "https://mcp.amap.com/sse?key=${AMAP_KEY}"`
+- **WHEN** app `@clawmasons/app-amap` has `transport: "sse"` and `url: "https://mcp.amap.com/sse?key=${AMAP_KEY}"`
 - **THEN** the generated mcpServers entry for `amap` contains `url: "https://mcp.amap.com/sse?key=${AMAP_KEY}"` and the computed `toolFilter`
 
 ### Requirement: Generate proxy authentication token
@@ -49,7 +49,7 @@ The generated config SHALL preserve `${VAR}` syntax in all `env` values and auth
 - **THEN** the generated mcpServers entry contains the literal string `"${GITHUB_TOKEN}"` — not a resolved value
 
 ### Requirement: PRD repo-ops example compliance
-The system SHALL produce output matching the structure in PRD §6.3 when given the PRD's `@clawforge/agent-repo-ops` example agent with `role-issue-manager` and `role-pr-reviewer`.
+The system SHALL produce output matching the structure in PRD §6.3 when given the PRD's `@clawmasons/agent-repo-ops` example agent with `role-issue-manager` and `role-pr-reviewer`.
 
 #### Scenario: Full repo-ops config
 - **WHEN** `generateProxyConfig()` is called with the PRD repo-ops agent (issue-manager allows `[create_issue, list_repos, add_label]` on github and `[send_message]` on slack; pr-reviewer allows `[list_repos, get_pr, create_review]` on github)

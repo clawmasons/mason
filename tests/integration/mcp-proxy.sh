@@ -82,7 +82,7 @@ info "Running forge install from forge-core directory..."
 # Clean previous install
 rm -rf "$WORKSPACE_DIR/.forge"
 
-(cd "$WORKSPACE_DIR" && node ../bin/forge.js install @clawforge/agent-note-taker) || fail "forge install failed"
+(cd "$WORKSPACE_DIR" && node ../bin/forge.js install @clawmasons/agent-note-taker) || fail "forge install failed"
 
 AGENT_DIR="$WORKSPACE_DIR/.forge/agents/note-taker"
 
