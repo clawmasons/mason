@@ -1,4 +1,4 @@
-import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from "../resolver/types.js";
+import type { ResolvedMember, ResolvedRole, ResolvedTask, ResolvedSkill } from "../resolver/types.js";
 import { getAppShortName } from "../generator/toolfilter.js";
 import type { RuntimeMaterializer, MaterializationResult, ComposeServiceDef } from "./types.js";
 
@@ -168,8 +168,8 @@ function generateSlashCommand(
 /**
  * Generate AGENTS.md content.
  */
-function generateAgentsMd(agent: ResolvedAgent): string {
-  const agentShortName = getAppShortName(agent.name);
+function generateAgentsMd(member: ResolvedMember): string {
+  const agentShortName = getAppShortName(member.name);
   const lines: string[] = [];
 
   lines.push(`# Agent: ${agentShortName}`);
@@ -180,7 +180,7 @@ function generateAgentsMd(agent: ResolvedAgent): string {
   lines.push("");
   lines.push("## Roles");
 
-  for (const role of agent.roles) {
+  for (const role of member.roles) {
     const roleShortName = getAppShortName(role.name);
     lines.push("");
     lines.push(`### ${roleShortName}`);
@@ -245,12 +245,12 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
   name: "claude-code",
 
   materializeWorkspace(
-    agent: ResolvedAgent,
+    member: ResolvedMember,
     proxyEndpoint: string,
     proxyToken?: string,
   ): MaterializationResult {
     const result: MaterializationResult = new Map();
-    const proxyType = agent.proxy?.type ?? "sse";
+    const proxyType = member.proxy?.type ?? "sse";
 
     // .mcp.json — MCP server config at workspace root
     result.set(
@@ -265,7 +265,7 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     );
 
     // .claude/commands/{task-short-name}.md
-    const allTasks = collectAllTasks(agent.roles);
+    const allTasks = collectAllTasks(member.roles);
     for (const [task, owningRoles] of allTasks) {
       const taskShortName = getAppShortName(task.name);
       result.set(
@@ -275,10 +275,10 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     }
 
     // AGENTS.md
-    result.set("AGENTS.md", generateAgentsMd(agent));
+    result.set("AGENTS.md", generateAgentsMd(member));
 
     // skills/{skill-short-name}/README.md
-    const allSkills = collectAllSkills(agent.roles);
+    const allSkills = collectAllSkills(member.roles);
     for (const [, skill] of allSkills) {
       const skillShortName = getAppShortName(skill.name);
       result.set(
@@ -306,8 +306,8 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     ].join("\n");
   },
 
-  generateComposeService(agent: ResolvedAgent): ComposeServiceDef {
-    const roleNames = agent.roles
+  generateComposeService(member: ResolvedMember): ComposeServiceDef {
+    const roleNames = member.roles
       .map((r) => getAppShortName(r.name))
       .join(",");
 

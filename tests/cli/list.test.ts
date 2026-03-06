@@ -47,7 +47,7 @@ describe("runList", () => {
     fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify(pkg, null, 2));
   }
 
-  function setupValidAgent(): void {
+  function setupValidMember(): void {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
@@ -101,40 +101,48 @@ describe("runList", () => {
       },
     });
 
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
+    writePackage(path.join(tmpDir, "members", "ops"), {
+      name: "@test/member-ops",
       version: "1.0.0",
       chapter: {
-        type: "agent",
+        type: "member",
+        memberType: "agent",
+        name: "Ops",
+        slug: "ops",
+        email: "ops@chapter.local",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
     });
   }
 
-  it("prints tree for a single agent", async () => {
-    setupValidAgent();
+  it("prints tree for a single member", async () => {
+    setupValidMember();
     await runList(tmpDir, {});
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("@test/agent-ops@1.0.0");
+    expect(logOutput).toContain("@test/member-ops@1.0.0");
     expect(logOutput).toContain("role: manager@1.0.0");
     expect(logOutput).toContain("task: triage@1.0.0");
     expect(logOutput).toContain("app: github@1.0.0");
     expect(logOutput).toContain("skill: labeling@1.0.0");
   });
 
-  it("prints trees for multiple agents", async () => {
-    setupValidAgent();
+  it("prints trees for multiple members", async () => {
+    setupValidMember();
 
-    // Add a second agent
-    writePackage(path.join(tmpDir, "agents", "ops2"), {
-      name: "@test/agent-ops2",
+    // Add a second member
+    writePackage(path.join(tmpDir, "members", "ops2"), {
+      name: "@test/member-ops2",
       version: "2.0.0",
       chapter: {
-        type: "agent",
+        type: "member",
+        memberType: "agent",
+        name: "Ops2",
+        slug: "ops2",
+        email: "ops2@chapter.local",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
@@ -145,20 +153,20 @@ describe("runList", () => {
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("@test/agent-ops@1.0.0");
-    expect(logOutput).toContain("@test/agent-ops2@2.0.0");
+    expect(logOutput).toContain("@test/member-ops@1.0.0");
+    expect(logOutput).toContain("@test/member-ops2@2.0.0");
   });
 
-  it("exits 1 when no agents are found", async () => {
+  it("exits 1 when no members are found", async () => {
     await runList(tmpDir, {});
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("No agents found");
+    expect(errorOutput).toContain("No members found");
   });
 
   it("outputs JSON array with --json flag", async () => {
-    setupValidAgent();
+    setupValidMember();
     await runList(tmpDir, { json: true });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
@@ -167,7 +175,7 @@ describe("runList", () => {
     const parsed = JSON.parse(logOutput);
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed).toHaveLength(1);
-    expect(parsed[0].name).toBe("@test/agent-ops");
+    expect(parsed[0].name).toBe("@test/member-ops");
     expect(parsed[0].roles).toHaveLength(1);
   });
 });

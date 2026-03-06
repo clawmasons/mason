@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { discoverPackages } from "../../resolver/discover.js";
-import { resolveAgent } from "../../resolver/resolve.js";
-import { validateAgent } from "../../validator/validate.js";
+import { resolveMember } from "../../resolver/resolve.js";
+import { validateMember } from "../../validator/validate.js";
 import type { ValidationResult } from "../../validator/types.js";
 
 interface ValidateOptions {
@@ -31,36 +31,36 @@ function formatErrors(result: ValidationResult): string {
 export function registerValidateCommand(program: Command): void {
   program
     .command("validate")
-    .description("Validate an agent's dependency graph and permissions")
-    .argument("<agent>", "Agent package name to validate")
+    .description("Validate a member's dependency graph and permissions")
+    .argument("<member>", "Member package name to validate")
     .option("--json", "Output validation result as JSON")
-    .action(async (agentName: string, options: ValidateOptions) => {
-      await runValidate(process.cwd(), agentName, options);
+    .action(async (memberName: string, options: ValidateOptions) => {
+      await runValidate(process.cwd(), memberName, options);
     });
 }
 
 export async function runValidate(
   rootDir: string,
-  agentName: string,
+  memberName: string,
   options: ValidateOptions,
 ): Promise<void> {
   try {
     // Discover packages
     const packages = discoverPackages(rootDir);
 
-    // Resolve agent graph
-    const agent = resolveAgent(agentName, packages);
+    // Resolve member graph
+    const member = resolveMember(memberName, packages);
 
     // Validate
-    const result = validateAgent(agent);
+    const result = validateMember(member);
 
     if (options.json) {
       console.log(JSON.stringify(result, null, 2));
     } else if (result.valid) {
-      console.log(`\n✔ Agent "${agentName}" is valid.\n`);
+      console.log(`\n✔ Member "${memberName}" is valid.\n`);
     } else {
       console.error(
-        `\n✘ Agent "${agentName}" has ${result.errors.length} validation error(s):${formatErrors(result)}\n`,
+        `\n✘ Member "${memberName}" has ${result.errors.length} validation error(s):${formatErrors(result)}\n`,
       );
     }
 

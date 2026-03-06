@@ -1,4 +1,4 @@
-import type { ResolvedAgent, ResolvedApp } from "../resolver/types.js";
+import type { ResolvedMember, ResolvedApp } from "../resolver/types.js";
 
 /** Known runtime → auth variable mappings. */
 const RUNTIME_API_KEYS: Record<string, string> = {
@@ -8,9 +8,9 @@ const RUNTIME_API_KEYS: Record<string, string> = {
 /**
  * Collect all unique apps from a resolved agent's roles.
  */
-function collectAllApps(agent: ResolvedAgent): Map<string, ResolvedApp> {
+function collectAllApps(member: ResolvedMember): Map<string, ResolvedApp> {
   const apps = new Map<string, ResolvedApp>();
-  for (const role of agent.roles) {
+  for (const role of member.roles) {
     for (const app of role.apps) {
       if (!apps.has(app.name)) {
         apps.set(app.name, app);
@@ -24,9 +24,9 @@ function collectAllApps(agent: ResolvedAgent): Map<string, ResolvedApp> {
  * Extract ${VAR} interpolation variable names from app env values.
  * Returns deduplicated sorted list.
  */
-function collectAppEnvVars(agent: ResolvedAgent): string[] {
+function collectAppEnvVars(member: ResolvedMember): string[] {
   const varNames = new Set<string>();
-  const allApps = collectAllApps(agent);
+  const allApps = collectAllApps(member);
 
   for (const [, app] of allApps) {
     if (app.env) {
@@ -51,8 +51,8 @@ function collectAppEnvVars(agent: ResolvedAgent): string[] {
  * - App Credentials (from app env fields)
  * - Runtime API Keys (per declared runtime)
  */
-export function generateEnvTemplate(agent: ResolvedAgent): string {
-  const port = agent.proxy?.port ?? 9090;
+export function generateEnvTemplate(member: ResolvedMember): string {
+  const port = member.proxy?.port ?? 9090;
   const lines: string[] = [];
 
   // Proxy section
@@ -61,7 +61,7 @@ export function generateEnvTemplate(agent: ResolvedAgent): string {
   lines.push(`CHAPTER_PROXY_PORT=${port}`);
 
   // App credentials section
-  const appVars = collectAppEnvVars(agent);
+  const appVars = collectAppEnvVars(member);
   lines.push("");
   lines.push("# App Credentials");
   for (const varName of appVars) {
@@ -71,7 +71,7 @@ export function generateEnvTemplate(agent: ResolvedAgent): string {
   // Runtime auth section
   lines.push("");
   lines.push("# Runtime Auth");
-  for (const runtime of agent.runtimes) {
+  for (const runtime of member.runtimes) {
     const apiKey = RUNTIME_API_KEYS[runtime];
     if (apiKey) {
       lines.push(`${apiKey}=`);

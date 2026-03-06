@@ -215,7 +215,23 @@ Replace the `agent` package type with `member`. Add the discriminated union sche
 
 **Testable output:** Schema validation passes for `{ type: "member", memberType: "agent", name: "...", slug: "...", email: "...", runtimes: [...], roles: [...] }`. Schema validation passes for `{ type: "member", memberType: "human", name: "...", slug: "...", email: "...", roles: [...] }`. Schema rejects human members with `runtimes`. Schema rejects members without `name`, `slug`, or `email`. All existing agent-related tests updated and passing. `npx tsc --noEmit` and `npx vitest run` pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-05-member-package-type-schema-resolver/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-05-member-package-type-schema-resolver/proposal.md)
+- [Design](../../changes/archive/2026-03-05-member-package-type-schema-resolver/design.md)
+- [Tasks](../../changes/archive/2026-03-05-member-package-type-schema-resolver/tasks.md)
+
+**Specs updated:**
+- [package-schema-validation](../../specs/package-schema-validation/spec.md) -- `AgentChapterField` → `MemberChapterField`, discriminated union on `memberType`
+- [dependency-graph-resolution](../../specs/dependency-graph-resolution/spec.md) -- `resolveAgent()` → `resolveMember()`, `ResolvedAgent` → `ResolvedMember` with member identity fields
+- [graph-validation](../../specs/graph-validation/spec.md) -- `validateAgent()` → `validateMember()`
+- [materializer-interface](../../specs/materializer-interface/spec.md) -- `ResolvedAgent` → `ResolvedMember`
+- [forge-install-command](../../specs/forge-install-command/spec.md) -- `<agent>` → `<member>`, `.chapter/agents/` → `.chapter/members/`
+- [build-command](../../specs/build-command/spec.md) -- `<agent>` → `<member>`, `resolveAgent` → `resolveMember`
+- [workspace-init](../../specs/workspace-init/spec.md) -- template `type: "agent"` → `type: "member"` with `memberType`
+- [chapter-core-package](../../specs/chapter-core-package/spec.md) -- `type: "agent"` → `type: "member"` with `memberType: "agent"`
+- [proxy-cli](../../specs/proxy-cli/spec.md) -- `--agent` → `--member`, `resolveAgent()` → `resolveMember()`
 
 ---
 

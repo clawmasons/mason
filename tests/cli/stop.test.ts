@@ -43,13 +43,13 @@ describe("CLI stop command", () => {
     }
   });
 
-  it("stop command accepts an agent argument", () => {
+  it("stop command accepts a member argument", () => {
     const stopCmd = program.commands.find((cmd) => cmd.name() === "stop");
     expect(stopCmd).toBeDefined();
     if (stopCmd) {
       const args = stopCmd.registeredArguments;
       expect(args).toHaveLength(1);
-      expect(args[0].name()).toBe("agent");
+      expect(args[0].name()).toBe("member");
       expect(args[0].required).toBe(true);
     }
   });
@@ -82,37 +82,37 @@ describe("stopAgent", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function setupAgentDir(): string {
-    const agentDir = path.join(tmpDir, ".chapter", "agents", "ops");
-    fs.mkdirSync(agentDir, { recursive: true });
+  function setupMemberDir(): string {
+    const memberDir = path.join(tmpDir, ".chapter", "members", "ops");
+    fs.mkdirSync(memberDir, { recursive: true });
     fs.writeFileSync(
-      path.join(agentDir, "docker-compose.yml"),
+      path.join(memberDir, "docker-compose.yml"),
       `version: "3.8"\nservices:\n  mcp-proxy:\n    image: proxy\n`,
     );
-    return agentDir;
+    return memberDir;
   }
 
-  it("exits 1 when agent directory does not exist", async () => {
-    await stopAgent(tmpDir, "@test/agent-ops", {});
+  it("exits 1 when member directory does not exist", async () => {
+    await stopAgent(tmpDir, "@test/member-ops", {});
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("not found");
   });
 
-  it("succeeds with valid agent directory", async () => {
-    setupAgentDir();
-    await stopAgent(tmpDir, "@test/agent-ops", {});
+  it("succeeds with valid member directory", async () => {
+    setupMemberDir();
+    await stopAgent(tmpDir, "@test/member-ops", {});
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("stopped");
   });
 
   it("exits 1 when docker-compose.yml is missing", async () => {
-    const agentDir = path.join(tmpDir, ".chapter", "agents", "ops");
-    fs.mkdirSync(agentDir, { recursive: true });
+    const memberDir = path.join(tmpDir, ".chapter", "members", "ops");
+    fs.mkdirSync(memberDir, { recursive: true });
     // No docker-compose.yml created
 
-    await stopAgent(tmpDir, "@test/agent-ops", {});
+    await stopAgent(tmpDir, "@test/member-ops", {});
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("docker-compose.yml");

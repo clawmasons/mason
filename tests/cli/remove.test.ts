@@ -190,18 +190,22 @@ describe("findDependents", () => {
     expect(dependents[0].name).toBe("@test/task-triage");
   });
 
-  it("detects agent roles reference", () => {
+  it("detects member roles reference", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
       chapter: { type: "role", permissions: {} },
     });
 
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
+    writePackage(path.join(tmpDir, "members", "ops"), {
+      name: "@test/member-ops",
       version: "1.0.0",
       chapter: {
-        type: "agent",
+        type: "member",
+        memberType: "agent",
+        name: "Ops",
+        slug: "ops",
+        email: "ops@chapter.local",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
@@ -210,7 +214,7 @@ describe("findDependents", () => {
     const packages = discoverPackages(tmpDir);
     const dependents = findDependents("@test/role-manager", packages);
     expect(dependents).toHaveLength(1);
-    expect(dependents[0].name).toBe("@test/agent-ops");
+    expect(dependents[0].name).toBe("@test/member-ops");
   });
 
   it("returns empty when no dependents exist", () => {

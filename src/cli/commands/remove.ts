@@ -62,7 +62,7 @@ export function findDependents(
       }
     }
 
-    if (chapter.type === "agent") {
+    if (chapter.type === "member") {
       // Check roles array
       if (chapter.roles.includes(targetPkg)) {
         isDependent = true;

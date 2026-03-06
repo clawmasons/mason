@@ -1,4 +1,4 @@
-import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedTask } from "../resolver/types.js";
+import type { ResolvedMember, ResolvedApp, ResolvedRole, ResolvedTask } from "../resolver/types.js";
 import type { ValidationError, ValidationResult } from "./types.js";
 
 /**
@@ -145,13 +145,13 @@ function checkAppLaunchConfig(
 }
 
 /**
- * Collect all unique apps from a resolved agent's roles.
+ * Collect all unique apps from a resolved member's roles.
  */
-function collectAllApps(agent: ResolvedAgent): ResolvedApp[] {
+function collectAllApps(member: ResolvedMember): ResolvedApp[] {
   const seen = new Set<string>();
   const apps: ResolvedApp[] = [];
 
-  for (const role of agent.roles) {
+  for (const role of member.roles) {
     for (const app of role.apps) {
       if (!seen.has(app.name)) {
         seen.add(app.name);
@@ -183,21 +183,21 @@ function collectAppsFromTask(
 }
 
 /**
- * Validate a resolved agent graph for semantic correctness.
+ * Validate a resolved member graph for semantic correctness.
  * Runs all validation checks and collects errors.
  */
-export function validateAgent(agent: ResolvedAgent): ValidationResult {
+export function validateMember(member: ResolvedMember): ValidationResult {
   const errors: ValidationError[] = [];
 
   // Check each role
-  for (const role of agent.roles) {
+  for (const role of member.roles) {
     checkRequirementCoverage(role, errors);
     checkToolExistence(role, errors);
     checkSkillAvailability(role, errors);
   }
 
   // Check all unique apps for launch config
-  const allApps = collectAllApps(agent);
+  const allApps = collectAllApps(member);
   for (const app of allApps) {
     checkAppLaunchConfig(app, errors);
   }

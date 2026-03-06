@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
-  resolveAgentDir,
+  resolveMemberDir,
   checkDockerCompose,
   validateEnvFile,
   execDockerCompose,
@@ -16,12 +16,12 @@ interface RunOptions {
 export function registerRunCommand(program: Command): void {
   program
     .command("run")
-    .description("Start the Docker Compose stack for an installed agent")
-    .argument("<agent>", "Agent package name to run")
+    .description("Start the Docker Compose stack for an installed member")
+    .argument("<member>", "Member package name to run")
     .option("--runtime <name>", "Start only this runtime (plus mcp-proxy)")
-    .option("--output-dir <dir>", "Custom agent directory")
-    .action(async (agentName: string, options: RunOptions) => {
-      await runAgent(process.cwd(), agentName, options);
+    .option("--output-dir <dir>", "Custom member directory")
+    .action(async (memberName: string, options: RunOptions) => {
+      await runAgent(process.cwd(), memberName, options);
     });
 }
 
@@ -64,20 +64,20 @@ function detectRuntimes(composePath: string): string[] {
 
 export async function runAgent(
   rootDir: string,
-  agentName: string,
+  memberName: string,
   options: RunOptions,
 ): Promise<void> {
   try {
     // 1. Check docker compose availability
     checkDockerCompose();
 
-    // 2. Resolve agent directory
-    const agentDir = resolveAgentDir(rootDir, agentName, options.outputDir);
-    const composePath = path.join(agentDir, "docker-compose.yml");
+    // 2. Resolve member directory
+    const memberDir = resolveMemberDir(rootDir, memberName, options.outputDir);
+    const composePath = path.join(memberDir, "docker-compose.yml");
 
-    if (!fs.existsSync(agentDir)) {
+    if (!fs.existsSync(memberDir)) {
       console.error(
-        `\n✘ Agent directory not found: ${agentDir}\n  Run "chapter install ${agentName}" first.\n`,
+        `\n✘ Member directory not found: ${memberDir}\n  Run "chapter install ${memberName}" first.\n`,
       );
       process.exit(1);
       return;
@@ -85,17 +85,17 @@ export async function runAgent(
 
     if (!fs.existsSync(composePath)) {
       console.error(
-        `\n✘ docker-compose.yml not found in ${agentDir}\n  The agent may need to be reinstalled with "chapter install ${agentName}".\n`,
+        `\n✘ docker-compose.yml not found in ${memberDir}\n  The member may need to be reinstalled with "chapter install ${memberName}".\n`,
       );
       process.exit(1);
       return;
     }
 
     // 3. Validate .env
-    const missingVars = validateEnvFile(agentDir);
+    const missingVars = validateEnvFile(memberDir);
     if (missingVars.length > 0) {
       console.error(
-        `\n✘ Missing required environment variables in ${path.join(agentDir, ".env")}:\n${missingVars.map((v) => `  - ${v}`).join("\n")}\n\n  Fill in these values before running the agent.\n`,
+        `\n✘ Missing required environment variables in ${path.join(memberDir, ".env")}:\n${missingVars.map((v) => `  - ${v}`).join("\n")}\n\n  Fill in these values before running the member.\n`,
       );
       process.exit(1);
       return;
@@ -136,7 +136,7 @@ export async function runAgent(
     }
 
     // 5. Phase 1: Start mcp-proxy detached
-    console.log(`Starting mcp-proxy for "${agentName}"...`);
+    console.log(`Starting mcp-proxy for "${memberName}"...`);
     const proxyArgs = ["compose", "-f", composePath, "up", "-d", "mcp-proxy"];
     const proxyExitCode = await execDockerCompose(proxyArgs);
 
@@ -155,7 +155,7 @@ export async function runAgent(
       return;
     }
 
-    console.log(`\n✔ Agent "${agentName}" session complete.\n`);
+    console.log(`\n✔ Member "${memberName}" session complete.\n`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\n✘ Run failed: ${message}\n`);

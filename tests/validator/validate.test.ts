@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { validateAgent } from "../../src/validator/validate.js";
-import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "../../src/resolver/types.js";
+import { validateMember } from "../../src/validator/validate.js";
+import type { ResolvedMember, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "../../src/resolver/types.js";
 
 // --- Test helpers ---
 
@@ -60,11 +60,16 @@ function makeRole(overrides: Partial<ResolvedRole> = {}): ResolvedRole {
   };
 }
 
-function makeAgent(overrides: Partial<ResolvedAgent> = {}): ResolvedAgent {
+function makeMember(overrides: Partial<ResolvedMember> = {}): ResolvedMember {
   return {
-    name: "@clawmasons/agent-repo-ops",
+    name: "@clawmasons/member-repo-ops",
     version: "1.0.0",
-    description: "Repository operations agent",
+    memberType: "agent",
+    memberName: "Repo Ops",
+    slug: "repo-ops",
+    email: "repo-ops@chapter.local",
+    authProviders: [],
+    description: "Repository operations member",
     runtimes: ["claude-code"],
     roles: [makeRole()],
     ...overrides,
@@ -73,10 +78,10 @@ function makeAgent(overrides: Partial<ResolvedAgent> = {}): ResolvedAgent {
 
 // --- Tests ---
 
-describe("validateAgent", () => {
+describe("validateMember", () => {
   describe("valid agents", () => {
     it("returns valid for a well-formed agent", () => {
-      const result = validateAgent(makeAgent());
+      const result = validateMember(makeMember());
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
@@ -136,18 +141,18 @@ describe("validateAgent", () => {
         skills: [],
       });
 
-      const agent = makeAgent({
+      const agent = makeMember({
         roles: [issueManagerRole, prReviewerRole],
         runtimes: ["claude-code", "codex"],
       });
 
-      const result = validateAgent(agent);
+      const result = validateMember(agent);
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
     it("returns valid for agent with no tasks in roles", () => {
-      const result = validateAgent(makeAgent({
+      const result = validateMember(makeMember({
         roles: [makeRole({ tasks: [], skills: [] })],
       }));
       expect(result.valid).toBe(true);
@@ -170,7 +175,7 @@ describe("validateAgent", () => {
         tasks: [task],
       });
 
-      const result = validateAgent(makeAgent({ roles: [role] }));
+      const result = validateMember(makeMember({ roles: [role] }));
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].category).toBe("requirement-coverage");
@@ -208,7 +213,7 @@ describe("validateAgent", () => {
         // No slack permissions
       });
 
-      const result = validateAgent(makeAgent({ roles: [role] }));
+      const result = validateMember(makeMember({ roles: [role] }));
       expect(result.valid).toBe(false);
       const coverageErrors = result.errors.filter((e) => e.category === "requirement-coverage");
       expect(coverageErrors).toHaveLength(1);
@@ -217,7 +222,7 @@ describe("validateAgent", () => {
     });
 
     it("passes when task requires app covered by role permissions", () => {
-      const result = validateAgent(makeAgent());
+      const result = validateMember(makeMember());
       const coverageErrors = result.errors.filter((e) => e.category === "requirement-coverage");
       expect(coverageErrors).toHaveLength(0);
     });
@@ -234,7 +239,7 @@ describe("validateAgent", () => {
         },
       });
 
-      const result = validateAgent(makeAgent({ roles: [role] }));
+      const result = validateMember(makeMember({ roles: [role] }));
       expect(result.valid).toBe(false);
       const toolErrors = result.errors.filter((e) => e.category === "tool-existence");
       expect(toolErrors).toHaveLength(1);
@@ -253,14 +258,14 @@ describe("validateAgent", () => {
         },
       });
 
-      const result = validateAgent(makeAgent({ roles: [role] }));
+      const result = validateMember(makeMember({ roles: [role] }));
       const toolErrors = result.errors.filter((e) => e.category === "tool-existence");
       expect(toolErrors).toHaveLength(2);
       expect(toolErrors.map((e) => e.context.tool).sort()).toEqual(["fake_tool_1", "fake_tool_2"]);
     });
 
     it("passes when all allowed tools exist in app", () => {
-      const result = validateAgent(makeAgent());
+      const result = validateMember(makeMember());
       const toolErrors = result.errors.filter((e) => e.category === "tool-existence");
       expect(toolErrors).toHaveLength(0);
     });
@@ -268,7 +273,7 @@ describe("validateAgent", () => {
 
   describe("skill availability", () => {
     it("passes when task skill is available in task resolution", () => {
-      const result = validateAgent(makeAgent());
+      const result = validateMember(makeMember());
       const skillErrors = result.errors.filter((e) => e.category === "skill-availability");
       expect(skillErrors).toHaveLength(0);
     });
@@ -284,7 +289,7 @@ describe("validateAgent", () => {
         skills: [skill], // but IS in the role's skills
       });
 
-      const result = validateAgent(makeAgent({ roles: [role] }));
+      const result = validateMember(makeMember({ roles: [role] }));
       const skillErrors = result.errors.filter((e) => e.category === "skill-availability");
       expect(skillErrors).toHaveLength(0);
     });
@@ -299,7 +304,7 @@ describe("validateAgent", () => {
         skills: [], // not in role either
       });
 
-      const result = validateAgent(makeAgent({ roles: [role] }));
+      const result = validateMember(makeMember({ roles: [role] }));
       expect(result.valid).toBe(false);
       const skillErrors = result.errors.filter((e) => e.category === "skill-availability");
       expect(skillErrors).toHaveLength(1);
@@ -318,7 +323,7 @@ describe("validateAgent", () => {
         skills: [],
       });
 
-      const result = validateAgent(makeAgent({ roles: [role] }));
+      const result = validateMember(makeMember({ roles: [role] }));
       const skillErrors = result.errors.filter((e) => e.category === "skill-availability");
       expect(skillErrors).toHaveLength(0);
     });
@@ -341,7 +346,7 @@ describe("validateAgent", () => {
         tasks: [makeTask({ apps: [badApp] })],
       });
 
-      const result = validateAgent(makeAgent({ roles: [role] }));
+      const result = validateMember(makeMember({ roles: [role] }));
       const configErrors = result.errors.filter((e) => e.category === "app-launch-config");
       expect(configErrors.length).toBeGreaterThanOrEqual(1);
       expect(configErrors.some((e) => e.context.field === "command")).toBe(true);
@@ -363,7 +368,7 @@ describe("validateAgent", () => {
         tasks: [makeTask({ apps: [badApp] })],
       });
 
-      const result = validateAgent(makeAgent({ roles: [role] }));
+      const result = validateMember(makeMember({ roles: [role] }));
       const configErrors = result.errors.filter((e) => e.category === "app-launch-config");
       expect(configErrors.length).toBeGreaterThanOrEqual(1);
       expect(configErrors.some((e) => e.context.field === "args")).toBe(true);
@@ -386,14 +391,14 @@ describe("validateAgent", () => {
         tasks: [makeTask({ apps: [badApp] })],
       });
 
-      const result = validateAgent(makeAgent({ roles: [role] }));
+      const result = validateMember(makeMember({ roles: [role] }));
       const configErrors = result.errors.filter((e) => e.category === "app-launch-config");
       expect(configErrors.length).toBeGreaterThanOrEqual(1);
       expect(configErrors.some((e) => e.context.field === "url")).toBe(true);
     });
 
     it("passes for valid stdio app", () => {
-      const result = validateAgent(makeAgent());
+      const result = validateMember(makeMember());
       const configErrors = result.errors.filter((e) => e.category === "app-launch-config");
       expect(configErrors).toHaveLength(0);
     });
@@ -417,7 +422,7 @@ describe("validateAgent", () => {
         skills: [],
       });
 
-      const result = validateAgent(makeAgent({ roles: [role] }));
+      const result = validateMember(makeMember({ roles: [role] }));
       const configErrors = result.errors.filter((e) => e.category === "app-launch-config");
       expect(configErrors).toHaveLength(0);
     });
@@ -455,7 +460,7 @@ describe("validateAgent", () => {
         apps: [makeApp(), badApp],
       });
 
-      const result = validateAgent(makeAgent({ roles: [role] }));
+      const result = validateMember(makeMember({ roles: [role] }));
       expect(result.valid).toBe(false);
 
       const categories = new Set(result.errors.map((e) => e.category));

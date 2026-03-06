@@ -215,7 +215,7 @@ describe("E2E Install Flow (Local tgz)", () => {
     chapterCli(["install", agentName], tmpDir);
 
     // Verify output directory was created
-    const installDir = join(tmpDir, ".chapter", "agents", "note-taker");
+    const installDir = join(tmpDir, ".chapter", "members", "note-taker");
     expect(existsSync(installDir)).toBe(true);
 
     // Verify Dockerfile exists and is single-stage
@@ -225,7 +225,7 @@ describe("E2E Install Flow (Local tgz)", () => {
     const dockerfile = readFileSync(dockerfilePath, "utf-8");
     expect(dockerfile).not.toContain("AS builder");
     expect(dockerfile).toContain("FROM node:22-slim");
-    expect(dockerfile).toContain(`CMD ["proxy", "--agent", "${agentName}"]`);
+    expect(dockerfile).toContain(`CMD ["proxy", "--member", "${agentName}"]`);
 
     // Verify docker-compose.yml exists
     expect(existsSync(join(installDir, "docker-compose.yml"))).toBe(true);

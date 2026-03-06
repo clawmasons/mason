@@ -14,13 +14,13 @@ describe("CLI permissions command", () => {
     }
   });
 
-  it("permissions command accepts an agent argument", () => {
+  it("permissions command accepts a member argument", () => {
     const permsCmd = program.commands.find((cmd) => cmd.name() === "permissions");
     expect(permsCmd).toBeDefined();
     if (permsCmd) {
       const args = permsCmd.registeredArguments;
       expect(args).toHaveLength(1);
-      expect(args[0].name()).toBe("agent");
+      expect(args[0].name()).toBe("member");
       expect(args[0].required).toBe(true);
     }
   });
@@ -58,7 +58,7 @@ describe("runPermissions", () => {
     fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify(pkg, null, 2));
   }
 
-  function setupTwoRoleAgent(): void {
+  function setupTwoRoleMember(): void {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
@@ -144,11 +144,15 @@ describe("runPermissions", () => {
       },
     });
 
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
+    writePackage(path.join(tmpDir, "members", "ops"), {
+      name: "@test/member-ops",
       version: "1.0.0",
       chapter: {
-        type: "agent",
+        type: "member",
+        memberType: "agent",
+        name: "Ops",
+        slug: "ops",
+        email: "ops@chapter.local",
         runtimes: ["claude-code"],
         roles: ["@test/role-issue-manager", "@test/role-pr-reviewer"],
       },
@@ -156,8 +160,8 @@ describe("runPermissions", () => {
   }
 
   it("displays per-role permission breakdown", async () => {
-    setupTwoRoleAgent();
-    await runPermissions(tmpDir, "@test/agent-ops", {});
+    setupTwoRoleMember();
+    await runPermissions(tmpDir, "@test/member-ops", {});
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
@@ -171,8 +175,8 @@ describe("runPermissions", () => {
   });
 
   it("displays deny list when present", async () => {
-    setupTwoRoleAgent();
-    await runPermissions(tmpDir, "@test/agent-ops", {});
+    setupTwoRoleMember();
+    await runPermissions(tmpDir, "@test/member-ops", {});
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("deny:");
@@ -180,8 +184,8 @@ describe("runPermissions", () => {
   });
 
   it("displays proxy-level toolFilter union", async () => {
-    setupTwoRoleAgent();
-    await runPermissions(tmpDir, "@test/agent-ops", {});
+    setupTwoRoleMember();
+    await runPermissions(tmpDir, "@test/member-ops", {});
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("Proxy toolFilter");
@@ -195,8 +199,8 @@ describe("runPermissions", () => {
   });
 
   it("outputs JSON with --json flag", async () => {
-    setupTwoRoleAgent();
-    await runPermissions(tmpDir, "@test/agent-ops", { json: true });
+    setupTwoRoleMember();
+    await runPermissions(tmpDir, "@test/member-ops", { json: true });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
@@ -217,7 +221,7 @@ describe("runPermissions", () => {
     expect(unionList).toContain("create_review");
   });
 
-  it("exits 1 when agent is not found", async () => {
+  it("exits 1 when member is not found", async () => {
     await runPermissions(tmpDir, "@test/nonexistent", {});
 
     expect(exitSpy).toHaveBeenCalledWith(1);
