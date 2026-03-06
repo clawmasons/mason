@@ -6,13 +6,13 @@ import {
   TypeMismatchError,
 } from "../../src/resolver/errors.js";
 import type { DiscoveredPackage } from "../../src/resolver/types.js";
-import type { ForgeField } from "../../src/schemas/index.js";
+import type { ChapterField } from "../../src/schemas/index.js";
 
 /**
  * Helper to build a DiscoveredPackage from minimal inputs.
  */
-function makePkg(name: string, version: string, forgeField: ForgeField): DiscoveredPackage {
-  return { name, version, packagePath: `/fake/${name}`, forgeField };
+function makePkg(name: string, version: string, chapterField: ChapterField): DiscoveredPackage {
+  return { name, version, packagePath: `/fake/${name}`, chapterField };
 }
 
 /**

@@ -139,7 +139,7 @@ function makePackages(agentName: string): Map<string, DiscoveredPackage> {
     name: agentName,
     version: "1.0.0",
     packagePath: "/fake/path",
-    forgeField: {
+    chapterField: {
       type: "agent",
       runtimes: ["claude-code"],
       roles: ["@test/role-dev"],
@@ -175,13 +175,13 @@ describe("startProxy", () => {
       name: "@test/agent-a",
       version: "1.0.0",
       packagePath: "/fake/a",
-      forgeField: { type: "agent", runtimes: ["claude-code"], roles: ["@test/role"] },
+      chapterField: { type: "agent", runtimes: ["claude-code"], roles: ["@test/role"] },
     });
     packages.set("@test/agent-b", {
       name: "@test/agent-b",
       version: "1.0.0",
       packagePath: "/fake/b",
-      forgeField: { type: "agent", runtimes: ["claude-code"], roles: ["@test/role"] },
+      chapterField: { type: "agent", runtimes: ["claude-code"], roles: ["@test/role"] },
     });
     vi.mocked(discoverPackages).mockReturnValue(packages);
 

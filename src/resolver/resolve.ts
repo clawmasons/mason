@@ -1,4 +1,4 @@
-import type { AppForgeField, RoleForgeField, SkillForgeField, TaskForgeField } from "../schemas/index.js";
+import type { AppChapterField, RoleChapterField, SkillChapterField, TaskChapterField } from "../schemas/index.js";
 import {
   CircularDependencyError,
   PackageNotFoundError,
@@ -29,18 +29,18 @@ function getPackage(
 }
 
 /**
- * Assert that a discovered package has the expected forge type.
+ * Assert that a discovered package has the expected chapter type.
  */
 function assertType(
   pkg: DiscoveredPackage,
   expectedType: string,
   context?: string,
 ): void {
-  if (pkg.forgeField.type !== expectedType) {
+  if (pkg.chapterField.type !== expectedType) {
     throw new TypeMismatchError(
       pkg.name,
       expectedType,
-      pkg.forgeField.type,
+      pkg.chapterField.type,
       context,
     );
   }
@@ -56,19 +56,19 @@ function resolveApp(
 ): ResolvedApp {
   const pkg = getPackage(name, packages, context);
   assertType(pkg, "app", context);
-  const forge = pkg.forgeField as AppForgeField;
+  const chapter = pkg.chapterField as AppChapterField;
 
   return {
     name: pkg.name,
     version: pkg.version,
-    transport: forge.transport,
-    command: forge.command,
-    args: forge.args,
-    url: forge.url,
-    env: forge.env,
-    tools: forge.tools,
-    capabilities: forge.capabilities,
-    description: forge.description,
+    transport: chapter.transport,
+    command: chapter.command,
+    args: chapter.args,
+    url: chapter.url,
+    env: chapter.env,
+    tools: chapter.tools,
+    capabilities: chapter.capabilities,
+    description: chapter.description,
   };
 }
 
@@ -82,13 +82,13 @@ function resolveSkill(
 ): ResolvedSkill {
   const pkg = getPackage(name, packages, context);
   assertType(pkg, "skill", context);
-  const forge = pkg.forgeField as SkillForgeField;
+  const chapter = pkg.chapterField as SkillChapterField;
 
   return {
     name: pkg.name,
     version: pkg.version,
-    artifacts: forge.artifacts,
-    description: forge.description,
+    artifacts: chapter.artifacts,
+    description: chapter.description,
   };
 }
 
@@ -109,30 +109,30 @@ function resolveTask(
 
   const pkg = getPackage(name, packages, context);
   assertType(pkg, "task", context);
-  const forge = pkg.forgeField as TaskForgeField;
+  const chapter = pkg.chapterField as TaskChapterField;
   const taskContext = `task "${name}"`;
 
   // Resolve required apps
   const apps: ResolvedApp[] = [];
-  if (forge.requires?.apps) {
-    for (const appName of forge.requires.apps) {
+  if (chapter.requires?.apps) {
+    for (const appName of chapter.requires.apps) {
       apps.push(resolveApp(appName, packages, taskContext));
     }
   }
 
   // Resolve required skills
   const skills: ResolvedSkill[] = [];
-  if (forge.requires?.skills) {
-    for (const skillName of forge.requires.skills) {
+  if (chapter.requires?.skills) {
+    for (const skillName of chapter.requires.skills) {
       skills.push(resolveSkill(skillName, packages, taskContext));
     }
   }
 
   // Resolve sub-tasks for composite tasks
   const subTasks: ResolvedTask[] = [];
-  if (forge.tasks) {
+  if (chapter.tasks) {
     const newPath = [...traversalPath, name];
-    for (const subTaskName of forge.tasks) {
+    for (const subTaskName of chapter.tasks) {
       subTasks.push(resolveTask(subTaskName, packages, newPath, taskContext));
     }
   }
@@ -140,12 +140,12 @@ function resolveTask(
   return {
     name: pkg.name,
     version: pkg.version,
-    taskType: forge.taskType,
-    prompt: forge.prompt,
-    timeout: forge.timeout,
-    approval: forge.approval,
-    requiredApps: forge.requires?.apps,
-    requiredSkills: forge.requires?.skills,
+    taskType: chapter.taskType,
+    prompt: chapter.prompt,
+    timeout: chapter.timeout,
+    approval: chapter.approval,
+    requiredApps: chapter.requires?.apps,
+    requiredSkills: chapter.requires?.skills,
     apps,
     skills,
     subTasks,
@@ -162,28 +162,28 @@ function resolveRole(
 ): ResolvedRole {
   const pkg = getPackage(name, packages, context);
   assertType(pkg, "role", context);
-  const forge = pkg.forgeField as RoleForgeField;
+  const chapter = pkg.chapterField as RoleChapterField;
   const roleContext = `role "${name}"`;
 
   // Resolve tasks
   const tasks: ResolvedTask[] = [];
-  if (forge.tasks) {
-    for (const taskName of forge.tasks) {
+  if (chapter.tasks) {
+    for (const taskName of chapter.tasks) {
       tasks.push(resolveTask(taskName, packages, [], roleContext));
     }
   }
 
   // Resolve role-level skills
   const skills: ResolvedSkill[] = [];
-  if (forge.skills) {
-    for (const skillName of forge.skills) {
+  if (chapter.skills) {
+    for (const skillName of chapter.skills) {
       skills.push(resolveSkill(skillName, packages, roleContext));
     }
   }
 
   // Collect all apps referenced by permissions (these are the apps this role touches)
   const apps: ResolvedApp[] = [];
-  for (const appName of Object.keys(forge.permissions)) {
+  for (const appName of Object.keys(chapter.permissions)) {
     try {
       apps.push(resolveApp(appName, packages, roleContext));
     } catch (e) {
@@ -200,9 +200,9 @@ function resolveRole(
   return {
     name: pkg.name,
     version: pkg.version,
-    description: forge.description,
-    permissions: forge.permissions,
-    constraints: forge.constraints,
+    description: chapter.description,
+    permissions: chapter.permissions,
+    constraints: chapter.constraints,
     tasks,
     apps,
     skills,
@@ -218,22 +218,22 @@ export function resolveAgent(
 ): ResolvedAgent {
   const pkg = getPackage(agentName, packages);
   assertType(pkg, "agent", undefined);
-  const forge = pkg.forgeField as { type: "agent"; runtimes: string[]; roles: string[]; description?: string; resources?: Array<{ type: string; ref: string; access: string }>; proxy?: { port?: number; type?: "sse" | "streamable-http" } };
+  const chapter = pkg.chapterField as { type: "agent"; runtimes: string[]; roles: string[]; description?: string; resources?: Array<{ type: string; ref: string; access: string }>; proxy?: { port?: number; type?: "sse" | "streamable-http" } };
   const agentContext = `agent "${agentName}"`;
 
   // Resolve all roles
   const roles: ResolvedRole[] = [];
-  for (const roleName of forge.roles) {
+  for (const roleName of chapter.roles) {
     roles.push(resolveRole(roleName, packages, agentContext));
   }
 
   return {
     name: pkg.name,
     version: pkg.version,
-    description: forge.description,
-    runtimes: forge.runtimes,
+    description: chapter.description,
+    runtimes: chapter.runtimes,
     roles,
-    resources: forge.resources,
-    proxy: forge.proxy,
+    resources: chapter.resources,
+    proxy: chapter.proxy,
   };
 }

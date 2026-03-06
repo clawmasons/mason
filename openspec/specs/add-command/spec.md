@@ -27,22 +27,22 @@ The `forge add` command SHALL delegate package installation to npm by executing 
 - **THEN** the command SHALL exit with code 1
 - **AND** SHALL print an error message containing "Add failed"
 
-### Requirement: Post-install forge field validation
-After successful npm install, the command SHALL read the installed package's `package.json` and validate its `forge` field using `parseForgeField()`.
+### Requirement: Post-install chapter field validation
+After successful npm install, the command SHALL read the installed package's `package.json` and validate its `chapter` field using `parseChapterField()`.
 
-#### Scenario: Valid forge package
-- **WHEN** npm install succeeds and the package has a valid `forge` field
-- **THEN** the command SHALL print a success message containing the package name and its forge type
+#### Scenario: Valid chapter package
+- **WHEN** npm install succeeds and the package has a valid `chapter` field
+- **THEN** the command SHALL print a success message containing the package name and its chapter type
 - **AND** SHALL exit with code 0
 
-#### Scenario: Package missing forge field
-- **WHEN** npm install succeeds but the package has no `forge` field
+#### Scenario: Package missing chapter field
+- **WHEN** npm install succeeds but the package has no `chapter` field
 - **THEN** the command SHALL run `npm uninstall <pkg>` to clean up
-- **AND** SHALL print an error message indicating the package is not a valid forge package
+- **AND** SHALL print an error message indicating the package is not a valid chapter package
 - **AND** SHALL exit with code 1
 
-#### Scenario: Package with invalid forge field
-- **WHEN** npm install succeeds but the package's `forge` field fails Zod validation
+#### Scenario: Package with invalid chapter field
+- **WHEN** npm install succeeds but the package's `chapter` field fails Zod validation
 - **THEN** the command SHALL run `npm uninstall <pkg>` to clean up
 - **AND** SHALL print an error message with the validation error details
 - **AND** SHALL exit with code 1

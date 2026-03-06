@@ -239,7 +239,7 @@ describe("forge init", () => {
           {
             name: "@{{projectScope}}/agent-note-taker",
             version: "1.0.0",
-            forge: {
+            chapter: {
               type: "agent",
               roles: ["@{{projectScope}}/role-writer"],
             },
@@ -256,7 +256,7 @@ describe("forge init", () => {
           {
             name: "@{{projectScope}}/role-writer",
             version: "1.0.0",
-            forge: {
+            chapter: {
               type: "role",
               tasks: ["@clawmasons/task-take-notes"],
               skills: ["@clawmasons/skill-markdown-conventions"],
@@ -338,7 +338,7 @@ describe("forge init", () => {
           ),
         );
         expect(agentPkg.name).toBe(`@${dirName}/agent-note-taker`);
-        expect(agentPkg.forge.roles).toEqual([`@${dirName}/role-writer`]);
+        expect(agentPkg.chapter.roles).toEqual([`@${dirName}/role-writer`]);
 
         const rolePkg = JSON.parse(
           fs.readFileSync(
@@ -348,7 +348,7 @@ describe("forge init", () => {
         );
         expect(rolePkg.name).toBe(`@${dirName}/role-writer`);
         // forge-core references should remain unchanged
-        expect(rolePkg.forge.tasks).toEqual(["@clawmasons/task-take-notes"]);
+        expect(rolePkg.chapter.tasks).toEqual(["@clawmasons/task-take-notes"]);
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }
@@ -375,7 +375,7 @@ describe("forge init", () => {
           ),
         );
         expect(agentPkg.name).toBe("@acme/agent-note-taker");
-        expect(agentPkg.forge.roles).toEqual(["@acme/role-writer"]);
+        expect(agentPkg.chapter.roles).toEqual(["@acme/role-writer"]);
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }

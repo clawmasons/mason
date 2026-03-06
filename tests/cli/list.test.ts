@@ -51,7 +51,7 @@ describe("runList", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -64,7 +64,7 @@ describe("runList", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "skill",
         artifacts: ["./SKILL.md"],
         description: "Labeling taxonomy",
@@ -74,7 +74,7 @@ describe("runList", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "task",
         taskType: "subagent",
         prompt: "./triage.md",
@@ -88,7 +88,7 @@ describe("runList", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -104,7 +104,7 @@ describe("runList", () => {
     writePackage(path.join(tmpDir, "agents", "ops"), {
       name: "@test/agent-ops",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "agent",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
@@ -133,7 +133,7 @@ describe("runList", () => {
     writePackage(path.join(tmpDir, "agents", "ops2"), {
       name: "@test/agent-ops2",
       version: "2.0.0",
-      forge: {
+      chapter: {
         type: "agent",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],

@@ -31,7 +31,20 @@ Rename the package.json metadata field from `"forge"` to `"chapter"` across the 
 
 **Testable output:** `npx tsc --noEmit` compiles. `npx vitest run` passes all tests. All component package.json files use `"chapter"` as the metadata key. `parseChapterField()` successfully parses `{ "chapter": { "type": "app", ... } }` from package.json. Grepping source/test code for `ForgeField` or `parseForgeField` returns zero results.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-05-rename-metadata-field-forge-to-chapter/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-05-rename-metadata-field-forge-to-chapter/proposal.md)
+- [Design](../../changes/archive/2026-03-05-rename-metadata-field-forge-to-chapter/design.md)
+- [Tasks](../../changes/archive/2026-03-05-rename-metadata-field-forge-to-chapter/tasks.md)
+
+**Specs updated:**
+- [package-schema-validation](../../specs/package-schema-validation/spec.md) -- renamed `ForgeField` → `ChapterField`, `parseForgeField` → `parseChapterField`
+- [package-discovery](../../specs/package-discovery/spec.md) -- renamed `forge` field → `chapter` field, `forgeField` → `chapterField`
+- [add-command](../../specs/add-command/spec.md) -- renamed `forge` field validation → `chapter` field validation
+- [remove-command](../../specs/remove-command/spec.md) -- renamed `forge` field references → `chapter` field
+- [workspace-init](../../specs/workspace-init/spec.md) -- renamed `forge` field references → `chapter` field
+- [forge-core-package](../../specs/forge-core-package/spec.md) -- renamed `forge` field references → `chapter` field
 
 ---
 

@@ -1,13 +1,13 @@
-import type { ForgeField } from "../schemas/index.js";
+import type { ChapterField } from "../schemas/index.js";
 
 /**
- * A forge package discovered on the filesystem.
+ * A chapter package discovered on the filesystem.
  */
 export interface DiscoveredPackage {
   name: string;
   version: string;
   packagePath: string;
-  forgeField: ForgeField;
+  chapterField: ChapterField;
 }
 
 /**

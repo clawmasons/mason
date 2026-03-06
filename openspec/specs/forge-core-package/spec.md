@@ -26,37 +26,37 @@ The `forge-core/` package SHALL contain sub-directories for all five forge compo
 
 #### Scenario: App component exists
 - **WHEN** `forge-core/apps/filesystem/package.json` is read
-- **THEN** it has `name: "@clawmasons/app-filesystem"` and a valid `forge` field with `type: "app"`
+- **THEN** it has `name: "@clawmasons/app-filesystem"` and a valid `chapter` field with `type: "app"`
 
 #### Scenario: Task component exists
 - **WHEN** `forge-core/tasks/take-notes/package.json` is read
-- **THEN** it has `name: "@clawmasons/task-take-notes"` and a valid `forge` field with `type: "task"`
+- **THEN** it has `name: "@clawmasons/task-take-notes"` and a valid `chapter` field with `type: "task"`
 
 #### Scenario: Skill component exists
 - **WHEN** `forge-core/skills/markdown-conventions/package.json` is read
-- **THEN** it has `name: "@clawmasons/skill-markdown-conventions"` and a valid `forge` field with `type: "skill"`, and `SKILL.md` exists alongside it
+- **THEN** it has `name: "@clawmasons/skill-markdown-conventions"` and a valid `chapter` field with `type: "skill"`, and `SKILL.md` exists alongside it
 
 #### Scenario: Role component exists
 - **WHEN** `forge-core/roles/writer/package.json` is read
-- **THEN** it has `name: "@clawmasons/role-writer"` and a valid `forge` field with `type: "role"`
+- **THEN** it has `name: "@clawmasons/role-writer"` and a valid `chapter` field with `type: "role"`
 
 #### Scenario: Agent component exists
 - **WHEN** `forge-core/agents/note-taker/package.json` is read
-- **THEN** it has `name: "@clawmasons/agent-note-taker"` and a valid `forge` field with `type: "agent"`
+- **THEN** it has `name: "@clawmasons/agent-note-taker"` and a valid `chapter` field with `type: "agent"`
 
-### Requirement: All forge-field cross-references use @clawmasons scope
-Every forge-field reference within `forge-core/` components SHALL use `@clawmasons/*` package names — not `@example/*`.
+### Requirement: All chapter field cross-references use @clawmasons scope
+Every chapter field reference within `forge-core/` components SHALL use `@clawmasons/*` package names — not `@example/*`.
 
 #### Scenario: Task references use @clawmasons scope
-- **WHEN** `forge-core/tasks/take-notes/package.json` forge field is read
+- **WHEN** `forge-core/tasks/take-notes/package.json` chapter field is read
 - **THEN** `requires.apps` contains `"@clawmasons/app-filesystem"` and `requires.skills` contains `"@clawmasons/skill-markdown-conventions"`
 
 #### Scenario: Role references use @clawmasons scope
-- **WHEN** `forge-core/roles/writer/package.json` forge field is read
+- **WHEN** `forge-core/roles/writer/package.json` chapter field is read
 - **THEN** `tasks` contains `"@clawmasons/task-take-notes"`, `skills` contains `"@clawmasons/skill-markdown-conventions"`, and `permissions` keys use `"@clawmasons/app-filesystem"`
 
 #### Scenario: Agent references use @clawmasons scope
-- **WHEN** `forge-core/agents/note-taker/package.json` forge field is read
+- **WHEN** `forge-core/agents/note-taker/package.json` chapter field is read
 - **THEN** `roles` contains `"@clawmasons/role-writer"`
 
 ### Requirement: forge-core produces a valid npm tarball
