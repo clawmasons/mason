@@ -223,6 +223,11 @@ Write the E2E test that validates the note-taker member materialized for pi-codi
 - Tests: proxy connectivity (skip if no Docker)
 - Tests: task execution (skip if no OPENROUTER_API_KEY)
 
-**Testable output:** `cd e2e && npm test` passes. Materialization tests verify all expected files exist with correct content. Docker Compose tests verify service definition and env vars. Tests skip gracefully when infrastructure is unavailable. `npx vitest run` in the e2e directory passes.
+**Testable output:** `cd e2e && npm test` passes. Materialization tests verify all expected files exist with correct content. Docker Compose tests verify service definition and env vars. Tests skip gracefully when infrastructure is unavailable. `npx vitest run` in the e2e directory passes (20 passed, 2 skipped).
 
-**Not Implemented Yet**
+**Implemented** -- 2026-03-06
+
+**Spec:** [openspec/changes/archive/2026-03-06-e2e-note-taker-test/](../../openspec/changes/archive/2026-03-06-e2e-note-taker-test/)
+- [Proposal](../../openspec/changes/archive/2026-03-06-e2e-note-taker-test/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-06-e2e-note-taker-test/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-06-e2e-note-taker-test/tasks.md)
