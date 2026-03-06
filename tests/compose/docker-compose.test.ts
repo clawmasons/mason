@@ -73,6 +73,7 @@ function makeClaudeCodeService(): ComposeServiceDef {
     depends_on: ["mcp-proxy"],
     stdin_open: true,
     tty: true,
+    init: true,
     networks: ["agent-net"],
   };
 }
@@ -87,6 +88,7 @@ function makeCodexService(): ComposeServiceDef {
     depends_on: ["mcp-proxy"],
     stdin_open: true,
     tty: true,
+    init: true,
     networks: ["agent-net"],
   };
 }
@@ -269,6 +271,14 @@ describe("generateDockerCompose", () => {
 
       expect(yaml).toContain("stdin_open: true");
       expect(yaml).toContain("tty: true");
+    });
+
+    it("renders init flag for proper PID 1 signal handling", () => {
+      const agent = makeRepoOpsAgent();
+      const services = new Map([["claude-code", makeClaudeCodeService()]]);
+      const yaml = generateDockerCompose(agent, services);
+
+      expect(yaml).toContain("init: true");
     });
   });
 

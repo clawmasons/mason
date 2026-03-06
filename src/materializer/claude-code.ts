@@ -1,4 +1,4 @@
-import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedTask, ResolvedSkill } from "../resolver/types.js";
+import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from "../resolver/types.js";
 import { getAppShortName } from "../generator/toolfilter.js";
 import type { RuntimeMaterializer, MaterializationResult, ComposeServiceDef } from "./types.js";
 
@@ -77,29 +77,13 @@ function collectAllTasks(
 }
 
 /**
- * Collect all unique apps from a resolved agent's roles.
- */
-function collectAllApps(agent: ResolvedAgent): Map<string, ResolvedApp> {
-  const apps = new Map<string, ResolvedApp>();
-  for (const role of agent.roles) {
-    for (const app of role.apps) {
-      if (!apps.has(app.name)) {
-        apps.set(app.name, app);
-      }
-    }
-  }
-  return apps;
-}
-
-/**
- * Generate .claude/settings.json content.
+ * Generate .mcp.json content.
  *
- * Creates one MCP server entry per app, keyed by short name.
- * Each entry points to the per-server endpoint exposed by mcp-proxy:
- *   /{shortName}/sse  (SSE)  or  /{shortName}/mcp  (streamable-http)
+ * Creates a single "forge" MCP server entry pointing at the proxy's
+ * unified endpoint:  /sse  (SSE)  or  /mcp  (streamable-http).
+ * The proxy handles tool prefixing internally (e.g. github_create_pr).
  */
-function generateSettingsJson(
-  agent: ResolvedAgent,
+function generateMcpJson(
   proxyEndpoint: string,
   proxyType: "sse" | "streamable-http",
   proxyToken?: string,
@@ -109,26 +93,30 @@ function generateSettingsJson(
     ? `Bearer ${proxyToken}`
     : "Bearer ${FORGE_PROXY_TOKEN}";
 
-  const allApps = collectAllApps(agent);
-  const mcpServers: Record<string, object> = {};
-  const permissions: string[] = [];
-
-  for (const [appName] of allApps) {
-    const shortName = getAppShortName(appName);
-    mcpServers[shortName] = {
-      type: proxyType,
-      url: `${proxyEndpoint}/${shortName}${pathSuffix}`,
-      headers: {
-        Authorization: bearerValue,
+  const mcpConfig = {
+    mcpServers: {
+      forge: {
+        type: proxyType,
+        url: `${proxyEndpoint}${pathSuffix}`,
+        headers: {
+          Authorization: bearerValue,
+        },
       },
-    };
-    permissions.push(`mcp__${shortName}__*`);
-  }
+    },
+  };
 
+  return JSON.stringify(mcpConfig, null, 2);
+}
+
+/**
+ * Generate .claude/settings.json content.
+ *
+ * Contains only permissions — MCP server config lives in .mcp.json.
+ */
+function generateSettingsJson(): string {
   const settings = {
-    mcpServers,
     permissions: {
-      allow: permissions,
+      allow: ["mcp__forge__*"],
       deny: [],
     },
   };
@@ -247,7 +235,8 @@ function generateSkillReadme(skill: ResolvedSkill): string {
  * Claude Code runtime materializer.
  *
  * Generates a workspace directory optimized for the Claude Code CLI:
- * - .claude/settings.json — MCP config pointing to forge-proxy
+ * - .mcp.json — MCP server config pointing to forge-proxy
+ * - .claude/settings.json — permissions (allow/deny)
  * - .claude/commands/*.md — slash commands scoped to roles
  * - AGENTS.md — agent identity and role documentation
  * - skills/{name}/README.md — skill artifact manifests
@@ -263,10 +252,16 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     const result: MaterializationResult = new Map();
     const proxyType = agent.proxy?.type ?? "sse";
 
-    // .claude/settings.json
+    // .mcp.json — MCP server config at workspace root
+    result.set(
+      ".mcp.json",
+      generateMcpJson(proxyEndpoint, proxyType, proxyToken),
+    );
+
+    // .claude/settings.json — permissions only
     result.set(
       ".claude/settings.json",
-      generateSettingsJson(agent, proxyEndpoint, proxyType, proxyToken),
+      generateSettingsJson(),
     );
 
     // .claude/commands/{task-short-name}.md
@@ -331,6 +326,7 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
       depends_on: ["mcp-proxy"],
       stdin_open: true,
       tty: true,
+      init: true,
       networks: ["agent-net"],
     };
   },

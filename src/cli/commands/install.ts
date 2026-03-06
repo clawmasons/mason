@@ -10,6 +10,7 @@ import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
 import { getAppShortName } from "../../generator/toolfilter.js";
 import { claudeCodeMaterializer } from "../../materializer/claude-code.js";
 import type { RuntimeMaterializer, ComposeServiceDef } from "../../materializer/types.js";
+import type { ResolvedAgent, ResolvedTask } from "../../resolver/types.js";
 import { generateDockerCompose } from "../../compose/docker-compose.js";
 import { generateEnvTemplate } from "../../compose/env.js";
 import { generateLockFile } from "../../compose/lock.js";
@@ -26,8 +27,28 @@ const materializerRegistry = new Map<string, RuntimeMaterializer>([
 /** Workspace directories that contain agent packages. */
 const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents"];
 
+/** Collect all package names from the resolved agent dependency graph. */
+function collectResolvedNames(agent: ResolvedAgent): Set<string> {
+  const names = new Set<string>();
+  names.add(agent.name);
+  for (const role of agent.roles) {
+    names.add(role.name);
+    for (const app of role.apps) names.add(app.name);
+    for (const skill of role.skills) names.add(skill.name);
+    for (const task of role.tasks) addTaskNames(task, names);
+  }
+  return names;
+}
+
+function addTaskNames(task: ResolvedTask, names: Set<string>): void {
+  names.add(task.name);
+  for (const app of task.apps) names.add(app.name);
+  for (const skill of task.skills) names.add(skill.name);
+  for (const sub of task.subTasks) addTaskNames(sub, names);
+}
+
 /**
- * Resolve the forge project root directory (where package.json, src/, bin/ live).
+ * Resolve the forge project root directory (where package.json, dist/, bin/ live).
  * Uses import.meta.url to locate the forge installation.
  */
 function getForgeProjectRoot(): string {
@@ -40,11 +61,14 @@ function getForgeProjectRoot(): string {
 /**
  * Copy a directory tree into the allFiles map with a given prefix.
  * Only copies files (not directories), recursively.
+ *
+ * @param skipDirs - Directory names to skip (defaults to ["node_modules", ".git"])
  */
 function copyDirToFiles(
   srcDir: string,
   prefix: string,
   allFiles: Map<string, string>,
+  skipDirs: string[] = ["node_modules", ".git"],
 ): void {
   if (!fs.existsSync(srcDir)) return;
 
@@ -54,9 +78,8 @@ function copyDirToFiles(
     const destPath = `${prefix}/${entry.name}`;
 
     if (entry.isDirectory()) {
-      // Skip node_modules in forge source (will be installed via npm ci)
-      if (entry.name === "node_modules" || entry.name === "dist" || entry.name === ".git") continue;
-      copyDirToFiles(srcPath, destPath, allFiles);
+      if (skipDirs.includes(entry.name)) continue;
+      copyDirToFiles(srcPath, destPath, allFiles, skipDirs);
     } else {
       allFiles.set(destPath, fs.readFileSync(srcPath, "utf-8"));
     }
@@ -148,23 +171,39 @@ export async function runInstall(
     // 7. Generate forge-proxy build context
     allFiles.set("forge-proxy/Dockerfile", proxyDockerfile);
 
-    // Copy forge project source into forge-proxy/forge/ for Docker build
+    // Copy pre-built forge package into forge-proxy/forge/ for Docker build.
+    // Only dist/, bin/, and package.json are needed.
+    // Production dependencies are installed via npm install in the Dockerfile.
     const forgeRoot = getForgeProjectRoot();
-    copyDirToFiles(path.join(forgeRoot, "src"), "forge-proxy/forge/src", allFiles);
-    copyDirToFiles(path.join(forgeRoot, "bin"), "forge-proxy/forge/bin", allFiles);
+    copyDirToFiles(path.join(forgeRoot, "dist"), "forge-proxy/forge/dist", allFiles, [".git"]);
+    copyDirToFiles(path.join(forgeRoot, "bin"), "forge-proxy/forge/bin", allFiles, [".git"]);
 
-    // Copy essential config files for the forge build
-    for (const configFile of ["package.json", "package-lock.json", "tsconfig.json", "tsconfig.build.json"]) {
-      const configPath = path.join(forgeRoot, configFile);
-      if (fs.existsSync(configPath)) {
-        allFiles.set(`forge-proxy/forge/${configFile}`, fs.readFileSync(configPath, "utf-8"));
-      }
+    // Copy package.json for dependency installation in Docker
+    const pkgJsonPath = path.join(forgeRoot, "package.json");
+    if (fs.existsSync(pkgJsonPath)) {
+      allFiles.set("forge-proxy/forge/package.json", fs.readFileSync(pkgJsonPath, "utf-8"));
     }
 
     // Copy agent workspace directories into forge-proxy/workspace/
     for (const wsDir of WORKSPACE_DIRS) {
       const wsDirPath = path.join(rootDir, wsDir);
       copyDirToFiles(wsDirPath, `forge-proxy/workspace/${wsDir}`, allFiles);
+    }
+
+    // Also copy packages discovered from outside the local workspace (e.g., node_modules/forge-core)
+    // Only copy packages that are in the resolved agent's dependency graph to avoid
+    // basename collisions (e.g., @clawforge/agent-note-taker overwriting @vis/agent-note-taker).
+    const resolvedNames = collectResolvedNames(agent);
+    for (const [, pkg] of packages) {
+      if (!resolvedNames.has(pkg.name)) continue;
+      const isLocal = WORKSPACE_DIRS.some((wsDir) =>
+        pkg.packagePath.startsWith(path.join(rootDir, wsDir) + path.sep),
+      );
+      if (!isLocal) {
+        const typeDir = `${pkg.forgeField.type}s`;
+        const dirName = path.basename(pkg.packagePath);
+        copyDirToFiles(pkg.packagePath, `forge-proxy/workspace/${typeDir}/${dirName}`, allFiles);
+      }
     }
 
     // 8. Generate docker-compose.yml

@@ -3,33 +3,33 @@
 ## Purpose
 Translates a resolved forge agent graph into Claude Code-specific runtime artifacts: workspace files, Dockerfile, and docker-compose service definition.
 ## Requirements
-### Requirement: Claude Code materializer generates settings.json with per-server MCP entries
+### Requirement: Claude Code materializer generates settings.json with single forge MCP entry
 
-The Claude Code materializer SHALL generate a `.claude/settings.json` file containing one `mcpServers` entry per unique app in the agent, keyed by the app's short name (e.g., `"github"`, `"slack"`). Each entry SHALL have:
+The Claude Code materializer SHALL generate a `.claude/settings.json` file containing a single `mcpServers` entry keyed as `"forge"`, pointing at the proxy's unified endpoint. The proxy handles tool prefixing internally (e.g. `github_create_pr`), so per-app routing is unnecessary. The entry SHALL have:
 - `type` set to the agent's proxy type (default `"sse"`)
-- `url` set to `{proxyEndpoint}/{shortName}/sse` (for SSE) or `{proxyEndpoint}/{shortName}/mcp` (for streamable-http)
+- `url` set to `{proxyEndpoint}/sse` (for SSE) or `{proxyEndpoint}/mcp` (for streamable-http)
 - `headers.Authorization` set to `"Bearer <actual-token>"` when a `proxyToken` is provided, or `"Bearer ${FORGE_PROXY_TOKEN}"` as a fallback placeholder
-- A `permissions` block with `allow: ["mcp__{shortName}__*", ...]` for each app and `deny: []`
+- A `permissions` block with `allow: ["mcp__forge__*"]` and `deny: []`
 
 #### Scenario: Default SSE proxy settings
-- **WHEN** materializeWorkspace is called with a resolved agent having apps `github` and `slack` using default SSE proxy on port 9090
-- **THEN** the result SHALL contain key `.claude/settings.json` with a JSON object having `mcpServers.github.url` equal to `"http://mcp-proxy:9090/github/sse"` and `mcpServers.slack.url` equal to `"http://mcp-proxy:9090/slack/sse"`, both with `type` equal to `"sse"`
+- **WHEN** materializeWorkspace is called with a resolved agent using default SSE proxy on port 9090
+- **THEN** the result SHALL contain key `.claude/settings.json` with a JSON object having a single `mcpServers.forge` entry with `url` equal to `"http://mcp-proxy:9090/sse"` and `type` equal to `"sse"`
 
 #### Scenario: Custom proxy port and streamable-http
 - **WHEN** the agent has `proxy.port` of 8080 and `proxy.type` of `"streamable-http"`
-- **THEN** the settings SHALL have `mcpServers.github.url` equal to `"http://mcp-proxy:8080/github/mcp"` and `mcpServers.github.type` equal to `"streamable-http"`
+- **THEN** the settings SHALL have `mcpServers.forge.url` equal to `"http://mcp-proxy:8080/mcp"` and `mcpServers.forge.type` equal to `"streamable-http"`
 
 #### Scenario: Auth header with baked token
 - **WHEN** settings.json is generated with a `proxyToken` of `"abc123"`
-- **THEN** each server entry's `headers.Authorization` SHALL equal `"Bearer abc123"`
+- **THEN** `mcpServers.forge.headers.Authorization` SHALL equal `"Bearer abc123"`
 
 #### Scenario: Auth header placeholder fallback
 - **WHEN** settings.json is generated without a `proxyToken`
-- **THEN** each server entry's `headers.Authorization` SHALL equal `"Bearer ${FORGE_PROXY_TOKEN}"`
+- **THEN** `mcpServers.forge.headers.Authorization` SHALL equal `"Bearer ${FORGE_PROXY_TOKEN}"`
 
-#### Scenario: Per-server permissions
-- **WHEN** the agent has apps `github` and `slack`
-- **THEN** `permissions.allow` SHALL equal `["mcp__github__*", "mcp__slack__*"]`
+#### Scenario: Single forge permission
+- **WHEN** settings.json is generated for any agent
+- **THEN** `permissions.allow` SHALL equal `["mcp__forge__*"]`
 
 ### Requirement: Claude Code materializer generates slash commands from tasks
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { type MockInstance, describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -37,7 +37,7 @@ describe("CLI install command", () => {
 
 describe("runInstall", () => {
   let tmpDir: string;
-  let exitSpy: ReturnType<typeof vi.spyOn>;
+  let exitSpy: MockInstance;
   let logSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
@@ -369,17 +369,16 @@ describe("runInstall", () => {
     expect(logOutput).toContain("forge run");
   });
 
-  it("bakes proxy token into settings.json", async () => {
+  it("bakes proxy token into .mcp.json", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
-    const settingsPath = path.join(outputDir, "claude-code/workspace/.claude/settings.json");
-    const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-    // Per-server entries: pick the first server (github) to check the baked token
-    const serverKeys = Object.keys(settings.mcpServers);
+    const mcpPath = path.join(outputDir, "claude-code/workspace/.mcp.json");
+    const mcp = JSON.parse(fs.readFileSync(mcpPath, "utf-8"));
+    const serverKeys = Object.keys(mcp.mcpServers);
     expect(serverKeys.length).toBeGreaterThan(0);
-    const authHeader = settings.mcpServers[serverKeys[0]].headers.Authorization;
+    const authHeader = mcp.mcpServers[serverKeys[0]].headers.Authorization;
 
     // Should contain actual token, not the placeholder
     expect(authHeader).not.toContain("${FORGE_PROXY_TOKEN}");
@@ -396,7 +395,7 @@ describe("runInstall", () => {
     expect(proxySection).toContain("FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}");
   });
 
-  it("generates forge-proxy/Dockerfile with forge build", async () => {
+  it("generates single-stage forge-proxy/Dockerfile with pre-built forge", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
@@ -406,6 +405,9 @@ describe("runInstall", () => {
 
     const dockerfile = fs.readFileSync(dockerfilePath, "utf-8");
     expect(dockerfile).toContain("FROM node:22-slim");
+    expect(dockerfile).not.toContain("AS builder");
+    expect(dockerfile).not.toContain("npm run build");
+    expect(dockerfile).not.toContain("COPY --from=builder");
     expect(dockerfile).toContain("forge.js");
     expect(dockerfile).toContain('"proxy"');
     expect(dockerfile).not.toContain("mcp-proxy");
@@ -421,13 +423,20 @@ describe("runInstall", () => {
     expect(composeContent).not.toContain("image: ghcr.io/tbxark/mcp-proxy");
   });
 
-  it("copies forge source into forge-proxy/forge/ build context", async () => {
+  it("copies pre-built forge into forge-proxy/forge/ build context", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
-    // Forge source files should be in the build context
+    // Pre-built forge artifacts should be in the build context
     expect(fs.existsSync(path.join(outputDir, "forge-proxy/forge/package.json"))).toBe(true);
+
+    // Verify source files are NOT in the build context
+    const allFiles = fs.readdirSync(path.join(outputDir, "forge-proxy/forge"), { recursive: true }) as string[];
+    const srcFiles = allFiles.filter((f) => f.toString().startsWith("src"));
+    const tsconfigFiles = allFiles.filter((f) => f.toString().includes("tsconfig"));
+    expect(srcFiles).toHaveLength(0);
+    expect(tsconfigFiles).toHaveLength(0);
   });
 
   it("copies workspace directories into forge-proxy/workspace/", async () => {
@@ -471,6 +480,80 @@ describe("runInstall", () => {
     const claudeDir = path.join(outputDir, "claude-code/.claude");
     expect(fs.existsSync(claudeDir)).toBe(true);
     expect(fs.statSync(claudeDir).isDirectory()).toBe(true);
+  });
+
+  it("copies node_modules forge packages into forge-proxy/workspace/", async () => {
+    setupValidAgent();
+
+    // Simulate a forge-core package in node_modules that bundles a task sub-component
+    const nmTaskDir = path.join(tmpDir, "node_modules", "@clawforge", "forge-core", "tasks", "take-notes");
+    writePackage(nmTaskDir, {
+      name: "@clawforge/task-take-notes",
+      version: "1.0.0",
+      forge: {
+        type: "task",
+        taskType: "subagent",
+        prompt: "./notes.md",
+        requires: {},
+      },
+    });
+    fs.writeFileSync(path.join(nmTaskDir, "notes.md"), "Take notes prompt");
+
+    // Add the node_modules task to the role so it's in the resolved dependency graph
+    const rolePkg = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, "roles", "manager", "package.json"), "utf-8"),
+    );
+    rolePkg.forge.tasks.push("@clawforge/task-take-notes");
+    fs.writeFileSync(
+      path.join(tmpDir, "roles", "manager", "package.json"),
+      JSON.stringify(rolePkg, null, 2),
+    );
+
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+
+    // The node_modules task should be copied into forge-proxy/workspace/tasks/
+    expect(
+      fs.existsSync(path.join(outputDir, "forge-proxy/workspace/tasks/take-notes/package.json")),
+    ).toBe(true);
+    expect(
+      fs.existsSync(path.join(outputDir, "forge-proxy/workspace/tasks/take-notes/notes.md")),
+    ).toBe(true);
+
+    // Local workspace packages should still be there too
+    expect(
+      fs.existsSync(path.join(outputDir, "forge-proxy/workspace/agents/ops/package.json")),
+    ).toBe(true);
+  });
+
+  it("does not copy non-local packages outside the resolved dependency graph", async () => {
+    setupValidAgent();
+
+    // Simulate an unrelated agent in node_modules with the same basename as our local agent
+    const nmAgentDir = path.join(tmpDir, "node_modules", "@clawforge", "forge-core", "agents", "ops");
+    writePackage(nmAgentDir, {
+      name: "@clawforge/agent-ops",
+      version: "1.0.0",
+      forge: {
+        type: "agent",
+        runtimes: ["claude-code"],
+        roles: [],
+      },
+    });
+
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
+
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+
+    // The local agent package.json should be preserved (not overwritten by the node_modules one)
+    const agentPkg = JSON.parse(
+      fs.readFileSync(path.join(outputDir, "forge-proxy/workspace/agents/ops/package.json"), "utf-8"),
+    );
+    expect(agentPkg.name).toBe("@test/agent-ops");
+    expect(agentPkg.name).not.toBe("@clawforge/agent-ops");
   });
 
   it("claude-code compose service has restart no", async () => {

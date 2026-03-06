@@ -9,28 +9,46 @@ describe("generateProxyDockerfile", () => {
     expect(result.length).toBeGreaterThan(0);
   });
 
-  it("uses Node.js 22-slim as base image", () => {
+  it("uses Node.js 22-slim as sole base image (single-stage)", () => {
     const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toContain("FROM node:22-slim AS builder");
     expect(result).toContain("FROM node:22-slim");
+    expect(result).not.toContain("AS builder");
+    expect(result).not.toContain("COPY --from=builder");
   });
 
-  it("builds forge from source in builder stage", () => {
+  it("does not build forge from source", () => {
     const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toContain("COPY forge/ ./forge/");
-    expect(result).toContain("npm ci --ignore-scripts");
-    expect(result).toContain("npm run build");
+    expect(result).not.toContain("npm run build");
+    expect(result).not.toContain("AS builder");
   });
 
-  it("copies forge build artifacts to runtime stage", () => {
+  it("installs build tools for native addons", () => {
     const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toContain("COPY --from=builder /build/forge/dist ./dist");
-    expect(result).toContain("COPY --from=builder /build/forge/bin ./bin");
-    expect(result).toContain("COPY --from=builder /build/forge/node_modules ./node_modules");
-    expect(result).toContain("COPY --from=builder /build/forge/package.json ./");
+    expect(result).toContain("python3 make g++");
+  });
+
+  it("installs production dependencies with native compilation", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
+
+    expect(result).toContain("npm install --omit=dev");
+    expect(result).not.toContain("--ignore-scripts");
+  });
+
+  it("copies pre-built forge dist and bin into the image", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
+
+    expect(result).toContain("COPY forge/dist ./dist");
+    expect(result).toContain("COPY forge/bin ./bin");
+  });
+
+  it("copies package manifests for dependency install", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
+
+    expect(result).toContain("COPY forge/package.json ./");
+    expect(result).not.toContain("package-lock.json");
   });
 
   it("copies workspace into the image", () => {
@@ -42,7 +60,7 @@ describe("generateProxyDockerfile", () => {
   it("uses forge proxy as entrypoint with agent name", () => {
     const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toContain('ENTRYPOINT ["node", "/app/bin/forge.js"]');
+    expect(result).toContain('ENTRYPOINT ["node", "/app/forge/bin/forge.js"]');
     expect(result).toContain('CMD ["proxy", "--agent", "@test/agent-test"]');
   });
 

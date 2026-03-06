@@ -2,7 +2,7 @@
 # .claude/commands/opsx/prd-implement-all.md
 ---
 
-Implement ALL changes from a PRD's IMPLEMENTATION.md sequentially, one change per branch, with PRs targeting the PRD feature branch.
+Implement ALL changes from a PRD's IMPLEMENTATION.md sequentially, one change per branch, with PRs targeting the PRD feature branch. Each change is executed by a sub-agent to keep context isolated.
 
 ## Pre-flight Checks
 
@@ -12,9 +12,9 @@ Before doing anything else, run these checks and **stop immediately** if any fai
 
 2. **Check branch name** — Run `git branch --show-current`. The current branch should be a PRD feature branch (NOT `main` or `master`). This branch is the **PRD branch** — all change PRs will target it. Save this branch name for the entire flow.
 
-3. **Find the PRD** — Look in `openspec/prds/` for a PRD whose name matches or relates to the current branch name. Read its `IMPLEMENTATION.md` and identify all changes. List them with their implementation status.
+3. **Find the PRD** — The branch name IS the PRD directory name. Look up `openspec/prds/<branch-name>/IMPLEMENTATION.md` directly. If it doesn't exist, stop with an error: "No PRD found at `openspec/prds/<branch-name>/`. The branch name must match the PRD directory."
 
-4. **Identify unimplemented changes** — Filter to only changes that are NOT marked as `**Implemented**`. If all changes are already implemented, tell the user and stop.
+4. **Identify unimplemented changes** — Read IMPLEMENTATION.md and list all changes with their implementation status. Filter to only changes that are NOT marked as `**Implemented**`. If all changes are already implemented, tell the user and stop.
 
 If checks pass, present the list of unimplemented changes and confirm with the user before starting.
 
@@ -22,50 +22,53 @@ If checks pass, present the list of unimplemented changes and confirm with the u
 
 For each unimplemented change, in order:
 
-### 1. Create Change Branch
+### 1. Prepare the PRD Branch
 
-From the PRD feature branch, create a new branch for this change:
+Ensure you're on the PRD branch with the latest changes:
 
 ```
 git checkout <prd-branch>
 git pull origin <prd-branch> --ff-only   # (if remote exists, otherwise skip)
+```
+
+### 2. Create Change Branch
+
+From the PRD feature branch, create a new branch for this change:
+
+```
 git checkout -b <change-branch-name>
 ```
 
 The change branch name should be a kebab-case summary of the change (e.g., `sqlite-database-module`, `tool-router`, `proxy-cli`).
 
-### 2. Tell User to /clear and Invoke the Change Command
+### 3. Spawn Sub-Agent for the Change
 
-Tell the user:
+Use the `Task` tool to spawn a sub-agent that implements the change. The sub-agent prompt should be:
 
-> **Ready to implement Change N: <change-title>**
->
-> To keep the context window clean, please run:
-> 1. `/clear`
-> 2. `/opsx:prd-implement-change`
->
-> The change command will detect the current branch and PRD automatically.
-> When the change PR is created, come back and run `/opsx:prd-implement-all` to continue.
+```
+You are on branch `<change-branch-name>`, which targets PRD branch `<prd-branch>`.
 
-**STOP HERE and wait for the user to complete the change.**
+Execute `/opsx:prd-implement-change` for the following:
+- PRD: `<prd-name>` (at `openspec/prds/<prd-name>/`)
+- Change: #<change-number> — <change-title>
+- Base branch for PR: `<prd-branch>`
 
-Do NOT attempt to run `/opsx:prd-implement-change` inline — the whole point is to `/clear` context between changes to keep the context window clean.
+Run the full lifecycle: new → ff → apply → test → verify → sync → archive → commit → PR.
+```
 
-### 3. Resume After Change (when user re-invokes this command)
+Use `subagent_type: "general-purpose"` for the sub-agent.
 
-When the user re-invokes `/opsx:prd-implement-all` after completing a change:
+**Wait for the sub-agent to complete.** Check the result:
+- If successful (PR created), report the PR URL and continue.
+- If the sub-agent fails, report the error and ask the user whether to retry, skip, or stop.
 
-1. **Detect state** — Check `git branch --show-current`. If on a change branch (not the PRD branch), check if there's an open PR for it.
+### 4. Merge the PR
 
-2. **Prompt to merge** — Ask the user:
-   > "Change N: <title> has a PR. Merge into the PRD branch and continue to the next change?"
+After the sub-agent completes successfully:
 
-   Options:
-   - **Yes, merge and continue** — Merge the PR into the PRD branch using `gh pr merge --squash --delete-branch`, then `git checkout <prd-branch> && git pull origin <prd-branch>`.  Continue to the next unimplemented change (go to step 1 of Per-Change Loop).
-   - **Skip this change** — Switch back to the PRD branch without merging. Continue to the next change.
-   - **Stop here** — Halt the flow and report status.
-
-3. **If already on the PRD branch** — The user may have already merged manually. Check IMPLEMENTATION.md for the next unimplemented change and proceed from step 1.
+1. Merge the PR into the PRD branch: `gh pr merge --squash --delete-branch`
+2. Return to the PRD branch: `git checkout <prd-branch> && git pull origin <prd-branch> --ff-only`
+3. Continue to the next unimplemented change (back to step 1).
 
 ## Completion
 
@@ -78,6 +81,6 @@ When all changes are implemented:
 ## Notes
 
 - Each change gets its own branch and PR targeting the PRD feature branch (not `main`)
-- The `/opsx:prd-implement-change` command will automatically detect the base branch for its PR
-- Context is cleared between changes via `/clear` to prevent context window overflow
-- This command is **re-entrant** — you can re-invoke it at any point and it will detect where you left off
+- Context isolation is handled by sub-agents — each change runs in its own context window
+- This command is **re-entrant** — if re-invoked, it re-reads IMPLEMENTATION.md and skips changes already marked as `**Implemented**`
+- The branch name must match the PRD directory name exactly (e.g., branch `forge-packaging` → `openspec/prds/forge-packaging/`)
