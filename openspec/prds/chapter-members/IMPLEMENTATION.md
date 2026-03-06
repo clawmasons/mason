@@ -129,7 +129,7 @@ Rename the workspace config directory, global data directory, and all environmen
 - [proxy-cli](../../specs/proxy-cli/spec.md) -- `~/.forge/forge.db` → `~/.chapter/data/chapter.db`, `ForgeProxyServer` → `ChapterProxyServer`
 - [proxy-server](../../specs/proxy-server/spec.md) -- `ForgeProxyServer` → `ChapterProxyServer`, MCP name `"forge"` → `"chapter"`
 - [claude-code-materializer](../../specs/claude-code-materializer/spec.md) -- `FORGE_*` → `CHAPTER_*`, `agent-net` → `chapter-net`, `mcpServers.forge` → `mcpServers.chapter`
-- [forge-install-command](../../specs/forge-install-command/spec.md) -- `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`, `.forge/agents/` → `.chapter/agents/`
+- [install-command](../../specs/install-command/spec.md) -- `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`, `.forge/agents/` → `.chapter/agents/`
 - [build-command](../../specs/build-command/spec.md) -- `forge.lock.json` → `chapter.lock.json`
 - [run-command](../../specs/run-command/spec.md) -- `.forge/agents/` → `.chapter/agents/`
 - [stop-command](../../specs/stop-command/spec.md) -- `.forge/agents/` → `.chapter/agents/`
@@ -172,7 +172,7 @@ Update all user-facing strings from "forge" to "chapter" across CLI output, help
 - [workspace-init](../../specs/workspace-init/spec.md) -- all init output references use "chapter"
 - [add-command](../../specs/add-command/spec.md) -- command references use "chapter"
 - [remove-command](../../specs/remove-command/spec.md) -- command references use "chapter"
-- [forge-install-command](../../specs/forge-install-command/spec.md) -- title and command references use "chapter"
+- [install-command](../../specs/install-command/spec.md) -- title and command references use "chapter"
 - [run-command](../../specs/run-command/spec.md) -- command references use "chapter"
 - [stop-command](../../specs/stop-command/spec.md) -- command references use "chapter"
 - [build-command](../../specs/build-command/spec.md) -- command references use "chapter"
@@ -227,7 +227,7 @@ Replace the `agent` package type with `member`. Add the discriminated union sche
 - [dependency-graph-resolution](../../specs/dependency-graph-resolution/spec.md) -- `resolveAgent()` → `resolveMember()`, `ResolvedAgent` → `ResolvedMember` with member identity fields
 - [graph-validation](../../specs/graph-validation/spec.md) -- `validateAgent()` → `validateMember()`
 - [materializer-interface](../../specs/materializer-interface/spec.md) -- `ResolvedAgent` → `ResolvedMember`
-- [forge-install-command](../../specs/forge-install-command/spec.md) -- `<agent>` → `<member>`, `.chapter/agents/` → `.chapter/members/`
+- [install-command](../../specs/install-command/spec.md) -- `<agent>` → `<member>`, `.chapter/agents/` → `.chapter/members/`
 - [build-command](../../specs/build-command/spec.md) -- `<agent>` → `<member>`, `resolveAgent` → `resolveMember`
 - [workspace-init](../../specs/workspace-init/spec.md) -- template `type: "agent"` → `type: "member"` with `memberType`
 - [chapter-core-package](../../specs/chapter-core-package/spec.md) -- `type: "agent"` → `type: "member"` with `memberType: "agent"`
@@ -260,7 +260,7 @@ Update `chapter install` to scaffold per-member directories under `.chapter/memb
 - [Tasks](../../changes/archive/2026-03-06-per-member-directory-structure/tasks.md)
 
 **Specs updated:**
-- [forge-install-command](../../specs/forge-install-command/spec.md) -- per-member layout, log/ dir, human member handling, proxy/ build path, slug-based directory naming
+- [install-command](../../specs/install-command/spec.md) -- per-member layout, log/ dir, human member handling, proxy/ build path, slug-based directory naming
 - [docker-install-pipeline](../../specs/docker-install-pipeline/spec.md) -- `chapter-proxy/` replaced with `proxy/`
 - [docker-compose-generation](../../specs/docker-compose-generation/spec.md) -- `build: ./chapter-proxy` replaced with `build: ./proxy`
 - [run-command](../../specs/run-command/spec.md) -- updated to member terminology, `.chapter/members/<slug>/` paths
@@ -299,7 +299,7 @@ Implement the members registry file and integrate it with `chapter install`.
 
 **Specs updated:**
 - [members-registry](../../specs/members-registry/spec.md) -- new spec for registry module
-- [forge-install-command](../../specs/forge-install-command/spec.md) -- added registry integration requirement
+- [install-command](../../specs/install-command/spec.md) -- added registry integration requirement
 - [list-command](../../specs/list-command/spec.md) -- updated to member terminology, added status display requirement
 
 ---
@@ -374,19 +374,27 @@ Update the openspec specification files to reflect the chapter + member terminol
 
 **PRD refs:** REQ-010 (Rename Internal References — documentation portion)
 
-**Summary:** Update the main spec files under `openspec/specs/` that contain forge-specific examples, variable names, or terminology. Focus on specs that are actively referenced (not archived changes). Update examples to use `chapter` field, `CHAPTER_*` env vars, `.chapter/` paths, and member references. This is a documentation-only change — no source code modified.
+**Summary:** Renamed the last forge-named spec directory (`forge-install-command/` to `install-command/`) and updated all references in both PRD IMPLEMENTATION files. All spec file content was already updated to chapter terminology in Changes #1-#9 -- this change addressed the remaining directory naming inconsistency. No source code modified -- documentation-only change.
 
 **User Story:** As a developer reading the specs, all examples and references are consistent with the chapter terminology — no confusion between "forge" and "chapter" in active documentation.
 
 **Scope:**
-- Modify: spec files under `openspec/specs/` that contain `forge`/`FORGE_` references in examples
-- Key specs: `docker-compose-generation/`, `env-generation/`, `claude-code-materializer/`, `workspace-init/`, `package-discovery/`, `proxy-server/`, etc.
-- Do NOT modify archived changes (historical record)
-- ~15-20 spec files
+- Renamed: `openspec/specs/forge-install-command/` to `openspec/specs/install-command/` (follows convention: `add-command`, `build-command`, etc.)
+- Modified: `openspec/prds/chapter-members/IMPLEMENTATION.md` — updated 5 spec links
+- Modified: `openspec/prds/forge-initial/IMPLEMENTATION.md` — updated 1 live spec link
+- Did NOT modify archived changes (historical record)
 
-**Testable output:** Grepping `openspec/specs/` for `[Ff]orge` returns zero results (excluding filenames that reference historical PRDs). All spec examples use `chapter` terminology consistently.
+**Testable output:** Grepping `openspec/specs/` for `[Ff]orge` returns zero results in both directory names and file content. All spec examples use `chapter` terminology consistently. All 628 tests pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-06-update-openspec-chapter-terminology/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-06-update-openspec-chapter-terminology/proposal.md)
+- [Design](../../changes/archive/2026-03-06-update-openspec-chapter-terminology/design.md)
+- [Tasks](../../changes/archive/2026-03-06-update-openspec-chapter-terminology/tasks.md)
+
+**Specs updated:**
+- [install-command](../../specs/install-command/spec.md) -- renamed from `forge-install-command/`, content unchanged (already updated in prior changes)
 
 ---
 
