@@ -2,7 +2,7 @@
 
 ## ADDED Requirements
 
-### Requirement: forge build command is registered as a CLI command
+### Requirement: chapter build command is registered as a CLI command
 
 The CLI SHALL register a `build` command that accepts a required `<agent>` argument (agent package name), an optional `--output <path>` option, and a `--json` flag.
 
@@ -10,9 +10,9 @@ The CLI SHALL register a `build` command that accepts a required `<agent>` argum
 - **WHEN** the CLI program is initialized
 - **THEN** the `build` command SHALL be available with argument `<agent>`, option `--output`, and flag `--json`
 
-### Requirement: forge build resolves the agent graph and generates a lock file
+### Requirement: chapter build resolves the agent graph and generates a lock file
 
-When `forge build <agent>` is run, the command SHALL:
+When `chapter build <agent>` is run, the command SHALL:
 1. Discover packages in the workspace via `discoverPackages()`
 2. Resolve the agent's dependency graph via `resolveAgent()`
 3. Validate the resolved graph via `validateAgent()`
@@ -20,24 +20,24 @@ When `forge build <agent>` is run, the command SHALL:
 5. Write `chapter.lock.json` to the output path
 
 #### Scenario: Successful build writes lock file
-- **WHEN** `forge build` is run with a valid agent name
+- **WHEN** `chapter build` is run with a valid agent name
 - **THEN** a `chapter.lock.json` file SHALL be written to the current working directory (or `--output` path)
 - **AND** the lock file SHALL contain the agent name, version, runtimes, and all resolved roles with their tasks, apps, and skills
 
 #### Scenario: Custom output path
-- **WHEN** `forge build` is run with `--output ./custom/path.json`
+- **WHEN** `chapter build` is run with `--output ./custom/path.json`
 - **THEN** the lock file SHALL be written to `./custom/path.json`
 
 #### Scenario: JSON output mode
-- **WHEN** `forge build` is run with `--json`
+- **WHEN** `chapter build` is run with `--json`
 - **THEN** the lock file content SHALL be printed to stdout as JSON instead of being written to a file
 
-### Requirement: forge build exits with non-zero code on failure
+### Requirement: chapter build exits with non-zero code on failure
 
 #### Scenario: Agent not found
-- **WHEN** `forge build` is run with a non-existent agent name
+- **WHEN** `chapter build` is run with a non-existent agent name
 - **THEN** the command SHALL print an error message and exit with code 1
 
 #### Scenario: Validation failure
-- **WHEN** `forge build` is run with an agent that fails validation
+- **WHEN** `chapter build` is run with an agent that fails validation
 - **THEN** the command SHALL print validation errors and exit with code 1

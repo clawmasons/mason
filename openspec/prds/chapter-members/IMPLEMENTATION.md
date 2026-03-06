@@ -158,9 +158,35 @@ Update all user-facing strings from "forge" to "chapter" across CLI output, help
 - Modify: any remaining source files with forge string literals in comments or log messages
 - Update openspec spec files that contain example output with forge references
 
-**Testable output:** All tests pass. Running `chapter --help` shows "chapter" in all output. Grepping all source/test files for the word "forge" (case-insensitive) returns zero results outside of historical PRDs/CHANGELOG and the openspec archive directory.
+**Testable output:** All tests pass (563/563). Running `chapter --help` shows "chapter" in all output. Grepping all source/test files for the word "forge" (case-insensitive) returns zero results outside of historical PRDs/CHANGELOG and the openspec archive directory.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-05-rename-cli-help-text-and-docs/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-05-rename-cli-help-text-and-docs/proposal.md)
+- [Design](../../changes/archive/2026-03-05-rename-cli-help-text-and-docs/design.md)
+- [Tasks](../../changes/archive/2026-03-05-rename-cli-help-text-and-docs/tasks.md)
+
+**Specs updated:**
+- [cli-framework](../../specs/cli-framework/spec.md) -- program name `"chapter"`, description `"Clawmasons Chapter"`
+- [workspace-init](../../specs/workspace-init/spec.md) -- all init output references use "chapter"
+- [add-command](../../specs/add-command/spec.md) -- command references use "chapter"
+- [remove-command](../../specs/remove-command/spec.md) -- command references use "chapter"
+- [forge-install-command](../../specs/forge-install-command/spec.md) -- title and command references use "chapter"
+- [run-command](../../specs/run-command/spec.md) -- command references use "chapter"
+- [stop-command](../../specs/stop-command/spec.md) -- command references use "chapter"
+- [build-command](../../specs/build-command/spec.md) -- command references use "chapter"
+- [list-command](../../specs/list-command/spec.md) -- command references use "chapter"
+- [permissions-command](../../specs/permissions-command/spec.md) -- command references use "chapter"
+- [proxy-cli](../../specs/proxy-cli/spec.md) -- command references use "chapter"
+- [docker-compose-generation](../../specs/docker-compose-generation/spec.md) -- proxy references use "chapter"
+- [claude-code-materializer](../../specs/claude-code-materializer/spec.md) -- generated content references "chapter"
+- [mcp-proxy-integration-test](../../specs/mcp-proxy-integration-test/spec.md) -- test description uses "chapter"
+- [graph-validation](../../specs/graph-validation/spec.md) -- command references use "chapter"
+- [proxy-config-generation](../../specs/proxy-config-generation/spec.md) -- proxy name uses "chapter"
+- [dependency-graph-resolution](../../specs/dependency-graph-resolution/spec.md) -- field references use "chapter"
+- [credential-loading](../../specs/credential-loading/spec.md) -- command references use "chapter"
+- [sqlite-database](../../specs/sqlite-database/spec.md) -- proxy references use "chapter"
 
 ---
 

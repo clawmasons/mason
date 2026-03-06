@@ -39,7 +39,7 @@ function getChapterProjectRoot(): string {
 }
 
 /**
- * Get the path to the templates directory inside the forge package.
+ * Get the path to the templates directory inside the chapter package.
  */
 export function getTemplatesDir(): string {
   return path.join(getChapterProjectRoot(), "templates");
@@ -62,7 +62,7 @@ export function listTemplates(templatesDir?: string): string[] {
  * Derive the project scope from a --name value or directory basename.
  *
  * - "@acme/my-agent" -> "acme"
- * - "test-forge" -> "test-forge"
+ * - "test-chapter" -> "test-chapter"
  * - "@myorg/cool-project" -> "myorg"
  */
 export function deriveProjectScope(nameOrDir: string): string {
@@ -109,7 +109,7 @@ export function copyTemplateFiles(
 export function registerInitCommand(program: Command): void {
   program
     .command("init")
-    .description("Initialize a new forge workspace")
+    .description("Initialize a new chapter workspace")
     .option("--name <name>", "Set the workspace package name")
     .option("--template <template>", "Use a project template")
     .action(async (options: InitOptions) => {
@@ -240,7 +240,7 @@ export async function runInit(
   }
 
   // Success output
-  console.log("\n✔ forge workspace initialized!\n");
+  console.log("\n✔ chapter workspace initialized!\n");
   console.log("Created:");
   for (const item of created) {
     console.log(`  ${item}`);
@@ -249,13 +249,13 @@ export async function runInit(
   if (usedTemplate) {
     console.log(`\nTemplate: ${options.template}`);
     console.log("\nNext steps:");
-    console.log(`  forge list                                    List discovered packages`);
-    console.log(`  forge validate @${projectScope}/agent-note-taker   Validate the agent graph`);
-    console.log(`  forge install @${projectScope}/agent-note-taker    Install and scaffold the agent\n`);
+    console.log(`  chapter list                                    List discovered packages`);
+    console.log(`  chapter validate @${projectScope}/agent-note-taker   Validate the agent graph`);
+    console.log(`  chapter install @${projectScope}/agent-note-taker    Install and scaffold the agent\n`);
   } else {
     console.log("\nNext steps:");
-    console.log("  forge add <package>    Add an agent component");
-    console.log("  forge build <agent>    Build and validate an agent");
-    console.log("  forge install <agent>  Install and scaffold an agent\n");
+    console.log("  chapter add <package>    Add an agent component");
+    console.log("  chapter build <agent>    Build and validate an agent");
+    console.log("  chapter install <agent>  Install and scaffold an agent\n");
   }
 }

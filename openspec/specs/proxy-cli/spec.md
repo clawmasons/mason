@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `forge proxy` CLI command orchestrates the full proxy startup sequence: discovers packages in the workspace, resolves the agent dependency graph, computes tool filters, loads credentials, opens the SQLite database, connects to upstream MCP servers, builds routing tables, and starts the downstream MCP server.
+The `chapter proxy` CLI command orchestrates the full proxy startup sequence: discovers packages in the workspace, resolves the agent dependency graph, computes tool filters, loads credentials, opens the SQLite database, connects to upstream MCP servers, builds routing tables, and starts the downstream MCP server.
 
 ## Source
 
@@ -13,7 +13,7 @@ The `forge proxy` CLI command orchestrates the full proxy startup sequence: disc
 
 ### `registerProxyCommand(program: Command): void`
 
-Registers the `forge proxy` command on the Commander.js program instance.
+Registers the `chapter proxy` command on the Commander.js program instance.
 
 ### `startProxy(rootDir: string, options: ProxyOptions): Promise<void>`
 
@@ -28,7 +28,7 @@ Main startup orchestrator. Follows PRD §6.2 startup sequence:
 7. Enumerate tools/resources/prompts and build routing tables
 8. Collect approval patterns from all roles
 9. Start MCP server on configured port
-10. Log "forge proxy ready" with summary
+10. Log "chapter proxy ready" with summary
 
 ### CLI Flags
 

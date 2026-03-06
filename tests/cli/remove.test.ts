@@ -48,7 +48,7 @@ describe("findDependents", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-remove-dep-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-remove-dep-test-"));
   });
 
   afterEach(() => {
@@ -240,7 +240,7 @@ describe("runRemove", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-remove-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-remove-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});

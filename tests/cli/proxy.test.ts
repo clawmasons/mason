@@ -61,7 +61,7 @@ vi.mock("../../src/proxy/server.js", () => ({
 
 // ── Command Registration Tests ──────────────────────────────────────
 
-describe("forge proxy command", () => {
+describe("chapter proxy command", () => {
   it("is registered on the program", () => {
     const proxyCmd = program.commands.find((cmd) => cmd.name() === "proxy");
     expect(proxyCmd).toBeDefined();

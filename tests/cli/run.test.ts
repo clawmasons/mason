@@ -78,7 +78,7 @@ describe("runAgent", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-run-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-run-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});

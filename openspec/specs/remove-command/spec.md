@@ -2,8 +2,8 @@
 
 ## ADDED Requirements
 
-### Requirement: CLI registration for forge remove
-The `forge remove` command SHALL be registered as a Commander.js command with a required `<pkg>` argument, a `--force` option, and optional variadic `[npmArgs...]` for forwarding to npm.
+### Requirement: CLI registration for chapter remove
+The `chapter remove` command SHALL be registered as a Commander.js command with a required `<pkg>` argument, a `--force` option, and optional variadic `[npmArgs...]` for forwarding to npm.
 
 #### Scenario: Command is registered
 - **WHEN** the CLI program is initialized
@@ -15,18 +15,18 @@ The `forge remove` command SHALL be registered as a Commander.js command with a 
 Before removing a package, the command SHALL scan all discovered chapter packages in the workspace to find packages that reference the target package in their `chapter` field.
 
 #### Scenario: No dependents found
-- **WHEN** `forge remove @clawmasons/app-unused` is run and no other package references it
+- **WHEN** `chapter remove @clawmasons/app-unused` is run and no other package references it
 - **THEN** the command SHALL proceed with npm uninstall
 
 #### Scenario: Dependents found without --force
-- **WHEN** `forge remove @clawmasons/app-github` is run and `@clawmasons/role-manager` references it in `permissions`
+- **WHEN** `chapter remove @clawmasons/app-github` is run and `@clawmasons/role-manager` references it in `permissions`
 - **THEN** the command SHALL NOT run npm uninstall
 - **AND** SHALL print an error listing the dependent packages
 - **AND** SHALL suggest using `--force` to override
 - **AND** SHALL exit with code 1
 
 #### Scenario: Dependents found with --force
-- **WHEN** `forge remove @clawmasons/app-github --force` is run and dependents exist
+- **WHEN** `chapter remove @clawmasons/app-github --force` is run and dependents exist
 - **THEN** the command SHALL print a warning listing the dependent packages
 - **AND** SHALL proceed with npm uninstall despite the dependents
 
@@ -71,5 +71,5 @@ When removal is permitted (no dependents or `--force`), the command SHALL delega
 - **AND** SHALL print an error message containing "Remove failed"
 
 #### Scenario: Remove with extra npm flags
-- **WHEN** `forge remove @clawmasons/app-github --force -- --no-save` is run
+- **WHEN** `chapter remove @clawmasons/app-github --force -- --no-save` is run
 - **THEN** the command SHALL execute `npm uninstall @clawmasons/app-github --no-save`

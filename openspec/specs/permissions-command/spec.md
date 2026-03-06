@@ -2,7 +2,7 @@
 
 ## ADDED Requirements
 
-### Requirement: forge permissions command is registered as a CLI command
+### Requirement: chapter permissions command is registered as a CLI command
 
 The CLI SHALL register a `permissions` command that accepts a required `<agent>` argument and a `--json` flag.
 
@@ -10,20 +10,20 @@ The CLI SHALL register a `permissions` command that accepts a required `<agent>`
 - **WHEN** the CLI program is initialized
 - **THEN** the `permissions` command SHALL be available with argument `<agent>` and flag `--json`
 
-### Requirement: forge permissions displays the per-role permission breakdown
+### Requirement: chapter permissions displays the per-role permission breakdown
 
-When `forge permissions <agent>` is run, the command SHALL:
+When `chapter permissions <agent>` is run, the command SHALL:
 1. Discover packages and resolve the agent's dependency graph
 2. For each role, display the app → allowed tools mapping from `role.permissions`
 3. Display the proxy-level toolFilter (union of all role allow-lists per app)
 
 #### Scenario: Per-role permission display
-- **WHEN** `forge permissions` is run for an agent with roles `issue-manager` and `pr-reviewer`
+- **WHEN** `chapter permissions` is run for an agent with roles `issue-manager` and `pr-reviewer`
 - **THEN** the output SHALL show each role's name
 - **AND** under each role, the apps and their allowed tools from `role.permissions`
 
 #### Scenario: Proxy-level toolFilter display
-- **WHEN** `forge permissions` is run for an agent
+- **WHEN** `chapter permissions` is run for an agent
 - **THEN** the output SHALL include a "Proxy toolFilter" section
 - **AND** for each app, the union of all role allow-lists SHALL be displayed
 
@@ -31,14 +31,14 @@ When `forge permissions <agent>` is run, the command SHALL:
 - **WHEN** a role has explicit `deny` entries for an app
 - **THEN** the per-role section SHALL also display the denied tools
 
-### Requirement: forge permissions exits with non-zero code on failure
+### Requirement: chapter permissions exits with non-zero code on failure
 
 #### Scenario: Agent not found
-- **WHEN** `forge permissions` is run with a non-existent agent name
+- **WHEN** `chapter permissions` is run with a non-existent agent name
 - **THEN** the command SHALL print an error message and exit with code 1
 
-### Requirement: forge permissions supports JSON output
+### Requirement: chapter permissions supports JSON output
 
 #### Scenario: JSON output
-- **WHEN** `forge permissions` is run with `--json`
+- **WHEN** `chapter permissions` is run with `--json`
 - **THEN** the output SHALL be a JSON object containing `roles` (per-role breakdown) and `toolFilters` (proxy-level union)

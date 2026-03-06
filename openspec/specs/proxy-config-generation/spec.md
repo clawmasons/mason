@@ -6,7 +6,7 @@ Generate a complete tbxark/mcp-proxy `config.json` from a resolved agent, includ
 ## Requirements
 
 ### Requirement: Generate complete mcpProxy section
-The system SHALL generate an `mcpProxy` section containing: `baseURL` (from agent proxy config or default `http://mcp-proxy:9090`), `addr` (default `:9090`), `name` (format `forge-proxy-{agent-short-name}`), `version` (agent version), `type` (from agent proxy config or default `sse`), and `options` with `panicIfInvalid: false`, `logEnabled: true`, and `authTokens` array.
+The system SHALL generate an `mcpProxy` section containing: `baseURL` (from agent proxy config or default `http://mcp-proxy:9090`), `addr` (default `:9090`), `name` (format `chapter-proxy-{agent-short-name}`), `version` (agent version), `type` (from agent proxy config or default `sse`), and `options` with `panicIfInvalid: false`, `logEnabled: true`, and `authTokens` array.
 
 #### Scenario: Default proxy settings
 - **WHEN** `generateProxyConfig(agent)` is called and the agent has no `proxy` field overrides
@@ -42,7 +42,7 @@ The system SHALL generate a `CHAPTER_PROXY_TOKEN` using `crypto.randomUUID()` an
 - **THEN** the config includes the caller's token in the authTokens
 
 ### Requirement: Preserve environment variable interpolation
-The generated config SHALL preserve `${VAR}` syntax in all `env` values and auth tokens. These are resolved by the mcp-proxy container at Docker runtime, not by forge at generation time.
+The generated config SHALL preserve `${VAR}` syntax in all `env` values and auth tokens. These are resolved by the mcp-proxy container at Docker runtime, not by chapter at generation time.
 
 #### Scenario: Env vars with interpolation
 - **WHEN** an app has `env: { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }`

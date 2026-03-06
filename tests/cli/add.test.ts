@@ -41,7 +41,7 @@ describe("runAdd", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-add-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-add-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -124,8 +124,8 @@ describe("runAdd", () => {
   it("rejects a package with an invalid chapter field and rolls back", async () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === "npm" && (args as string[])[0] === "install") {
-        writeNodeModulesPackage("bad-forge-pkg", {
-          name: "bad-forge-pkg",
+        writeNodeModulesPackage("bad-chapter-pkg", {
+          name: "bad-chapter-pkg",
           version: "1.0.0",
           chapter: {
             type: "app",
@@ -136,7 +136,7 @@ describe("runAdd", () => {
       return Buffer.from("");
     });
 
-    await runAdd(tmpDir, "bad-forge-pkg", { npmArgs: [] });
+    await runAdd(tmpDir, "bad-chapter-pkg", { npmArgs: [] });
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -145,7 +145,7 @@ describe("runAdd", () => {
     // Verify rollback
     expect(mockExecFileSync).toHaveBeenCalledWith(
       "npm",
-      ["uninstall", "bad-forge-pkg"],
+      ["uninstall", "bad-chapter-pkg"],
       expect.objectContaining({ cwd: tmpDir }),
     );
   });

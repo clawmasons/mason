@@ -11,7 +11,7 @@ interface AddOptions {
 export function registerAddCommand(program: Command): void {
   program
     .command("add")
-    .description("Add a forge package dependency (wraps npm install with chapter validation)")
+    .description("Add a chapter package dependency (wraps npm install with chapter validation)")
     .argument("<pkg>", "Package name to add")
     .argument("[npmArgs...]", "Additional arguments forwarded to npm install")
     .action(async (pkg: string, npmArgs: string[]) => {

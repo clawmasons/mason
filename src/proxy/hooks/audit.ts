@@ -56,6 +56,6 @@ export function auditPostHook(
     insertAuditLog(db, entry);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[forge] audit log write failed: ${message}`);
+    console.error(`[chapter] audit log write failed: ${message}`);
   }
 }

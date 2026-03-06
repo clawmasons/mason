@@ -1,22 +1,22 @@
 ## Purpose
 
-Commander.js-based CLI entry point for the forge tool. Provides the executable binary, command routing, version/help display, and a modular command registration pattern that all forge CLI commands plug into.
+Commander.js-based CLI entry point for the chapter tool. Provides the executable binary, command routing, version/help display, and a modular command registration pattern that all chapter CLI commands plug into.
 
 ## Requirements
 
 ### Requirement: CLI entry point with Commander.js
-The system SHALL provide a CLI executable registered as `forge` in package.json's `bin` field, powered by Commander.js with a program name of `forge`, a version matching package.json, and a description of "Agent Forge System — AI agent packaging, governance, and runtime orchestration".
+The system SHALL provide a CLI executable registered as `chapter` in package.json's `bin` field, powered by Commander.js with a program name of `chapter`, a version matching package.json, and a description of "Clawmasons Chapter — AI agent packaging, governance, and runtime orchestration".
 
 #### Scenario: Display version
-- **WHEN** the user runs `forge --version`
+- **WHEN** the user runs `chapter --version`
 - **THEN** the CLI outputs the version from package.json (e.g., `0.1.0`)
 
 #### Scenario: Display help
-- **WHEN** the user runs `forge --help`
+- **WHEN** the user runs `chapter --help`
 - **THEN** the CLI outputs usage information listing all registered commands
 
 #### Scenario: Unknown command
-- **WHEN** the user runs `forge nonexistent`
+- **WHEN** the user runs `chapter nonexistent`
 - **THEN** the CLI exits with a non-zero exit code and displays an error suggesting available commands
 
 ### Requirement: Command module registration
