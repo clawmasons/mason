@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { piCodingAgentMaterializer } from "../../src/materializer/pi-coding-agent.js";
+import { piCodingAgentMaterializer, PROVIDER_ENV_VARS } from "../../src/materializer/pi-coding-agent.js";
 import type { ResolvedMember, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "../../src/resolver/types.js";
 
 function makeGithubApp(): ResolvedApp {
@@ -515,11 +515,135 @@ describe("piCodingAgentMaterializer", () => {
       const service = piCodingAgentMaterializer.generateComposeService(member);
       expect(service.working_dir).toBe("/home/node/workspace");
     });
+
+    describe("LLM provider environment variables", () => {
+      it("includes OPENROUTER_API_KEY for openrouter provider", () => {
+        const member = makePiMember();
+        member.llm = { provider: "openrouter", model: "anthropic/claude-sonnet-4" };
+        const service = piCodingAgentMaterializer.generateComposeService(member);
+        expect(service.environment).toContain("OPENROUTER_API_KEY=${OPENROUTER_API_KEY}");
+      });
+
+      it("includes ANTHROPIC_API_KEY for anthropic provider", () => {
+        const member = makePiMember();
+        member.llm = { provider: "anthropic", model: "claude-opus-4" };
+        const service = piCodingAgentMaterializer.generateComposeService(member);
+        expect(service.environment).toContain("ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}");
+      });
+
+      it("includes OPENAI_API_KEY for openai provider", () => {
+        const member = makePiMember();
+        member.llm = { provider: "openai", model: "gpt-4o" };
+        const service = piCodingAgentMaterializer.generateComposeService(member);
+        expect(service.environment).toContain("OPENAI_API_KEY=${OPENAI_API_KEY}");
+      });
+
+      it("includes GEMINI_API_KEY for google provider", () => {
+        const member = makePiMember();
+        member.llm = { provider: "google", model: "gemini-2.5-pro" };
+        const service = piCodingAgentMaterializer.generateComposeService(member);
+        expect(service.environment).toContain("GEMINI_API_KEY=${GEMINI_API_KEY}");
+      });
+
+      it("includes AZURE_OPENAI_API_KEY for azure-openai provider", () => {
+        const member = makePiMember();
+        member.llm = { provider: "azure-openai", model: "gpt-4o" };
+        const service = piCodingAgentMaterializer.generateComposeService(member);
+        expect(service.environment).toContain("AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}");
+      });
+
+      it("omits LLM env var for unknown provider", () => {
+        const member = makePiMember();
+        member.llm = { provider: "custom-provider", model: "my-model" };
+        const service = piCodingAgentMaterializer.generateComposeService(member);
+        // Should not have any provider-specific API key
+        const llmEnvVars = service.environment.filter((e) =>
+          e.includes("_API_KEY=") && !e.startsWith("CHAPTER_"),
+        );
+        expect(llmEnvVars).toHaveLength(0);
+      });
+
+      it("omits LLM env var when member has no llm config", () => {
+        const member = makePiMember();
+        delete member.llm;
+        const service = piCodingAgentMaterializer.generateComposeService(member);
+        const llmEnvVars = service.environment.filter((e) =>
+          e.includes("_API_KEY=") && !e.startsWith("CHAPTER_"),
+        );
+        expect(llmEnvVars).toHaveLength(0);
+      });
+    });
+
+    describe("proxy environment variables", () => {
+      it("includes CHAPTER_PROXY_TOKEN", () => {
+        const member = makePiMember();
+        const service = piCodingAgentMaterializer.generateComposeService(member);
+        expect(service.environment).toContain("CHAPTER_PROXY_TOKEN=${CHAPTER_PROXY_TOKEN}");
+      });
+
+      it("includes CHAPTER_PROXY_ENDPOINT with default port", () => {
+        const member = makePiMember();
+        const service = piCodingAgentMaterializer.generateComposeService(member);
+        expect(service.environment).toContain("CHAPTER_PROXY_ENDPOINT=http://mcp-proxy:9090");
+      });
+
+      it("uses custom port in CHAPTER_PROXY_ENDPOINT", () => {
+        const member = makePiMember();
+        member.proxy = { port: 8080, type: "sse" };
+        const service = piCodingAgentMaterializer.generateComposeService(member);
+        expect(service.environment).toContain("CHAPTER_PROXY_ENDPOINT=http://mcp-proxy:8080");
+      });
+
+      it("uses default port 9090 when no proxy config", () => {
+        const member = makePiMember();
+        delete member.proxy;
+        const service = piCodingAgentMaterializer.generateComposeService(member);
+        expect(service.environment).toContain("CHAPTER_PROXY_ENDPOINT=http://mcp-proxy:9090");
+      });
+    });
   });
 
   describe("generateConfigJson", () => {
     it("is not defined (pi doesn't need config bypass)", () => {
       expect(piCodingAgentMaterializer.generateConfigJson).toBeUndefined();
+    });
+  });
+
+  describe("PROVIDER_ENV_VARS", () => {
+    it("maps openrouter to OPENROUTER_API_KEY", () => {
+      expect(PROVIDER_ENV_VARS["openrouter"]).toBe("OPENROUTER_API_KEY");
+    });
+
+    it("maps anthropic to ANTHROPIC_API_KEY", () => {
+      expect(PROVIDER_ENV_VARS["anthropic"]).toBe("ANTHROPIC_API_KEY");
+    });
+
+    it("maps openai to OPENAI_API_KEY", () => {
+      expect(PROVIDER_ENV_VARS["openai"]).toBe("OPENAI_API_KEY");
+    });
+
+    it("maps google to GEMINI_API_KEY", () => {
+      expect(PROVIDER_ENV_VARS["google"]).toBe("GEMINI_API_KEY");
+    });
+
+    it("maps mistral to MISTRAL_API_KEY", () => {
+      expect(PROVIDER_ENV_VARS["mistral"]).toBe("MISTRAL_API_KEY");
+    });
+
+    it("maps groq to GROQ_API_KEY", () => {
+      expect(PROVIDER_ENV_VARS["groq"]).toBe("GROQ_API_KEY");
+    });
+
+    it("maps xai to XAI_API_KEY", () => {
+      expect(PROVIDER_ENV_VARS["xai"]).toBe("XAI_API_KEY");
+    });
+
+    it("maps azure-openai to AZURE_OPENAI_API_KEY", () => {
+      expect(PROVIDER_ENV_VARS["azure-openai"]).toBe("AZURE_OPENAI_API_KEY");
+    });
+
+    it("contains exactly 8 providers", () => {
+      expect(Object.keys(PROVIDER_ENV_VARS)).toHaveLength(8);
     });
   });
 });
