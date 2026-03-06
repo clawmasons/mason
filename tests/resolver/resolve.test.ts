@@ -579,6 +579,85 @@ describe("resolveMember", () => {
     });
   });
 
+  describe("llm configuration", () => {
+    it("resolves agent member with llm field populated", () => {
+      const packages = new Map<string, DiscoveredPackage>();
+      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
+        type: "member",
+        memberType: "agent",
+        name: "Coder",
+        slug: "coder",
+        email: "coder@chapter.local",
+        authProviders: [],
+        runtimes: ["pi-coding-agent"],
+        roles: ["@test/role"],
+        resources: [],
+        llm: {
+          provider: "openrouter",
+          model: "anthropic/claude-sonnet-4",
+        },
+      }));
+      packages.set("@test/role", makePkg("@test/role", "1.0.0", {
+        type: "role",
+        permissions: {},
+      }));
+
+      const resolved = resolveMember("@test/member", packages);
+      expect(resolved.llm).toEqual({
+        provider: "openrouter",
+        model: "anthropic/claude-sonnet-4",
+      });
+    });
+
+    it("resolves agent member without llm field as undefined", () => {
+      const packages = new Map<string, DiscoveredPackage>();
+      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
+        type: "member",
+        memberType: "agent",
+        name: "Test",
+        slug: "test",
+        email: "test@chapter.local",
+        authProviders: [],
+        runtimes: ["claude-code"],
+        roles: ["@test/role"],
+        resources: [],
+      }));
+      packages.set("@test/role", makePkg("@test/role", "1.0.0", {
+        type: "role",
+        permissions: {},
+      }));
+
+      const resolved = resolveMember("@test/member", packages);
+      expect(resolved.llm).toBeUndefined();
+    });
+
+    it("resolves human member without llm field", () => {
+      const packages = new Map<string, DiscoveredPackage>();
+      packages.set("@acme/member-alice", makePkg("@acme/member-alice", "1.0.0", {
+        type: "member",
+        memberType: "human",
+        name: "Alice Chen",
+        slug: "alice",
+        email: "alice@acme.com",
+        authProviders: [],
+        roles: ["@acme/role-admin"],
+      }));
+      packages.set("@acme/role-admin", makePkg("@acme/role-admin", "1.0.0", {
+        type: "role",
+        permissions: {},
+      }));
+
+      const resolved = resolveMember("@acme/member-alice", packages);
+      expect(resolved.llm).toBeUndefined();
+    });
+
+    it("existing repo-ops fixture has no llm (backward compatible)", () => {
+      const packages = buildRepoOpsFixture();
+      const resolved = resolveMember("@clawmasons/member-repo-ops", packages);
+      expect(resolved.llm).toBeUndefined();
+    });
+  });
+
   describe("minimal members", () => {
     it("resolves member with role that has no tasks or skills", () => {
       const packages = new Map<string, DiscoveredPackage>();

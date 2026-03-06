@@ -26,7 +26,12 @@ Add an optional `llm` field (provider + model) to the agent member schema, resol
 
 **Testable output:** Schema validation passes for agent member with `llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" }`. Schema validation passes for agent member without `llm` (optional). Schema rejects `llm: { provider: "openrouter" }` (missing model). Schema rejects `llm: { model: "..." }` (missing provider). Human member schema rejects `llm` field. Resolver produces `ResolvedMember` with `llm` populated when present. `npx tsc --noEmit` and `npx vitest run` pass.
 
-**Not Implemented Yet**
+**Implemented** -- 2026-03-06
+
+**Spec:** [openspec/changes/archive/2026-03-06-llm-configuration-schema/](../../openspec/changes/archive/2026-03-06-llm-configuration-schema/)
+- [Proposal](../../openspec/changes/archive/2026-03-06-llm-configuration-schema/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-06-llm-configuration-schema/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-06-llm-configuration-schema/tasks.md)
 
 ---
 

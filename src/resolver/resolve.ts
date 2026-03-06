@@ -244,6 +244,7 @@ export function resolveMember(
       roles,
       resources: chapter.resources.length > 0 ? chapter.resources : undefined,
       proxy: chapter.proxy,
+      llm: chapter.llm,
     };
   }
 
