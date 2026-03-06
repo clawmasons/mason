@@ -1,0 +1,9 @@
+{
+  "name": "e2e-test-chapter",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["members/*"],
+  "dependencies": {
+    "@clawmasons/chapter-core": "*"
+  }
+}
