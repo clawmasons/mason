@@ -14,13 +14,13 @@ describe("CLI validate command", () => {
     }
   });
 
-  it("validate command accepts an agent argument", () => {
+  it("validate command accepts a member argument", () => {
     const validateCmd = program.commands.find((cmd) => cmd.name() === "validate");
     expect(validateCmd).toBeDefined();
     if (validateCmd) {
       const args = validateCmd.registeredArguments;
       expect(args).toHaveLength(1);
-      expect(args[0].name()).toBe("agent");
+      expect(args[0].name()).toBe("member");
       expect(args[0].required).toBe(true);
     }
   });
@@ -42,7 +42,7 @@ describe("runValidate", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-validate-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-validate-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -58,12 +58,12 @@ describe("runValidate", () => {
     fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify(pkg, null, 2));
   }
 
-  function setupValidAgent(): void {
+  function setupValidMember(): void {
     // App
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -77,7 +77,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "skill",
         artifacts: ["./SKILL.md"],
         description: "Labeling taxonomy",
@@ -88,7 +88,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "task",
         taskType: "subagent",
         prompt: "./triage.md",
@@ -103,7 +103,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -116,24 +116,28 @@ describe("runValidate", () => {
       },
     });
 
-    // Agent
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
+    // Member
+    writePackage(path.join(tmpDir, "members", "ops"), {
+      name: "@test/member-ops",
       version: "1.0.0",
-      forge: {
-        type: "agent",
+      chapter: {
+        type: "member",
+        memberType: "agent",
+        name: "Ops",
+        slug: "ops",
+        email: "ops@chapter.local",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
     });
   }
 
-  function setupInvalidAgent(): void {
+  function setupInvalidMember(): void {
     // App
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -147,7 +151,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "skill",
         artifacts: ["./SKILL.md"],
         description: "Labeling taxonomy",
@@ -158,7 +162,7 @@ describe("runValidate", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "task",
         taskType: "subagent",
         requires: {
@@ -168,11 +172,11 @@ describe("runValidate", () => {
       },
     });
 
-    // Role — allows a tool that doesn't exist on the app
+    // Role -- allows a tool that doesn't exist on the app
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -185,30 +189,34 @@ describe("runValidate", () => {
       },
     });
 
-    // Agent
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
+    // Member
+    writePackage(path.join(tmpDir, "members", "ops"), {
+      name: "@test/member-ops",
       version: "1.0.0",
-      forge: {
-        type: "agent",
+      chapter: {
+        type: "member",
+        memberType: "agent",
+        name: "Ops",
+        slug: "ops",
+        email: "ops@chapter.local",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
     });
   }
 
-  it("exits 0 and prints success for valid agent", async () => {
-    setupValidAgent();
-    await runValidate(tmpDir, "@test/agent-ops", {});
+  it("exits 0 and prints success for valid member", async () => {
+    setupValidMember();
+    await runValidate(tmpDir, "@test/member-ops", {});
 
     expect(exitSpy).toHaveBeenCalledWith(0);
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("valid");
   });
 
-  it("exits 1 and prints errors for invalid agent", async () => {
-    setupInvalidAgent();
-    await runValidate(tmpDir, "@test/agent-ops", {});
+  it("exits 1 and prints errors for invalid member", async () => {
+    setupInvalidMember();
+    await runValidate(tmpDir, "@test/member-ops", {});
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -216,9 +224,9 @@ describe("runValidate", () => {
     expect(errorOutput).toContain("nonexistent_tool");
   });
 
-  it("outputs JSON when --json flag is set for valid agent", async () => {
-    setupValidAgent();
-    await runValidate(tmpDir, "@test/agent-ops", { json: true });
+  it("outputs JSON when --json flag is set for valid member", async () => {
+    setupValidMember();
+    await runValidate(tmpDir, "@test/member-ops", { json: true });
 
     expect(exitSpy).toHaveBeenCalledWith(0);
     const logOutput = logSpy.mock.calls.flat().join("\n");
@@ -227,9 +235,9 @@ describe("runValidate", () => {
     expect(parsed.errors).toEqual([]);
   });
 
-  it("outputs JSON when --json flag is set for invalid agent", async () => {
-    setupInvalidAgent();
-    await runValidate(tmpDir, "@test/agent-ops", { json: true });
+  it("outputs JSON when --json flag is set for invalid member", async () => {
+    setupInvalidMember();
+    await runValidate(tmpDir, "@test/member-ops", { json: true });
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const logOutput = logSpy.mock.calls.flat().join("\n");
@@ -239,8 +247,8 @@ describe("runValidate", () => {
     expect(parsed.errors[0].category).toBe("tool-existence");
   });
 
-  it("exits 1 when agent is not found", async () => {
-    // Empty workspace — no packages
+  it("exits 1 when member is not found", async () => {
+    // Empty workspace -- no packages
     await runValidate(tmpDir, "@test/nonexistent", {});
 
     expect(exitSpy).toHaveBeenCalledWith(1);
@@ -248,7 +256,7 @@ describe("runValidate", () => {
     expect(errorOutput).toContain("not found");
   });
 
-  it("outputs JSON error when agent is not found with --json", async () => {
+  it("outputs JSON error when member is not found with --json", async () => {
     await runValidate(tmpDir, "@test/nonexistent", { json: true });
 
     expect(exitSpy).toHaveBeenCalledWith(1);

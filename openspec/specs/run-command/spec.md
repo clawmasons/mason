@@ -2,51 +2,51 @@
 
 ## ADDED Requirements
 
-### Requirement: forge run command is registered as a CLI command
+### Requirement: chapter run command is registered as a CLI command
 
-The CLI SHALL register a `run` command that accepts a required `<agent>` argument (agent package name), an optional `--runtime <name>` option, and an optional `--output-dir <dir>` option.
+The CLI SHALL register a `run` command that accepts a required `<member>` argument (member package name), an optional `--runtime <name>` option, and an optional `--output-dir <dir>` option.
 
 #### Scenario: Command registration
 - **WHEN** the CLI program is initialized
-- **THEN** the `run` command SHALL be available with argument `<agent>`, option `--runtime`, and option `--output-dir`
+- **THEN** the `run` command SHALL be available with argument `<member>`, option `--runtime`, and option `--output-dir`
 
-### Requirement: forge run resolves the agent directory
+### Requirement: chapter run resolves the member directory
 
-The run command SHALL resolve the agent's scaffolded directory at `.forge/agents/<short-name>/` relative to the current working directory by default. If `--output-dir` is specified, it SHALL use that path instead. The short name is derived from the agent package name by stripping the scope prefix and `agent-` prefix (matching `getAppShortName` behavior).
+The run command SHALL resolve the member's scaffolded directory at `.chapter/members/<short-name>/` relative to the current working directory by default. If `--output-dir` is specified, it SHALL use that path instead. The short name is derived from the member package name by stripping the scope prefix and `member-` prefix (matching `getAppShortName` behavior).
 
-#### Scenario: Default agent directory resolution
-- **WHEN** `forge run my-agent` is executed in a workspace where `.forge/agents/my-agent/docker-compose.yml` exists
-- **THEN** the command SHALL use `.forge/agents/my-agent/` as the agent directory
+#### Scenario: Default member directory resolution
+- **WHEN** `chapter run @acme/member-ops` is executed in a workspace where `.chapter/members/ops/docker-compose.yml` exists
+- **THEN** the command SHALL use `.chapter/members/ops/` as the member directory
 
 #### Scenario: Custom output directory
-- **WHEN** `forge run my-agent --output-dir ./custom/path` is executed
-- **THEN** the command SHALL use `./custom/path` as the agent directory
+- **WHEN** `chapter run @acme/member-ops --output-dir ./custom/path` is executed
+- **THEN** the command SHALL use `./custom/path` as the member directory
 
-#### Scenario: Agent directory not found
-- **WHEN** `forge run my-agent` is executed but `.forge/agents/my-agent/` does not exist
-- **THEN** the command SHALL print an error message indicating the agent is not installed and exit with code 1
+#### Scenario: Member directory not found
+- **WHEN** `chapter run @acme/member-ops` is executed but `.chapter/members/ops/` does not exist
+- **THEN** the command SHALL print an error message indicating the member is not installed and exit with code 1
 
 #### Scenario: docker-compose.yml missing
-- **WHEN** the agent directory exists but does not contain `docker-compose.yml`
-- **THEN** the command SHALL print an error message indicating the agent needs to be reinstalled and exit with code 1
+- **WHEN** the member directory exists but does not contain `docker-compose.yml`
+- **THEN** the command SHALL print an error message indicating the member needs to be reinstalled and exit with code 1
 
-### Requirement: forge run validates environment variables before starting
+### Requirement: chapter run validates environment variables before starting
 
-Before delegating to Docker Compose, the run command SHALL read the `.env` file in the agent directory and validate that all required environment variables have non-empty values. Variables with empty values, or whose values are the placeholder string, SHALL cause the command to fail.
+Before delegating to Docker Compose, the run command SHALL read the `.env` file in the member directory and validate that all required environment variables have non-empty values. Variables with empty values, or whose values are the placeholder string, SHALL cause the command to fail.
 
 #### Scenario: All env variables filled
-- **WHEN** `forge run my-agent` is executed and the `.env` file has all variables with non-empty values
+- **WHEN** `chapter run @acme/member-ops` is executed and the `.env` file has all variables with non-empty values
 - **THEN** the command SHALL proceed to start Docker Compose
 
 #### Scenario: Missing env values
-- **WHEN** `forge run my-agent` is executed and the `.env` file has variables with empty values (e.g., `GITHUB_TOKEN=`)
+- **WHEN** `chapter run @acme/member-ops` is executed and the `.env` file has variables with empty values (e.g., `GITHUB_TOKEN=`)
 - **THEN** the command SHALL print an error listing the missing variables and exit with code 1
 
 #### Scenario: No .env file
-- **WHEN** `forge run my-agent` is executed and no `.env` file exists in the agent directory
+- **WHEN** `chapter run @acme/member-ops` is executed and no `.env` file exists in the member directory
 - **THEN** the command SHALL print an error indicating credentials need to be configured and exit with code 1
 
-### Requirement: forge run uses two-phase Docker Compose strategy
+### Requirement: chapter run uses two-phase Docker Compose strategy
 
 The run command SHALL use a two-phase approach to support interactive runtimes:
 - **Phase 1:** `docker compose -f <compose-path> up -d mcp-proxy` (start proxy detached)
@@ -55,51 +55,68 @@ The run command SHALL use a two-phase approach to support interactive runtimes:
 This allows interactive runtimes (like claude-code) to attach to stdin/stdout.
 
 #### Scenario: Successful two-phase startup
-- **WHEN** `forge run my-agent` is executed with valid configuration and a single runtime
+- **WHEN** `chapter run @acme/member-ops` is executed with valid configuration and a single runtime
 - **THEN** the command SHALL first execute `docker compose up -d mcp-proxy`
 - **AND** then execute `docker compose run --rm <runtime>` for the auto-detected runtime
 - **AND** print a session complete message when the runtime exits
 
 #### Scenario: Docker Compose failure in proxy phase
-- **WHEN** `forge run my-agent` is executed and the proxy startup returns a non-zero exit code
+- **WHEN** `chapter run @acme/member-ops` is executed and the proxy startup returns a non-zero exit code
 - **THEN** the command SHALL exit with the same non-zero exit code without starting the runtime
 
 #### Scenario: Docker Compose failure in runtime phase
 - **WHEN** the proxy starts successfully but the runtime returns a non-zero exit code
 - **THEN** the command SHALL exit with the same non-zero exit code
 
-### Requirement: forge run auto-detects single runtime
+### Requirement: chapter run auto-detects single runtime
 
 When `--runtime` is not specified, the run command SHALL parse the compose file to detect runtime services (all services except `mcp-proxy`). If exactly one runtime exists, it SHALL be used automatically.
 
 #### Scenario: Single runtime auto-detected
-- **WHEN** `forge run my-agent` is executed and the compose file has only `mcp-proxy` and `claude-code` services
+- **WHEN** `chapter run @acme/member-ops` is executed and the compose file has only `mcp-proxy` and `claude-code` services
 - **THEN** the command SHALL auto-detect `claude-code` as the runtime and proceed with two-phase startup
 
 #### Scenario: Multiple runtimes require --runtime flag
-- **WHEN** `forge run my-agent` is executed and the compose file has `mcp-proxy`, `claude-code`, and `codex` services
+- **WHEN** `chapter run @acme/member-ops` is executed and the compose file has `mcp-proxy`, `claude-code`, and `codex` services
 - **THEN** the command SHALL print an error listing the available runtimes and suggesting `--runtime` and exit with code 1
 
 #### Scenario: No runtime services found
 - **WHEN** the compose file only contains `mcp-proxy` and no runtime services
 - **THEN** the command SHALL print an error and exit with code 1
 
-### Requirement: forge run supports --runtime flag for selective startup
+### Requirement: chapter run supports --runtime flag for selective startup
 
 When `--runtime` is specified, the run command SHALL use the specified runtime in the two-phase startup.
 
 #### Scenario: Starting a specific runtime
-- **WHEN** `forge run my-agent --runtime claude-code` is executed
+- **WHEN** `chapter run @acme/member-ops --runtime claude-code` is executed
 - **THEN** the command SHALL execute phase 1 (`up -d mcp-proxy`) and phase 2 (`run --rm claude-code`)
 
 #### Scenario: Unknown runtime specified
-- **WHEN** `forge run my-agent --runtime unknown-runtime` is executed
+- **WHEN** `chapter run @acme/member-ops --runtime unknown-runtime` is executed
 - **THEN** the command SHALL print an error indicating the runtime is not found in the compose file and exit with code 1
 
-### Requirement: forge run checks for docker compose availability
+### Requirement: chapter run checks for docker compose availability
 
 Before attempting to start the stack, the run command SHALL verify that `docker compose` (v2) is available on the system.
 
 #### Scenario: Docker Compose not installed
-- **WHEN** `forge run my-agent` is executed but `docker compose` is not available
+- **WHEN** `chapter run @acme/member-ops` is executed but `docker compose` is not available
 - **THEN** the command SHALL print an error indicating Docker Compose v2 is required and exit with code 1
+
+### Requirement: chapter run rejects disabled members
+
+After checking Docker Compose availability, the run command SHALL check the member's status in `.chapter/members.json`. If the member is explicitly disabled, the command SHALL refuse to start it. If the member is not in the registry at all, the command SHALL proceed normally (lenient behavior for backward compatibility and `--output-dir` usage).
+
+#### Scenario: Disabled member
+- **WHEN** `chapter run @acme/member-ops` is executed and the member has status `"disabled"` in `members.json`
+- **THEN** the command SHALL print an error indicating the member is disabled and suggesting `chapter enable @<slug>`
+- **AND** the process SHALL exit with code 1
+
+#### Scenario: Enabled member
+- **WHEN** `chapter run @acme/member-ops` is executed and the member has status `"enabled"` in `members.json`
+- **THEN** the command SHALL proceed normally with directory resolution and Docker Compose startup
+
+#### Scenario: Member not in registry
+- **WHEN** `chapter run @acme/member-ops` is executed and the member is not present in `members.json` (or the file does not exist)
+- **THEN** the command SHALL proceed normally (no blocking)

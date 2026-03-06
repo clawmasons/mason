@@ -48,7 +48,7 @@ describe("findDependents", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-remove-dep-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-remove-dep-test-"));
   });
 
   afterEach(() => {
@@ -64,7 +64,7 @@ describe("findDependents", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -77,7 +77,7 @@ describe("findDependents", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         permissions: {
           "@test/app-github": { allow: ["create_issue"], deny: [] },
@@ -95,13 +95,13 @@ describe("findDependents", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      forge: { type: "task", taskType: "subagent" },
+      chapter: { type: "task", taskType: "subagent" },
     });
 
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         tasks: ["@test/task-triage"],
         permissions: {},
@@ -118,13 +118,13 @@ describe("findDependents", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      forge: { type: "skill", artifacts: ["./SKILL.md"], description: "Labeling" },
+      chapter: { type: "skill", artifacts: ["./SKILL.md"], description: "Labeling" },
     });
 
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         skills: ["@test/skill-labeling"],
         permissions: {},
@@ -141,7 +141,7 @@ describe("findDependents", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -154,7 +154,7 @@ describe("findDependents", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "task",
         taskType: "subagent",
         requires: { apps: ["@test/app-github"] },
@@ -171,13 +171,13 @@ describe("findDependents", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      forge: { type: "skill", artifacts: ["./SKILL.md"], description: "Labeling" },
+      chapter: { type: "skill", artifacts: ["./SKILL.md"], description: "Labeling" },
     });
 
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "task",
         taskType: "subagent",
         requires: { skills: ["@test/skill-labeling"] },
@@ -190,18 +190,22 @@ describe("findDependents", () => {
     expect(dependents[0].name).toBe("@test/task-triage");
   });
 
-  it("detects agent roles reference", () => {
+  it("detects member roles reference", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: { type: "role", permissions: {} },
+      chapter: { type: "role", permissions: {} },
     });
 
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
+    writePackage(path.join(tmpDir, "members", "ops"), {
+      name: "@test/member-ops",
       version: "1.0.0",
-      forge: {
-        type: "agent",
+      chapter: {
+        type: "member",
+        memberType: "agent",
+        name: "Ops",
+        slug: "ops",
+        email: "ops@chapter.local",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
@@ -210,14 +214,14 @@ describe("findDependents", () => {
     const packages = discoverPackages(tmpDir);
     const dependents = findDependents("@test/role-manager", packages);
     expect(dependents).toHaveLength(1);
-    expect(dependents[0].name).toBe("@test/agent-ops");
+    expect(dependents[0].name).toBe("@test/member-ops");
   });
 
   it("returns empty when no dependents exist", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -240,7 +244,7 @@ describe("runRemove", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-remove-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-remove-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -262,7 +266,7 @@ describe("runRemove", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -287,7 +291,7 @@ describe("runRemove", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -300,7 +304,7 @@ describe("runRemove", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         permissions: {
           "@test/app-github": { allow: ["create_issue"], deny: [] },
@@ -324,7 +328,7 @@ describe("runRemove", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -337,7 +341,7 @@ describe("runRemove", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         permissions: {
           "@test/app-github": { allow: ["create_issue"], deny: [] },

@@ -10,13 +10,14 @@ export interface LockFileRole {
 }
 
 /**
- * The forge.lock.json structure.
+ * The chapter.lock.json structure.
  */
 export interface LockFile {
   lockVersion: number;
-  agent: {
+  member: {
     name: string;
     version: string;
+    memberType: "human" | "agent";
     runtimes: string[];
   };
   roles: LockFileRole[];

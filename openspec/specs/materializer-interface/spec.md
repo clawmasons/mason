@@ -7,9 +7,9 @@ TBD - created by archiving change claude-code-materializer. Update Purpose after
 
 The system SHALL define a `RuntimeMaterializer` interface with the following properties and methods:
 - `name: string` — the runtime identifier (e.g., `"claude-code"`, `"codex"`)
-- `materializeWorkspace(agent: ResolvedAgent, proxyEndpoint: string, proxyToken?: string): MaterializationResult` — generates workspace file content. When `proxyToken` is provided, the actual token value SHALL be baked into configuration files instead of using environment variable placeholders.
-- `generateDockerfile(agent: ResolvedAgent): string` — generates a Dockerfile string
-- `generateComposeService(agent: ResolvedAgent): ComposeServiceDef` — generates a docker-compose service definition
+- `materializeWorkspace(agent: ResolvedMember, proxyEndpoint: string, proxyToken?: string): MaterializationResult` — generates workspace file content. When `proxyToken` is provided, the actual token value SHALL be baked into configuration files instead of using environment variable placeholders.
+- `generateDockerfile(agent: ResolvedMember): string` — generates a Dockerfile string
+- `generateComposeService(agent: ResolvedMember): ComposeServiceDef` — generates a docker-compose service definition
 
 #### Scenario: Interface has correct shape
 - **WHEN** a materializer implements the RuntimeMaterializer interface

@@ -153,7 +153,7 @@ describe("auditPostHook", () => {
     }).not.toThrow();
 
     expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[forge] audit log write failed"),
+      expect.stringContaining("[chapter] audit log write failed"),
     );
 
     stderrSpy.mockRestore();

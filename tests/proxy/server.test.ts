@@ -3,7 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Tool, Resource, Prompt, CallToolResult, ReadResourceResult, GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
-import { ForgeProxyServer } from "../../src/proxy/server.js";
+import { ChapterProxyServer } from "../../src/proxy/server.js";
 import type { ToolRouter, RouteEntry, ResourceRouter, PromptRouter, PromptRouteEntry } from "../../src/proxy/router.js";
 import type { UpstreamManager } from "../../src/proxy/upstream.js";
 import { openDatabase, queryAuditLog, updateApprovalStatus } from "../../src/proxy/db.js";
@@ -117,8 +117,8 @@ function getPort(): number {
 
 // ── SSE Transport Tests ─────────────────────────────────────────────
 
-describe("ForgeProxyServer (SSE)", () => {
-  let server: ForgeProxyServer;
+describe("ChapterProxyServer (SSE)", () => {
+  let server: ChapterProxyServer;
   let client: Client;
 
   afterEach(async () => {
@@ -132,7 +132,7 @@ describe("ForgeProxyServer (SSE)", () => {
     const router = createMockRouter(tools, new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -151,7 +151,7 @@ describe("ForgeProxyServer (SSE)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -169,7 +169,7 @@ describe("ForgeProxyServer (SSE)", () => {
       content: [{ type: "text", text: "PR #42 created" }],
     });
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -192,7 +192,7 @@ describe("ForgeProxyServer (SSE)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -217,7 +217,7 @@ describe("ForgeProxyServer (SSE)", () => {
       new Error("Connection refused"),
     );
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -237,7 +237,7 @@ describe("ForgeProxyServer (SSE)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     // Verify server is listening by connecting
@@ -256,7 +256,7 @@ describe("ForgeProxyServer (SSE)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port: getPort(), transport: "sse", router, upstream });
+    server = new ChapterProxyServer({ port: getPort(), transport: "sse", router, upstream });
     await expect(server.stop()).resolves.toBeUndefined();
   });
 
@@ -265,7 +265,7 @@ describe("ForgeProxyServer (SSE)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -276,8 +276,8 @@ describe("ForgeProxyServer (SSE)", () => {
 
 // ── Streamable HTTP Transport Tests ─────────────────────────────────
 
-describe("ForgeProxyServer (streamable-http)", () => {
-  let server: ForgeProxyServer;
+describe("ChapterProxyServer (streamable-http)", () => {
+  let server: ChapterProxyServer;
   let client: Client;
 
   afterEach(async () => {
@@ -291,7 +291,7 @@ describe("ForgeProxyServer (streamable-http)", () => {
     const router = createMockRouter(tools, new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "streamable-http", router, upstream });
+    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream });
     await server.start();
 
     client = await connectClient(port, "streamable-http");
@@ -313,7 +313,7 @@ describe("ForgeProxyServer (streamable-http)", () => {
       content: [{ type: "text", text: "PR #42 created" }],
     });
 
-    server = new ForgeProxyServer({ port, transport: "streamable-http", router, upstream });
+    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream });
     await server.start();
 
     client = await connectClient(port, "streamable-http");
@@ -335,7 +335,7 @@ describe("ForgeProxyServer (streamable-http)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "streamable-http", router, upstream });
+    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream });
     await server.start();
 
     client = await connectClient(port, "streamable-http");
@@ -357,7 +357,7 @@ describe("ForgeProxyServer (streamable-http)", () => {
       new Error("Timeout waiting for response"),
     );
 
-    server = new ForgeProxyServer({ port, transport: "streamable-http", router, upstream });
+    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream });
     await server.start();
 
     client = await connectClient(port, "streamable-http");
@@ -375,8 +375,8 @@ describe("ForgeProxyServer (streamable-http)", () => {
 
 // ── Audit Logging Integration Tests ──────────────────────────────────
 
-describe("ForgeProxyServer (audit logging)", () => {
-  let server: ForgeProxyServer;
+describe("ChapterProxyServer (audit logging)", () => {
+  let server: ChapterProxyServer;
   let client: Client;
   let db: Database.Database;
 
@@ -396,7 +396,7 @@ describe("ForgeProxyServer (audit logging)", () => {
       content: [{ type: "text", text: "PR #42 created" }],
     });
 
-    server = new ForgeProxyServer({
+    server = new ChapterProxyServer({
       port,
       transport: "sse",
       router,
@@ -428,7 +428,7 @@ describe("ForgeProxyServer (audit logging)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({
+    server = new ChapterProxyServer({
       port,
       transport: "sse",
       router,
@@ -455,7 +455,7 @@ describe("ForgeProxyServer (audit logging)", () => {
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream(undefined, new Error("Connection refused"));
 
-    server = new ForgeProxyServer({
+    server = new ChapterProxyServer({
       port,
       transport: "sse",
       router,
@@ -484,7 +484,7 @@ describe("ForgeProxyServer (audit logging)", () => {
     });
 
     // No db provided
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -500,8 +500,8 @@ describe("ForgeProxyServer (audit logging)", () => {
 
 // ── Approval Workflow Integration Tests ──────────────────────────────
 
-describe("ForgeProxyServer (approval workflow)", () => {
-  let server: ForgeProxyServer;
+describe("ChapterProxyServer (approval workflow)", () => {
+  let server: ChapterProxyServer;
   let client: Client;
   let db: Database.Database;
 
@@ -521,7 +521,7 @@ describe("ForgeProxyServer (approval workflow)", () => {
       content: [{ type: "text", text: "Repo deleted" }],
     });
 
-    server = new ForgeProxyServer({
+    server = new ChapterProxyServer({
       port,
       transport: "sse",
       router,
@@ -567,7 +567,7 @@ describe("ForgeProxyServer (approval workflow)", () => {
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({
+    server = new ChapterProxyServer({
       port,
       transport: "sse",
       router,
@@ -615,7 +615,7 @@ describe("ForgeProxyServer (approval workflow)", () => {
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({
+    server = new ChapterProxyServer({
       port,
       transport: "sse",
       router,
@@ -654,7 +654,7 @@ describe("ForgeProxyServer (approval workflow)", () => {
       content: [{ type: "text", text: "repos listed" }],
     });
 
-    server = new ForgeProxyServer({
+    server = new ChapterProxyServer({
       port,
       transport: "sse",
       router,
@@ -684,8 +684,8 @@ describe("ForgeProxyServer (approval workflow)", () => {
 
 // ── Resource Passthrough Tests ──────────────────────────────────────
 
-describe("ForgeProxyServer (resources)", () => {
-  let server: ForgeProxyServer;
+describe("ChapterProxyServer (resources)", () => {
+  let server: ChapterProxyServer;
   let client: Client;
 
   afterEach(async () => {
@@ -700,7 +700,7 @@ describe("ForgeProxyServer (resources)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -720,7 +720,7 @@ describe("ForgeProxyServer (resources)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -737,7 +737,7 @@ describe("ForgeProxyServer (resources)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -751,7 +751,7 @@ describe("ForgeProxyServer (resources)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "streamable-http", router, upstream, resourceRouter });
+    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream, resourceRouter });
     await server.start();
 
     client = await connectClient(port, "streamable-http");
@@ -764,8 +764,8 @@ describe("ForgeProxyServer (resources)", () => {
 
 // ── Prompt Passthrough Tests ────────────────────────────────────────
 
-describe("ForgeProxyServer (prompts)", () => {
-  let server: ForgeProxyServer;
+describe("ChapterProxyServer (prompts)", () => {
+  let server: ChapterProxyServer;
   let client: Client;
 
   afterEach(async () => {
@@ -780,7 +780,7 @@ describe("ForgeProxyServer (prompts)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream, promptRouter });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream, promptRouter });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -804,7 +804,7 @@ describe("ForgeProxyServer (prompts)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream, promptRouter });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream, promptRouter });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -824,7 +824,7 @@ describe("ForgeProxyServer (prompts)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "sse", router, upstream, promptRouter });
+    server = new ChapterProxyServer({ port, transport: "sse", router, upstream, promptRouter });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -838,7 +838,7 @@ describe("ForgeProxyServer (prompts)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ForgeProxyServer({ port, transport: "streamable-http", router, upstream, promptRouter });
+    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream, promptRouter });
     await server.start();
 
     client = await connectClient(port, "streamable-http");

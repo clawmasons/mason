@@ -14,13 +14,13 @@ describe("CLI build command", () => {
     }
   });
 
-  it("build command accepts an agent argument", () => {
+  it("build command accepts a member argument", () => {
     const buildCmd = program.commands.find((cmd) => cmd.name() === "build");
     expect(buildCmd).toBeDefined();
     if (buildCmd) {
       const args = buildCmd.registeredArguments;
       expect(args).toHaveLength(1);
-      expect(args[0].name()).toBe("agent");
+      expect(args[0].name()).toBe("member");
       expect(args[0].required).toBe(true);
     }
   });
@@ -44,7 +44,7 @@ describe("runBuild", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-build-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-build-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -60,11 +60,11 @@ describe("runBuild", () => {
     fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify(pkg, null, 2));
   }
 
-  function setupValidAgent(): void {
+  function setupValidMember(): void {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -77,7 +77,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "skill",
         artifacts: ["./SKILL.md"],
         description: "Labeling taxonomy",
@@ -87,7 +87,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "task",
         taskType: "subagent",
         prompt: "./triage.md",
@@ -101,7 +101,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -114,11 +114,15 @@ describe("runBuild", () => {
       },
     });
 
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
+    writePackage(path.join(tmpDir, "members", "ops"), {
+      name: "@test/member-ops",
       version: "1.0.0",
-      forge: {
-        type: "agent",
+      chapter: {
+        type: "member",
+        memberType: "agent",
+        name: "Ops",
+        slug: "ops",
+        email: "ops@chapter.local",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
@@ -126,51 +130,51 @@ describe("runBuild", () => {
   }
 
   it("writes lock file to default path", async () => {
-    setupValidAgent();
-    await runBuild(tmpDir, "@test/agent-ops", {});
+    setupValidMember();
+    await runBuild(tmpDir, "@test/member-ops", {});
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
-    const lockPath = path.join(tmpDir, "forge.lock.json");
+    const lockPath = path.join(tmpDir, "chapter.lock.json");
     expect(fs.existsSync(lockPath)).toBe(true);
 
     const lock = JSON.parse(fs.readFileSync(lockPath, "utf-8"));
     expect(lock.lockVersion).toBe(1);
-    expect(lock.agent.name).toBe("@test/agent-ops");
-    expect(lock.agent.runtimes).toContain("claude-code");
+    expect(lock.member.name).toBe("@test/member-ops");
+    expect(lock.member.runtimes).toContain("claude-code");
     expect(lock.roles).toHaveLength(1);
     expect(lock.roles[0].name).toBe("@test/role-manager");
     expect(lock.generatedFiles).toEqual([]);
   });
 
   it("writes lock file to custom output path", async () => {
-    setupValidAgent();
+    setupValidMember();
     const customPath = path.join(tmpDir, "custom", "lock.json");
-    await runBuild(tmpDir, "@test/agent-ops", { output: customPath });
+    await runBuild(tmpDir, "@test/member-ops", { output: customPath });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     expect(fs.existsSync(customPath)).toBe(true);
 
     const lock = JSON.parse(fs.readFileSync(customPath, "utf-8"));
-    expect(lock.agent.name).toBe("@test/agent-ops");
+    expect(lock.member.name).toBe("@test/member-ops");
   });
 
   it("prints JSON to stdout with --json flag", async () => {
-    setupValidAgent();
-    await runBuild(tmpDir, "@test/agent-ops", { json: true });
+    setupValidMember();
+    await runBuild(tmpDir, "@test/member-ops", { json: true });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     const parsed = JSON.parse(logOutput);
     expect(parsed.lockVersion).toBe(1);
-    expect(parsed.agent.name).toBe("@test/agent-ops");
+    expect(parsed.member.name).toBe("@test/member-ops");
 
     // Should NOT write a file
-    expect(fs.existsSync(path.join(tmpDir, "forge.lock.json"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "chapter.lock.json"))).toBe(false);
   });
 
-  it("exits 1 when agent is not found", async () => {
+  it("exits 1 when member is not found", async () => {
     await runBuild(tmpDir, "@test/nonexistent", {});
 
     expect(exitSpy).toHaveBeenCalledWith(1);
@@ -183,7 +187,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -196,13 +200,13 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      forge: { type: "skill", artifacts: ["./SKILL.md"], description: "Labeling" },
+      chapter: { type: "skill", artifacts: ["./SKILL.md"], description: "Labeling" },
     });
 
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "task",
         taskType: "subagent",
         requires: { apps: ["@test/app-github"], skills: ["@test/skill-labeling"] },
@@ -213,7 +217,7 @@ describe("runBuild", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -223,13 +227,21 @@ describe("runBuild", () => {
       },
     });
 
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
+    writePackage(path.join(tmpDir, "members", "ops"), {
+      name: "@test/member-ops",
       version: "1.0.0",
-      forge: { type: "agent", runtimes: ["claude-code"], roles: ["@test/role-manager"] },
+      chapter: {
+        type: "member",
+        memberType: "agent",
+        name: "Ops",
+        slug: "ops",
+        email: "ops@chapter.local",
+        runtimes: ["claude-code"],
+        roles: ["@test/role-manager"],
+      },
     });
 
-    await runBuild(tmpDir, "@test/agent-ops", {});
+    await runBuild(tmpDir, "@test/member-ops", {});
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");

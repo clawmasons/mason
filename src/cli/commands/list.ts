@@ -1,8 +1,11 @@
+import * as path from "node:path";
 import type { Command } from "commander";
 import { discoverPackages } from "../../resolver/discover.js";
-import { resolveAgent } from "../../resolver/resolve.js";
-import type { ResolvedAgent, ResolvedRole } from "../../resolver/types.js";
+import { resolveMember } from "../../resolver/resolve.js";
+import type { ResolvedMember, ResolvedRole } from "../../resolver/types.js";
 import { getAppShortName } from "../../generator/toolfilter.js";
+import { readMembersRegistry } from "../../registry/members.js";
+import type { MembersRegistry } from "../../registry/types.js";
 
 interface ListOptions {
   json?: boolean;
@@ -11,7 +14,7 @@ interface ListOptions {
 export function registerListCommand(program: Command): void {
   program
     .command("list")
-    .description("List installed agents and their dependency trees")
+    .description("List installed members and their dependency trees")
     .option("--json", "Output as JSON")
     .action(async (options: ListOptions) => {
       await runList(process.cwd(), options);
@@ -26,43 +29,61 @@ export async function runList(
     // 1. Discover all packages
     const packages = discoverPackages(rootDir);
 
-    // 2. Find all agent packages
-    const agentNames: string[] = [];
+    // 2. Find all member packages
+    const memberNames: string[] = [];
     for (const [name, pkg] of packages) {
-      if (pkg.forgeField.type === "agent") {
-        agentNames.push(name);
+      if (pkg.chapterField.type === "member") {
+        memberNames.push(name);
       }
     }
 
-    if (agentNames.length === 0) {
-      console.error("No agents found.");
+    if (memberNames.length === 0) {
+      console.error("No members found.");
       process.exit(1);
       return;
     }
 
-    // 3. Resolve each agent
-    const agents: ResolvedAgent[] = [];
-    for (const name of agentNames.sort()) {
-      agents.push(resolveAgent(name, packages));
+    // 3. Resolve each member
+    const members: ResolvedMember[] = [];
+    for (const name of memberNames.sort()) {
+      members.push(resolveMember(name, packages));
     }
 
+    // 4. Read the members registry for status information
+    const chapterDir = path.join(rootDir, ".chapter");
+    const registry = readMembersRegistry(chapterDir);
+
     if (options.json) {
-      console.log(JSON.stringify(agents, null, 2));
+      console.log(JSON.stringify(members, null, 2));
       return;
     }
 
-    // 4. Print tree for each agent
-    for (let i = 0; i < agents.length; i++) {
-      const agent = agents[i];
+    // 5. Print tree for each member with status
+    for (let i = 0; i < members.length; i++) {
+      const member = members[i];
       if (i > 0) console.log("");
-      console.log(`${agent.name}@${agent.version}`);
-      printRoles(agent.roles);
+      const statusSuffix = formatMemberStatus(member, registry);
+      console.log(`${member.name}@${member.version}${statusSuffix}`);
+      printRoles(member.roles);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\n✘ List failed: ${message}\n`);
     process.exit(1);
   }
+}
+
+/**
+ * Format the member status suffix for display.
+ * Shows "(memberType, status)" if the member is in the registry,
+ * or "(memberType)" if the member is not installed.
+ */
+function formatMemberStatus(member: ResolvedMember, registry: MembersRegistry): string {
+  const entry = registry.members[member.slug];
+  if (entry) {
+    return ` (${member.memberType}, ${entry.status})`;
+  }
+  return ` (${member.memberType})`;
 }
 
 function printRoles(roles: ResolvedRole[]): void {

@@ -11,7 +11,7 @@ interface RemoveOptions {
 export function registerRemoveCommand(program: Command): void {
   program
     .command("remove")
-    .description("Remove a forge package dependency (wraps npm uninstall with dependent checking)")
+    .description("Remove a chapter package dependency (wraps npm uninstall with dependent checking)")
     .argument("<pkg>", "Package name to remove")
     .argument("[npmArgs...]", "Additional arguments forwarded to npm uninstall")
     .option("--force", "Remove even if other packages depend on it", false)
@@ -21,8 +21,8 @@ export function registerRemoveCommand(program: Command): void {
 }
 
 /**
- * Find all forge packages in the workspace that reference the target package
- * in their forge field (permissions, tasks, skills, requires, roles).
+ * Find all chapter packages in the workspace that reference the target package
+ * in their chapter field (permissions, tasks, skills, requires, roles).
  */
 export function findDependents(
   targetPkg: string,
@@ -33,38 +33,38 @@ export function findDependents(
   for (const [name, pkg] of packages) {
     if (name === targetPkg) continue;
 
-    const forge = pkg.forgeField;
+    const chapter = pkg.chapterField;
     let isDependent = false;
 
-    if (forge.type === "role") {
+    if (chapter.type === "role") {
       // Check permissions keys (app references)
-      if (forge.permissions && targetPkg in forge.permissions) {
+      if (chapter.permissions && targetPkg in chapter.permissions) {
         isDependent = true;
       }
       // Check tasks array
-      if (forge.tasks?.includes(targetPkg)) {
+      if (chapter.tasks?.includes(targetPkg)) {
         isDependent = true;
       }
       // Check skills array
-      if (forge.skills?.includes(targetPkg)) {
+      if (chapter.skills?.includes(targetPkg)) {
         isDependent = true;
       }
     }
 
-    if (forge.type === "task") {
+    if (chapter.type === "task") {
       // Check requires.apps
-      if (forge.requires?.apps?.includes(targetPkg)) {
+      if (chapter.requires?.apps?.includes(targetPkg)) {
         isDependent = true;
       }
       // Check requires.skills
-      if (forge.requires?.skills?.includes(targetPkg)) {
+      if (chapter.requires?.skills?.includes(targetPkg)) {
         isDependent = true;
       }
     }
 
-    if (forge.type === "agent") {
+    if (chapter.type === "member") {
       // Check roles array
-      if (forge.roles.includes(targetPkg)) {
+      if (chapter.roles.includes(targetPkg)) {
         isDependent = true;
       }
     }
@@ -88,7 +88,7 @@ export async function runRemove(
     const dependents = findDependents(pkg, packages);
 
     if (dependents.length > 0) {
-      const depList = dependents.map((d) => `  - ${d.name} (${d.forgeField.type})`).join("\n");
+      const depList = dependents.map((d) => `  - ${d.name} (${d.chapterField.type})`).join("\n");
 
       if (!options.force) {
         console.error(

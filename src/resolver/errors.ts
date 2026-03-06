@@ -15,15 +15,15 @@ export class PackageNotFoundError extends Error {
 }
 
 /**
- * Thrown when a package's forge field is invalid or cannot be parsed.
+ * Thrown when a package's chapter field is invalid or cannot be parsed.
  */
-export class InvalidForgeFieldError extends Error {
+export class InvalidChapterFieldError extends Error {
   constructor(
     public readonly packageName: string,
     public readonly reason: string,
   ) {
-    super(`Invalid forge field in package "${packageName}": ${reason}`);
-    this.name = "InvalidForgeFieldError";
+    super(`Invalid chapter field in package "${packageName}": ${reason}`);
+    this.name = "InvalidChapterFieldError";
   }
 }
 
@@ -38,7 +38,7 @@ export class CircularDependencyError extends Error {
 }
 
 /**
- * Thrown when a dependency has the wrong forge type (e.g., agent.roles
+ * Thrown when a dependency has the wrong chapter type (e.g., agent.roles
  * references an app instead of a role).
  */
 export class TypeMismatchError extends Error {

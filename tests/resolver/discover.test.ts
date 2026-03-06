@@ -7,7 +7,7 @@ import { discoverPackages } from "../../src/resolver/discover.js";
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-discover-"));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-discover-"));
 });
 
 afterEach(() => {
@@ -29,7 +29,7 @@ describe("discoverPackages", () => {
       writePackageJson("apps/github", {
         name: "@clawmasons/app-github",
         version: "1.2.0",
-        forge: {
+        chapter: {
           type: "app",
           transport: "stdio",
           command: "npx",
@@ -46,14 +46,14 @@ describe("discoverPackages", () => {
       expect(pkg).toBeDefined();
       expect(pkg?.name).toBe("@clawmasons/app-github");
       expect(pkg?.version).toBe("1.2.0");
-      expect(pkg?.forgeField.type).toBe("app");
+      expect(pkg?.chapterField.type).toBe("app");
     });
 
     it("discovers role packages in roles/ directory", () => {
       writePackageJson("roles/issue-manager", {
         name: "@clawmasons/role-issue-manager",
         version: "2.0.0",
-        forge: {
+        chapter: {
           type: "role",
           description: "Manages GitHub issues",
           permissions: {
@@ -70,34 +70,34 @@ describe("discoverPackages", () => {
 
       const pkg = result.get("@clawmasons/role-issue-manager");
       expect(pkg).toBeDefined();
-      expect(pkg?.forgeField.type).toBe("role");
+      expect(pkg?.chapterField.type).toBe("role");
     });
 
     it("discovers packages across all workspace directories", () => {
       writePackageJson("apps/github", {
         name: "@clawmasons/app-github",
         version: "1.0.0",
-        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
+        chapter: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
       });
       writePackageJson("skills/labeling", {
         name: "@clawmasons/skill-labeling",
         version: "1.0.0",
-        forge: { type: "skill", artifacts: ["./SKILL.md"], description: "Labeling" },
+        chapter: { type: "skill", artifacts: ["./SKILL.md"], description: "Labeling" },
       });
       writePackageJson("tasks/triage", {
         name: "@clawmasons/task-triage",
         version: "1.0.0",
-        forge: { type: "task", taskType: "subagent" },
+        chapter: { type: "task", taskType: "subagent" },
       });
       writePackageJson("roles/manager", {
         name: "@clawmasons/role-manager",
         version: "1.0.0",
-        forge: { type: "role", permissions: { "@clawmasons/app-github": { allow: ["t"], deny: [] } } },
+        chapter: { type: "role", permissions: { "@clawmasons/app-github": { allow: ["t"], deny: [] } } },
       });
-      writePackageJson("agents/ops", {
-        name: "@clawmasons/agent-ops",
+      writePackageJson("members/ops", {
+        name: "@clawmasons/member-ops",
         version: "1.0.0",
-        forge: { type: "agent", runtimes: ["claude-code"], roles: ["@clawmasons/role-manager"] },
+        chapter: { type: "member", memberType: "agent", name: "Ops", slug: "ops", email: "ops@chapter.local", runtimes: ["claude-code"], roles: ["@clawmasons/role-manager"] },
       });
 
       const result = discoverPackages(tmpDir);
@@ -111,7 +111,7 @@ describe("discoverPackages", () => {
       expect(result.size).toBe(0);
     });
 
-    it("skips packages without forge field", () => {
+    it("skips packages without chapter field", () => {
       writePackageJson("apps/plain-npm", {
         name: "plain-npm-package",
         version: "1.0.0",
@@ -121,11 +121,11 @@ describe("discoverPackages", () => {
       expect(result.size).toBe(0);
     });
 
-    it("skips packages with invalid forge field", () => {
+    it("skips packages with invalid chapter field", () => {
       writePackageJson("apps/bad-schema", {
         name: "bad-schema",
         version: "1.0.0",
-        forge: { type: "app" }, // missing required fields
+        chapter: { type: "app" }, // missing required fields
       });
 
       const result = discoverPackages(tmpDir);
@@ -144,7 +144,7 @@ describe("discoverPackages", () => {
       writePackageJson("node_modules/some-app", {
         name: "some-app",
         version: "1.0.0",
-        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
+        chapter: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
       });
 
       const result = discoverPackages(tmpDir);
@@ -156,7 +156,7 @@ describe("discoverPackages", () => {
       writePackageJson("node_modules/@clawmasons/app-github", {
         name: "@clawmasons/app-github",
         version: "1.2.0",
-        forge: {
+        chapter: {
           type: "app",
           transport: "stdio",
           command: "npx",
@@ -176,7 +176,7 @@ describe("discoverPackages", () => {
       expect(result.size).toBe(0);
     });
 
-    it("skips node_modules packages without forge field", () => {
+    it("skips node_modules packages without chapter field", () => {
       writePackageJson("node_modules/express", {
         name: "express",
         version: "4.18.0",
@@ -189,26 +189,26 @@ describe("discoverPackages", () => {
 
   describe("node_modules workspace dir scanning", () => {
     it("discovers sub-components inside a scoped node_modules package with workspace dirs", () => {
-      // Simulate @clawmasons/forge-core containing apps/, tasks/, skills/
-      writePackageJson("node_modules/@clawmasons/forge-core", {
-        name: "@clawmasons/forge-core",
+      // Simulate @clawmasons/chapter-core containing apps/, tasks/, skills/
+      writePackageJson("node_modules/@clawmasons/chapter-core", {
+        name: "@clawmasons/chapter-core",
         version: "0.1.0",
-        // No forge field on the library itself
+        // No chapter field on the library itself
       });
-      writePackageJson("node_modules/@clawmasons/forge-core/apps/filesystem", {
+      writePackageJson("node_modules/@clawmasons/chapter-core/apps/filesystem", {
         name: "@clawmasons/app-filesystem",
         version: "0.1.0",
-        forge: { type: "app", transport: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem"], tools: ["read_file"], capabilities: ["tools"] },
+        chapter: { type: "app", transport: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem"], tools: ["read_file"], capabilities: ["tools"] },
       });
-      writePackageJson("node_modules/@clawmasons/forge-core/tasks/take-notes", {
+      writePackageJson("node_modules/@clawmasons/chapter-core/tasks/take-notes", {
         name: "@clawmasons/task-take-notes",
         version: "0.1.0",
-        forge: { type: "task", taskType: "subagent" },
+        chapter: { type: "task", taskType: "subagent" },
       });
-      writePackageJson("node_modules/@clawmasons/forge-core/skills/markdown-conventions", {
+      writePackageJson("node_modules/@clawmasons/chapter-core/skills/markdown-conventions", {
         name: "@clawmasons/skill-markdown-conventions",
         version: "0.1.0",
-        forge: { type: "skill", artifacts: ["./SKILL.md"], description: "Markdown writing conventions" },
+        chapter: { type: "skill", artifacts: ["./SKILL.md"], description: "Markdown writing conventions" },
       });
 
       const result = discoverPackages(tmpDir);
@@ -216,15 +216,15 @@ describe("discoverPackages", () => {
       expect(result.has("@clawmasons/task-take-notes")).toBe(true);
       expect(result.has("@clawmasons/skill-markdown-conventions")).toBe(true);
       expect(result.get("@clawmasons/app-filesystem")?.packagePath).toBe(
-        path.join(tmpDir, "node_modules/@clawmasons/forge-core/apps/filesystem"),
+        path.join(tmpDir, "node_modules/@clawmasons/chapter-core/apps/filesystem"),
       );
     });
 
     it("discovers sub-components inside an unscoped node_modules package with workspace dirs", () => {
-      writePackageJson("node_modules/forge-core/apps/tool", {
+      writePackageJson("node_modules/chapter-core/apps/tool", {
         name: "@org/app-tool",
         version: "1.0.0",
-        forge: { type: "app", transport: "stdio", command: "node", args: ["server.js"], tools: ["run"], capabilities: ["tools"] },
+        chapter: { type: "app", transport: "stdio", command: "node", args: ["server.js"], tools: ["run"], capabilities: ["tools"] },
       });
 
       const result = discoverPackages(tmpDir);
@@ -236,13 +236,13 @@ describe("discoverPackages", () => {
       writePackageJson("apps/filesystem", {
         name: "@clawmasons/app-filesystem",
         version: "2.0.0",
-        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["read_file"], capabilities: ["tools"] },
+        chapter: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["read_file"], capabilities: ["tools"] },
       });
-      // Same package inside node_modules forge-core
-      writePackageJson("node_modules/@clawmasons/forge-core/apps/filesystem", {
+      // Same package inside node_modules chapter-core
+      writePackageJson("node_modules/@clawmasons/chapter-core/apps/filesystem", {
         name: "@clawmasons/app-filesystem",
         version: "1.0.0",
-        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["read_file"], capabilities: ["tools"] },
+        chapter: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["read_file"], capabilities: ["tools"] },
       });
 
       const result = discoverPackages(tmpDir);
@@ -256,7 +256,7 @@ describe("discoverPackages", () => {
       writePackageJson("node_modules/some-app", {
         name: "some-app",
         version: "1.0.0",
-        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
+        chapter: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
       });
 
       const result = discoverPackages(tmpDir);
@@ -264,16 +264,16 @@ describe("discoverPackages", () => {
       expect(result.has("some-app")).toBe(true);
     });
 
-    it("registers both a package with a direct forge field and its workspace dir sub-components", () => {
+    it("registers both a package with a direct chapter field and its workspace dir sub-components", () => {
       writePackageJson("node_modules/@org/lib", {
         name: "@org/lib",
         version: "1.0.0",
-        forge: { type: "skill", artifacts: ["./LIB.md"], description: "Library skill" },
+        chapter: { type: "skill", artifacts: ["./LIB.md"], description: "Library skill" },
       });
       writePackageJson("node_modules/@org/lib/apps/tool", {
         name: "@org/app-tool",
         version: "1.0.0",
-        forge: { type: "app", transport: "stdio", command: "node", args: ["server.js"], tools: ["run"], capabilities: ["tools"] },
+        chapter: { type: "app", transport: "stdio", command: "node", args: ["server.js"], tools: ["run"], capabilities: ["tools"] },
       });
 
       const result = discoverPackages(tmpDir);
@@ -282,12 +282,12 @@ describe("discoverPackages", () => {
       expect(result.size).toBe(2);
     });
 
-    it("skips sub-directories without valid forge packages inside workspace dirs", () => {
-      // forge-core with an apps/ dir, but the sub-package has no forge field
-      writePackageJson("node_modules/@clawmasons/forge-core/apps/plain", {
+    it("skips sub-directories without valid chapter packages inside workspace dirs", () => {
+      // chapter-core with an apps/ dir, but the sub-package has no chapter field
+      writePackageJson("node_modules/@clawmasons/chapter-core/apps/plain", {
         name: "plain-package",
         version: "1.0.0",
-        // No forge field
+        // No chapter field
       });
 
       const result = discoverPackages(tmpDir);
@@ -300,12 +300,12 @@ describe("discoverPackages", () => {
       writePackageJson("apps/github", {
         name: "@clawmasons/app-github",
         version: "2.0.0",
-        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
+        chapter: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
       });
       writePackageJson("node_modules/@clawmasons/app-github", {
         name: "@clawmasons/app-github",
         version: "1.0.0",
-        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
+        chapter: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
       });
 
       const result = discoverPackages(tmpDir);
@@ -320,7 +320,7 @@ describe("discoverPackages", () => {
       writePackageJson("apps/github", {
         name: "@clawmasons/app-github",
         version: "1.2.0",
-        forge: {
+        chapter: {
           type: "app",
           transport: "stdio",
           command: "npx",
@@ -337,13 +337,13 @@ describe("discoverPackages", () => {
       expect(pkg?.name).toBe("@clawmasons/app-github");
       expect(pkg?.version).toBe("1.2.0");
       expect(pkg?.packagePath).toBe(path.join(tmpDir, "apps/github"));
-      expect(pkg?.forgeField.type).toBe("app");
+      expect(pkg?.chapterField.type).toBe("app");
     });
 
     it("defaults version to 0.0.0 when missing", () => {
       writePackageJson("apps/github", {
         name: "@clawmasons/app-github",
-        forge: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
+        chapter: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
       });
 
       const result = discoverPackages(tmpDir);

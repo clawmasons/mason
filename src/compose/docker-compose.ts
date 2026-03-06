@@ -1,12 +1,12 @@
-import type { ResolvedAgent, ResolvedApp } from "../resolver/types.js";
+import type { ResolvedMember, ResolvedApp } from "../resolver/types.js";
 import type { ComposeServiceDef } from "../materializer/types.js";
 
 /**
  * Collect all unique apps from a resolved agent's roles.
  */
-function collectAllApps(agent: ResolvedAgent): Map<string, ResolvedApp> {
+function collectAllApps(member: ResolvedMember): Map<string, ResolvedApp> {
   const apps = new Map<string, ResolvedApp>();
-  for (const role of agent.roles) {
+  for (const role of member.roles) {
     for (const app of role.apps) {
       if (!apps.has(app.name)) {
         apps.set(app.name, app);
@@ -20,9 +20,9 @@ function collectAllApps(agent: ResolvedAgent): Map<string, ResolvedApp> {
  * Extract environment variable names referenced via ${VAR} interpolation
  * from all app env fields. Returns deduplicated sorted list.
  */
-function collectProxyEnvVars(agent: ResolvedAgent): string[] {
+function collectProxyEnvVars(member: ResolvedMember): string[] {
   const varNames = new Set<string>();
-  const allApps = collectAllApps(agent);
+  const allApps = collectAllApps(member);
 
   for (const [, app] of allApps) {
     if (app.env) {
@@ -92,34 +92,34 @@ function renderComposeService(service: ComposeServiceDef): string {
  * Generate a complete docker-compose.yml string from a resolved agent
  * and its runtime compose services.
  *
- * The proxy service runs `forge proxy` natively. Runtime services
+ * The proxy service runs `chapter proxy` natively. Runtime services
  * are rendered from their ComposeServiceDef definitions.
  */
 export function generateDockerCompose(
-  agent: ResolvedAgent,
+  member: ResolvedMember,
   runtimeServices: Map<string, ComposeServiceDef>,
 ): string {
-  const port = agent.proxy?.port ?? 9090;
-  const envVars = collectProxyEnvVars(agent);
+  const port = member.proxy?.port ?? 9090;
+  const envVars = collectProxyEnvVars(member);
 
   const lines: string[] = [];
 
   lines.push("services:");
   lines.push("");
 
-  // forge proxy service (service name kept as mcp-proxy for depends_on compatibility)
+  // chapter proxy service (service name kept as mcp-proxy for depends_on compatibility)
   lines.push("  mcp-proxy:");
-  lines.push("    build: ./forge-proxy");
+  lines.push("    build: ./proxy");
   lines.push("    restart: unless-stopped");
   lines.push("    ports:");
-  lines.push(`      - "\${FORGE_PROXY_PORT:-${port}}:${port}"`);
+  lines.push(`      - "\${CHAPTER_PROXY_PORT:-${port}}:${port}"`);
   lines.push("    volumes:");
-  lines.push("      - ./forge-proxy/logs:/logs");
+  lines.push("      - ./proxy/logs:/logs");
   lines.push("      - ./data:/home/node/data");
 
   lines.push("    environment:");
-  lines.push("      - FORGE_DB_PATH=/home/node/data/forge.db");
-  lines.push("      - FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}");
+  lines.push("      - CHAPTER_DB_PATH=/home/node/data/chapter.db");
+  lines.push("      - CHAPTER_PROXY_TOKEN=${CHAPTER_PROXY_TOKEN}");
   for (const varName of envVars) {
     lines.push(`      - ${varName}=\${${varName}}`);
   }
@@ -130,7 +130,7 @@ export function generateDockerCompose(
   lines.push('        max-size: "10m"');
   lines.push('        max-file: "5"');
   lines.push("    networks:");
-  lines.push("      - agent-net");
+  lines.push("      - chapter-net");
 
   // Runtime services
   for (const [name, service] of runtimeServices) {
@@ -142,7 +142,7 @@ export function generateDockerCompose(
   // Networks
   lines.push("");
   lines.push("networks:");
-  lines.push("  agent-net:");
+  lines.push("  chapter-net:");
   lines.push("    driver: bridge");
 
   return lines.join("\n");

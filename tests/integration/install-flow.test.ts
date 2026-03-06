@@ -1,37 +1,45 @@
 /**
- * End-to-End Integration Test — Install Flow (Local tgz)
+ * End-to-End Integration Test — Full Chapter Workflow (Local tgz)
  *
- * Validates the complete forge packaging pipeline using only local .tgz files:
- *   npm pack -> npm install tgz -> forge init -> forge validate -> forge list -> forge install
+ * Validates the complete chapter lifecycle using only local .tgz files:
+ *   npm pack -> npm install tgz -> chapter init -> chapter validate -> chapter list
+ *   -> chapter install -> verify registry -> verify dirs -> disable -> run guard
+ *   -> enable -> no-forge check
  *
  * This test proves that the entire user journey works without any npm registry access.
- * It exercises all forge-packaging PRD changes:
- *   - forge-core package (Change 1)
- *   - Discovery enhancement (Change 2)
- *   - Template system (Change 3)
- *   - Simplified Dockerfile (Change 4)
- *   - Example removal (Change 5)
+ * It exercises all chapter-members PRD changes:
+ *   - Rename & rebrand (Changes 1-4)
+ *   - Member model (Change 5)
+ *   - Per-member dirs (Change 6)
+ *   - Members registry (Change 7)
+ *   - Enable/disable (Change 8)
+ *   - Templates (Change 9)
+ *   - Terminology (Change 10)
+ *   - E2E validation (Change 11)
  *
- * PRD refs: forge-packaging PRD Section 2 (Measurable Outcomes)
+ * PRD refs: chapter-members PRD Phase 5 (End-to-End Validation)
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { readMembersRegistry, getMember } from "../../src/registry/members.js";
+import { runDisable } from "../../src/cli/commands/disable.js";
+import { runEnable } from "../../src/cli/commands/enable.js";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
-const FORGE_ROOT = join(import.meta.dirname, "..", "..");
-const FORGE_CORE_DIR = join(FORGE_ROOT, "forge-core");
+const CHAPTER_ROOT = join(import.meta.dirname, "..", "..");
+const CHAPTER_CORE_DIR = join(CHAPTER_ROOT, "chapter-core");
 const TIMEOUT = 120_000;
 
 // ── Shared State ───────────────────────────────────────────────────────
 
 let tmpDir: string;
-let forgeTgzPath: string;
-let forgeCoreTgzPath: string;
+let chapterTgzPath: string;
+let chapterCoreTgzPath: string;
 let projectScope: string;
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -49,39 +57,39 @@ function run(cmd: string, args: string[], cwd: string): string {
 }
 
 /**
- * Run the locally-installed forge CLI via node_modules/.bin/forge.
- * Avoids npx, which can resolve to the wrong "forge" package on the registry.
+ * Run the locally-installed chapter CLI via node_modules/.bin/chapter.
+ * Avoids npx, which can resolve to the wrong package on the registry.
  */
-function forgeCli(args: string[], cwd: string): string {
-  const forgeBin = join(cwd, "node_modules", ".bin", "forge");
-  return run(forgeBin, args, cwd);
+function chapterCli(args: string[], cwd: string): string {
+  const chapterBin = join(cwd, "node_modules", ".bin", "chapter");
+  return run(chapterBin, args, cwd);
 }
 
 // ── Setup / Teardown ───────────────────────────────────────────────────
 
 beforeAll(() => {
-  // 1. Build forge
-  run("npm", ["run", "build"], FORGE_ROOT);
+  // 1. Build chapter
+  run("npm", ["run", "build"], CHAPTER_ROOT);
 
-  // 2. Pack @clawmasons/forge
-  const forgePackJson = run("npm", ["pack", "--json"], FORGE_ROOT);
-  const forgePackResult = JSON.parse(forgePackJson) as Array<{ filename: string }>;
-  const forgeFilename = forgePackResult[0]!.filename;
-  forgeTgzPath = join(FORGE_ROOT, forgeFilename);
+  // 2. Pack @clawmasons/chapter
+  const chapterPackJson = run("npm", ["pack", "--json"], CHAPTER_ROOT);
+  const chapterPackResult = JSON.parse(chapterPackJson) as Array<{ filename: string }>;
+  const chapterFilename = chapterPackResult[0]!.filename;
+  chapterTgzPath = join(CHAPTER_ROOT, chapterFilename);
 
-  // 3. Pack @clawmasons/forge-core
-  const corePackJson = run("npm", ["pack", "--json"], FORGE_CORE_DIR);
+  // 3. Pack @clawmasons/chapter-core
+  const corePackJson = run("npm", ["pack", "--json"], CHAPTER_CORE_DIR);
   const corePackResult = JSON.parse(corePackJson) as Array<{ filename: string }>;
   const coreFilename = corePackResult[0]!.filename;
-  forgeCoreTgzPath = join(FORGE_CORE_DIR, coreFilename);
+  chapterCoreTgzPath = join(CHAPTER_CORE_DIR, coreFilename);
 
   // 4. Create temp directory
-  tmpDir = mkdtempSync(join(tmpdir(), "test-forge-"));
+  tmpDir = mkdtempSync(join(tmpdir(), "test-chapter-"));
   projectScope = tmpDir.split("/").pop()!;
 
   // Verify tgz files exist
-  expect(existsSync(forgeTgzPath)).toBe(true);
-  expect(existsSync(forgeCoreTgzPath)).toBe(true);
+  expect(existsSync(chapterTgzPath)).toBe(true);
+  expect(existsSync(chapterCoreTgzPath)).toBe(true);
 }, TIMEOUT);
 
 afterAll(() => {
@@ -96,12 +104,12 @@ afterAll(() => {
 
   // Clean up tgz files (they're gitignored but tidy up)
   try {
-    if (forgeTgzPath && existsSync(forgeTgzPath)) rmSync(forgeTgzPath);
+    if (chapterTgzPath && existsSync(chapterTgzPath)) rmSync(chapterTgzPath);
   } catch {
     /* ignore */
   }
   try {
-    if (forgeCoreTgzPath && existsSync(forgeCoreTgzPath)) rmSync(forgeCoreTgzPath);
+    if (chapterCoreTgzPath && existsSync(chapterCoreTgzPath)) rmSync(chapterCoreTgzPath);
   } catch {
     /* ignore */
   }
@@ -112,36 +120,36 @@ afterAll(() => {
 describe("E2E Install Flow (Local tgz)", () => {
   // Tests run sequentially within a describe — each step depends on the previous one.
 
-  it("step 1: installs forge from tgz and runs forge init", () => {
+  it("step 1: installs chapter from tgz and runs chapter init", () => {
     // Initialize a bare package.json so npm install works
     run("npm", ["init", "-y"], tmpDir);
 
-    // Install forge tgz to get the CLI
-    run("npm", ["install", forgeTgzPath], tmpDir);
+    // Install chapter tgz to get the CLI
+    run("npm", ["install", chapterTgzPath], tmpDir);
 
-    // Verify forge CLI is available
-    expect(existsSync(join(tmpDir, "node_modules", ".bin", "forge"))).toBe(true);
+    // Verify chapter CLI is available
+    expect(existsSync(join(tmpDir, "node_modules", ".bin", "chapter"))).toBe(true);
 
-    // Run forge init --template note-taker
-    // This will copy template files (including package.json with @clawmasons/forge-core dep),
-    // create .forge/ scaffold, and attempt npm install. The npm install inside init
-    // may warn about @clawmasons/forge-core not being on the registry — that's expected
+    // Run chapter init --template note-taker
+    // This will copy template files (including package.json with @clawmasons/chapter-core dep),
+    // create .chapter/ scaffold, and attempt npm install. The npm install inside init
+    // may warn about @clawmasons/chapter-core not being on the registry — that's expected
     // for local tgz testing. The template files are still copied correctly.
-    forgeCli(["init", "--template", "note-taker"], tmpDir);
+    chapterCli(["init", "--template", "note-taker"], tmpDir);
 
     // Verify scaffold was created
-    expect(existsSync(join(tmpDir, ".forge"))).toBe(true);
-    expect(existsSync(join(tmpDir, ".forge", "config.json"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".chapter"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".chapter", "config.json"))).toBe(true);
 
-    // Verify template files were copied
-    expect(existsSync(join(tmpDir, "agents", "note-taker", "package.json"))).toBe(true);
+    // Verify template files were copied (still uses members/ directory from template)
+    expect(existsSync(join(tmpDir, "members", "note-taker", "package.json"))).toBe(true);
     expect(existsSync(join(tmpDir, "roles", "writer", "package.json"))).toBe(true);
 
-    // Verify agent package.json has correct project scope
-    const agentPkg = JSON.parse(
-      readFileSync(join(tmpDir, "agents", "note-taker", "package.json"), "utf-8"),
+    // Verify member package.json has correct project scope
+    const memberPkg = JSON.parse(
+      readFileSync(join(tmpDir, "members", "note-taker", "package.json"), "utf-8"),
     ) as { name: string };
-    expect(agentPkg.name).toBe(`@${projectScope}/agent-note-taker`);
+    expect(memberPkg.name).toBe(`@${projectScope}/member-note-taker`);
 
     // Verify role package.json has correct project scope
     const rolePkg = JSON.parse(
@@ -151,38 +159,38 @@ describe("E2E Install Flow (Local tgz)", () => {
   }, TIMEOUT);
 
   it("step 2: installs both tgz packages for full dependency resolution", () => {
-    // After forge init, the template's package.json replaced the original.
-    // Install both forge and forge-core tgz files to populate node_modules
+    // After chapter init, the template's package.json replaced the original.
+    // Install both chapter and chapter-core tgz files to populate node_modules
     // with all required packages for discovery and CLI usage.
-    run("npm", ["install", forgeTgzPath, forgeCoreTgzPath], tmpDir);
+    run("npm", ["install", chapterTgzPath, chapterCoreTgzPath], tmpDir);
 
     // Verify both packages are installed
-    expect(existsSync(join(tmpDir, "node_modules", "@clawmasons", "forge"))).toBe(true);
-    expect(existsSync(join(tmpDir, "node_modules", "@clawmasons", "forge-core"))).toBe(true);
+    expect(existsSync(join(tmpDir, "node_modules", "@clawmasons", "chapter"))).toBe(true);
+    expect(existsSync(join(tmpDir, "node_modules", "@clawmasons", "chapter-core"))).toBe(true);
 
-    // Verify forge CLI binary is linked
-    expect(existsSync(join(tmpDir, "node_modules", ".bin", "forge"))).toBe(true);
+    // Verify chapter CLI binary is linked
+    expect(existsSync(join(tmpDir, "node_modules", ".bin", "chapter"))).toBe(true);
 
-    // Verify forge-core contains expected component structure
+    // Verify chapter-core contains expected component structure
     expect(
-      existsSync(join(tmpDir, "node_modules", "@clawmasons", "forge-core", "apps", "filesystem", "package.json")),
+      existsSync(join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "apps", "filesystem", "package.json")),
     ).toBe(true);
     expect(
-      existsSync(join(tmpDir, "node_modules", "@clawmasons", "forge-core", "tasks", "take-notes", "package.json")),
+      existsSync(join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "tasks", "take-notes", "package.json")),
     ).toBe(true);
     expect(
-      existsSync(join(tmpDir, "node_modules", "@clawmasons", "forge-core", "skills", "markdown-conventions", "package.json")),
+      existsSync(join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "skills", "markdown-conventions", "package.json")),
     ).toBe(true);
   }, TIMEOUT);
 
-  it("step 3: forge validate confirms agent graph is valid", () => {
-    const agentName = `@${projectScope}/agent-note-taker`;
-    const output = forgeCli(["validate", agentName], tmpDir);
+  it("step 3: chapter validate confirms agent graph is valid", () => {
+    const agentName = `@${projectScope}/member-note-taker`;
+    const output = chapterCli(["validate", agentName], tmpDir);
     expect(output).toContain("is valid");
   }, TIMEOUT);
 
-  it("step 4: forge list shows complete agent dependency tree", () => {
-    const output = forgeCli(["list", "--json"], tmpDir);
+  it("step 4: chapter list shows complete agent dependency tree", () => {
+    const output = chapterCli(["list", "--json"], tmpDir);
     const agents = JSON.parse(output) as Array<{
       name: string;
       roles: Array<{
@@ -193,46 +201,170 @@ describe("E2E Install Flow (Local tgz)", () => {
       }>;
     }>;
 
-    // Should have at least one agent (may also pick up forge-core's agent)
+    // Should have at least one agent (may also pick up chapter-core's member)
     expect(agents.length).toBeGreaterThanOrEqual(1);
 
     // Find our template agent (local scope takes precedence)
-    const agent = agents.find((a) => a.name === `@${projectScope}/agent-note-taker`);
+    const agent = agents.find((a) => a.name === `@${projectScope}/member-note-taker`);
     expect(agent).toBeDefined();
 
     // Agent should have the writer role
     const role = agent!.roles.find((r) => r.name === `@${projectScope}/role-writer`);
     expect(role).toBeDefined();
 
-    // Role should reference forge-core components
+    // Role should reference chapter-core components
     expect(role!.tasks.some((t) => t.name === "@clawmasons/task-take-notes")).toBe(true);
     expect(role!.skills.some((s) => s.name === "@clawmasons/skill-markdown-conventions")).toBe(true);
     expect(role!.apps.some((a) => a.name === "@clawmasons/app-filesystem")).toBe(true);
   }, TIMEOUT);
 
-  it("step 5: forge install generates single-stage Dockerfile", () => {
-    const agentName = `@${projectScope}/agent-note-taker`;
-    forgeCli(["install", agentName], tmpDir);
+  it("step 5: chapter install generates single-stage Dockerfile", () => {
+    const agentName = `@${projectScope}/member-note-taker`;
+    chapterCli(["install", agentName], tmpDir);
 
     // Verify output directory was created
-    const installDir = join(tmpDir, ".forge", "agents", "note-taker");
+    const installDir = join(tmpDir, ".chapter", "members", "note-taker");
     expect(existsSync(installDir)).toBe(true);
 
     // Verify Dockerfile exists and is single-stage
-    const dockerfilePath = join(installDir, "forge-proxy", "Dockerfile");
+    const dockerfilePath = join(installDir, "proxy", "Dockerfile");
     expect(existsSync(dockerfilePath)).toBe(true);
 
     const dockerfile = readFileSync(dockerfilePath, "utf-8");
     expect(dockerfile).not.toContain("AS builder");
     expect(dockerfile).toContain("FROM node:22-slim");
-    expect(dockerfile).toContain(`CMD ["proxy", "--agent", "${agentName}"]`);
+    expect(dockerfile).toContain(`CMD ["proxy", "--member", "${agentName}"]`);
 
     // Verify docker-compose.yml exists
     expect(existsSync(join(installDir, "docker-compose.yml"))).toBe(true);
 
-    // Verify forge proxy build context has pre-built artifacts (not source)
-    expect(existsSync(join(installDir, "forge-proxy", "forge", "dist"))).toBe(true);
-    expect(existsSync(join(installDir, "forge-proxy", "forge", "bin"))).toBe(true);
-    expect(existsSync(join(installDir, "forge-proxy", "forge", "package.json"))).toBe(true);
+    // Verify log/ directory exists
+    expect(existsSync(join(installDir, "log"))).toBe(true);
+
+    // Verify proxy build context has pre-built artifacts (not source)
+    expect(existsSync(join(installDir, "proxy", "chapter", "dist"))).toBe(true);
+    expect(existsSync(join(installDir, "proxy", "chapter", "bin"))).toBe(true);
+    expect(existsSync(join(installDir, "proxy", "chapter", "package.json"))).toBe(true);
+  }, TIMEOUT);
+
+  // ── New Steps: Registry, Enable/Disable, Forge-Remnant Checks ──────
+
+  it("step 6: members registry is populated after install", () => {
+    const chapterDir = join(tmpDir, ".chapter");
+
+    // Verify members.json exists
+    expect(existsSync(join(chapterDir, "members.json"))).toBe(true);
+
+    // Read and validate registry
+    const registry = readMembersRegistry(chapterDir);
+    const entry = registry.members["note-taker"];
+
+    expect(entry).toBeDefined();
+    expect(entry!.status).toBe("enabled");
+    expect(entry!.memberType).toBe("agent");
+    expect(entry!.package).toBe(`@${projectScope}/member-note-taker`);
+
+    // Verify installedAt is a valid ISO 8601 timestamp
+    expect(entry!.installedAt).toBeTruthy();
+    const parsedDate = new Date(entry!.installedAt);
+    expect(parsedDate.getTime()).not.toBeNaN();
+  }, TIMEOUT);
+
+  it("step 7: per-member directory structure is complete", () => {
+    const installDir = join(tmpDir, ".chapter", "members", "note-taker");
+
+    // Activity log directory
+    expect(existsSync(join(installDir, "log"))).toBe(true);
+
+    // Proxy build context
+    expect(existsSync(join(installDir, "proxy", "Dockerfile"))).toBe(true);
+    expect(existsSync(join(installDir, "proxy", "chapter", "dist"))).toBe(true);
+    expect(existsSync(join(installDir, "proxy", "chapter", "package.json"))).toBe(true);
+
+    // Claude-code runtime workspace
+    expect(existsSync(join(installDir, "claude-code", "workspace"))).toBe(true);
+    expect(existsSync(join(installDir, "claude-code", "workspace", ".claude", "settings.json"))).toBe(true);
+    expect(existsSync(join(installDir, "claude-code", "workspace", "AGENTS.md"))).toBe(true);
+    expect(existsSync(join(installDir, "claude-code", "Dockerfile"))).toBe(true);
+
+    // Docker artifacts
+    expect(existsSync(join(installDir, "docker-compose.yml"))).toBe(true);
+    expect(existsSync(join(installDir, ".env"))).toBe(true);
+    expect(existsSync(join(installDir, "chapter.lock.json"))).toBe(true);
+  }, TIMEOUT);
+
+  it("step 8: chapter disable updates registry status", () => {
+    // Suppress console output during disable
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    runDisable(tmpDir, "@note-taker");
+
+    logSpy.mockRestore();
+
+    // Verify the registry was updated
+    const chapterDir = join(tmpDir, ".chapter");
+    const registry = readMembersRegistry(chapterDir);
+    const entry = registry.members["note-taker"];
+
+    expect(entry).toBeDefined();
+    expect(entry!.status).toBe("disabled");
+
+    // Other fields should be preserved
+    expect(entry!.memberType).toBe("agent");
+    expect(entry!.package).toBe(`@${projectScope}/member-note-taker`);
+    expect(entry!.installedAt).toBeTruthy();
+  }, TIMEOUT);
+
+  it("step 9: disabled member is blocked from running", () => {
+    const chapterDir = join(tmpDir, ".chapter");
+
+    // Verify getMember confirms the disabled status
+    const entry = getMember(chapterDir, "note-taker");
+    expect(entry).toBeDefined();
+    expect(entry!.status).toBe("disabled");
+
+    // The run command checks: if (memberEntry && memberEntry.status === "disabled")
+    // This verifies the guard condition would trigger. Full run rejection is
+    // covered by unit tests in tests/cli/run.test.ts since run requires Docker.
+  }, TIMEOUT);
+
+  it("step 10: chapter enable re-enables the member", () => {
+    // Suppress console output during enable
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    runEnable(tmpDir, "@note-taker");
+
+    logSpy.mockRestore();
+
+    // Verify the registry was updated
+    const chapterDir = join(tmpDir, ".chapter");
+    const registry = readMembersRegistry(chapterDir);
+    const entry = registry.members["note-taker"];
+
+    expect(entry).toBeDefined();
+    expect(entry!.status).toBe("enabled");
+  }, TIMEOUT);
+
+  it("step 11: no forge references in generated config files", () => {
+    const installDir = join(tmpDir, ".chapter", "members", "note-taker");
+
+    // Check key generated files for "forge" references (case-insensitive)
+    const filesToCheck: Array<[string, string]> = [
+      ["docker-compose.yml", join(installDir, "docker-compose.yml")],
+      [".env", join(installDir, ".env")],
+      ["chapter.lock.json", join(installDir, "chapter.lock.json")],
+      ["members.json", join(tmpDir, ".chapter", "members.json")],
+    ];
+
+    for (const [label, filePath] of filesToCheck) {
+      expect(existsSync(filePath)).toBe(true);
+      const content = readFileSync(filePath, "utf-8");
+      // Find any "forge" references with context for debugging
+      const lines = content.split("\n");
+      const forgeLines = lines
+        .map((line, i) => ({ line, num: i + 1 }))
+        .filter(({ line }) => /forge/i.test(line));
+      expect(forgeLines, `Found "forge" in ${label}: ${JSON.stringify(forgeLines)}`).toHaveLength(0);
+    }
   }, TIMEOUT);
 });

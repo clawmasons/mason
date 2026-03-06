@@ -1,7 +1,7 @@
 # graph-validation Specification
 
 ## Purpose
-TBD - created by archiving change forge-validate-graph-validation. Update Purpose after archive.
+TBD - created by archiving change chapter-validate-graph-validation. Update Purpose after archive.
 ## Requirements
 ### Requirement: Validate requirement coverage
 The system SHALL check that for every task in a role, each app listed in the task's `requires.apps` has a corresponding entry in the parent role's `permissions` object. A task cannot use an app that its role doesn't govern.
@@ -63,36 +63,36 @@ The system SHALL check that every resolved app has valid launch configuration: s
 The system SHALL collect all validation errors across all check categories rather than failing on the first error. The validation result SHALL contain all errors found, enabling developers to fix all problems in a single pass.
 
 #### Scenario: Multiple errors across categories
-- **WHEN** an agent has both a tool existence error (role allows nonexistent tool) and a requirement coverage error (task requires uncovered app)
+- **WHEN** a member has both a tool existence error (role allows nonexistent tool) and a requirement coverage error (task requires uncovered app)
 - **THEN** the validation result contains both errors, each with its own category and context
 
 ### Requirement: Structured validation result
-The `validateAgent()` function SHALL return a `ValidationResult` containing: `valid` (boolean), `errors` (array of `ValidationError`). Each `ValidationError` SHALL contain: `category` (one of `requirement-coverage`, `tool-existence`, `skill-availability`, `app-launch-config`), `message` (human-readable description), and `context` (object with relevant identifiers like role name, task name, app name, tool name).
+The `validateMember()` function SHALL return a `ValidationResult` containing: `valid` (boolean), `errors` (array of `ValidationError`). Each `ValidationError` SHALL contain: `category` (one of `requirement-coverage`, `tool-existence`, `skill-availability`, `app-launch-config`), `message` (human-readable description), and `context` (object with relevant identifiers like role name, task name, app name, tool name).
 
-#### Scenario: Valid agent returns clean result
-- **WHEN** `validateAgent(resolvedAgent)` is called on a fully valid agent
+#### Scenario: Valid member returns clean result
+- **WHEN** `validateMember(resolvedMember)` is called on a fully valid member
 - **THEN** the result has `valid: true` and `errors: []`
 
-#### Scenario: Invalid agent returns structured errors
-- **WHEN** `validateAgent(resolvedAgent)` is called on an agent with validation issues
+#### Scenario: Invalid member returns structured errors
+- **WHEN** `validateMember(resolvedMember)` is called on a member with validation issues
 - **THEN** the result has `valid: false` and `errors` contains one or more `ValidationError` objects with populated `category`, `message`, and `context` fields
 
 ### Requirement: CLI validate command
-The system SHALL provide a `forge validate <agent>` CLI command that discovers packages, resolves the agent graph, runs validation, and outputs results. The command SHALL exit with code 0 when the agent is valid and non-zero when validation fails. The command SHALL support a `--json` flag for machine-readable output.
+The system SHALL provide a `chapter validate <member>` CLI command that discovers packages, resolves the member graph, runs validation, and outputs results. The command SHALL exit with code 0 when the member is valid and non-zero when validation fails. The command SHALL support a `--json` flag for machine-readable output.
 
-#### Scenario: Valid agent CLI output
-- **WHEN** `forge validate @clawmasons/agent-repo-ops` is run and the agent passes all checks
+#### Scenario: Valid member CLI output
+- **WHEN** `chapter validate @clawmasons/member-repo-ops` is run and the member passes all checks
 - **THEN** the command prints a success message and exits with code 0
 
-#### Scenario: Invalid agent CLI output
-- **WHEN** `forge validate @clawmasons/agent-repo-ops` is run and the agent has validation errors
+#### Scenario: Invalid member CLI output
+- **WHEN** `chapter validate @clawmasons/member-repo-ops` is run and the member has validation errors
 - **THEN** the command prints each error with its category and context, and exits with code 1
 
 #### Scenario: JSON output mode
-- **WHEN** `forge validate @clawmasons/agent-repo-ops --json` is run
+- **WHEN** `chapter validate @clawmasons/member-repo-ops --json` is run
 - **THEN** the command outputs the `ValidationResult` as JSON to stdout
 
-#### Scenario: Agent not found
-- **WHEN** `forge validate @clawmasons/nonexistent` is run and the agent package cannot be discovered
+#### Scenario: Member not found
+- **WHEN** `chapter validate @clawmasons/nonexistent` is run and the member package cannot be discovered
 - **THEN** the command prints an error message and exits with non-zero code
 

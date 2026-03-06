@@ -11,11 +11,11 @@ The system SHALL provide a `generateEnvTemplate(agent)` function that returns a 
 
 #### Scenario: Template includes proxy token
 - **WHEN** `generateEnvTemplate()` is called
-- **THEN** the output SHALL include `FORGE_PROXY_TOKEN=` in the proxy section
+- **THEN** the output SHALL include `CHAPTER_PROXY_TOKEN=` in the proxy section
 
 #### Scenario: Template includes proxy port
 - **WHEN** `generateEnvTemplate()` is called
-- **THEN** the output SHALL include `FORGE_PROXY_PORT=<default-port>` in the proxy section
+- **THEN** the output SHALL include `CHAPTER_PROXY_PORT=<default-port>` in the proxy section
 
 ### Requirement: App environment variables are collected and deduplicated
 

@@ -9,9 +9,9 @@ export interface InitOptions {
   template?: string;
 }
 
-const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".forge"];
+const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "members", ".chapter"];
 
-const ENV_EXAMPLE = `# Credential bindings for forge agent deployments
+const ENV_EXAMPLE = `# Credential bindings for chapter member deployments
 # Copy this file to .env and fill in your values
 # NEVER commit .env files to version control
 
@@ -24,14 +24,14 @@ const ENV_EXAMPLE = `# Credential bindings for forge agent deployments
 const GITIGNORE = `node_modules/
 dist/
 .env
-.forge/.env
+.chapter/.env
 `;
 
 /**
- * Resolve the forge project root directory (where package.json, src/, bin/ live).
+ * Resolve the chapter project root directory (where package.json, src/, bin/ live).
  * The templates/ directory lives at the project root.
  */
-function getForgeProjectRoot(): string {
+function getChapterProjectRoot(): string {
   // This file is at src/cli/commands/init.ts (or dist/cli/commands/init.js)
   // The project root is 3 levels up from the file's directory.
   const thisFile = fileURLToPath(import.meta.url);
@@ -39,10 +39,10 @@ function getForgeProjectRoot(): string {
 }
 
 /**
- * Get the path to the templates directory inside the forge package.
+ * Get the path to the templates directory inside the chapter package.
  */
 export function getTemplatesDir(): string {
-  return path.join(getForgeProjectRoot(), "templates");
+  return path.join(getChapterProjectRoot(), "templates");
 }
 
 /**
@@ -62,7 +62,7 @@ export function listTemplates(templatesDir?: string): string[] {
  * Derive the project scope from a --name value or directory basename.
  *
  * - "@acme/my-agent" -> "acme"
- * - "test-forge" -> "test-forge"
+ * - "test-chapter" -> "test-chapter"
  * - "@myorg/cool-project" -> "myorg"
  */
 export function deriveProjectScope(nameOrDir: string): string {
@@ -109,7 +109,7 @@ export function copyTemplateFiles(
 export function registerInitCommand(program: Command): void {
   program
     .command("init")
-    .description("Initialize a new forge workspace")
+    .description("Initialize a new chapter workspace")
     .option("--name <name>", "Set the workspace package name")
     .option("--template <template>", "Use a project template")
     .action(async (options: InitOptions) => {
@@ -122,12 +122,12 @@ export async function runInit(
   options: InitOptions,
   deps?: { templatesDir?: string; skipNpmInstall?: boolean },
 ): Promise<void> {
-  const forgeDir = path.join(targetDir, ".forge");
+  const chapterDir = path.join(targetDir, ".chapter");
 
   // Idempotency check
-  if (fs.existsSync(forgeDir)) {
+  if (fs.existsSync(chapterDir)) {
     console.log(
-      "⚠ Workspace already initialized (.forge/ directory exists). Nothing to do.",
+      "⚠ Workspace already initialized (.chapter/ directory exists). Nothing to do.",
     );
     return;
   }
@@ -190,7 +190,7 @@ export async function runInit(
   if (fs.existsSync(packageJsonPath)) {
     if (!usedTemplate) {
       console.log(
-        '⚠ package.json already exists. Skipping generation. Please add "workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"] manually.',
+        '⚠ package.json already exists. Skipping generation. Please add "workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "members/*"] manually.',
       );
     }
   } else {
@@ -198,22 +198,22 @@ export async function runInit(
       name: projectName,
       version: "0.1.0",
       private: true,
-      workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"],
+      workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "members/*"],
     };
     fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
     created.push("package.json");
   }
 
-  // Generate .forge/config.json
-  const configPath = path.join(forgeDir, "config.json");
+  // Generate .chapter/config.json
+  const configPath = path.join(chapterDir, "config.json");
   const config = { version: "0.1.0" };
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
-  created.push(".forge/config.json");
+  created.push(".chapter/config.json");
 
-  // Generate .forge/.env.example
-  const envExamplePath = path.join(forgeDir, ".env.example");
+  // Generate .chapter/.env.example
+  const envExamplePath = path.join(chapterDir, ".env.example");
   fs.writeFileSync(envExamplePath, ENV_EXAMPLE);
-  created.push(".forge/.env.example");
+  created.push(".chapter/.env.example");
 
   // Generate .gitignore (only if it doesn't exist)
   const gitignorePath = path.join(targetDir, ".gitignore");
@@ -240,7 +240,7 @@ export async function runInit(
   }
 
   // Success output
-  console.log("\n✔ forge workspace initialized!\n");
+  console.log("\n✔ chapter workspace initialized!\n");
   console.log("Created:");
   for (const item of created) {
     console.log(`  ${item}`);
@@ -249,13 +249,13 @@ export async function runInit(
   if (usedTemplate) {
     console.log(`\nTemplate: ${options.template}`);
     console.log("\nNext steps:");
-    console.log(`  forge list                                    List discovered packages`);
-    console.log(`  forge validate @${projectScope}/agent-note-taker   Validate the agent graph`);
-    console.log(`  forge install @${projectScope}/agent-note-taker    Install and scaffold the agent\n`);
+    console.log(`  chapter list                                    List discovered packages`);
+    console.log(`  chapter validate @${projectScope}/member-note-taker   Validate the member graph`);
+    console.log(`  chapter install @${projectScope}/member-note-taker    Install and scaffold the member\n`);
   } else {
     console.log("\nNext steps:");
-    console.log("  forge add <package>    Add an agent component");
-    console.log("  forge build <agent>    Build and validate an agent");
-    console.log("  forge install <agent>  Install and scaffold an agent\n");
+    console.log("  chapter add <package>    Add a chapter component");
+    console.log("  chapter build <member>   Build and validate a member");
+    console.log("  chapter install <member> Install and scaffold a member\n");
   }
 }

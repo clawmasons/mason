@@ -4,19 +4,19 @@ import { execSync, spawn } from "node:child_process";
 import { getAppShortName } from "../../generator/toolfilter.js";
 
 /**
- * Resolve the scaffolded agent directory.
- * Uses `.forge/agents/<short-name>/` by default, or a custom outputDir if provided.
+ * Resolve the scaffolded member directory.
+ * Uses `.chapter/members/<short-name>/` by default, or a custom outputDir if provided.
  */
-export function resolveAgentDir(
+export function resolveMemberDir(
   rootDir: string,
-  agentName: string,
+  memberName: string,
   outputDir?: string,
 ): string {
   if (outputDir) {
     return path.resolve(rootDir, outputDir);
   }
-  const shortName = getAppShortName(agentName);
-  return path.join(rootDir, ".forge", "agents", shortName);
+  const shortName = getAppShortName(memberName);
+  return path.join(rootDir, ".chapter", "members", shortName);
 }
 
 /**
@@ -42,7 +42,7 @@ export function validateEnvFile(agentDir: string): string[] {
 
   if (!fs.existsSync(envPath)) {
     throw new Error(
-      `No .env file found at ${envPath}. Run forge install first to generate credentials template.`,
+      `No .env file found at ${envPath}. Run chapter install first to generate credentials template.`,
     );
   }
 

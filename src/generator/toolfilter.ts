@@ -1,16 +1,16 @@
-import type { ResolvedAgent } from "../resolver/types.js";
+import type { ResolvedMember } from "../resolver/types.js";
 import type { ToolFilter } from "./types.js";
 
-/** Known forge package type prefixes. */
-const TYPE_PREFIXES = ["app-", "agent-", "role-", "task-", "skill-"];
+/** Known chapter package type prefixes. */
+const TYPE_PREFIXES = ["app-", "member-", "agent-", "role-", "task-", "skill-"];
 
 /**
- * Extract a short name from a forge package name.
- * Strips the npm scope and any known forge type prefix.
+ * Extract a short name from a chapter package name.
+ * Strips the npm scope and any known chapter type prefix.
  *
  * Examples:
  *   "@clawmasons/app-github" → "github"
- *   "@clawmasons/agent-repo-ops" → "repo-ops"
+ *   "@clawmasons/member-note-taker" → "note-taker"
  *   "@clawmasons/slack-server" → "slack-server"
  *   "app-github" → "github"
  */
@@ -37,11 +37,11 @@ export function getAppShortName(packageName: string): string {
  * computes the set union. Returns a Map keyed by full app package name.
  */
 export function computeToolFilters(
-  agent: ResolvedAgent,
+  member: ResolvedMember,
 ): Map<string, ToolFilter> {
   const toolSets = new Map<string, Set<string>>();
 
-  for (const role of agent.roles) {
+  for (const role of member.roles) {
     for (const [appName, perms] of Object.entries(role.permissions)) {
       let toolSet = toolSets.get(appName);
       if (!toolSet) {

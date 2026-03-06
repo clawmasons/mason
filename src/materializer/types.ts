@@ -1,4 +1,4 @@
-import type { ResolvedAgent } from "../resolver/types.js";
+import type { ResolvedMember } from "../resolver/types.js";
 
 /**
  * A map of relative file paths to their string content.
@@ -25,7 +25,7 @@ export interface ComposeServiceDef {
 /**
  * The contract all runtime materializers implement.
  *
- * A materializer translates the abstract forge dependency graph into
+ * A materializer translates the abstract chapter dependency graph into
  * a specific runtime's native configuration format.
  */
 export interface RuntimeMaterializer {
@@ -38,16 +38,16 @@ export interface RuntimeMaterializer {
    * The caller handles writing files to disk.
    */
   materializeWorkspace(
-    agent: ResolvedAgent,
+    member: ResolvedMember,
     proxyEndpoint: string,
     proxyToken?: string,
   ): MaterializationResult;
 
   /** Generate a Dockerfile string for this runtime's container. */
-  generateDockerfile(agent: ResolvedAgent): string;
+  generateDockerfile(member: ResolvedMember): string;
 
   /** Generate a docker-compose service definition for this runtime. */
-  generateComposeService(agent: ResolvedAgent): ComposeServiceDef;
+  generateComposeService(member: ResolvedMember): ComposeServiceDef;
 
   /** Generate runtime-specific config JSON (e.g., OOBE bypass for Claude Code). */
   generateConfigJson?(): string;

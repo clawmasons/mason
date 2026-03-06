@@ -1,10 +1,10 @@
 {
-  "name": "@clawmasons/forge",
+  "name": "@clawmasons/chapter",
   "version": "0.1.0",
-  "description": "Agent Forge System — npm-native packaging, governance, and runtime portability for AI agents",
+  "description": "Clawmasons Chapter — npm-native packaging, governance, and runtime portability for AI agents and human members",
   "type": "module",
   "bin": {
-    "forge": "./bin/forge.js"
+    "chapter": "./bin/chapter.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,6 +24,7 @@
   "keywords": [
     "ai",
     "agent",
+    "chapter",
     "mcp",
     "npm",
     "governance"
@@ -34,7 +35,7 @@
     "templates"
   ],
   "license": "MIT",
-  "workspaces": ["forge-core"],
+  "workspaces": ["chapter-core"],
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@types/better-sqlite3": "^7.6.13",

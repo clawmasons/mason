@@ -1,0 +1,12 @@
+{
+  "name": "@clawmasons/chapter-core",
+  "version": "0.1.0",
+  "description": "Pre-built library of reusable chapter components — apps, tasks, skills, roles, and members",
+  "files": [
+    "apps",
+    "tasks",
+    "skills",
+    "roles",
+    "members"
+  ]
+}

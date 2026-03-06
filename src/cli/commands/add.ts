@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { parseForgeField } from "../../schemas/index.js";
+import { parseChapterField } from "../../schemas/index.js";
 
 interface AddOptions {
   npmArgs: string[];
@@ -11,7 +11,7 @@ interface AddOptions {
 export function registerAddCommand(program: Command): void {
   program
     .command("add")
-    .description("Add a forge package dependency (wraps npm install with forge validation)")
+    .description("Add a chapter package dependency (wraps npm install with chapter validation)")
     .argument("<pkg>", "Package name to add")
     .argument("[npmArgs...]", "Additional arguments forwarded to npm install")
     .action(async (pkg: string, npmArgs: string[]) => {
@@ -39,7 +39,7 @@ export async function runAdd(
       return;
     }
 
-    // 2. Validate forge field on the installed package
+    // 2. Validate chapter field on the installed package
     const pkgJsonPath = path.join(rootDir, "node_modules", ...pkg.split("/"), "package.json");
     if (!fs.existsSync(pkgJsonPath)) {
       console.error(`\n✘ Add failed: could not find installed package at ${pkgJsonPath}\n`);
@@ -47,7 +47,7 @@ export async function runAdd(
       return;
     }
 
-    let pkgJson: { name?: string; forge?: unknown };
+    let pkgJson: { name?: string; chapter?: unknown };
     try {
       pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
     } catch {
@@ -57,21 +57,21 @@ export async function runAdd(
       return;
     }
 
-    if (!pkgJson.forge) {
+    if (!pkgJson.chapter) {
       rollbackInstall(rootDir, pkg);
       console.error(
-        `\n✘ Add failed: ${pkg} is not a valid forge package (missing "forge" field in package.json)\n`,
+        `\n✘ Add failed: ${pkg} is not a valid chapter package (missing "chapter" field in package.json)\n`,
       );
       process.exit(1);
       return;
     }
 
-    const result = parseForgeField(pkgJson.forge);
+    const result = parseChapterField(pkgJson.chapter);
     if (!result.success) {
       rollbackInstall(rootDir, pkg);
       const issues = result.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`);
       console.error(
-        `\n✘ Add failed: ${pkg} has an invalid forge field:\n${issues.join("\n")}\n`,
+        `\n✘ Add failed: ${pkg} has an invalid chapter field:\n${issues.join("\n")}\n`,
       );
       process.exit(1);
       return;

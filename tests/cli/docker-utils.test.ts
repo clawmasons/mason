@@ -3,28 +3,28 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
-  resolveAgentDir,
+  resolveMemberDir,
   validateEnvFile,
 } from "../../src/cli/commands/docker-utils.js";
 
-describe("resolveAgentDir", () => {
+describe("resolveMemberDir", () => {
   it("returns default path using short name", () => {
-    const result = resolveAgentDir("/workspace", "@test/agent-ops");
-    expect(result).toBe(path.join("/workspace", ".forge", "agents", "ops"));
+    const result = resolveMemberDir("/workspace", "@test/member-ops");
+    expect(result).toBe(path.join("/workspace", ".chapter", "members", "ops"));
   });
 
-  it("strips scope and agent- prefix", () => {
-    const result = resolveAgentDir("/workspace", "@clawmasons/agent-repo-ops");
-    expect(result).toBe(path.join("/workspace", ".forge", "agents", "repo-ops"));
+  it("strips scope and member- prefix", () => {
+    const result = resolveMemberDir("/workspace", "@clawmasons/member-repo-ops");
+    expect(result).toBe(path.join("/workspace", ".chapter", "members", "repo-ops"));
   });
 
   it("uses custom outputDir when provided", () => {
-    const result = resolveAgentDir("/workspace", "@test/agent-ops", "./custom/dir");
+    const result = resolveMemberDir("/workspace", "@test/member-ops", "./custom/dir");
     expect(result).toBe(path.resolve("/workspace", "./custom/dir"));
   });
 
   it("uses absolute custom outputDir as-is", () => {
-    const result = resolveAgentDir("/workspace", "@test/agent-ops", "/absolute/path");
+    const result = resolveMemberDir("/workspace", "@test/member-ops", "/absolute/path");
     expect(result).toBe("/absolute/path");
   });
 });
@@ -33,7 +33,7 @@ describe("validateEnvFile", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-env-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-env-test-"));
   });
 
   afterEach(() => {
@@ -43,7 +43,7 @@ describe("validateEnvFile", () => {
   it("returns empty array when all values are filled", () => {
     fs.writeFileSync(
       path.join(tmpDir, ".env"),
-      "# Comment\nGITHUB_TOKEN=abc123\nFORGE_PROXY_TOKEN=xyz\n",
+      "# Comment\nGITHUB_TOKEN=abc123\nCHAPTER_PROXY_TOKEN=xyz\n",
     );
     const missing = validateEnvFile(tmpDir);
     expect(missing).toEqual([]);
@@ -52,7 +52,7 @@ describe("validateEnvFile", () => {
   it("returns missing variables with empty values", () => {
     fs.writeFileSync(
       path.join(tmpDir, ".env"),
-      "GITHUB_TOKEN=\nFORGE_PROXY_TOKEN=abc\nSLACK_TOKEN=\n",
+      "GITHUB_TOKEN=\nCHAPTER_PROXY_TOKEN=abc\nSLACK_TOKEN=\n",
     );
     const missing = validateEnvFile(tmpDir);
     expect(missing).toEqual(["GITHUB_TOKEN", "SLACK_TOKEN"]);

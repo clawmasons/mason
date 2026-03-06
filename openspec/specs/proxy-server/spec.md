@@ -4,25 +4,25 @@ The downstream-facing MCP server that aggregates upstream MCP apps through the T
 
 ## Requirements
 
-### Requirement: ForgeProxyServer creates an MCP server named "forge"
-The `ForgeProxyServer` class SHALL create an MCP `Server` instance with `name: "forge"` and `version: "0.1.0"`. The server SHALL declare the `tools` capability.
+### Requirement: ChapterProxyServer creates an MCP server named "chapter"
+The `ChapterProxyServer` class SHALL create an MCP `Server` instance with `name: "chapter"` and `version: "0.1.0"`. The server SHALL declare the `tools` capability.
 
 #### Scenario: Server identity
 - **WHEN** a runtime connects to the proxy server
-- **THEN** the MCP server identifies itself as `{ name: "forge", version: "0.1.0" }`
+- **THEN** the MCP server identifies itself as `{ name: "chapter", version: "0.1.0" }`
 
-### Requirement: ForgeProxyServer starts an HTTP server on configurable port
-The `ForgeProxyServer` SHALL start a `node:http` server on the port specified in its configuration. The `start()` method SHALL return a promise that resolves when the server is listening. The default port SHALL be 9090.
+### Requirement: ChapterProxyServer starts an HTTP server on configurable port
+The `ChapterProxyServer` SHALL start a `node:http` server on the port specified in its configuration. The `start()` method SHALL return a promise that resolves when the server is listening. The default port SHALL be 9090.
 
 #### Scenario: Start on default port
-- **WHEN** `ForgeProxyServer` is constructed with no port specified and `start()` is called
+- **WHEN** `ChapterProxyServer` is constructed with no port specified and `start()` is called
 - **THEN** the HTTP server listens on port 9090
 
 #### Scenario: Start on custom port
-- **WHEN** `ForgeProxyServer` is constructed with `port: 3000` and `start()` is called
+- **WHEN** `ChapterProxyServer` is constructed with `port: 3000` and `start()` is called
 - **THEN** the HTTP server listens on port 3000
 
-### Requirement: ForgeProxyServer supports SSE transport
+### Requirement: ChapterProxyServer supports SSE transport
 When configured with `transport: "sse"`, the server SHALL handle:
 - `GET /sse` — create a new `SSEServerTransport`, connect a new `Server` instance, and start the SSE stream
 - `POST /messages` — forward the message body to the active `SSEServerTransport`
@@ -31,7 +31,7 @@ When configured with `transport: "sse"`, the server SHALL handle:
 - **WHEN** a client connects via `GET /sse` and sends a `tools/list` request via `POST /messages`
 - **THEN** the server returns the prefixed, filtered tool list from the `ToolRouter`
 
-### Requirement: ForgeProxyServer supports streamable-http transport
+### Requirement: ChapterProxyServer supports streamable-http transport
 When configured with `transport: "streamable-http"`, the server SHALL route all requests to `StreamableHTTPServerTransport.handleRequest()` for the MCP endpoint path.
 
 #### Scenario: Streamable-http connection and tool listing
@@ -145,7 +145,7 @@ When the upstream `callTool()` throws an error, the handler SHALL catch the erro
 - **AND** the upstream `callTool()` throws an error with message "Connection refused"
 - **THEN** the proxy returns `{ content: [{ type: "text", text: "Connection refused" }], isError: true }`
 
-### Requirement: ForgeProxyServer graceful shutdown
+### Requirement: ChapterProxyServer graceful shutdown
 The `stop()` method SHALL close the HTTP server and all active transports. It SHALL return a promise that resolves when shutdown is complete.
 
 #### Scenario: Clean shutdown
@@ -158,24 +158,24 @@ The `stop()` method SHALL close the HTTP server and all active transports. It SH
 - **WHEN** `stop()` is called on a server that was never started
 - **THEN** the method resolves without error
 
-### Requirement: ForgeProxyServerConfig accepts optional database and agent context
-The `ForgeProxyServerConfig` interface SHALL accept an optional `db` field (a `better-sqlite3` Database instance) and an optional `agentName` field (string, defaults to `"unknown"`). When `db` is provided, audit logging is active for all tool calls.
+### Requirement: ChapterProxyServerConfig accepts optional database and agent context
+The `ChapterProxyServerConfig` interface SHALL accept an optional `db` field (a `better-sqlite3` Database instance) and an optional `agentName` field (string, defaults to `"unknown"`). When `db` is provided, audit logging is active for all tool calls.
 
 #### Scenario: Config with database enables audit logging
-- **WHEN** `ForgeProxyServer` is constructed with `{ db: <Database>, agentName: "note-taker", ... }`
+- **WHEN** `ChapterProxyServer` is constructed with `{ db: <Database>, agentName: "note-taker", ... }`
 - **THEN** all `tools/call` requests are audit-logged to the provided database
 
 #### Scenario: Config without database disables audit logging
-- **WHEN** `ForgeProxyServer` is constructed without a `db` field
+- **WHEN** `ChapterProxyServer` is constructed without a `db` field
 - **THEN** `tools/call` requests proceed without audit logging
 
-### Requirement: ForgeProxyServerConfig accepts optional approval patterns
-The `ForgeProxyServerConfig` interface SHALL accept an optional `approvalPatterns` field (string[]). When `approvalPatterns` and `db` are both provided, tool calls matching any pattern require approval before execution. When either is absent, no approval checks are performed.
+### Requirement: ChapterProxyServerConfig accepts optional approval patterns
+The `ChapterProxyServerConfig` interface SHALL accept an optional `approvalPatterns` field (string[]). When `approvalPatterns` and `db` are both provided, tool calls matching any pattern require approval before execution. When either is absent, no approval checks are performed.
 
 #### Scenario: Config with approval patterns enables approval workflow
-- **WHEN** `ForgeProxyServer` is constructed with `{ approvalPatterns: ["github_delete_*"], db: <Database>, ... }`
+- **WHEN** `ChapterProxyServer` is constructed with `{ approvalPatterns: ["github_delete_*"], db: <Database>, ... }`
 - **THEN** tool calls matching `github_delete_*` require approval
 
 #### Scenario: Config without approval patterns disables approval workflow
-- **WHEN** `ForgeProxyServer` is constructed without `approvalPatterns`
+- **WHEN** `ChapterProxyServer` is constructed without `approvalPatterns`
 - **THEN** no tool calls require approval

@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-export const skillForgeFieldSchema = z.object({
+export const skillChapterFieldSchema = z.object({
   type: z.literal("skill"),
   artifacts: z.array(z.string()).min(1),
   description: z.string(),
 });
 
-export type SkillForgeField = z.infer<typeof skillForgeFieldSchema>;
+export type SkillChapterField = z.infer<typeof skillChapterFieldSchema>;

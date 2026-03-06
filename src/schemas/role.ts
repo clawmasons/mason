@@ -5,7 +5,7 @@ const permissionEntrySchema = z.object({
   deny: z.array(z.string()),
 });
 
-export const roleForgeFieldSchema = z.object({
+export const roleChapterFieldSchema = z.object({
   type: z.literal("role"),
   description: z.string().optional(),
   tasks: z.array(z.string()).optional(),
@@ -20,4 +20,4 @@ export const roleForgeFieldSchema = z.object({
     .optional(),
 });
 
-export type RoleForgeField = z.infer<typeof roleForgeFieldSchema>;
+export type RoleChapterField = z.infer<typeof roleChapterFieldSchema>;

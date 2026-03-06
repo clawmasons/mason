@@ -31,7 +31,20 @@ Rename the package.json metadata field from `"forge"` to `"chapter"` across the 
 
 **Testable output:** `npx tsc --noEmit` compiles. `npx vitest run` passes all tests. All component package.json files use `"chapter"` as the metadata key. `parseChapterField()` successfully parses `{ "chapter": { "type": "app", ... } }` from package.json. Grepping source/test code for `ForgeField` or `parseForgeField` returns zero results.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-05-rename-metadata-field-forge-to-chapter/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-05-rename-metadata-field-forge-to-chapter/proposal.md)
+- [Design](../../changes/archive/2026-03-05-rename-metadata-field-forge-to-chapter/design.md)
+- [Tasks](../../changes/archive/2026-03-05-rename-metadata-field-forge-to-chapter/tasks.md)
+
+**Specs updated:**
+- [package-schema-validation](../../specs/package-schema-validation/spec.md) -- renamed `ForgeField` → `ChapterField`, `parseForgeField` → `parseChapterField`
+- [package-discovery](../../specs/package-discovery/spec.md) -- renamed `forge` field → `chapter` field, `forgeField` → `chapterField`
+- [add-command](../../specs/add-command/spec.md) -- renamed `forge` field validation → `chapter` field validation
+- [remove-command](../../specs/remove-command/spec.md) -- renamed `forge` field references → `chapter` field
+- [workspace-init](../../specs/workspace-init/spec.md) -- renamed `forge` field references → `chapter` field
+- [forge-core-package](../../specs/forge-core-package/spec.md) -- renamed `forge` field references → `chapter` field
 
 ---
 
@@ -50,14 +63,27 @@ Rename the npm package names and the forge-core directory to chapter-core.
 - Rename file: `bin/forge.js` → `bin/chapter.js`
 - Modify: root `package.json` — name, bin, workspaces, description
 - Modify: `chapter-core/package.json` — name, description
-- Modify: `chapter-core/agents/note-taker/package.json` — name `@clawmasons/agent-note-taker` → `@clawmasons/member-note-taker`
+- Modify: `chapter-core/members/note-taker/package.json` — name `@clawmasons/agent-note-taker` → `@clawmasons/member-note-taker`
 - Modify: templates `package.json` files — forge-core dependency → chapter-core, agent → member references
 - Update all test files referencing `forge-core` paths or `@clawmasons/forge-core` package name
 - Update all source files referencing these package names
 
 **Testable output:** `npm install` succeeds at root. `npm pack` produces `clawmasons-chapter-*.tgz`. `chapter-core/package.json` has `name: "@clawmasons/chapter-core"`. `bin/chapter.js` exists and is referenced in package.json. All tests pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-05-rename-npm-packages-and-directory/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-05-rename-npm-packages-and-directory/proposal.md)
+- [Design](../../changes/archive/2026-03-05-rename-npm-packages-and-directory/design.md)
+- [Tasks](../../changes/archive/2026-03-05-rename-npm-packages-and-directory/tasks.md)
+
+**Specs updated:**
+- [chapter-core-package](../../specs/chapter-core-package/spec.md) -- renamed from `forge-core-package/`, all references updated to `@clawmasons/chapter-core`, `members/`, `@clawmasons/member-note-taker`
+- [docker-install-pipeline](../../specs/docker-install-pipeline/spec.md) -- updated `forge-proxy/` → `chapter-proxy/`, `forge/` → `chapter/`, ENTRYPOINT paths, `getChapterProjectRoot()`
+- [workspace-init](../../specs/workspace-init/spec.md) -- updated template references: `@clawmasons/chapter-core` dep, `members/` directory, `member-note-taker` package names
+- [package-discovery](../../specs/package-discovery/spec.md) -- updated `forge-core` → `chapter-core` in node_modules examples
+- [cli-framework](../../specs/cli-framework/spec.md) -- updated `bin/forge.js` → `bin/chapter.js`, `@clawmasons/forge` → `@clawmasons/chapter`
+- [docker-compose-generation](../../specs/docker-compose-generation/spec.md) -- updated `./forge-proxy` → `./chapter-proxy` build context paths
 
 ---
 
@@ -88,7 +114,30 @@ Rename the workspace config directory, global data directory, and all environmen
 
 **Testable output:** `npx tsc --noEmit` compiles. All tests pass. Grepping source/test code for `FORGE_` returns zero results. Grepping for `\.forge[/"]` returns zero results in source (excluding historical PRDs). `chapter init` creates `.chapter/`. Proxy uses `~/.chapter/data/chapter.db`.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-05-rename-dotforge-and-env-vars/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-05-rename-dotforge-and-env-vars/proposal.md)
+- [Design](../../changes/archive/2026-03-05-rename-dotforge-and-env-vars/design.md)
+- [Tasks](../../changes/archive/2026-03-05-rename-dotforge-and-env-vars/tasks.md)
+
+**Specs updated:**
+- [workspace-init](../../specs/workspace-init/spec.md) -- `.forge/` → `.chapter/` directory references
+- [docker-compose-generation](../../specs/docker-compose-generation/spec.md) -- `FORGE_*` → `CHAPTER_*`, `agent-net` → `chapter-net`
+- [env-generation](../../specs/env-generation/spec.md) -- `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`, `FORGE_PROXY_PORT` → `CHAPTER_PROXY_PORT`
+- [lock-file-generation](../../specs/lock-file-generation/spec.md) -- `forge.lock.json` → `chapter.lock.json`
+- [proxy-cli](../../specs/proxy-cli/spec.md) -- `~/.forge/forge.db` → `~/.chapter/data/chapter.db`, `ForgeProxyServer` → `ChapterProxyServer`
+- [proxy-server](../../specs/proxy-server/spec.md) -- `ForgeProxyServer` → `ChapterProxyServer`, MCP name `"forge"` → `"chapter"`
+- [claude-code-materializer](../../specs/claude-code-materializer/spec.md) -- `FORGE_*` → `CHAPTER_*`, `agent-net` → `chapter-net`, `mcpServers.forge` → `mcpServers.chapter`
+- [install-command](../../specs/install-command/spec.md) -- `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`, `.forge/agents/` → `.chapter/agents/`
+- [build-command](../../specs/build-command/spec.md) -- `forge.lock.json` → `chapter.lock.json`
+- [run-command](../../specs/run-command/spec.md) -- `.forge/agents/` → `.chapter/agents/`
+- [stop-command](../../specs/stop-command/spec.md) -- `.forge/agents/` → `.chapter/agents/`
+- [mcp-proxy-integration-test](../../specs/mcp-proxy-integration-test/spec.md) -- `ForgeProxyServer` → `ChapterProxyServer`, test file rename
+- [resource-prompt-passthrough](../../specs/resource-prompt-passthrough/spec.md) -- `ForgeProxyServer` → `ChapterProxyServer`
+- [sqlite-database](../../specs/sqlite-database/spec.md) -- `~/.forge/forge.db` → `~/.chapter/data/chapter.db`
+- [proxy-config-generation](../../specs/proxy-config-generation/spec.md) -- `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`
+- [docker-install-pipeline](../../specs/docker-install-pipeline/spec.md) -- `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`
 
 ---
 
@@ -109,9 +158,35 @@ Update all user-facing strings from "forge" to "chapter" across CLI output, help
 - Modify: any remaining source files with forge string literals in comments or log messages
 - Update openspec spec files that contain example output with forge references
 
-**Testable output:** All tests pass. Running `chapter --help` shows "chapter" in all output. Grepping all source/test files for the word "forge" (case-insensitive) returns zero results outside of historical PRDs/CHANGELOG and the openspec archive directory.
+**Testable output:** All tests pass (563/563). Running `chapter --help` shows "chapter" in all output. Grepping all source/test files for the word "forge" (case-insensitive) returns zero results outside of historical PRDs/CHANGELOG and the openspec archive directory.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-05-rename-cli-help-text-and-docs/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-05-rename-cli-help-text-and-docs/proposal.md)
+- [Design](../../changes/archive/2026-03-05-rename-cli-help-text-and-docs/design.md)
+- [Tasks](../../changes/archive/2026-03-05-rename-cli-help-text-and-docs/tasks.md)
+
+**Specs updated:**
+- [cli-framework](../../specs/cli-framework/spec.md) -- program name `"chapter"`, description `"Clawmasons Chapter"`
+- [workspace-init](../../specs/workspace-init/spec.md) -- all init output references use "chapter"
+- [add-command](../../specs/add-command/spec.md) -- command references use "chapter"
+- [remove-command](../../specs/remove-command/spec.md) -- command references use "chapter"
+- [install-command](../../specs/install-command/spec.md) -- title and command references use "chapter"
+- [run-command](../../specs/run-command/spec.md) -- command references use "chapter"
+- [stop-command](../../specs/stop-command/spec.md) -- command references use "chapter"
+- [build-command](../../specs/build-command/spec.md) -- command references use "chapter"
+- [list-command](../../specs/list-command/spec.md) -- command references use "chapter"
+- [permissions-command](../../specs/permissions-command/spec.md) -- command references use "chapter"
+- [proxy-cli](../../specs/proxy-cli/spec.md) -- command references use "chapter"
+- [docker-compose-generation](../../specs/docker-compose-generation/spec.md) -- proxy references use "chapter"
+- [claude-code-materializer](../../specs/claude-code-materializer/spec.md) -- generated content references "chapter"
+- [mcp-proxy-integration-test](../../specs/mcp-proxy-integration-test/spec.md) -- test description uses "chapter"
+- [graph-validation](../../specs/graph-validation/spec.md) -- command references use "chapter"
+- [proxy-config-generation](../../specs/proxy-config-generation/spec.md) -- proxy name uses "chapter"
+- [dependency-graph-resolution](../../specs/dependency-graph-resolution/spec.md) -- field references use "chapter"
+- [credential-loading](../../specs/credential-loading/spec.md) -- command references use "chapter"
+- [sqlite-database](../../specs/sqlite-database/spec.md) -- proxy references use "chapter"
 
 ---
 
@@ -134,40 +209,62 @@ Replace the `agent` package type with `member`. Add the discriminated union sche
 - Modify: `src/validator/validate.ts` — `validateAgent()` → `validateMember()`
 - Update all CLI commands that reference `resolveAgent`, `ResolvedAgent`, `validateAgent`
 - Update materializers, compose, proxy code
-- Update `chapter-core/agents/note-taker/package.json` → `chapter-core/members/note-taker/package.json` with new schema fields
-- Rename directory: `chapter-core/agents/` → `chapter-core/members/`
+- Update `chapter-core/members/note-taker/package.json` with new schema fields (directory already renamed in Change #2)
 - Update templates similarly
 - Update all tests
 
 **Testable output:** Schema validation passes for `{ type: "member", memberType: "agent", name: "...", slug: "...", email: "...", runtimes: [...], roles: [...] }`. Schema validation passes for `{ type: "member", memberType: "human", name: "...", slug: "...", email: "...", roles: [...] }`. Schema rejects human members with `runtimes`. Schema rejects members without `name`, `slug`, or `email`. All existing agent-related tests updated and passing. `npx tsc --noEmit` and `npx vitest run` pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-05-member-package-type-schema-resolver/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-05-member-package-type-schema-resolver/proposal.md)
+- [Design](../../changes/archive/2026-03-05-member-package-type-schema-resolver/design.md)
+- [Tasks](../../changes/archive/2026-03-05-member-package-type-schema-resolver/tasks.md)
+
+**Specs updated:**
+- [package-schema-validation](../../specs/package-schema-validation/spec.md) -- `AgentChapterField` → `MemberChapterField`, discriminated union on `memberType`
+- [dependency-graph-resolution](../../specs/dependency-graph-resolution/spec.md) -- `resolveAgent()` → `resolveMember()`, `ResolvedAgent` → `ResolvedMember` with member identity fields
+- [graph-validation](../../specs/graph-validation/spec.md) -- `validateAgent()` → `validateMember()`
+- [materializer-interface](../../specs/materializer-interface/spec.md) -- `ResolvedAgent` → `ResolvedMember`
+- [install-command](../../specs/install-command/spec.md) -- `<agent>` → `<member>`, `.chapter/agents/` → `.chapter/members/`
+- [build-command](../../specs/build-command/spec.md) -- `<agent>` → `<member>`, `resolveAgent` → `resolveMember`
+- [workspace-init](../../specs/workspace-init/spec.md) -- template `type: "agent"` → `type: "member"` with `memberType`
+- [chapter-core-package](../../specs/chapter-core-package/spec.md) -- `type: "agent"` → `type: "member"` with `memberType: "agent"`
+- [proxy-cli](../../specs/proxy-cli/spec.md) -- `--agent` → `--member`, `resolveAgent()` → `resolveMember()`
 
 ---
 
 ### CHANGE 6: Per-Member Directory Structure & Install Pipeline
 
-Update `chapter install` to scaffold per-member directories under `.chapter/members/<slug>/` instead of the flat layout under `.forge/agents/<name>/`.
+Update `chapter install` to scaffold per-member directories under `.chapter/members/<slug>/` with `log/`, `proxy/`, and runtime directories for agent members, and only `log/` for human members.
 
 **PRD refs:** REQ-008 (Per-Member Directory Structure)
 
-**Summary:** Rewrite the install pipeline in `src/cli/commands/install.ts` and `src/cli/commands/docker-utils.ts` to create the per-member directory structure: `.chapter/members/<slug>/log/`, `.chapter/members/<slug>/proxy/` (agent only), `.chapter/members/<slug>/<runtime>/` (agent only). Update materializers to generate workspace files into the new paths. Update Docker Compose generation for the new layout. Update `chapter run` and `chapter stop` to work with per-member paths.
+**Summary:** Updated the install pipeline in `src/cli/commands/install.ts` to use `member.slug` for directory naming, create `log/` directories for all members, rename the proxy build context from `chapter-proxy/` to `proxy/`, and handle human member installs (log/ only, no docker artifacts). Updated `src/compose/docker-compose.ts` to reference `build: ./proxy` and `./proxy/logs:/logs`. Updated all related tests and the E2E integration test. No changes needed to `docker-utils.ts`, `run.ts`, or `stop.ts` (they already used `resolveMemberDir()` which derives from package name, aligning with slug).
 
 **User Story:** As a user, when I run `chapter install @acme/member-note-taker`, the scaffolded directory is at `.chapter/members/note-taker/` with `log/`, `proxy/`, and `claude-code/` subdirectories. When I install a human member, only `log/` is created.
 
 **Scope:**
-- Modify: `src/cli/commands/install.ts` — new directory layout
-- Modify: `src/cli/commands/docker-utils.ts` — path helpers for per-member layout
-- Modify: `src/cli/commands/run.ts` — find docker-compose at new path
-- Modify: `src/cli/commands/stop.ts` — find docker-compose at new path
-- Modify: `src/materializer/claude-code.ts` — output to per-member runtime dir
-- Modify: `src/compose/docker-compose.ts` — paths relative to per-member dir
-- Modify: `src/generator/proxy-dockerfile.ts` — per-member proxy dir
-- Update all related tests
+- Modify: `src/cli/commands/install.ts` — use member.slug for dir naming, create log/, handle human members, rename chapter-proxy/ to proxy/
+- Modify: `src/compose/docker-compose.ts` — build path `./proxy`, log mount `./proxy/logs:/logs`
+- Updated tests: `tests/cli/install.test.ts`, `tests/compose/docker-compose.test.ts`, `tests/compose/lock.test.ts`, `tests/integration/install-flow.test.ts`
 
-**Testable output:** `chapter install @member-note-taker` creates `.chapter/members/note-taker/log/`, `.chapter/members/note-taker/proxy/`, `.chapter/members/note-taker/claude-code/workspace/`. Human member install creates only `.chapter/members/<slug>/log/`. All tests pass. Docker Compose generation references the new paths.
+**Testable output:** `chapter install @member-note-taker` creates `.chapter/members/note-taker/log/`, `.chapter/members/note-taker/proxy/Dockerfile`, `.chapter/members/note-taker/claude-code/workspace/`. Human member install creates only `.chapter/members/<slug>/log/`. All 583 tests pass. Docker Compose generation references `build: ./proxy`.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-06-per-member-directory-structure/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-06-per-member-directory-structure/proposal.md)
+- [Design](../../changes/archive/2026-03-06-per-member-directory-structure/design.md)
+- [Tasks](../../changes/archive/2026-03-06-per-member-directory-structure/tasks.md)
+
+**Specs updated:**
+- [install-command](../../specs/install-command/spec.md) -- per-member layout, log/ dir, human member handling, proxy/ build path, slug-based directory naming
+- [docker-install-pipeline](../../specs/docker-install-pipeline/spec.md) -- `chapter-proxy/` replaced with `proxy/`
+- [docker-compose-generation](../../specs/docker-compose-generation/spec.md) -- `build: ./chapter-proxy` replaced with `build: ./proxy`
+- [run-command](../../specs/run-command/spec.md) -- updated to member terminology, `.chapter/members/<slug>/` paths
+- [stop-command](../../specs/stop-command/spec.md) -- updated to member terminology, `.chapter/members/<slug>/` paths
 
 ---
 
@@ -177,21 +274,33 @@ Implement the members registry file and integrate it with `chapter install`.
 
 **PRD refs:** REQ-006 (Members Registry)
 
-**Summary:** Create a members registry module that manages `.chapter/members.json`. When `chapter install` runs, it adds or updates an entry in the registry with: package name, member type, status (`"enabled"`), and installation timestamp. The registry is a simple JSON file. Create functions: `readMembersRegistry()`, `writeMembersRegistry()`, `addMember()`, `updateMemberStatus()`, `getMember()`. Integrate with `chapter install` — after successful installation, update the registry. Integrate with `chapter list` — show member status from registry.
+**Summary:** Created a members registry module at `src/registry/members.ts` that manages `.chapter/members.json`. When `chapter install` runs (for both agent and human members), it adds or updates an entry in the registry with: package name, member type, status (`"enabled"`), and installation timestamp. The registry is a simple JSON file keyed by member slug. Created functions: `readMembersRegistry()`, `writeMembersRegistry()`, `addMember()`, `updateMemberStatus()`, `getMember()`. Integrated with `chapter install` -- after successful installation, the registry is updated. Integrated with `chapter list` -- shows member type and status (enabled/disabled) alongside the member name and version.
 
 **User Story:** As a user, after running `chapter install @acme/member-note-taker`, I can see in `.chapter/members.json` that `note-taker` is installed and enabled. Running `chapter list` shows the enabled/disabled status of each member.
 
 **Scope:**
-- New file: `src/registry/members.ts` — registry CRUD functions
 - New file: `src/registry/types.ts` — MembersRegistry, MemberEntry types
-- New test: `tests/registry/members.test.ts`
-- Modify: `src/cli/commands/install.ts` — call `addMember()` after install
-- Modify: `src/cli/commands/list.ts` — show member status
-- ~100-150 lines new code
+- New file: `src/registry/members.ts` — registry CRUD functions
+- New test: `tests/registry/members.test.ts` — 17 unit tests
+- Modify: `src/cli/commands/install.ts` — call `addMember()` after install (both agent and human paths)
+- Modify: `src/cli/commands/list.ts` — read registry and show member type and status
+- Modify: `tests/cli/install.test.ts` — 3 new tests for registry integration
+- Modify: `tests/cli/list.test.ts` — 3 new tests for status display
+- ~100 lines new source code, ~200 lines new test code
 
-**Testable output:** After `chapter install`, `.chapter/members.json` exists with correct entry. Reinstalling the same member updates (not duplicates) the entry. `chapter list` output includes member status. Unit tests for all registry functions pass.
+**Testable output:** After `chapter install`, `.chapter/members.json` exists with correct entry. Reinstalling the same member updates (not duplicates) the entry. `chapter list` output includes member type and status. Unit tests for all registry functions pass. All 606 tests pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-06-members-registry/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-06-members-registry/proposal.md)
+- [Design](../../changes/archive/2026-03-06-members-registry/design.md)
+- [Tasks](../../changes/archive/2026-03-06-members-registry/tasks.md)
+
+**Specs updated:**
+- [members-registry](../../specs/members-registry/spec.md) -- new spec for registry module
+- [install-command](../../specs/install-command/spec.md) -- added registry integration requirement
+- [list-command](../../specs/list-command/spec.md) -- updated to member terminology, added status display requirement
 
 ---
 
@@ -214,9 +323,19 @@ Implement the enable and disable CLI commands for managing member lifecycle.
 - New test: `tests/cli/disable.test.ts`
 - ~50-80 lines new code per command
 
-**Testable output:** `chapter enable @note-taker` sets status to `"enabled"` in `members.json`. `chapter disable @note-taker` sets status to `"disabled"`. Running enable/disable on non-installed member shows error. `chapter run` on a disabled member shows error. All tests pass.
+**Testable output:** `chapter enable @note-taker` sets status to `"enabled"` in `members.json`. `chapter disable @note-taker` sets status to `"disabled"`. Running enable/disable on non-installed member shows error. `chapter run` on a disabled member shows error. All 627 tests pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-06-chapter-enable-disable-commands/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-06-chapter-enable-disable-commands/proposal.md)
+- [Design](../../changes/archive/2026-03-06-chapter-enable-disable-commands/design.md)
+- [Tasks](../../changes/archive/2026-03-06-chapter-enable-disable-commands/tasks.md)
+
+**Specs updated:**
+- [enable-disable-commands](../../specs/enable-disable-commands/spec.md) -- new spec for enable/disable CLI commands
+- [run-command](../../specs/run-command/spec.md) -- added requirement for disabled member rejection
+- [cli-framework](../../specs/cli-framework/spec.md) -- added enable/disable to registered commands list
 
 ---
 
@@ -226,21 +345,26 @@ Update the `templates/note-taker/` template to use chapter terminology, member p
 
 **PRD refs:** REQ-004 (Rename npm Packages — template portion), REQ-005 (Member Package Type — template component)
 
-**Summary:** Update `templates/note-taker/package.json` to depend on `@clawmasons/chapter-core` instead of `@clawmasons/forge-core`. Rename `templates/note-taker/agents/` directory to `templates/note-taker/members/`. Update the template member package.json to use the new member schema (`type: "member"`, `memberType: "agent"`, `name`, `slug`, `email` fields with `{{projectName}}` and `{{projectScope}}` placeholders). Update all `"chapter"` metadata keys (instead of `"forge"`). Update `chapter init` template copying logic if directory names changed.
+**Summary:** Finalized the `templates/note-taker/` template for the chapter + member model. Most heavy lifting was done in prior changes (#1 renamed metadata field, #2 renamed packages/directories, #5 introduced member schema). This change added `authProviders: []` to the template member package.json to match the PRD agent member example, added a schema validation test to verify template output validates against the member schema via `parseChapterField()`, and updated the workspace-init spec with template validation scenarios.
 
 **User Story:** As a new user, when I run `chapter init --template note-taker --name @acme/my-project`, the generated workspace has members (not agents), uses the `chapter` metadata field, and depends on `@clawmasons/chapter-core`.
 
 **Scope:**
-- Rename directory: `templates/note-taker/agents/` → `templates/note-taker/members/`
-- Modify: `templates/note-taker/package.json` — dependency name
-- Modify: `templates/note-taker/members/note-taker/package.json` — member schema with placeholders
-- Modify: `templates/note-taker/roles/writer/package.json` — `chapter` field
-- Modify: `src/cli/commands/init.ts` — update template detection if needed (look for `members/` instead of `agents/`)
-- Update tests: `tests/cli/init.test.ts`
+- Modify: `templates/note-taker/members/note-taker/package.json` — added `authProviders: []` to match PRD example
+- Update tests: `tests/cli/init.test.ts` — added schema validation test for template output, updated test fixture to include `authProviders: []`
+- Update spec: `openspec/specs/workspace-init/spec.md` — added template identity fields and schema validation scenarios
 
-**Testable output:** `chapter init --template note-taker` produces a workspace with `members/note-taker/package.json` using `"chapter"` metadata key and `"type": "member"`. The generated `package.json` depends on `@clawmasons/chapter-core`. `chapter validate` succeeds on the init output. All init tests pass.
+**Testable output:** `chapter init --template note-taker` produces a workspace with `members/note-taker/package.json` using `"chapter"` metadata key and `"type": "member"`. The generated `package.json` depends on `@clawmasons/chapter-core`. `parseChapterField()` succeeds on the template output. All 628 tests pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-06-update-templates-chapter-member/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-06-update-templates-chapter-member/proposal.md)
+- [Design](../../changes/archive/2026-03-06-update-templates-chapter-member/design.md)
+- [Tasks](../../changes/archive/2026-03-06-update-templates-chapter-member/tasks.md)
+
+**Specs updated:**
+- [workspace-init](../../specs/workspace-init/spec.md) -- added template identity fields scenario and schema validation scenario
 
 ---
 
@@ -250,19 +374,27 @@ Update the openspec specification files to reflect the chapter + member terminol
 
 **PRD refs:** REQ-010 (Rename Internal References — documentation portion)
 
-**Summary:** Update the main spec files under `openspec/specs/` that contain forge-specific examples, variable names, or terminology. Focus on specs that are actively referenced (not archived changes). Update examples to use `chapter` field, `CHAPTER_*` env vars, `.chapter/` paths, and member references. This is a documentation-only change — no source code modified.
+**Summary:** Renamed the last forge-named spec directory (`forge-install-command/` to `install-command/`) and updated all references in both PRD IMPLEMENTATION files. All spec file content was already updated to chapter terminology in Changes #1-#9 -- this change addressed the remaining directory naming inconsistency. No source code modified -- documentation-only change.
 
 **User Story:** As a developer reading the specs, all examples and references are consistent with the chapter terminology — no confusion between "forge" and "chapter" in active documentation.
 
 **Scope:**
-- Modify: spec files under `openspec/specs/` that contain `forge`/`FORGE_` references in examples
-- Key specs: `docker-compose-generation/`, `env-generation/`, `claude-code-materializer/`, `workspace-init/`, `package-discovery/`, `proxy-server/`, etc.
-- Do NOT modify archived changes (historical record)
-- ~15-20 spec files
+- Renamed: `openspec/specs/forge-install-command/` to `openspec/specs/install-command/` (follows convention: `add-command`, `build-command`, etc.)
+- Modified: `openspec/prds/chapter-members/IMPLEMENTATION.md` — updated 5 spec links
+- Modified: `openspec/prds/forge-initial/IMPLEMENTATION.md` — updated 1 live spec link
+- Did NOT modify archived changes (historical record)
 
-**Testable output:** Grepping `openspec/specs/` for `[Ff]orge` returns zero results (excluding filenames that reference historical PRDs). All spec examples use `chapter` terminology consistently.
+**Testable output:** Grepping `openspec/specs/` for `[Ff]orge` returns zero results in both directory names and file content. All spec examples use `chapter` terminology consistently. All 628 tests pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-06-update-openspec-chapter-terminology/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-06-update-openspec-chapter-terminology/proposal.md)
+- [Design](../../changes/archive/2026-03-06-update-openspec-chapter-terminology/design.md)
+- [Tasks](../../changes/archive/2026-03-06-update-openspec-chapter-terminology/tasks.md)
+
+**Specs updated:**
+- [install-command](../../specs/install-command/spec.md) -- renamed from `forge-install-command/`, content unchanged (already updated in prior changes)
 
 ---
 
@@ -282,6 +414,14 @@ Create or update integration tests that exercise the complete chapter workflow w
 - New assertions: verify `.chapter/members.json` content, per-member directory structure, no "forge" in generated files
 - Verify: `npx tsc --noEmit`, `npx eslint src/ tests/`, `npx vitest run` all pass
 
-**Testable output:** Integration tests pass. The full sequence (init → validate → list → install → enable/disable) completes without errors. Generated files contain no "forge" references. All ~550+ tests pass.
+**Testable output:** Integration tests pass. The full sequence (init → validate → list → install → verify registry → verify dirs → disable → verify run guard → enable → no-forge check) completes without errors. Generated files contain no "forge" references. All 634 tests pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-06-end-to-end-chapter-validation/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-06-end-to-end-chapter-validation/proposal.md)
+- [Design](../../changes/archive/2026-03-06-end-to-end-chapter-validation/design.md)
+- [Tasks](../../changes/archive/2026-03-06-end-to-end-chapter-validation/tasks.md)
+
+**Specs updated:**
+- [e2e-chapter-workflow](../../specs/e2e-chapter-workflow/spec.md) -- new spec for the end-to-end chapter workflow integration test

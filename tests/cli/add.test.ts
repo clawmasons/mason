@@ -41,7 +41,7 @@ describe("runAdd", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-add-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-add-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -62,14 +62,14 @@ describe("runAdd", () => {
     fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify(pkgJson, null, 2));
   }
 
-  it("adds a valid forge package successfully", async () => {
+  it("adds a valid chapter package successfully", async () => {
     // Simulate npm install by pre-creating the package in node_modules
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === "npm" && (args as string[])[0] === "install") {
         writeNodeModulesPackage("@test/app-github", {
           name: "@test/app-github",
           version: "1.0.0",
-          forge: {
+          chapter: {
             type: "app",
             transport: "stdio",
             command: "npx",
@@ -96,7 +96,7 @@ describe("runAdd", () => {
     );
   });
 
-  it("rejects a package missing the forge field and rolls back", async () => {
+  it("rejects a package missing the chapter field and rolls back", async () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === "npm" && (args as string[])[0] === "install") {
         writeNodeModulesPackage("plain-pkg", {
@@ -111,7 +111,7 @@ describe("runAdd", () => {
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("not a valid forge package");
+    expect(errorOutput).toContain("not a valid chapter package");
 
     // Verify rollback (npm uninstall) was called
     expect(mockExecFileSync).toHaveBeenCalledWith(
@@ -121,13 +121,13 @@ describe("runAdd", () => {
     );
   });
 
-  it("rejects a package with an invalid forge field and rolls back", async () => {
+  it("rejects a package with an invalid chapter field and rolls back", async () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === "npm" && (args as string[])[0] === "install") {
-        writeNodeModulesPackage("bad-forge-pkg", {
-          name: "bad-forge-pkg",
+        writeNodeModulesPackage("bad-chapter-pkg", {
+          name: "bad-chapter-pkg",
           version: "1.0.0",
-          forge: {
+          chapter: {
             type: "app",
             // Missing required fields: transport, tools, capabilities
           },
@@ -136,16 +136,16 @@ describe("runAdd", () => {
       return Buffer.from("");
     });
 
-    await runAdd(tmpDir, "bad-forge-pkg", { npmArgs: [] });
+    await runAdd(tmpDir, "bad-chapter-pkg", { npmArgs: [] });
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("invalid forge field");
+    expect(errorOutput).toContain("invalid chapter field");
 
     // Verify rollback
     expect(mockExecFileSync).toHaveBeenCalledWith(
       "npm",
-      ["uninstall", "bad-forge-pkg"],
+      ["uninstall", "bad-chapter-pkg"],
       expect.objectContaining({ cwd: tmpDir }),
     );
   });
@@ -168,7 +168,7 @@ describe("runAdd", () => {
         writeNodeModulesPackage("@test/app-github", {
           name: "@test/app-github",
           version: "1.0.0",
-          forge: {
+          chapter: {
             type: "app",
             transport: "stdio",
             command: "npx",
@@ -196,7 +196,7 @@ describe("runAdd", () => {
         writeNodeModulesPackage("@clawmasons/app-github", {
           name: "@clawmasons/app-github",
           version: "1.0.0",
-          forge: {
+          chapter: {
             type: "app",
             transport: "stdio",
             command: "npx",

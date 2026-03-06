@@ -8,12 +8,13 @@ import {
   deriveProjectScope,
   copyTemplateFiles,
 } from "../../src/cli/commands/init.js";
+import { parseChapterField } from "../../src/schemas/chapter-field.js";
 
-describe("forge init", () => {
+describe("chapter init", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-test-"));
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
@@ -27,7 +28,7 @@ describe("forge init", () => {
     it("creates all workspace directories", async () => {
       await runInit(tmpDir, {}, { skipNpmInstall: true });
 
-      const expectedDirs = ["apps", "tasks", "skills", "roles", "agents", ".forge"];
+      const expectedDirs = ["apps", "tasks", "skills", "roles", "members", ".chapter"];
       for (const dir of expectedDirs) {
         const stat = fs.statSync(path.join(tmpDir, dir));
         expect(stat.isDirectory()).toBe(true);
@@ -46,7 +47,7 @@ describe("forge init", () => {
         "tasks/*",
         "skills/*",
         "roles/*",
-        "agents/*",
+        "members/*",
       ]);
     });
 
@@ -58,18 +59,18 @@ describe("forge init", () => {
       expect(pkg.name).toBe(path.basename(tmpDir));
     });
 
-    it("creates .forge/config.json with defaults", async () => {
+    it("creates .chapter/config.json with defaults", async () => {
       await runInit(tmpDir, {}, { skipNpmInstall: true });
 
-      const configPath = path.join(tmpDir, ".forge", "config.json");
+      const configPath = path.join(tmpDir, ".chapter", "config.json");
       const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       expect(config).toEqual({ version: "0.1.0" });
     });
 
-    it("creates .forge/.env.example with credential placeholders", async () => {
+    it("creates .chapter/.env.example with credential placeholders", async () => {
       await runInit(tmpDir, {}, { skipNpmInstall: true });
 
-      const envPath = path.join(tmpDir, ".forge", ".env.example");
+      const envPath = path.join(tmpDir, ".chapter", ".env.example");
       const content = fs.readFileSync(envPath, "utf-8");
       expect(content).toContain("GITHUB_TOKEN");
       expect(content).toContain("ANTHROPIC_API_KEY");
@@ -83,14 +84,14 @@ describe("forge init", () => {
       expect(content).toContain("node_modules/");
       expect(content).toContain(".env");
       expect(content).toContain("dist/");
-      expect(content).toContain(".forge/.env");
+      expect(content).toContain(".chapter/.env");
     });
 
     it("prints success output with created files", async () => {
       await runInit(tmpDir, {}, { skipNpmInstall: true });
 
       const logCalls = vi.mocked(console.log).mock.calls.flat().join("\n");
-      expect(logCalls).toContain("forge workspace initialized");
+      expect(logCalls).toContain("chapter workspace initialized");
       expect(logCalls).toContain("Created:");
       expect(logCalls).toContain("Next steps:");
     });
@@ -115,9 +116,9 @@ describe("forge init", () => {
   });
 
   describe("idempotency", () => {
-    it("warns and exits if .forge/ directory already exists", async () => {
-      // Create .forge directory to simulate existing workspace
-      fs.mkdirSync(path.join(tmpDir, ".forge"), { recursive: true });
+    it("warns and exits if .chapter/ directory already exists", async () => {
+      // Create .chapter directory to simulate existing workspace
+      fs.mkdirSync(path.join(tmpDir, ".chapter"), { recursive: true });
 
       await runInit(tmpDir, {}, { skipNpmInstall: true });
 
@@ -129,10 +130,10 @@ describe("forge init", () => {
     });
 
     it("does not modify existing files when workspace exists", async () => {
-      // Create .forge directory and a config file
-      fs.mkdirSync(path.join(tmpDir, ".forge"), { recursive: true });
+      // Create .chapter directory and a config file
+      fs.mkdirSync(path.join(tmpDir, ".chapter"), { recursive: true });
       fs.writeFileSync(
-        path.join(tmpDir, ".forge", "config.json"),
+        path.join(tmpDir, ".chapter", "config.json"),
         '{"version":"0.0.1"}',
       );
 
@@ -140,7 +141,7 @@ describe("forge init", () => {
 
       // Config should be untouched
       const config = JSON.parse(
-        fs.readFileSync(path.join(tmpDir, ".forge", "config.json"), "utf-8"),
+        fs.readFileSync(path.join(tmpDir, ".chapter", "config.json"), "utf-8"),
       );
       expect(config.version).toBe("0.0.1");
     });
@@ -209,7 +210,7 @@ describe("forge init", () => {
       // Create a test templates directory with a "test-template" template
       templatesDir = path.join(tmpDir, "__templates__");
       const templateDir = path.join(templatesDir, "test-template");
-      fs.mkdirSync(path.join(templateDir, "agents", "note-taker"), {
+      fs.mkdirSync(path.join(templateDir, "members", "note-taker"), {
         recursive: true,
       });
       fs.mkdirSync(path.join(templateDir, "roles", "writer"), {
@@ -224,24 +225,30 @@ describe("forge init", () => {
             name: "{{projectName}}",
             version: "0.1.0",
             private: true,
-            workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"],
-            dependencies: { "@clawmasons/forge-core": "^0.1.0" },
+            workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "members/*"],
+            dependencies: { "@clawmasons/chapter-core": "^0.1.0" },
           },
           null,
           2,
         ),
       );
 
-      // Template agent package.json
+      // Template member package.json
       fs.writeFileSync(
-        path.join(templateDir, "agents", "note-taker", "package.json"),
+        path.join(templateDir, "members", "note-taker", "package.json"),
         JSON.stringify(
           {
-            name: "@{{projectScope}}/agent-note-taker",
+            name: "@{{projectScope}}/member-note-taker",
             version: "1.0.0",
-            forge: {
-              type: "agent",
+            chapter: {
+              type: "member",
+              memberType: "agent",
+              name: "Note Taker",
+              slug: "note-taker",
+              email: "note-taker@chapter.local",
+              authProviders: [],
               roles: ["@{{projectScope}}/role-writer"],
+              runtimes: ["claude-code"],
             },
           },
           null,
@@ -256,7 +263,7 @@ describe("forge init", () => {
           {
             name: "@{{projectScope}}/role-writer",
             version: "1.0.0",
-            forge: {
+            chapter: {
               type: "role",
               tasks: ["@clawmasons/task-take-notes"],
               skills: ["@clawmasons/skill-markdown-conventions"],
@@ -275,7 +282,7 @@ describe("forge init", () => {
     });
 
     it("copies template files to target directory", async () => {
-      const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-init-tmpl-"));
+      const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-init-tmpl-"));
       try {
         await runInit(
           targetDir,
@@ -286,7 +293,7 @@ describe("forge init", () => {
         expect(fs.existsSync(path.join(targetDir, "package.json"))).toBe(true);
         expect(
           fs.existsSync(
-            path.join(targetDir, "agents", "note-taker", "package.json"),
+            path.join(targetDir, "members", "note-taker", "package.json"),
           ),
         ).toBe(true);
         expect(
@@ -301,7 +308,7 @@ describe("forge init", () => {
 
     it("replaces {{projectName}} with directory name in package.json", async () => {
       const targetDir = fs.mkdtempSync(
-        path.join(os.tmpdir(), "test-forge-"),
+        path.join(os.tmpdir(), "test-chapter-"),
       );
       try {
         await runInit(
@@ -321,7 +328,7 @@ describe("forge init", () => {
 
     it("replaces {{projectScope}} in component package.json files", async () => {
       const targetDir = fs.mkdtempSync(
-        path.join(os.tmpdir(), "test-forge-"),
+        path.join(os.tmpdir(), "test-chapter-"),
       );
       try {
         await runInit(
@@ -331,14 +338,14 @@ describe("forge init", () => {
         );
 
         const dirName = path.basename(targetDir);
-        const agentPkg = JSON.parse(
+        const memberPkg = JSON.parse(
           fs.readFileSync(
-            path.join(targetDir, "agents", "note-taker", "package.json"),
+            path.join(targetDir, "members", "note-taker", "package.json"),
             "utf-8",
           ),
         );
-        expect(agentPkg.name).toBe(`@${dirName}/agent-note-taker`);
-        expect(agentPkg.forge.roles).toEqual([`@${dirName}/role-writer`]);
+        expect(memberPkg.name).toBe(`@${dirName}/member-note-taker`);
+        expect(memberPkg.chapter.roles).toEqual([`@${dirName}/role-writer`]);
 
         const rolePkg = JSON.parse(
           fs.readFileSync(
@@ -347,15 +354,15 @@ describe("forge init", () => {
           ),
         );
         expect(rolePkg.name).toBe(`@${dirName}/role-writer`);
-        // forge-core references should remain unchanged
-        expect(rolePkg.forge.tasks).toEqual(["@clawmasons/task-take-notes"]);
+        // chapter-core references should remain unchanged
+        expect(rolePkg.chapter.tasks).toEqual(["@clawmasons/task-take-notes"]);
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }
     });
 
     it("uses --name to scope local components", async () => {
-      const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-init-"));
+      const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-init-"));
       try {
         await runInit(
           targetDir,
@@ -368,14 +375,14 @@ describe("forge init", () => {
         );
         expect(pkg.name).toBe("@acme/my-agent");
 
-        const agentPkg = JSON.parse(
+        const memberPkg = JSON.parse(
           fs.readFileSync(
-            path.join(targetDir, "agents", "note-taker", "package.json"),
+            path.join(targetDir, "members", "note-taker", "package.json"),
             "utf-8",
           ),
         );
-        expect(agentPkg.name).toBe("@acme/agent-note-taker");
-        expect(agentPkg.forge.roles).toEqual(["@acme/role-writer"]);
+        expect(memberPkg.name).toBe("@acme/member-note-taker");
+        expect(memberPkg.chapter.roles).toEqual(["@acme/role-writer"]);
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }
@@ -403,8 +410,8 @@ describe("forge init", () => {
       exitSpy.mockRestore();
     });
 
-    it("creates forge scaffold after copying template files", async () => {
-      const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-init-"));
+    it("creates chapter scaffold after copying template files", async () => {
+      const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-init-"));
       try {
         await runInit(
           targetDir,
@@ -412,12 +419,12 @@ describe("forge init", () => {
           { templatesDir, skipNpmInstall: true },
         );
 
-        // Forge scaffold should exist
+        // Chapter scaffold should exist
         expect(
-          fs.existsSync(path.join(targetDir, ".forge", "config.json")),
+          fs.existsSync(path.join(targetDir, ".chapter", "config.json")),
         ).toBe(true);
         expect(
-          fs.existsSync(path.join(targetDir, ".forge", ".env.example")),
+          fs.existsSync(path.join(targetDir, ".chapter", ".env.example")),
         ).toBe(true);
         expect(fs.existsSync(path.join(targetDir, ".gitignore"))).toBe(true);
       } finally {
@@ -425,9 +432,41 @@ describe("forge init", () => {
       }
     });
 
+    it("generates member package.json that validates against member schema", async () => {
+      const targetDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "test-chapter-"),
+      );
+      try {
+        await runInit(
+          targetDir,
+          { template: "test-template", name: "@acme/my-project" },
+          { templatesDir, skipNpmInstall: true },
+        );
+
+        const memberPkg = JSON.parse(
+          fs.readFileSync(
+            path.join(targetDir, "members", "note-taker", "package.json"),
+            "utf-8",
+          ),
+        );
+
+        // Verify the chapter field validates against the member schema
+        const result = parseChapterField(memberPkg.chapter);
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.type).toBe("member");
+          if (result.data.type === "member") {
+            expect(result.data.memberType).toBe("agent");
+          }
+        }
+      } finally {
+        fs.rmSync(targetDir, { recursive: true, force: true });
+      }
+    });
+
     it("shows template-specific next steps", async () => {
       const targetDir = fs.mkdtempSync(
-        path.join(os.tmpdir(), "test-forge-"),
+        path.join(os.tmpdir(), "test-chapter-"),
       );
       try {
         await runInit(
@@ -439,8 +478,8 @@ describe("forge init", () => {
         const dirName = path.basename(targetDir);
         const logCalls = vi.mocked(console.log).mock.calls.flat().join("\n");
         expect(logCalls).toContain("Template: test-template");
-        expect(logCalls).toContain(`forge validate @${dirName}/agent-note-taker`);
-        expect(logCalls).toContain("forge list");
+        expect(logCalls).toContain(`chapter validate @${dirName}/member-note-taker`);
+        expect(logCalls).toContain("chapter list");
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }
@@ -453,7 +492,7 @@ describe("forge init", () => {
       fs.mkdirSync(path.join(templatesDir, "note-taker"), { recursive: true });
       fs.mkdirSync(path.join(templatesDir, "chatbot"), { recursive: true });
 
-      const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-init-"));
+      const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-init-"));
       try {
         await runInit(
           targetDir,
@@ -475,7 +514,7 @@ describe("forge init", () => {
       const templatesDir = path.join(tmpDir, "__templates__");
       fs.mkdirSync(templatesDir, { recursive: true });
 
-      const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-init-"));
+      const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-init-"));
       try {
         await runInit(
           targetDir,
@@ -499,7 +538,7 @@ describe("deriveProjectScope", () => {
   });
 
   it("returns name as-is for unscoped names", () => {
-    expect(deriveProjectScope("test-forge")).toBe("test-forge");
+    expect(deriveProjectScope("test-chapter")).toBe("test-chapter");
     expect(deriveProjectScope("my-project")).toBe("my-project");
   });
 
@@ -584,21 +623,21 @@ describe("copyTemplateFiles", () => {
   });
 
   it("substitutes {{projectScope}} in nested package.json files", () => {
-    fs.mkdirSync(path.join(srcDir, "agents", "test"), { recursive: true });
+    fs.mkdirSync(path.join(srcDir, "members", "test"), { recursive: true });
     fs.writeFileSync(
-      path.join(srcDir, "agents", "test", "package.json"),
-      JSON.stringify({ name: "@{{projectScope}}/agent-test" }),
+      path.join(srcDir, "members", "test", "package.json"),
+      JSON.stringify({ name: "@{{projectScope}}/member-test" }),
     );
 
     copyTemplateFiles(srcDir, destDir, "@acme/my-agent", "acme");
 
     const pkg = JSON.parse(
       fs.readFileSync(
-        path.join(destDir, "agents", "test", "package.json"),
+        path.join(destDir, "members", "test", "package.json"),
         "utf-8",
       ),
     );
-    expect(pkg.name).toBe("@acme/agent-test");
+    expect(pkg.name).toBe("@acme/member-test");
   });
 
   it("does not substitute placeholders in non-package.json files", () => {
