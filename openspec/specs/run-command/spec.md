@@ -103,3 +103,20 @@ Before attempting to start the stack, the run command SHALL verify that `docker 
 #### Scenario: Docker Compose not installed
 - **WHEN** `chapter run @acme/member-ops` is executed but `docker compose` is not available
 - **THEN** the command SHALL print an error indicating Docker Compose v2 is required and exit with code 1
+
+### Requirement: chapter run rejects disabled members
+
+After checking Docker Compose availability, the run command SHALL check the member's status in `.chapter/members.json`. If the member is explicitly disabled, the command SHALL refuse to start it. If the member is not in the registry at all, the command SHALL proceed normally (lenient behavior for backward compatibility and `--output-dir` usage).
+
+#### Scenario: Disabled member
+- **WHEN** `chapter run @acme/member-ops` is executed and the member has status `"disabled"` in `members.json`
+- **THEN** the command SHALL print an error indicating the member is disabled and suggesting `chapter enable @<slug>`
+- **AND** the process SHALL exit with code 1
+
+#### Scenario: Enabled member
+- **WHEN** `chapter run @acme/member-ops` is executed and the member has status `"enabled"` in `members.json`
+- **THEN** the command SHALL proceed normally with directory resolution and Docker Compose startup
+
+#### Scenario: Member not in registry
+- **WHEN** `chapter run @acme/member-ops` is executed and the member is not present in `members.json` (or the file does not exist)
+- **THEN** the command SHALL proceed normally (no blocking)

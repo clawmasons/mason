@@ -7,6 +7,8 @@ import {
   validateEnvFile,
   execDockerCompose,
 } from "./docker-utils.js";
+import { getAppShortName } from "../../generator/toolfilter.js";
+import { getMember } from "../../registry/members.js";
 
 interface RunOptions {
   runtime?: string;
@@ -70,6 +72,18 @@ export async function runAgent(
   try {
     // 1. Check docker compose availability
     checkDockerCompose();
+
+    // 1b. Check member status in registry (disabled members cannot be started)
+    const slug = getAppShortName(memberName);
+    const chapterDir = path.join(rootDir, ".chapter");
+    const memberEntry = getMember(chapterDir, slug);
+    if (memberEntry && memberEntry.status === "disabled") {
+      console.error(
+        `\n✘ Member "${memberName}" is disabled. Run "chapter enable @${slug}" to enable it.\n`,
+      );
+      process.exit(1);
+      return;
+    }
 
     // 2. Resolve member directory
     const memberDir = resolveMemberDir(rootDir, memberName, options.outputDir);
