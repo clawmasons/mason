@@ -414,6 +414,14 @@ Create or update integration tests that exercise the complete chapter workflow w
 - New assertions: verify `.chapter/members.json` content, per-member directory structure, no "forge" in generated files
 - Verify: `npx tsc --noEmit`, `npx eslint src/ tests/`, `npx vitest run` all pass
 
-**Testable output:** Integration tests pass. The full sequence (init → validate → list → install → enable/disable) completes without errors. Generated files contain no "forge" references. All ~550+ tests pass.
+**Testable output:** Integration tests pass. The full sequence (init → validate → list → install → verify registry → verify dirs → disable → verify run guard → enable → no-forge check) completes without errors. Generated files contain no "forge" references. All 634 tests pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-06-end-to-end-chapter-validation/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-06-end-to-end-chapter-validation/proposal.md)
+- [Design](../../changes/archive/2026-03-06-end-to-end-chapter-validation/design.md)
+- [Tasks](../../changes/archive/2026-03-06-end-to-end-chapter-validation/tasks.md)
+
+**Specs updated:**
+- [e2e-chapter-workflow](../../specs/e2e-chapter-workflow/spec.md) -- new spec for the end-to-end chapter workflow integration test

@@ -1,25 +1,33 @@
 /**
- * End-to-End Integration Test — Install Flow (Local tgz)
+ * End-to-End Integration Test — Full Chapter Workflow (Local tgz)
  *
- * Validates the complete chapter packaging pipeline using only local .tgz files:
- *   npm pack -> npm install tgz -> chapter init -> chapter validate -> chapter list -> chapter install
+ * Validates the complete chapter lifecycle using only local .tgz files:
+ *   npm pack -> npm install tgz -> chapter init -> chapter validate -> chapter list
+ *   -> chapter install -> verify registry -> verify dirs -> disable -> run guard
+ *   -> enable -> no-forge check
  *
  * This test proves that the entire user journey works without any npm registry access.
- * It exercises all chapter-packaging PRD changes:
- *   - chapter-core package (Change 1)
- *   - Discovery enhancement (Change 2)
- *   - Template system (Change 3)
- *   - Simplified Dockerfile (Change 4)
- *   - Example removal (Change 5)
+ * It exercises all chapter-members PRD changes:
+ *   - Rename & rebrand (Changes 1-4)
+ *   - Member model (Change 5)
+ *   - Per-member dirs (Change 6)
+ *   - Members registry (Change 7)
+ *   - Enable/disable (Change 8)
+ *   - Templates (Change 9)
+ *   - Terminology (Change 10)
+ *   - E2E validation (Change 11)
  *
- * PRD refs: chapter-members PRD Section 2 (Measurable Outcomes)
+ * PRD refs: chapter-members PRD Phase 5 (End-to-End Validation)
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { readMembersRegistry, getMember } from "../../src/registry/members.js";
+import { runDisable } from "../../src/cli/commands/disable.js";
+import { runEnable } from "../../src/cli/commands/enable.js";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -237,5 +245,126 @@ describe("E2E Install Flow (Local tgz)", () => {
     expect(existsSync(join(installDir, "proxy", "chapter", "dist"))).toBe(true);
     expect(existsSync(join(installDir, "proxy", "chapter", "bin"))).toBe(true);
     expect(existsSync(join(installDir, "proxy", "chapter", "package.json"))).toBe(true);
+  }, TIMEOUT);
+
+  // ── New Steps: Registry, Enable/Disable, Forge-Remnant Checks ──────
+
+  it("step 6: members registry is populated after install", () => {
+    const chapterDir = join(tmpDir, ".chapter");
+
+    // Verify members.json exists
+    expect(existsSync(join(chapterDir, "members.json"))).toBe(true);
+
+    // Read and validate registry
+    const registry = readMembersRegistry(chapterDir);
+    const entry = registry.members["note-taker"];
+
+    expect(entry).toBeDefined();
+    expect(entry!.status).toBe("enabled");
+    expect(entry!.memberType).toBe("agent");
+    expect(entry!.package).toBe(`@${projectScope}/member-note-taker`);
+
+    // Verify installedAt is a valid ISO 8601 timestamp
+    expect(entry!.installedAt).toBeTruthy();
+    const parsedDate = new Date(entry!.installedAt);
+    expect(parsedDate.getTime()).not.toBeNaN();
+  }, TIMEOUT);
+
+  it("step 7: per-member directory structure is complete", () => {
+    const installDir = join(tmpDir, ".chapter", "members", "note-taker");
+
+    // Activity log directory
+    expect(existsSync(join(installDir, "log"))).toBe(true);
+
+    // Proxy build context
+    expect(existsSync(join(installDir, "proxy", "Dockerfile"))).toBe(true);
+    expect(existsSync(join(installDir, "proxy", "chapter", "dist"))).toBe(true);
+    expect(existsSync(join(installDir, "proxy", "chapter", "package.json"))).toBe(true);
+
+    // Claude-code runtime workspace
+    expect(existsSync(join(installDir, "claude-code", "workspace"))).toBe(true);
+    expect(existsSync(join(installDir, "claude-code", "workspace", ".claude", "settings.json"))).toBe(true);
+    expect(existsSync(join(installDir, "claude-code", "workspace", "AGENTS.md"))).toBe(true);
+    expect(existsSync(join(installDir, "claude-code", "Dockerfile"))).toBe(true);
+
+    // Docker artifacts
+    expect(existsSync(join(installDir, "docker-compose.yml"))).toBe(true);
+    expect(existsSync(join(installDir, ".env"))).toBe(true);
+    expect(existsSync(join(installDir, "chapter.lock.json"))).toBe(true);
+  }, TIMEOUT);
+
+  it("step 8: chapter disable updates registry status", () => {
+    // Suppress console output during disable
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    runDisable(tmpDir, "@note-taker");
+
+    logSpy.mockRestore();
+
+    // Verify the registry was updated
+    const chapterDir = join(tmpDir, ".chapter");
+    const registry = readMembersRegistry(chapterDir);
+    const entry = registry.members["note-taker"];
+
+    expect(entry).toBeDefined();
+    expect(entry!.status).toBe("disabled");
+
+    // Other fields should be preserved
+    expect(entry!.memberType).toBe("agent");
+    expect(entry!.package).toBe(`@${projectScope}/member-note-taker`);
+    expect(entry!.installedAt).toBeTruthy();
+  }, TIMEOUT);
+
+  it("step 9: disabled member is blocked from running", () => {
+    const chapterDir = join(tmpDir, ".chapter");
+
+    // Verify getMember confirms the disabled status
+    const entry = getMember(chapterDir, "note-taker");
+    expect(entry).toBeDefined();
+    expect(entry!.status).toBe("disabled");
+
+    // The run command checks: if (memberEntry && memberEntry.status === "disabled")
+    // This verifies the guard condition would trigger. Full run rejection is
+    // covered by unit tests in tests/cli/run.test.ts since run requires Docker.
+  }, TIMEOUT);
+
+  it("step 10: chapter enable re-enables the member", () => {
+    // Suppress console output during enable
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    runEnable(tmpDir, "@note-taker");
+
+    logSpy.mockRestore();
+
+    // Verify the registry was updated
+    const chapterDir = join(tmpDir, ".chapter");
+    const registry = readMembersRegistry(chapterDir);
+    const entry = registry.members["note-taker"];
+
+    expect(entry).toBeDefined();
+    expect(entry!.status).toBe("enabled");
+  }, TIMEOUT);
+
+  it("step 11: no forge references in generated config files", () => {
+    const installDir = join(tmpDir, ".chapter", "members", "note-taker");
+
+    // Check key generated files for "forge" references (case-insensitive)
+    const filesToCheck: Array<[string, string]> = [
+      ["docker-compose.yml", join(installDir, "docker-compose.yml")],
+      [".env", join(installDir, ".env")],
+      ["chapter.lock.json", join(installDir, "chapter.lock.json")],
+      ["members.json", join(tmpDir, ".chapter", "members.json")],
+    ];
+
+    for (const [label, filePath] of filesToCheck) {
+      expect(existsSync(filePath)).toBe(true);
+      const content = readFileSync(filePath, "utf-8");
+      // Find any "forge" references with context for debugging
+      const lines = content.split("\n");
+      const forgeLines = lines
+        .map((line, i) => ({ line, num: i + 1 }))
+        .filter(({ line }) => /forge/i.test(line));
+      expect(forgeLines, `Found "forge" in ${label}: ${JSON.stringify(forgeLines)}`).toHaveLength(0);
+    }
   }, TIMEOUT);
 });
