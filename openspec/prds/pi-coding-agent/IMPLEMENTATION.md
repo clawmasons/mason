@@ -153,7 +153,7 @@ Create the `e2e/` package at the project root with TypeScript, vitest, and setup
 
 **PRD refs:** REQ-004 (E2E Testing Package), PRD §5.1–§5.5
 
-**Summary:** Create `e2e/` directory with `package.json` (private, type: module, vitest + tsx + dotenv deps, workspace dependency on `@clawmasons/chapter`), `tsconfig.json`, `vitest.config.ts`, `.env.example`. Create `scripts/setup-chapter.ts` — programmatically creates a temp workspace, copies fixture packages, runs `chapter init` and `chapter install` via the chapter package's exported API. Create `scripts/teardown-chapter.ts` — stops Docker Compose, removes temp workspace. Scripts are usable standalone via `npm run setup` / `npm run teardown`. Add `e2e` to root `package.json` workspaces array.
+**Summary:** Create `e2e/` directory with `package.json` (private, type: module, vitest + tsx + dotenv devDependencies), `tsconfig.json`, `vitest.config.ts`, `.env.example`, `.gitignore`. Create `scripts/setup-chapter.ts` — creates a temp workspace, copies fixture packages, runs `chapter init` and `chapter install` via the CLI binary (`node bin/chapter.js`). Create `scripts/teardown-chapter.ts` — stops Docker Compose, removes temp workspace. Scripts are usable standalone via `npm run setup` / `npm run teardown`. Add `e2e` to root `package.json` workspaces array. Note: no explicit `@clawmasons/chapter` dependency needed since the root package IS chapter and npm workspace symlinks make it available.
 
 **User Story:** As a developer, I run `cd e2e && npm run setup` to create a fully-materialized test chapter. I can inspect the generated files, manually start the stack, and poke around. When done, `npm run teardown` cleans everything up. The same scripts are called by automated tests.
 
@@ -168,9 +168,14 @@ Create the `e2e/` package at the project root with TypeScript, vitest, and setup
 - New file: `e2e/scripts/teardown-chapter.ts`
 - Modify: root `package.json` — add `"e2e"` to workspaces array
 
-**Testable output:** `cd e2e && npm install` succeeds. `npm run setup` creates a temp chapter workspace with fixture members installed. The workspace contains `.chapter/members.json`, `.chapter/members/<slug>/` directories. `npm run teardown` removes the workspace. Scripts print clear status messages and paths.
+**Testable output:** `cd e2e && npm install` succeeds. `npm run setup` creates a temp chapter workspace with chapter initialized. `npm run teardown` removes the workspace cleanly. Scripts print clear status messages and paths. `npx tsc --noEmit` passes in both root and e2e. All 733 existing tests pass with 0 regressions.
 
-**Not Implemented Yet**
+**Implemented** -- 2026-03-06
+
+**Spec:** [openspec/changes/archive/2026-03-06-e2e-testing-framework/](../../openspec/changes/archive/2026-03-06-e2e-testing-framework/)
+- [Proposal](../../openspec/changes/archive/2026-03-06-e2e-testing-framework/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-06-e2e-testing-framework/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-06-e2e-testing-framework/tasks.md)
 
 ---
 
