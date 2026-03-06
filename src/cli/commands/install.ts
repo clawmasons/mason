@@ -13,6 +13,7 @@ import type { ResolvedMember, ResolvedTask } from "../../resolver/types.js";
 import { generateDockerCompose } from "../../compose/docker-compose.js";
 import { generateEnvTemplate } from "../../compose/env.js";
 import { generateLockFile } from "../../compose/lock.js";
+import { addMember } from "../../registry/members.js";
 
 interface InstallOptions {
   outputDir?: string;
@@ -130,6 +131,16 @@ export async function runInstall(
     // 3c. Handle human member install (log/ directory only, no docker artifacts)
     if (member.memberType === "human") {
       fs.mkdirSync(path.join(outputDir, "log"), { recursive: true });
+
+      // Update members registry
+      const chapterDir = path.join(rootDir, ".chapter");
+      addMember(chapterDir, member.slug, {
+        package: member.name,
+        memberType: member.memberType,
+        status: "enabled",
+        installedAt: new Date().toISOString(),
+      });
+
       console.log(`\n✔ Member "${memberName}" installed successfully!\n`);
       console.log(`  Output: ${outputDir}`);
       console.log(`  Type: human`);
@@ -252,6 +263,15 @@ export async function runInstall(
 
     // Create log/ directory for activity tracking
     fs.mkdirSync(path.join(outputDir, "log"), { recursive: true });
+
+    // Update members registry
+    const chapterDir = path.join(rootDir, ".chapter");
+    addMember(chapterDir, member.slug, {
+      package: member.name,
+      memberType: member.memberType,
+      status: "enabled",
+      installedAt: new Date().toISOString(),
+    });
 
     // Success summary
     const materializedRuntimes = member.runtimes.filter((r) => materializerRegistry.has(r));

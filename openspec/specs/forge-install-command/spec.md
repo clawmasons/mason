@@ -131,6 +131,27 @@ The command SHALL print a success message listing:
 - **WHEN** install completes successfully for a human member
 - **THEN** the output SHALL indicate the member type is `human` and list `log/` as the created directory
 
+### Requirement: chapter install updates the members registry
+
+After successful installation (both agent and human members), the install command SHALL call `addMember()` to add or update the member's entry in `.chapter/members.json` with:
+- `package`: the member's npm package name
+- `memberType`: `"human"` or `"agent"`
+- `status`: `"enabled"`
+- `installedAt`: current ISO 8601 timestamp
+
+#### Scenario: Agent install creates registry entry
+- **WHEN** `chapter install @acme/member-note-taker` completes successfully (slug: `note-taker`)
+- **THEN** `.chapter/members.json` SHALL contain an entry for `note-taker` with `status: "enabled"`, `memberType: "agent"`, and a valid `installedAt` timestamp
+
+#### Scenario: Human install creates registry entry
+- **WHEN** `chapter install @acme/member-alice` completes successfully (slug: `alice`)
+- **THEN** `.chapter/members.json` SHALL contain an entry for `alice` with `status: "enabled"`, `memberType: "human"`, and a valid `installedAt` timestamp
+
+#### Scenario: Reinstall updates registry entry
+- **WHEN** `chapter install` is run for a member that is already in the registry
+- **THEN** the entry SHALL be fully replaced with updated `installedAt` timestamp
+- **AND** the registry SHALL still contain exactly one entry for that slug (no duplicates)
+
 ### Requirement: cli-framework registers the install command
 
 The CLI command registration hub SHALL import and register the install command alongside init and validate.

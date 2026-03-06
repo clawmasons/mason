@@ -4,6 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { program } from "../../src/cli/index.js";
 import { runList } from "../../src/cli/commands/list.js";
+import { writeMembersRegistry } from "../../src/registry/members.js";
+import type { MembersRegistry } from "../../src/registry/types.js";
 
 describe("CLI list command", () => {
   it("has the list command registered", () => {
@@ -177,5 +179,63 @@ describe("runList", () => {
     expect(parsed).toHaveLength(1);
     expect(parsed[0].name).toBe("@test/member-ops");
     expect(parsed[0].roles).toHaveLength(1);
+  });
+
+  it("shows member type and status when registry exists", async () => {
+    setupValidMember();
+
+    const chapterDir = path.join(tmpDir, ".chapter");
+    const registry: MembersRegistry = {
+      members: {
+        ops: {
+          package: "@test/member-ops",
+          memberType: "agent",
+          status: "enabled",
+          installedAt: "2026-03-06T10:30:00.000Z",
+        },
+      },
+    };
+    writeMembersRegistry(chapterDir, registry);
+
+    await runList(tmpDir, {});
+
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("(agent, enabled)");
+  });
+
+  it("shows member type without status when not in registry", async () => {
+    setupValidMember();
+    // No registry file -- member is discovered but not installed
+    await runList(tmpDir, {});
+
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("(agent)");
+    expect(logOutput).not.toContain("enabled");
+    expect(logOutput).not.toContain("disabled");
+  });
+
+  it("shows disabled status for disabled members", async () => {
+    setupValidMember();
+
+    const chapterDir = path.join(tmpDir, ".chapter");
+    const registry: MembersRegistry = {
+      members: {
+        ops: {
+          package: "@test/member-ops",
+          memberType: "agent",
+          status: "disabled",
+          installedAt: "2026-03-06T10:30:00.000Z",
+        },
+      },
+    };
+    writeMembersRegistry(chapterDir, registry);
+
+    await runList(tmpDir, {});
+
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("(agent, disabled)");
   });
 });
