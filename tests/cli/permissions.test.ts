@@ -62,7 +62,7 @@ describe("runPermissions", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -75,7 +75,7 @@ describe("runPermissions", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "skill",
         artifacts: ["./SKILL.md"],
         description: "Labeling taxonomy",
@@ -85,7 +85,7 @@ describe("runPermissions", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "task",
         taskType: "subagent",
         prompt: "./triage.md",
@@ -99,7 +99,7 @@ describe("runPermissions", () => {
     writePackage(path.join(tmpDir, "tasks", "review"), {
       name: "@test/task-review",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "task",
         taskType: "subagent",
         prompt: "./review.md",
@@ -114,7 +114,7 @@ describe("runPermissions", () => {
     writePackage(path.join(tmpDir, "roles", "issue-manager"), {
       name: "@test/role-issue-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -131,7 +131,7 @@ describe("runPermissions", () => {
     writePackage(path.join(tmpDir, "roles", "pr-reviewer"), {
       name: "@test/role-pr-reviewer",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         tasks: ["@test/task-review"],
         skills: [],
@@ -147,7 +147,7 @@ describe("runPermissions", () => {
     writePackage(path.join(tmpDir, "agents", "ops"), {
       name: "@test/agent-ops",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "agent",
         runtimes: ["claude-code"],
         roles: ["@test/role-issue-manager", "@test/role-pr-reviewer"],

@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { parseForgeField } from "../../src/schemas/forge-field.js";
+import { parseChapterField } from "../../src/schemas/chapter-field.js";
 
-describe("parseForgeField", () => {
+describe("parseChapterField", () => {
   it("parses an app by type discrimination", () => {
-    const result = parseForgeField({
+    const result = parseChapterField({
       type: "app",
       transport: "stdio",
       command: "npx",
@@ -18,7 +18,7 @@ describe("parseForgeField", () => {
   });
 
   it("parses a skill by type discrimination", () => {
-    const result = parseForgeField({
+    const result = parseChapterField({
       type: "skill",
       artifacts: ["./SKILL.md"],
       description: "A skill",
@@ -30,7 +30,7 @@ describe("parseForgeField", () => {
   });
 
   it("parses a task by type discrimination", () => {
-    const result = parseForgeField({
+    const result = parseChapterField({
       type: "task",
       taskType: "subagent",
     });
@@ -41,7 +41,7 @@ describe("parseForgeField", () => {
   });
 
   it("parses a role by type discrimination", () => {
-    const result = parseForgeField({
+    const result = parseChapterField({
       type: "role",
       permissions: {
         "@clawmasons/app-github": {
@@ -57,7 +57,7 @@ describe("parseForgeField", () => {
   });
 
   it("parses an agent by type discrimination", () => {
-    const result = parseForgeField({
+    const result = parseChapterField({
       type: "agent",
       runtimes: ["claude-code"],
       roles: ["@clawmasons/role-issue-manager"],
@@ -69,22 +69,22 @@ describe("parseForgeField", () => {
   });
 
   it("fails on unknown type", () => {
-    const result = parseForgeField({ type: "unknown" });
+    const result = parseChapterField({ type: "unknown" });
     expect(result.success).toBe(false);
   });
 
   it("fails on missing type", () => {
-    const result = parseForgeField({});
+    const result = parseChapterField({});
     expect(result.success).toBe(false);
   });
 
   it("fails on non-object input", () => {
-    const result = parseForgeField("not an object");
+    const result = parseChapterField("not an object");
     expect(result.success).toBe(false);
   });
 
   it("fails on null input", () => {
-    const result = parseForgeField(null);
+    const result = parseChapterField(null);
     expect(result.success).toBe(false);
   });
 });

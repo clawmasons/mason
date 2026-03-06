@@ -173,7 +173,7 @@ function resolveAgentName(
 
   const agents: string[] = [];
   for (const [name, pkg] of packages) {
-    if (pkg.forgeField.type === "agent") {
+    if (pkg.chapterField.type === "agent") {
       agents.push(name);
     }
   }

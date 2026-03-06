@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const appForgeFieldSchema = z
+export const appChapterFieldSchema = z
   .object({
     type: z.literal("app"),
     description: z.string().optional(),
@@ -39,4 +39,4 @@ export const appForgeFieldSchema = z
     }
   });
 
-export type AppForgeField = z.infer<typeof appForgeFieldSchema>;
+export type AppChapterField = z.infer<typeof appChapterFieldSchema>;

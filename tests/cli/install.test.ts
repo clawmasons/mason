@@ -63,7 +63,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -78,7 +78,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "skill",
         artifacts: ["./SKILL.md"],
         description: "Labeling taxonomy",
@@ -89,7 +89,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "task",
         taskType: "subagent",
         prompt: "./triage.md",
@@ -104,7 +104,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -121,7 +121,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "agents", "ops"), {
       name: "@test/agent-ops",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "agent",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
@@ -134,7 +134,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "apps", "github"), {
       name: "@test/app-github",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "app",
         transport: "stdio",
         command: "npx",
@@ -148,7 +148,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "skills", "labeling"), {
       name: "@test/skill-labeling",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "skill",
         artifacts: ["./SKILL.md"],
         description: "Labeling taxonomy",
@@ -159,7 +159,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "tasks", "triage"), {
       name: "@test/task-triage",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "task",
         taskType: "subagent",
         requires: {
@@ -173,7 +173,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "role",
         tasks: ["@test/task-triage"],
         skills: ["@test/skill-labeling"],
@@ -190,7 +190,7 @@ describe("runInstall", () => {
     writePackage(path.join(tmpDir, "agents", "ops"), {
       name: "@test/agent-ops",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "agent",
         runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
@@ -267,7 +267,7 @@ describe("runInstall", () => {
     const agentPkg = JSON.parse(
       fs.readFileSync(path.join(tmpDir, "agents", "ops", "package.json"), "utf-8"),
     );
-    agentPkg.forge.runtimes = ["claude-code", "codex"];
+    agentPkg.chapter.runtimes = ["claude-code", "codex"];
     fs.writeFileSync(
       path.join(tmpDir, "agents", "ops", "package.json"),
       JSON.stringify(agentPkg, null, 2),
@@ -490,7 +490,7 @@ describe("runInstall", () => {
     writePackage(nmTaskDir, {
       name: "@clawmasons/task-take-notes",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "task",
         taskType: "subagent",
         prompt: "./notes.md",
@@ -503,7 +503,7 @@ describe("runInstall", () => {
     const rolePkg = JSON.parse(
       fs.readFileSync(path.join(tmpDir, "roles", "manager", "package.json"), "utf-8"),
     );
-    rolePkg.forge.tasks.push("@clawmasons/task-take-notes");
+    rolePkg.chapter.tasks.push("@clawmasons/task-take-notes");
     fs.writeFileSync(
       path.join(tmpDir, "roles", "manager", "package.json"),
       JSON.stringify(rolePkg, null, 2),
@@ -536,7 +536,7 @@ describe("runInstall", () => {
     writePackage(nmAgentDir, {
       name: "@clawmasons/agent-ops",
       version: "1.0.0",
-      forge: {
+      chapter: {
         type: "agent",
         runtimes: ["claude-code"],
         roles: [],

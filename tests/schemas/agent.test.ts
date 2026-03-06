@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { agentForgeFieldSchema } from "../../src/schemas/agent.js";
+import { agentChapterFieldSchema } from "../../src/schemas/agent.js";
 
-describe("agentForgeFieldSchema", () => {
+describe("agentChapterFieldSchema", () => {
   it("validates a valid agent", () => {
-    const result = agentForgeFieldSchema.safeParse({
+    const result = agentChapterFieldSchema.safeParse({
       type: "agent",
       runtimes: ["claude-code", "codex"],
       roles: ["@clawmasons/role-issue-manager"],
@@ -16,7 +16,7 @@ describe("agentForgeFieldSchema", () => {
   });
 
   it("validates agent with resources", () => {
-    const result = agentForgeFieldSchema.safeParse({
+    const result = agentChapterFieldSchema.safeParse({
       type: "agent",
       runtimes: ["claude-code"],
       roles: ["@clawmasons/role-issue-manager"],
@@ -36,7 +36,7 @@ describe("agentForgeFieldSchema", () => {
   });
 
   it("rejects agent missing runtimes", () => {
-    const result = agentForgeFieldSchema.safeParse({
+    const result = agentChapterFieldSchema.safeParse({
       type: "agent",
       roles: ["@clawmasons/role-issue-manager"],
     });
@@ -44,7 +44,7 @@ describe("agentForgeFieldSchema", () => {
   });
 
   it("rejects agent with empty runtimes array", () => {
-    const result = agentForgeFieldSchema.safeParse({
+    const result = agentChapterFieldSchema.safeParse({
       type: "agent",
       runtimes: [],
       roles: ["@clawmasons/role-issue-manager"],
@@ -53,7 +53,7 @@ describe("agentForgeFieldSchema", () => {
   });
 
   it("rejects agent missing roles", () => {
-    const result = agentForgeFieldSchema.safeParse({
+    const result = agentChapterFieldSchema.safeParse({
       type: "agent",
       runtimes: ["claude-code"],
     });
@@ -61,7 +61,7 @@ describe("agentForgeFieldSchema", () => {
   });
 
   it("validates PRD example: @clawmasons/agent-repo-ops", () => {
-    const result = agentForgeFieldSchema.safeParse({
+    const result = agentChapterFieldSchema.safeParse({
       type: "agent",
       description: "Repository operations agent for GitHub.",
       runtimes: ["claude-code", "codex"],
@@ -85,7 +85,7 @@ describe("agentForgeFieldSchema", () => {
   });
 
   it("validates agent with proxy defaults omitted", () => {
-    const result = agentForgeFieldSchema.safeParse({
+    const result = agentChapterFieldSchema.safeParse({
       type: "agent",
       runtimes: ["claude-code"],
       roles: ["@clawmasons/role-issue-manager"],

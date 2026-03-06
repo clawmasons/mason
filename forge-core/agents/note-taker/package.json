@@ -2,7 +2,7 @@
   "name": "@clawmasons/agent-note-taker",
   "version": "1.0.0",
   "description": "Note-taker agent — creates and organizes markdown notes via filesystem MCP server",
-  "forge": {
+  "chapter": {
     "type": "agent",
     "description": "A note-taking agent that reads, writes, and organizes markdown files.",
     "runtimes": ["claude-code"],

@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { roleForgeFieldSchema } from "../../src/schemas/role.js";
+import { roleChapterFieldSchema } from "../../src/schemas/role.js";
 
-describe("roleForgeFieldSchema", () => {
+describe("roleChapterFieldSchema", () => {
   it("validates a valid role with permissions", () => {
-    const result = roleForgeFieldSchema.safeParse({
+    const result = roleChapterFieldSchema.safeParse({
       type: "role",
       permissions: {
         "@clawmasons/app-github": {
@@ -22,7 +22,7 @@ describe("roleForgeFieldSchema", () => {
   });
 
   it("validates role with deny wildcard", () => {
-    const result = roleForgeFieldSchema.safeParse({
+    const result = roleChapterFieldSchema.safeParse({
       type: "role",
       permissions: {
         "@clawmasons/app-slack": {
@@ -40,7 +40,7 @@ describe("roleForgeFieldSchema", () => {
   });
 
   it("validates role with constraints", () => {
-    const result = roleForgeFieldSchema.safeParse({
+    const result = roleChapterFieldSchema.safeParse({
       type: "role",
       permissions: {
         "@clawmasons/app-github": {
@@ -63,14 +63,14 @@ describe("roleForgeFieldSchema", () => {
   });
 
   it("rejects role without permissions", () => {
-    const result = roleForgeFieldSchema.safeParse({
+    const result = roleChapterFieldSchema.safeParse({
       type: "role",
     });
     expect(result.success).toBe(false);
   });
 
   it("validates PRD example: @clawmasons/role-issue-manager", () => {
-    const result = roleForgeFieldSchema.safeParse({
+    const result = roleChapterFieldSchema.safeParse({
       type: "role",
       description: "Manages GitHub issues: triage, label, assign.",
       tasks: [

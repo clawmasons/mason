@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { appForgeFieldSchema } from "../../src/schemas/app.js";
+import { appChapterFieldSchema } from "../../src/schemas/app.js";
 
-describe("appForgeFieldSchema", () => {
+describe("appChapterFieldSchema", () => {
   it("validates a valid stdio app", () => {
-    const result = appForgeFieldSchema.safeParse({
+    const result = appChapterFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       command: "npx",
@@ -15,7 +15,7 @@ describe("appForgeFieldSchema", () => {
   });
 
   it("validates a valid remote SSE app", () => {
-    const result = appForgeFieldSchema.safeParse({
+    const result = appChapterFieldSchema.safeParse({
       type: "app",
       transport: "sse",
       url: "https://mcp.amap.com/sse?key=abc",
@@ -26,7 +26,7 @@ describe("appForgeFieldSchema", () => {
   });
 
   it("validates a valid streamable-http app", () => {
-    const result = appForgeFieldSchema.safeParse({
+    const result = appChapterFieldSchema.safeParse({
       type: "app",
       transport: "streamable-http",
       url: "https://example.com/mcp",
@@ -37,7 +37,7 @@ describe("appForgeFieldSchema", () => {
   });
 
   it("rejects stdio app missing command", () => {
-    const result = appForgeFieldSchema.safeParse({
+    const result = appChapterFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       tools: ["foo"],
@@ -47,7 +47,7 @@ describe("appForgeFieldSchema", () => {
   });
 
   it("rejects sse app missing url", () => {
-    const result = appForgeFieldSchema.safeParse({
+    const result = appChapterFieldSchema.safeParse({
       type: "app",
       transport: "sse",
       tools: ["foo"],
@@ -57,7 +57,7 @@ describe("appForgeFieldSchema", () => {
   });
 
   it("preserves env variables with interpolation syntax", () => {
-    const result = appForgeFieldSchema.safeParse({
+    const result = appChapterFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       command: "npx",
@@ -75,7 +75,7 @@ describe("appForgeFieldSchema", () => {
   });
 
   it("validates PRD example: @clawmasons/app-github", () => {
-    const result = appForgeFieldSchema.safeParse({
+    const result = appChapterFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       command: "npx",
@@ -99,7 +99,7 @@ describe("appForgeFieldSchema", () => {
   });
 
   it("validates PRD example: @clawmasons/app-amap", () => {
-    const result = appForgeFieldSchema.safeParse({
+    const result = appChapterFieldSchema.safeParse({
       type: "app",
       transport: "sse",
       url: "https://mcp.amap.com/sse?key=${AMAP_KEY}",
@@ -110,7 +110,7 @@ describe("appForgeFieldSchema", () => {
   });
 
   it("accepts optional description", () => {
-    const result = appForgeFieldSchema.safeParse({
+    const result = appChapterFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       command: "npx",

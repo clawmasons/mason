@@ -1,6 +1,6 @@
-export { appForgeFieldSchema, type AppForgeField } from "./app.js";
-export { skillForgeFieldSchema, type SkillForgeField } from "./skill.js";
-export { taskForgeFieldSchema, type TaskForgeField } from "./task.js";
-export { roleForgeFieldSchema, type RoleForgeField } from "./role.js";
-export { agentForgeFieldSchema, type AgentForgeField } from "./agent.js";
-export { parseForgeField, type ForgeField } from "./forge-field.js";
+export { appChapterFieldSchema, type AppChapterField } from "./app.js";
+export { skillChapterFieldSchema, type SkillChapterField } from "./skill.js";
+export { taskChapterFieldSchema, type TaskChapterField } from "./task.js";
+export { roleChapterFieldSchema, type RoleChapterField } from "./role.js";
+export { agentChapterFieldSchema, type AgentChapterField } from "./agent.js";
+export { parseChapterField, type ChapterField } from "./chapter-field.js";

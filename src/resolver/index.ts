@@ -9,7 +9,7 @@ export type {
 
 export {
   PackageNotFoundError,
-  InvalidForgeFieldError,
+  InvalidChapterFieldError,
   CircularDependencyError,
   TypeMismatchError,
 } from "./errors.js";

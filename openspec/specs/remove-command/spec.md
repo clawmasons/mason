@@ -12,7 +12,7 @@ The `forge remove` command SHALL be registered as a Commander.js command with a 
 - **AND** it SHALL have a `--force` boolean option
 
 ### Requirement: Dependent package checking
-Before removing a package, the command SHALL scan all discovered forge packages in the workspace to find packages that reference the target package in their `forge` field.
+Before removing a package, the command SHALL scan all discovered chapter packages in the workspace to find packages that reference the target package in their `chapter` field.
 
 #### Scenario: No dependents found
 - **WHEN** `forge remove @clawmasons/app-unused` is run and no other package references it
@@ -31,7 +31,7 @@ Before removing a package, the command SHALL scan all discovered forge packages 
 - **AND** SHALL proceed with npm uninstall despite the dependents
 
 ### Requirement: Dependency reference detection
-The dependent checker SHALL detect references to the target package in the following forge field locations:
+The dependent checker SHALL detect references to the target package in the following chapter field locations:
 
 #### Scenario: Role permissions reference
 - **WHEN** a role has `permissions: { "@target/app": { allow: [...] } }`

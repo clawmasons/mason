@@ -105,11 +105,11 @@ The `@clawmasons/forge` package SHALL contain a `templates/` directory with at l
 
 #### Scenario: Template agent references local role
 - **WHEN** `templates/note-taker/agents/note-taker/package.json` is read
-- **THEN** the forge field has `type: "agent"` and `roles` contains `@{{projectScope}}/role-writer`
+- **THEN** the chapter field has `type: "agent"` and `roles` contains `@{{projectScope}}/role-writer`
 
 #### Scenario: Template role references forge-core components
 - **WHEN** `templates/note-taker/roles/writer/package.json` is read
-- **THEN** the forge field has `type: "role"`, tasks include `@clawmasons/task-take-notes`, skills include `@clawmasons/skill-markdown-conventions`, and permissions reference `@clawmasons/app-filesystem`
+- **THEN** the chapter field has `type: "role"`, tasks include `@clawmasons/task-take-notes`, skills include `@clawmasons/skill-markdown-conventions`, and permissions reference `@clawmasons/app-filesystem`
 
 ### Requirement: forge init --template copies template files
 The `forge init` command SHALL accept a `--template <name>` option. When specified, it SHALL copy all files from the named template directory into the target directory before creating the forge scaffold.

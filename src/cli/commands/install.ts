@@ -200,7 +200,7 @@ export async function runInstall(
         pkg.packagePath.startsWith(path.join(rootDir, wsDir) + path.sep),
       );
       if (!isLocal) {
-        const typeDir = `${pkg.forgeField.type}s`;
+        const typeDir = `${pkg.chapterField.type}s`;
         const dirName = path.basename(pkg.packagePath);
         copyDirToFiles(pkg.packagePath, `forge-proxy/workspace/${typeDir}/${dirName}`, allFiles);
       }

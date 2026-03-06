@@ -2,7 +2,7 @@
   "name": "@{{projectScope}}/role-writer",
   "version": "1.0.0",
   "description": "Writer role — permission boundary for filesystem note operations",
-  "forge": {
+  "chapter": {
     "type": "role",
     "description": "Manages notes on the filesystem: read, write, list, and create directories.",
     "tasks": ["@clawmasons/task-take-notes"],
