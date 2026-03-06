@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { type MockInstance, describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -235,7 +235,7 @@ describe("findDependents", () => {
 
 describe("runRemove", () => {
   let tmpDir: string;
-  let exitSpy: ReturnType<typeof vi.spyOn>;
+  let exitSpy: MockInstance;
   let logSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
 

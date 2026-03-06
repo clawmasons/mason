@@ -86,6 +86,7 @@ The `runInstall()` function SHALL:
 5. Copy `package.json` and `package-lock.json` from `getForgeProjectRoot()` into `forge-proxy/forge/`
 6. NOT copy forge source files (`src/`), TypeScript config files, or `node_modules/` into the build context
 7. Copy agent workspace directories (apps/, roles/, agents/, tasks/, skills/) into `forge-proxy/workspace/`
+8. Copy non-local packages from the resolved dependency graph into `forge-proxy/workspace/{type}s/{basename}/` — packages NOT in the agent's resolved graph SHALL be excluded
 
 The `copyDirToFiles()` helper accepts a configurable `skipDirs` parameter (default: `["node_modules", ".git"]`).
 
@@ -105,6 +106,11 @@ The `copyDirToFiles()` helper accepts a configurable `skipDirs` parameter (defau
 - **GIVEN** a valid agent with packages in apps/ and agents/
 - **WHEN** `runInstall()` is called
 - **THEN** `forge-proxy/workspace/agents/` and `forge-proxy/workspace/apps/` exist with the package.json files
+
+#### Scenario: Non-local packages outside resolved graph are excluded
+- **GIVEN** a local agent `@vis/agent-note-taker` and a node_modules package `@clawforge/agent-note-taker` with the same directory basename
+- **WHEN** `runInstall()` is called for `@vis/agent-note-taker`
+- **THEN** `forge-proxy/workspace/agents/note-taker/package.json` SHALL contain `@vis/agent-note-taker` (not `@clawforge`)
 
 ### Requirement: Proxy config generator is deprecated
 

@@ -24,10 +24,17 @@ describe("generateProxyDockerfile", () => {
     expect(result).not.toContain("AS builder");
   });
 
-  it("installs production dependencies only", () => {
+  it("installs build tools for native addons", () => {
     const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toContain("npm ci --omit=dev --ignore-scripts");
+    expect(result).toContain("python3 make g++");
+  });
+
+  it("installs production dependencies with native compilation", () => {
+    const result = generateProxyDockerfile("@test/agent-test");
+
+    expect(result).toContain("npm install --omit=dev");
+    expect(result).not.toContain("--ignore-scripts");
   });
 
   it("copies pre-built forge dist and bin into the image", () => {
@@ -40,7 +47,8 @@ describe("generateProxyDockerfile", () => {
   it("copies package manifests for dependency install", () => {
     const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toContain("COPY forge/package.json forge/package-lock.json ./");
+    expect(result).toContain("COPY forge/package.json ./");
+    expect(result).not.toContain("package-lock.json");
   });
 
   it("copies workspace into the image", () => {

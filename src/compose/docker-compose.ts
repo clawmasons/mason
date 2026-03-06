@@ -78,6 +78,7 @@ function renderComposeService(service: ComposeServiceDef): string {
 
   lines.push(`stdin_open: ${service.stdin_open}`);
   lines.push(`tty: ${service.tty}`);
+  lines.push(`init: ${service.init}`);
 
   lines.push("networks:");
   for (const net of service.networks) {

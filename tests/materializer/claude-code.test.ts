@@ -128,48 +128,46 @@ describe("claudeCodeMaterializer", () => {
   });
 
   describe("materializeWorkspace", () => {
-    describe("settings.json", () => {
-      it("generates per-server entries with default SSE proxy", () => {
+    describe(".mcp.json", () => {
+      it("generates single forge entry with default SSE proxy", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const settingsJson = result.get(".claude/settings.json");
-        expect(settingsJson).toBeDefined();
+        const mcpJson = result.get(".mcp.json");
+        expect(mcpJson).toBeDefined();
 
-        const settings = JSON.parse(settingsJson!);
-        expect(settings.mcpServers.github).toBeDefined();
-        expect(settings.mcpServers.github.type).toBe("sse");
-        expect(settings.mcpServers.github.url).toBe("http://mcp-proxy:9090/github/sse");
-        expect(settings.mcpServers.slack).toBeDefined();
-        expect(settings.mcpServers.slack.url).toBe("http://mcp-proxy:9090/slack/sse");
-        expect(settings.mcpServers["forge-proxy"]).toBeUndefined();
+        const mcp = JSON.parse(mcpJson!);
+        expect(mcp.mcpServers.forge).toBeDefined();
+        expect(mcp.mcpServers.forge.type).toBe("sse");
+        expect(mcp.mcpServers.forge.url).toBe("http://mcp-proxy:9090/sse");
+        expect(Object.keys(mcp.mcpServers)).toEqual(["forge"]);
       });
 
-      it("generates per-server entries with custom port", () => {
+      it("generates single forge entry with custom port", () => {
         const agent = makeRepoOpsAgent();
         agent.proxy = { port: 8080, type: "sse" };
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:8080");
 
-        const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.mcpServers.github.url).toBe("http://mcp-proxy:8080/github/sse");
+        const mcp = JSON.parse(result.get(".mcp.json")!);
+        expect(mcp.mcpServers.forge.url).toBe("http://mcp-proxy:8080/sse");
       });
 
-      it("generates per-server entries with streamable-http transport", () => {
+      it("generates forge entry with streamable-http transport", () => {
         const agent = makeRepoOpsAgent();
         agent.proxy = { port: 9090, type: "streamable-http" };
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.mcpServers.github.type).toBe("streamable-http");
-        expect(settings.mcpServers.github.url).toBe("http://mcp-proxy:9090/github/mcp");
+        const mcp = JSON.parse(result.get(".mcp.json")!);
+        expect(mcp.mcpServers.forge.type).toBe("streamable-http");
+        expect(mcp.mcpServers.forge.url).toBe("http://mcp-proxy:9090/mcp");
       });
 
       it("includes placeholder auth header when no token provided", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.mcpServers.github.headers.Authorization).toBe("Bearer ${FORGE_PROXY_TOKEN}");
+        const mcp = JSON.parse(result.get(".mcp.json")!);
+        expect(mcp.mcpServers.forge.headers.Authorization).toBe("Bearer ${FORGE_PROXY_TOKEN}");
       });
 
       it("bakes actual token into auth header when proxyToken provided", () => {
@@ -177,18 +175,16 @@ describe("claudeCodeMaterializer", () => {
         const token = "abc123def456";
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", token);
 
-        const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.mcpServers.github.headers.Authorization).toBe("Bearer abc123def456");
-        expect(settings.mcpServers.slack.headers.Authorization).toBe("Bearer abc123def456");
+        const mcp = JSON.parse(result.get(".mcp.json")!);
+        expect(mcp.mcpServers.forge.headers.Authorization).toBe("Bearer abc123def456");
       });
 
-      it("includes per-server permissions", () => {
+      it("does not contain permissions", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.permissions.allow).toEqual(["mcp__github__*", "mcp__slack__*"]);
-        expect(settings.permissions.deny).toEqual([]);
+        const mcp = JSON.parse(result.get(".mcp.json")!);
+        expect(mcp.permissions).toBeUndefined();
       });
 
       it("defaults to SSE when agent has no proxy field", () => {
@@ -196,9 +192,28 @@ describe("claudeCodeMaterializer", () => {
         delete agent.proxy;
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
+        const mcp = JSON.parse(result.get(".mcp.json")!);
+        expect(mcp.mcpServers.forge.type).toBe("sse");
+        expect(mcp.mcpServers.forge.url).toBe("http://mcp-proxy:9090/sse");
+      });
+    });
+
+    describe("settings.json", () => {
+      it("includes single forge permission", () => {
+        const agent = makeRepoOpsAgent();
+        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
         const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.mcpServers.github.type).toBe("sse");
-        expect(settings.mcpServers.github.url).toBe("http://mcp-proxy:9090/github/sse");
+        expect(settings.permissions.allow).toEqual(["mcp__forge__*"]);
+        expect(settings.permissions.deny).toEqual([]);
+      });
+
+      it("does not contain mcpServers", () => {
+        const agent = makeRepoOpsAgent();
+        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const settings = JSON.parse(result.get(".claude/settings.json")!);
+        expect(settings.mcpServers).toBeUndefined();
       });
     });
 
@@ -386,6 +401,7 @@ describe("claudeCodeMaterializer", () => {
           ".claude/commands/review-pr.md",
           ".claude/commands/triage-issue.md",
           ".claude/settings.json",
+          ".mcp.json",
           "AGENTS.md",
           "skills/labeling/README.md",
         ]);
@@ -522,6 +538,12 @@ describe("claudeCodeMaterializer", () => {
       const service = claudeCodeMaterializer.generateComposeService(agent);
       expect(service.stdin_open).toBe(true);
       expect(service.tty).toBe(true);
+    });
+
+    it("enables init for proper PID 1 signal handling", () => {
+      const agent = makeRepoOpsAgent();
+      const service = claudeCodeMaterializer.generateComposeService(agent);
+      expect(service.init).toBe(true);
     });
 
     it("connects to agent-net network", () => {

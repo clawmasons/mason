@@ -18,6 +18,7 @@ export interface ComposeServiceDef {
   depends_on: string[];
   stdin_open: boolean;
   tty: boolean;
+  init: boolean;
   networks: string[];
 }
 
