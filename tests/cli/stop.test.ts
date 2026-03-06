@@ -83,7 +83,7 @@ describe("stopAgent", () => {
   });
 
   function setupAgentDir(): string {
-    const agentDir = path.join(tmpDir, ".forge", "agents", "ops");
+    const agentDir = path.join(tmpDir, ".chapter", "agents", "ops");
     fs.mkdirSync(agentDir, { recursive: true });
     fs.writeFileSync(
       path.join(agentDir, "docker-compose.yml"),
@@ -108,7 +108,7 @@ describe("stopAgent", () => {
   });
 
   it("exits 1 when docker-compose.yml is missing", async () => {
-    const agentDir = path.join(tmpDir, ".forge", "agents", "ops");
+    const agentDir = path.join(tmpDir, ".chapter", "agents", "ops");
     fs.mkdirSync(agentDir, { recursive: true });
     // No docker-compose.yml created
 

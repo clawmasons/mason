@@ -12,14 +12,14 @@ The CLI SHALL register a `stop` command that accepts a required `<agent>` argume
 
 ### Requirement: forge stop resolves the agent directory
 
-The stop command SHALL resolve the agent's scaffolded directory using the same convention as the run command: `.forge/agents/<short-name>/` by default, or `--output-dir` if specified.
+The stop command SHALL resolve the agent's scaffolded directory using the same convention as the run command: `.chapter/agents/<short-name>/` by default, or `--output-dir` if specified.
 
 #### Scenario: Default agent directory resolution
-- **WHEN** `forge stop my-agent` is executed in a workspace where `.forge/agents/my-agent/docker-compose.yml` exists
-- **THEN** the command SHALL use `.forge/agents/my-agent/` as the agent directory
+- **WHEN** `forge stop my-agent` is executed in a workspace where `.chapter/agents/my-agent/docker-compose.yml` exists
+- **THEN** the command SHALL use `.chapter/agents/my-agent/` as the agent directory
 
 #### Scenario: Agent directory not found
-- **WHEN** `forge stop my-agent` is executed but `.forge/agents/my-agent/` does not exist
+- **WHEN** `forge stop my-agent` is executed but `.chapter/agents/my-agent/` does not exist
 - **THEN** the command SHALL print an error message indicating the agent is not installed and exit with code 1
 
 ### Requirement: forge stop tears down the Docker Compose stack

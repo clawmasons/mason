@@ -65,7 +65,7 @@ The `generateDockerCompose()` function SHALL generate a proxy service that:
 2. Has no `entrypoint:` or `command:` directives (uses Dockerfile ENTRYPOINT/CMD)
 3. Does not mount `config.json` (chapter proxy reads from workspace)
 4. Mounts `./chapter-proxy/logs:/logs` for log persistence
-5. Passes `FORGE_PROXY_TOKEN` and app credential env vars
+5. Passes `CHAPTER_PROXY_TOKEN` and app credential env vars
 
 #### Scenario: Proxy service configuration
 - **GIVEN** an agent with `proxy: { port: 9090 }`

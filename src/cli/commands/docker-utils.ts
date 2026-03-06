@@ -5,7 +5,7 @@ import { getAppShortName } from "../../generator/toolfilter.js";
 
 /**
  * Resolve the scaffolded agent directory.
- * Uses `.forge/agents/<short-name>/` by default, or a custom outputDir if provided.
+ * Uses `.chapter/agents/<short-name>/` by default, or a custom outputDir if provided.
  */
 export function resolveAgentDir(
   rootDir: string,
@@ -16,7 +16,7 @@ export function resolveAgentDir(
     return path.resolve(rootDir, outputDir);
   }
   const shortName = getAppShortName(agentName);
-  return path.join(rootDir, ".forge", "agents", shortName);
+  return path.join(rootDir, ".chapter", "agents", shortName);
 }
 
 /**

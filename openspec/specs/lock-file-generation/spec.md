@@ -1,6 +1,6 @@
 ## ADDED Requirements
 
-### Requirement: generateLockFile produces a forge.lock.json object
+### Requirement: generateLockFile produces a chapter.lock.json object
 
 The system SHALL provide a `generateLockFile(agent, generatedFiles)` function that returns a JSON-serializable object representing the lock file.
 

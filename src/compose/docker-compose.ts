@@ -112,14 +112,14 @@ export function generateDockerCompose(
   lines.push("    build: ./chapter-proxy");
   lines.push("    restart: unless-stopped");
   lines.push("    ports:");
-  lines.push(`      - "\${FORGE_PROXY_PORT:-${port}}:${port}"`);
+  lines.push(`      - "\${CHAPTER_PROXY_PORT:-${port}}:${port}"`);
   lines.push("    volumes:");
   lines.push("      - ./chapter-proxy/logs:/logs");
   lines.push("      - ./data:/home/node/data");
 
   lines.push("    environment:");
-  lines.push("      - FORGE_DB_PATH=/home/node/data/forge.db");
-  lines.push("      - FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}");
+  lines.push("      - CHAPTER_DB_PATH=/home/node/data/chapter.db");
+  lines.push("      - CHAPTER_PROXY_TOKEN=${CHAPTER_PROXY_TOKEN}");
   for (const varName of envVars) {
     lines.push(`      - ${varName}=\${${varName}}`);
   }
@@ -130,7 +130,7 @@ export function generateDockerCompose(
   lines.push('        max-size: "10m"');
   lines.push('        max-file: "5"');
   lines.push("    networks:");
-  lines.push("      - agent-net");
+  lines.push("      - chapter-net");
 
   // Runtime services
   for (const [name, service] of runtimeServices) {
@@ -142,7 +142,7 @@ export function generateDockerCompose(
   // Networks
   lines.push("");
   lines.push("networks:");
-  lines.push("  agent-net:");
+  lines.push("  chapter-net:");
   lines.push("    driver: bridge");
 
   return lines.join("\n");

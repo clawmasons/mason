@@ -212,7 +212,7 @@ describe("runInstall", () => {
     expect(fs.existsSync(path.join(outputDir, "claude-code/workspace/AGENTS.md"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "docker-compose.yml"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, ".env"))).toBe(true);
-    expect(fs.existsSync(path.join(outputDir, "forge.lock.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "chapter.lock.json"))).toBe(true);
   });
 
   it("does not generate mcp-proxy config.json", async () => {
@@ -236,13 +236,13 @@ describe("runInstall", () => {
     expect(content).toContain("manager");
   });
 
-  it("generates .env with non-empty FORGE_PROXY_TOKEN", async () => {
+  it("generates .env with non-empty CHAPTER_PROXY_TOKEN", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
     const envContent = fs.readFileSync(path.join(outputDir, ".env"), "utf-8");
-    const tokenMatch = envContent.match(/FORGE_PROXY_TOKEN=(\S+)/);
+    const tokenMatch = envContent.match(/CHAPTER_PROXY_TOKEN=(\S+)/);
     expect(tokenMatch).not.toBeNull();
     expect(tokenMatch![1].length).toBe(64); // 32 bytes = 64 hex chars
   });
@@ -313,7 +313,7 @@ describe("runInstall", () => {
     setupValidAgent();
     await runInstall(tmpDir, "@test/agent-ops", {});
 
-    const defaultDir = path.join(tmpDir, ".forge", "agents", "ops");
+    const defaultDir = path.join(tmpDir, ".chapter", "agents", "ops");
     expect(fs.existsSync(path.join(defaultDir, "chapter-proxy/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(defaultDir, "docker-compose.yml"))).toBe(true);
   });
@@ -335,12 +335,12 @@ describe("runInstall", () => {
     expect(errorOutput).toContain("Install failed");
   });
 
-  it("generates forge.lock.json with correct structure", async () => {
+  it("generates chapter.lock.json with correct structure", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
-    const lockPath = path.join(outputDir, "forge.lock.json");
+    const lockPath = path.join(outputDir, "chapter.lock.json");
     const lock = JSON.parse(fs.readFileSync(lockPath, "utf-8"));
 
     expect(lock.lockVersion).toBe(1);
@@ -381,18 +381,18 @@ describe("runInstall", () => {
     const authHeader = mcp.mcpServers[serverKeys[0]].headers.Authorization;
 
     // Should contain actual token, not the placeholder
-    expect(authHeader).not.toContain("${FORGE_PROXY_TOKEN}");
+    expect(authHeader).not.toContain("${CHAPTER_PROXY_TOKEN}");
     expect(authHeader).toMatch(/^Bearer [a-f0-9]{64}$/);
   });
 
-  it("docker-compose.yml includes FORGE_PROXY_TOKEN in proxy env", async () => {
+  it("docker-compose.yml includes CHAPTER_PROXY_TOKEN in proxy env", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
     const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
     const proxySection = composeContent.split("claude-code:")[0];
-    expect(proxySection).toContain("FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}");
+    expect(proxySection).toContain("CHAPTER_PROXY_TOKEN=${CHAPTER_PROXY_TOKEN}");
   });
 
   it("generates single-stage chapter-proxy/Dockerfile with pre-built chapter", async () => {

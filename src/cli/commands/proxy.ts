@@ -9,7 +9,7 @@ import { openDatabase } from "../../proxy/db.js";
 import { UpstreamManager } from "../../proxy/upstream.js";
 import type { UpstreamAppConfig } from "../../proxy/upstream.js";
 import { ToolRouter, ResourceRouter, PromptRouter } from "../../proxy/router.js";
-import { ForgeProxyServer } from "../../proxy/server.js";
+import { ChapterProxyServer } from "../../proxy/server.js";
 import type Database from "better-sqlite3";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ export async function startProxy(
 ): Promise<void> {
   let db: Database.Database | undefined;
   let upstream: UpstreamManager | undefined;
-  let server: ForgeProxyServer | undefined;
+  let server: ChapterProxyServer | undefined;
 
   // Graceful shutdown handler
   const shutdown = async () => {
@@ -122,7 +122,7 @@ export async function startProxy(
       : agent.proxy?.port ?? 9090;
     const transport = agent.proxy?.type ?? "sse";
 
-    server = new ForgeProxyServer({
+    server = new ChapterProxyServer({
       port,
       transport,
       router,
@@ -142,7 +142,7 @@ export async function startProxy(
     const promptCount = promptRouter.listPrompts().length;
 
     console.log(
-      `\nforge proxy ready\n` +
+      `\nchapter proxy ready\n` +
       `  Agent:     ${agent.name}\n` +
       `  Port:      ${port}\n` +
       `  Transport: ${transport}\n` +

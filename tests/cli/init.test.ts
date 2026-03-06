@@ -27,7 +27,7 @@ describe("forge init", () => {
     it("creates all workspace directories", async () => {
       await runInit(tmpDir, {}, { skipNpmInstall: true });
 
-      const expectedDirs = ["apps", "tasks", "skills", "roles", "agents", ".forge"];
+      const expectedDirs = ["apps", "tasks", "skills", "roles", "agents", ".chapter"];
       for (const dir of expectedDirs) {
         const stat = fs.statSync(path.join(tmpDir, dir));
         expect(stat.isDirectory()).toBe(true);
@@ -58,18 +58,18 @@ describe("forge init", () => {
       expect(pkg.name).toBe(path.basename(tmpDir));
     });
 
-    it("creates .forge/config.json with defaults", async () => {
+    it("creates .chapter/config.json with defaults", async () => {
       await runInit(tmpDir, {}, { skipNpmInstall: true });
 
-      const configPath = path.join(tmpDir, ".forge", "config.json");
+      const configPath = path.join(tmpDir, ".chapter", "config.json");
       const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       expect(config).toEqual({ version: "0.1.0" });
     });
 
-    it("creates .forge/.env.example with credential placeholders", async () => {
+    it("creates .chapter/.env.example with credential placeholders", async () => {
       await runInit(tmpDir, {}, { skipNpmInstall: true });
 
-      const envPath = path.join(tmpDir, ".forge", ".env.example");
+      const envPath = path.join(tmpDir, ".chapter", ".env.example");
       const content = fs.readFileSync(envPath, "utf-8");
       expect(content).toContain("GITHUB_TOKEN");
       expect(content).toContain("ANTHROPIC_API_KEY");
@@ -83,7 +83,7 @@ describe("forge init", () => {
       expect(content).toContain("node_modules/");
       expect(content).toContain(".env");
       expect(content).toContain("dist/");
-      expect(content).toContain(".forge/.env");
+      expect(content).toContain(".chapter/.env");
     });
 
     it("prints success output with created files", async () => {
@@ -115,9 +115,9 @@ describe("forge init", () => {
   });
 
   describe("idempotency", () => {
-    it("warns and exits if .forge/ directory already exists", async () => {
-      // Create .forge directory to simulate existing workspace
-      fs.mkdirSync(path.join(tmpDir, ".forge"), { recursive: true });
+    it("warns and exits if .chapter/ directory already exists", async () => {
+      // Create .chapter directory to simulate existing workspace
+      fs.mkdirSync(path.join(tmpDir, ".chapter"), { recursive: true });
 
       await runInit(tmpDir, {}, { skipNpmInstall: true });
 
@@ -129,10 +129,10 @@ describe("forge init", () => {
     });
 
     it("does not modify existing files when workspace exists", async () => {
-      // Create .forge directory and a config file
-      fs.mkdirSync(path.join(tmpDir, ".forge"), { recursive: true });
+      // Create .chapter directory and a config file
+      fs.mkdirSync(path.join(tmpDir, ".chapter"), { recursive: true });
       fs.writeFileSync(
-        path.join(tmpDir, ".forge", "config.json"),
+        path.join(tmpDir, ".chapter", "config.json"),
         '{"version":"0.0.1"}',
       );
 
@@ -140,7 +140,7 @@ describe("forge init", () => {
 
       // Config should be untouched
       const config = JSON.parse(
-        fs.readFileSync(path.join(tmpDir, ".forge", "config.json"), "utf-8"),
+        fs.readFileSync(path.join(tmpDir, ".chapter", "config.json"), "utf-8"),
       );
       expect(config.version).toBe("0.0.1");
     });
@@ -403,7 +403,7 @@ describe("forge init", () => {
       exitSpy.mockRestore();
     });
 
-    it("creates forge scaffold after copying template files", async () => {
+    it("creates chapter scaffold after copying template files", async () => {
       const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-init-"));
       try {
         await runInit(
@@ -414,10 +414,10 @@ describe("forge init", () => {
 
         // Forge scaffold should exist
         expect(
-          fs.existsSync(path.join(targetDir, ".forge", "config.json")),
+          fs.existsSync(path.join(targetDir, ".chapter", "config.json")),
         ).toBe(true);
         expect(
-          fs.existsSync(path.join(targetDir, ".forge", ".env.example")),
+          fs.existsSync(path.join(targetDir, ".chapter", ".env.example")),
         ).toBe(true);
         expect(fs.existsSync(path.join(targetDir, ".gitignore"))).toBe(true);
       } finally {

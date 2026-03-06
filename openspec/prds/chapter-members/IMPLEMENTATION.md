@@ -114,7 +114,30 @@ Rename the workspace config directory, global data directory, and all environmen
 
 **Testable output:** `npx tsc --noEmit` compiles. All tests pass. Grepping source/test code for `FORGE_` returns zero results. Grepping for `\.forge[/"]` returns zero results in source (excluding historical PRDs). `chapter init` creates `.chapter/`. Proxy uses `~/.chapter/data/chapter.db`.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-05-rename-dotforge-and-env-vars/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-05-rename-dotforge-and-env-vars/proposal.md)
+- [Design](../../changes/archive/2026-03-05-rename-dotforge-and-env-vars/design.md)
+- [Tasks](../../changes/archive/2026-03-05-rename-dotforge-and-env-vars/tasks.md)
+
+**Specs updated:**
+- [workspace-init](../../specs/workspace-init/spec.md) -- `.forge/` → `.chapter/` directory references
+- [docker-compose-generation](../../specs/docker-compose-generation/spec.md) -- `FORGE_*` → `CHAPTER_*`, `agent-net` → `chapter-net`
+- [env-generation](../../specs/env-generation/spec.md) -- `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`, `FORGE_PROXY_PORT` → `CHAPTER_PROXY_PORT`
+- [lock-file-generation](../../specs/lock-file-generation/spec.md) -- `forge.lock.json` → `chapter.lock.json`
+- [proxy-cli](../../specs/proxy-cli/spec.md) -- `~/.forge/forge.db` → `~/.chapter/data/chapter.db`, `ForgeProxyServer` → `ChapterProxyServer`
+- [proxy-server](../../specs/proxy-server/spec.md) -- `ForgeProxyServer` → `ChapterProxyServer`, MCP name `"forge"` → `"chapter"`
+- [claude-code-materializer](../../specs/claude-code-materializer/spec.md) -- `FORGE_*` → `CHAPTER_*`, `agent-net` → `chapter-net`, `mcpServers.forge` → `mcpServers.chapter`
+- [forge-install-command](../../specs/forge-install-command/spec.md) -- `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`, `.forge/agents/` → `.chapter/agents/`
+- [build-command](../../specs/build-command/spec.md) -- `forge.lock.json` → `chapter.lock.json`
+- [run-command](../../specs/run-command/spec.md) -- `.forge/agents/` → `.chapter/agents/`
+- [stop-command](../../specs/stop-command/spec.md) -- `.forge/agents/` → `.chapter/agents/`
+- [mcp-proxy-integration-test](../../specs/mcp-proxy-integration-test/spec.md) -- `ForgeProxyServer` → `ChapterProxyServer`, test file rename
+- [resource-prompt-passthrough](../../specs/resource-prompt-passthrough/spec.md) -- `ForgeProxyServer` → `ChapterProxyServer`
+- [sqlite-database](../../specs/sqlite-database/spec.md) -- `~/.forge/forge.db` → `~/.chapter/data/chapter.db`
+- [proxy-config-generation](../../specs/proxy-config-generation/spec.md) -- `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`
+- [docker-install-pipeline](../../specs/docker-install-pipeline/spec.md) -- `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`
 
 ---
 

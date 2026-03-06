@@ -23,7 +23,7 @@ Main startup orchestrator. Follows PRD §6.2 startup sequence:
 2. Resolve agent (auto-detect single agent or use `--agent` flag)
 3. Compute tool filters from role permissions
 4. Load `.env` credentials and resolve `${VAR}` references
-5. Open SQLite database (`~/.forge/forge.db`)
+5. Open SQLite database (`~/.chapter/data/chapter.db`)
 6. Start upstream MCP clients in parallel (with configurable timeout)
 7. Enumerate tools/resources/prompts and build routing tables
 8. Collect approval patterns from all roles
@@ -55,7 +55,7 @@ Main startup orchestrator. Follows PRD §6.2 startup sequence:
 - `src/proxy/db.ts` — `openDatabase()`
 - `src/proxy/upstream.ts` — `UpstreamManager`
 - `src/proxy/router.ts` — `ToolRouter`, `ResourceRouter`, `PromptRouter`
-- `src/proxy/server.ts` — `ForgeProxyServer`
+- `src/proxy/server.ts` — `ChapterProxyServer`
 
 ## Tests
 

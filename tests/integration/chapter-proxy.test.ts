@@ -2,7 +2,7 @@
  * End-to-End Integration Test — Native Forge Proxy
  *
  * Exercises the full proxy pipeline with a real upstream MCP server:
- *   UpstreamManager → ToolRouter → ForgeProxyServer → MCP Client
+ *   UpstreamManager → ToolRouter → ChapterProxyServer → MCP Client
  *
  * Uses @modelcontextprotocol/server-filesystem as the upstream via stdio.
  */
@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import { ForgeProxyServer } from "../../src/proxy/server.js";
+import { ChapterProxyServer } from "../../src/proxy/server.js";
 import { UpstreamManager } from "../../src/proxy/upstream.js";
 import { ToolRouter } from "../../src/proxy/router.js";
 import { openDatabase, queryAuditLog } from "../../src/proxy/db.js";
@@ -35,7 +35,7 @@ let dbPath: string;
 let db: Database.Database;
 let upstream: UpstreamManager;
 let router: ToolRouter;
-let server: ForgeProxyServer;
+let server: ChapterProxyServer;
 let client: Client;
 
 // ── Setup / Teardown ───────────────────────────────────────────────────
@@ -77,8 +77,8 @@ beforeAll(async () => {
   ]);
   router = new ToolRouter(upstreamTools, toolFilters);
 
-  // 5. Start ForgeProxyServer
-  server = new ForgeProxyServer({
+  // 5. Start ChapterProxyServer
+  server = new ChapterProxyServer({
     port: TEST_PORT,
     transport: "streamable-http",
     router,
@@ -211,7 +211,7 @@ describe("Forge Proxy Integration", () => {
 // ── Approval Workflow Tests (separate server instance) ─────────────────
 
 describe("Forge Proxy Integration — Approval Workflow", () => {
-  let approvalServer: ForgeProxyServer;
+  let approvalServer: ChapterProxyServer;
   let approvalClient: Client;
   let approvalDb: Database.Database;
   const APPROVAL_PORT = TEST_PORT + 1;
@@ -221,7 +221,7 @@ describe("Forge Proxy Integration — Approval Workflow", () => {
     const approvalDbPath = join(tmpDir, "forge-approval-test.db");
     approvalDb = openDatabase(approvalDbPath);
 
-    approvalServer = new ForgeProxyServer({
+    approvalServer = new ChapterProxyServer({
       port: APPROVAL_PORT,
       transport: "streamable-http",
       router,
@@ -286,7 +286,7 @@ describe("Forge Proxy Integration — Approval Workflow", () => {
   it("proxy server shuts down cleanly", async () => {
     // Create a second server to test shutdown without affecting other tests
     const shutdownPort = APPROVAL_PORT + 1;
-    const shutdownServer = new ForgeProxyServer({
+    const shutdownServer = new ChapterProxyServer({
       port: shutdownPort,
       transport: "streamable-http",
       router,

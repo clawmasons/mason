@@ -53,7 +53,7 @@ vi.mock("../../src/proxy/router.js", () => ({
 }));
 
 vi.mock("../../src/proxy/server.js", () => ({
-  ForgeProxyServer: vi.fn().mockImplementation(() => ({
+  ChapterProxyServer: vi.fn().mockImplementation(() => ({
     start: vi.fn(),
     stop: vi.fn(),
   })),
@@ -98,7 +98,7 @@ import { discoverPackages } from "../../src/resolver/discover.js";
 import { resolveAgent } from "../../src/resolver/resolve.js";
 import { computeToolFilters } from "../../src/generator/toolfilter.js";
 import { UpstreamManager } from "../../src/proxy/upstream.js";
-import { ForgeProxyServer } from "../../src/proxy/server.js";
+import { ChapterProxyServer } from "../../src/proxy/server.js";
 import type { DiscoveredPackage, ResolvedAgent } from "../../src/resolver/types.js";
 
 function makeAgent(name: string): ResolvedAgent {
@@ -199,7 +199,7 @@ describe("startProxy", () => {
     await startProxy("/fake/root", {});
 
     expect(resolveAgent).toHaveBeenCalledWith(agentName, expect.any(Map));
-    expect(ForgeProxyServer).toHaveBeenCalled();
+    expect(ChapterProxyServer).toHaveBeenCalled();
   });
 
   it("uses --agent flag to select agent", async () => {
@@ -221,7 +221,7 @@ describe("startProxy", () => {
 
     await startProxy("/fake/root", { agent: agentName, port: "8080" });
 
-    expect(ForgeProxyServer).toHaveBeenCalledWith(
+    expect(ChapterProxyServer).toHaveBeenCalledWith(
       expect.objectContaining({ port: 8080 }),
     );
   });
@@ -267,7 +267,7 @@ describe("startProxy", () => {
 
     await startProxy("/fake/root", { agent: agentName });
 
-    expect(ForgeProxyServer).toHaveBeenCalledWith(
+    expect(ChapterProxyServer).toHaveBeenCalledWith(
       expect.objectContaining({
         approvalPatterns: ["github_delete_*"],
       }),

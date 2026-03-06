@@ -64,30 +64,30 @@ function makeRepoOpsAgent(): ResolvedAgent {
 
 describe("generateEnvTemplate", () => {
   describe("proxy section", () => {
-    it("includes FORGE_PROXY_TOKEN", () => {
+    it("includes CHAPTER_PROXY_TOKEN", () => {
       const agent = makeRepoOpsAgent();
       const env = generateEnvTemplate(agent);
-      expect(env).toContain("FORGE_PROXY_TOKEN=");
+      expect(env).toContain("CHAPTER_PROXY_TOKEN=");
     });
 
-    it("includes FORGE_PROXY_PORT with default port", () => {
+    it("includes CHAPTER_PROXY_PORT with default port", () => {
       const agent = makeRepoOpsAgent();
       const env = generateEnvTemplate(agent);
-      expect(env).toContain("FORGE_PROXY_PORT=9090");
+      expect(env).toContain("CHAPTER_PROXY_PORT=9090");
     });
 
     it("uses custom port", () => {
       const agent = makeRepoOpsAgent();
       agent.proxy = { port: 8080, type: "sse" };
       const env = generateEnvTemplate(agent);
-      expect(env).toContain("FORGE_PROXY_PORT=8080");
+      expect(env).toContain("CHAPTER_PROXY_PORT=8080");
     });
 
     it("uses default port when no proxy field", () => {
       const agent = makeRepoOpsAgent();
       delete agent.proxy;
       const env = generateEnvTemplate(agent);
-      expect(env).toContain("FORGE_PROXY_PORT=9090");
+      expect(env).toContain("CHAPTER_PROXY_PORT=9090");
     });
 
     it("has # Proxy comment header", () => {

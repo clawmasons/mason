@@ -91,7 +91,7 @@ describe("runAgent", () => {
   });
 
   function setupAgentDir(envContent: string, composeContent?: string): string {
-    const agentDir = path.join(tmpDir, ".forge", "agents", "ops");
+    const agentDir = path.join(tmpDir, ".chapter", "agents", "ops");
     fs.mkdirSync(agentDir, { recursive: true });
     fs.writeFileSync(
       path.join(agentDir, "docker-compose.yml"),
@@ -102,7 +102,7 @@ describe("runAgent", () => {
   }
 
   it("exits 1 when docker-compose.yml is missing", async () => {
-    const agentDir = path.join(tmpDir, ".forge", "agents", "ops");
+    const agentDir = path.join(tmpDir, ".chapter", "agents", "ops");
     fs.mkdirSync(agentDir, { recursive: true });
     fs.writeFileSync(path.join(agentDir, ".env"), "TOKEN=abc\n");
     // No docker-compose.yml
@@ -121,7 +121,7 @@ describe("runAgent", () => {
   });
 
   it("exits 1 when .env has missing values", async () => {
-    setupAgentDir("GITHUB_TOKEN=\nFORGE_PROXY_TOKEN=abc\n");
+    setupAgentDir("GITHUB_TOKEN=\nCHAPTER_PROXY_TOKEN=abc\n");
     await runAgent(tmpDir, "@test/agent-ops", {});
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -129,7 +129,7 @@ describe("runAgent", () => {
   });
 
   it("succeeds with valid configuration and auto-detects single runtime", async () => {
-    setupAgentDir("GITHUB_TOKEN=abc123\nFORGE_PROXY_TOKEN=xyz\n");
+    setupAgentDir("GITHUB_TOKEN=abc123\nCHAPTER_PROXY_TOKEN=xyz\n");
     await runAgent(tmpDir, "@test/agent-ops", {});
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     const logOutput = logSpy.mock.calls.flat().join("\n");
@@ -137,7 +137,7 @@ describe("runAgent", () => {
   });
 
   it("exits 1 when runtime not found in compose file", async () => {
-    setupAgentDir("GITHUB_TOKEN=abc\nFORGE_PROXY_TOKEN=xyz\n");
+    setupAgentDir("GITHUB_TOKEN=abc\nCHAPTER_PROXY_TOKEN=xyz\n");
     await runAgent(tmpDir, "@test/agent-ops", { runtime: "unknown-runtime" });
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -145,7 +145,7 @@ describe("runAgent", () => {
   });
 
   it("accepts valid runtime from compose file", async () => {
-    setupAgentDir("GITHUB_TOKEN=abc\nFORGE_PROXY_TOKEN=xyz\n");
+    setupAgentDir("GITHUB_TOKEN=abc\nCHAPTER_PROXY_TOKEN=xyz\n");
     await runAgent(tmpDir, "@test/agent-ops", { runtime: "claude-code" });
     expect(exitSpy).not.toHaveBeenCalledWith(1);
   });
@@ -164,7 +164,7 @@ describe("runAgent", () => {
   });
 
   it("runs two-phase: mcp-proxy detached then runtime interactive", async () => {
-    setupAgentDir("GITHUB_TOKEN=abc\nFORGE_PROXY_TOKEN=xyz\n");
+    setupAgentDir("GITHUB_TOKEN=abc\nCHAPTER_PROXY_TOKEN=xyz\n");
     await runAgent(tmpDir, "@test/agent-ops", {});
 
     // Should have 2 spawn calls

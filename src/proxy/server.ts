@@ -20,7 +20,7 @@ import type { ApprovalOptions } from "./hooks/approval.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-export interface ForgeProxyServerConfig {
+export interface ChapterProxyServerConfig {
   port?: number;
   transport: "sse" | "streamable-http";
   router: ToolRouter;
@@ -33,16 +33,16 @@ export interface ForgeProxyServerConfig {
   promptRouter?: PromptRouter;
 }
 
-// ── ForgeProxyServer ──────────────────────────────────────────────────
+// ── ChapterProxyServer ──────────────────────────────────────────────────
 
 const DEFAULT_PORT = 9090;
 
-export class ForgeProxyServer {
-  private config: Required<Pick<ForgeProxyServerConfig, "port" | "transport">> & ForgeProxyServerConfig;
+export class ChapterProxyServer {
+  private config: Required<Pick<ChapterProxyServerConfig, "port" | "transport">> & ChapterProxyServerConfig;
   private httpServer: HttpServer | null = null;
   private activeTransports: Set<SSEServerTransport | StreamableHTTPServerTransport> = new Set();
 
-  constructor(config: ForgeProxyServerConfig) {
+  constructor(config: ChapterProxyServerConfig) {
     this.config = { ...config, port: config.port ?? DEFAULT_PORT };
   }
 
@@ -185,7 +185,7 @@ export class ForgeProxyServer {
     if (promptRouter) capabilities.prompts = {};
 
     const server = new Server(
-      { name: "forge", version: "0.1.0" },
+      { name: "chapter", version: "0.1.0" },
       { capabilities },
     );
 

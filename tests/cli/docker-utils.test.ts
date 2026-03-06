@@ -10,12 +10,12 @@ import {
 describe("resolveAgentDir", () => {
   it("returns default path using short name", () => {
     const result = resolveAgentDir("/workspace", "@test/agent-ops");
-    expect(result).toBe(path.join("/workspace", ".forge", "agents", "ops"));
+    expect(result).toBe(path.join("/workspace", ".chapter", "agents", "ops"));
   });
 
   it("strips scope and agent- prefix", () => {
     const result = resolveAgentDir("/workspace", "@clawmasons/agent-repo-ops");
-    expect(result).toBe(path.join("/workspace", ".forge", "agents", "repo-ops"));
+    expect(result).toBe(path.join("/workspace", ".chapter", "agents", "repo-ops"));
   });
 
   it("uses custom outputDir when provided", () => {
@@ -43,7 +43,7 @@ describe("validateEnvFile", () => {
   it("returns empty array when all values are filled", () => {
     fs.writeFileSync(
       path.join(tmpDir, ".env"),
-      "# Comment\nGITHUB_TOKEN=abc123\nFORGE_PROXY_TOKEN=xyz\n",
+      "# Comment\nGITHUB_TOKEN=abc123\nCHAPTER_PROXY_TOKEN=xyz\n",
     );
     const missing = validateEnvFile(tmpDir);
     expect(missing).toEqual([]);
@@ -52,7 +52,7 @@ describe("validateEnvFile", () => {
   it("returns missing variables with empty values", () => {
     fs.writeFileSync(
       path.join(tmpDir, ".env"),
-      "GITHUB_TOKEN=\nFORGE_PROXY_TOKEN=abc\nSLACK_TOKEN=\n",
+      "GITHUB_TOKEN=\nCHAPTER_PROXY_TOKEN=abc\nSLACK_TOKEN=\n",
     );
     const missing = validateEnvFile(tmpDir);
     expect(missing).toEqual(["GITHUB_TOKEN", "SLACK_TOKEN"]);
