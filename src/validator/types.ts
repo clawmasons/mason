@@ -5,7 +5,8 @@ export type ValidationErrorCategory =
   | "requirement-coverage"
   | "tool-existence"
   | "skill-availability"
-  | "app-launch-config";
+  | "app-launch-config"
+  | "llm-config";
 
 /**
  * A single validation error with category, message, and structured context.
@@ -20,6 +21,26 @@ export interface ValidationError {
     tool?: string;
     skill?: string;
     field?: string;
+    member?: string;
+    runtime?: string;
+  };
+}
+
+/**
+ * Categories of validation warnings.
+ */
+export type ValidationWarningCategory = "llm-config";
+
+/**
+ * A single validation warning with category, message, and structured context.
+ * Warnings are informational — they do not affect the `valid` flag.
+ */
+export interface ValidationWarning {
+  category: ValidationWarningCategory;
+  message: string;
+  context: {
+    member?: string;
+    runtime?: string;
   };
 }
 
@@ -29,4 +50,5 @@ export interface ValidationError {
 export interface ValidationResult {
   valid: boolean;
   errors: ValidationError[];
+  warnings: ValidationWarning[];
 }

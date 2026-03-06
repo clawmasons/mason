@@ -45,6 +45,11 @@ export async function runBuild(
       process.exit(1);
       return;
     }
+    if (validation.warnings.length > 0) {
+      for (const w of validation.warnings) {
+        console.warn(`  ⚠ [${w.category}] ${w.message}`);
+      }
+    }
 
     // 4. Generate lock file (empty generated files — build doesn't scaffold)
     const lockFile = generateLockFile(member, []);

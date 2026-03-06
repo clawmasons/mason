@@ -122,6 +122,11 @@ export async function runInstall(
       process.exit(1);
       return;
     }
+    if (validation.warnings.length > 0) {
+      for (const w of validation.warnings) {
+        console.warn(`  ⚠ [${w.category}] ${w.message}`);
+      }
+    }
 
     // 3b. Determine output directory using member slug
     const outputDir = options.outputDir

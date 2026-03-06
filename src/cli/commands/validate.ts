@@ -58,6 +58,12 @@ export async function runValidate(
       console.log(JSON.stringify(result, null, 2));
     } else if (result.valid) {
       console.log(`\n✔ Member "${memberName}" is valid.\n`);
+      if (result.warnings.length > 0) {
+        for (const w of result.warnings) {
+          console.warn(`  ⚠ [${w.category}] ${w.message}`);
+        }
+        console.warn("");
+      }
     } else {
       console.error(
         `\n✘ Member "${memberName}" has ${result.errors.length} validation error(s):${formatErrors(result)}\n`,

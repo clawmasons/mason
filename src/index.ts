@@ -33,6 +33,8 @@ export {
   type ValidationResult,
   type ValidationError,
   type ValidationErrorCategory,
+  type ValidationWarning,
+  type ValidationWarningCategory,
 } from "./validator/index.js";
 
 export {
