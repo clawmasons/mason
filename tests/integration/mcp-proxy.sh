@@ -12,7 +12,7 @@ set -euo pipefail
 # ─── Configuration ───────────────────────────────────────────────────────────
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-WORKSPACE_DIR="$PROJECT_ROOT/forge-core"
+WORKSPACE_DIR="$PROJECT_ROOT/chapter-core"
 AGENT_DIR=""  # Set after install
 PROXY_PORT="${FORGE_PROXY_PORT:-9099}"  # Use non-default port to avoid conflicts
 PROXY_TOKEN=""  # Extracted from .env after install
@@ -77,12 +77,12 @@ pass "forge built"
 
 # ─── Step 3: Run forge install ───────────────────────────────────────────────
 
-info "Running forge install from forge-core directory..."
+info "Running forge install from chapter-core directory..."
 
 # Clean previous install
 rm -rf "$WORKSPACE_DIR/.forge"
 
-(cd "$WORKSPACE_DIR" && node ../bin/forge.js install @clawmasons/agent-note-taker) || fail "forge install failed"
+(cd "$WORKSPACE_DIR" && node ../bin/chapter.js install @clawmasons/member-note-taker) || fail "chapter install failed"
 
 AGENT_DIR="$WORKSPACE_DIR/.forge/agents/note-taker"
 

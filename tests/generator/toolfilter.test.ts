@@ -29,6 +29,10 @@ describe("getAppShortName", () => {
     expect(getAppShortName("myserver")).toBe("myserver");
   });
 
+  it("strips member- prefix from scoped package", () => {
+    expect(getAppShortName("@clawmasons/member-note-taker")).toBe("note-taker");
+  });
+
   it("strips agent- prefix from scoped package", () => {
     expect(getAppShortName("@clawmasons/agent-repo-ops")).toBe("repo-ops");
   });

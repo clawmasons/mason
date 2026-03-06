@@ -63,14 +63,27 @@ Rename the npm package names and the forge-core directory to chapter-core.
 - Rename file: `bin/forge.js` → `bin/chapter.js`
 - Modify: root `package.json` — name, bin, workspaces, description
 - Modify: `chapter-core/package.json` — name, description
-- Modify: `chapter-core/agents/note-taker/package.json` — name `@clawmasons/agent-note-taker` → `@clawmasons/member-note-taker`
+- Modify: `chapter-core/members/note-taker/package.json` — name `@clawmasons/agent-note-taker` → `@clawmasons/member-note-taker`
 - Modify: templates `package.json` files — forge-core dependency → chapter-core, agent → member references
 - Update all test files referencing `forge-core` paths or `@clawmasons/forge-core` package name
 - Update all source files referencing these package names
 
 **Testable output:** `npm install` succeeds at root. `npm pack` produces `clawmasons-chapter-*.tgz`. `chapter-core/package.json` has `name: "@clawmasons/chapter-core"`. `bin/chapter.js` exists and is referenced in package.json. All tests pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-05-rename-npm-packages-and-directory/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-05-rename-npm-packages-and-directory/proposal.md)
+- [Design](../../changes/archive/2026-03-05-rename-npm-packages-and-directory/design.md)
+- [Tasks](../../changes/archive/2026-03-05-rename-npm-packages-and-directory/tasks.md)
+
+**Specs updated:**
+- [chapter-core-package](../../specs/chapter-core-package/spec.md) -- renamed from `forge-core-package/`, all references updated to `@clawmasons/chapter-core`, `members/`, `@clawmasons/member-note-taker`
+- [docker-install-pipeline](../../specs/docker-install-pipeline/spec.md) -- updated `forge-proxy/` → `chapter-proxy/`, `forge/` → `chapter/`, ENTRYPOINT paths, `getChapterProjectRoot()`
+- [workspace-init](../../specs/workspace-init/spec.md) -- updated template references: `@clawmasons/chapter-core` dep, `members/` directory, `member-note-taker` package names
+- [package-discovery](../../specs/package-discovery/spec.md) -- updated `forge-core` → `chapter-core` in node_modules examples
+- [cli-framework](../../specs/cli-framework/spec.md) -- updated `bin/forge.js` → `bin/chapter.js`, `@clawmasons/forge` → `@clawmasons/chapter`
+- [docker-compose-generation](../../specs/docker-compose-generation/spec.md) -- updated `./forge-proxy` → `./chapter-proxy` build context paths
 
 ---
 
@@ -147,8 +160,7 @@ Replace the `agent` package type with `member`. Add the discriminated union sche
 - Modify: `src/validator/validate.ts` — `validateAgent()` → `validateMember()`
 - Update all CLI commands that reference `resolveAgent`, `ResolvedAgent`, `validateAgent`
 - Update materializers, compose, proxy code
-- Update `chapter-core/agents/note-taker/package.json` → `chapter-core/members/note-taker/package.json` with new schema fields
-- Rename directory: `chapter-core/agents/` → `chapter-core/members/`
+- Update `chapter-core/members/note-taker/package.json` with new schema fields (directory already renamed in Change #2)
 - Update templates similarly
 - Update all tests
 
@@ -244,9 +256,7 @@ Update the `templates/note-taker/` template to use chapter terminology, member p
 **User Story:** As a new user, when I run `chapter init --template note-taker --name @acme/my-project`, the generated workspace has members (not agents), uses the `chapter` metadata field, and depends on `@clawmasons/chapter-core`.
 
 **Scope:**
-- Rename directory: `templates/note-taker/agents/` → `templates/note-taker/members/`
-- Modify: `templates/note-taker/package.json` — dependency name
-- Modify: `templates/note-taker/members/note-taker/package.json` — member schema with placeholders
+- Modify: `templates/note-taker/members/note-taker/package.json` — member schema with placeholders (directory already renamed in Change #2, dependency already updated in Change #2)
 - Modify: `templates/note-taker/roles/writer/package.json` — `chapter` field
 - Modify: `src/cli/commands/init.ts` — update template detection if needed (look for `members/` instead of `agents/`)
 - Update tests: `tests/cli/init.test.ts`

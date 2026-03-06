@@ -48,10 +48,10 @@ function addTaskNames(task: ResolvedTask, names: Set<string>): void {
 }
 
 /**
- * Resolve the forge project root directory (where package.json, dist/, bin/ live).
- * Uses import.meta.url to locate the forge installation.
+ * Resolve the chapter project root directory (where package.json, dist/, bin/ live).
+ * Uses import.meta.url to locate the chapter installation.
  */
-function getForgeProjectRoot(): string {
+function getChapterProjectRoot(): string {
   // This file is at src/cli/commands/install.ts (or dist/cli/commands/install.js)
   // The project root is 3 levels up from the file's directory.
   const thisFile = fileURLToPath(import.meta.url);
@@ -125,7 +125,7 @@ export async function runInstall(
     }
 
     // 4. Generate proxy Dockerfile
-    console.log("Generating forge proxy Dockerfile...");
+    console.log("Generating chapter proxy Dockerfile...");
     const proxyDockerfile = generateProxyDockerfile(agentName);
 
     // 5. Generate proxy auth token (before materialization so it can be baked in)
@@ -168,31 +168,31 @@ export async function runInstall(
       runtimeServices.set(runtime, service);
     }
 
-    // 7. Generate forge-proxy build context
-    allFiles.set("forge-proxy/Dockerfile", proxyDockerfile);
+    // 7. Generate chapter-proxy build context
+    allFiles.set("chapter-proxy/Dockerfile", proxyDockerfile);
 
-    // Copy pre-built forge package into forge-proxy/forge/ for Docker build.
+    // Copy pre-built chapter package into chapter-proxy/chapter/ for Docker build.
     // Only dist/, bin/, and package.json are needed.
     // Production dependencies are installed via npm install in the Dockerfile.
-    const forgeRoot = getForgeProjectRoot();
-    copyDirToFiles(path.join(forgeRoot, "dist"), "forge-proxy/forge/dist", allFiles, [".git"]);
-    copyDirToFiles(path.join(forgeRoot, "bin"), "forge-proxy/forge/bin", allFiles, [".git"]);
+    const chapterRoot = getChapterProjectRoot();
+    copyDirToFiles(path.join(chapterRoot, "dist"), "chapter-proxy/chapter/dist", allFiles, [".git"]);
+    copyDirToFiles(path.join(chapterRoot, "bin"), "chapter-proxy/chapter/bin", allFiles, [".git"]);
 
     // Copy package.json for dependency installation in Docker
-    const pkgJsonPath = path.join(forgeRoot, "package.json");
+    const pkgJsonPath = path.join(chapterRoot, "package.json");
     if (fs.existsSync(pkgJsonPath)) {
-      allFiles.set("forge-proxy/forge/package.json", fs.readFileSync(pkgJsonPath, "utf-8"));
+      allFiles.set("chapter-proxy/chapter/package.json", fs.readFileSync(pkgJsonPath, "utf-8"));
     }
 
-    // Copy agent workspace directories into forge-proxy/workspace/
+    // Copy agent workspace directories into chapter-proxy/workspace/
     for (const wsDir of WORKSPACE_DIRS) {
       const wsDirPath = path.join(rootDir, wsDir);
-      copyDirToFiles(wsDirPath, `forge-proxy/workspace/${wsDir}`, allFiles);
+      copyDirToFiles(wsDirPath, `chapter-proxy/workspace/${wsDir}`, allFiles);
     }
 
-    // Also copy packages discovered from outside the local workspace (e.g., node_modules/forge-core)
+    // Also copy packages discovered from outside the local workspace (e.g., node_modules/chapter-core)
     // Only copy packages that are in the resolved agent's dependency graph to avoid
-    // basename collisions (e.g., @clawmasons/agent-note-taker overwriting @vis/agent-note-taker).
+    // basename collisions (e.g., @clawmasons/member-note-taker overwriting @vis/member-note-taker).
     const resolvedNames = collectResolvedNames(agent);
     for (const [, pkg] of packages) {
       if (!resolvedNames.has(pkg.name)) continue;
@@ -202,7 +202,7 @@ export async function runInstall(
       if (!isLocal) {
         const typeDir = `${pkg.chapterField.type}s`;
         const dirName = path.basename(pkg.packagePath);
-        copyDirToFiles(pkg.packagePath, `forge-proxy/workspace/${typeDir}/${dirName}`, allFiles);
+        copyDirToFiles(pkg.packagePath, `chapter-proxy/workspace/${typeDir}/${dirName}`, allFiles);
       }
     }
 

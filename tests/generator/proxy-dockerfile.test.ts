@@ -17,7 +17,7 @@ describe("generateProxyDockerfile", () => {
     expect(result).not.toContain("COPY --from=builder");
   });
 
-  it("does not build forge from source", () => {
+  it("does not build chapter from source", () => {
     const result = generateProxyDockerfile("@test/agent-test");
 
     expect(result).not.toContain("npm run build");
@@ -37,17 +37,17 @@ describe("generateProxyDockerfile", () => {
     expect(result).not.toContain("--ignore-scripts");
   });
 
-  it("copies pre-built forge dist and bin into the image", () => {
+  it("copies pre-built chapter dist and bin into the image", () => {
     const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toContain("COPY forge/dist ./dist");
-    expect(result).toContain("COPY forge/bin ./bin");
+    expect(result).toContain("COPY chapter/dist ./dist");
+    expect(result).toContain("COPY chapter/bin ./bin");
   });
 
   it("copies package manifests for dependency install", () => {
     const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toContain("COPY forge/package.json ./");
+    expect(result).toContain("COPY chapter/package.json ./");
     expect(result).not.toContain("package-lock.json");
   });
 
@@ -57,10 +57,10 @@ describe("generateProxyDockerfile", () => {
     expect(result).toContain("COPY workspace/ ./workspace/");
   });
 
-  it("uses forge proxy as entrypoint with agent name", () => {
+  it("uses chapter proxy as entrypoint with agent name", () => {
     const result = generateProxyDockerfile("@test/agent-test");
 
-    expect(result).toContain('ENTRYPOINT ["node", "/app/forge/bin/forge.js"]');
+    expect(result).toContain('ENTRYPOINT ["node", "/app/chapter/bin/chapter.js"]');
     expect(result).toContain('CMD ["proxy", "--agent", "@test/agent-test"]');
   });
 
@@ -71,9 +71,9 @@ describe("generateProxyDockerfile", () => {
   });
 
   it("embeds the provided agent name in CMD", () => {
-    const result = generateProxyDockerfile("@clawmasons/agent-repo-ops");
+    const result = generateProxyDockerfile("@clawmasons/member-repo-ops");
 
-    expect(result).toContain("@clawmasons/agent-repo-ops");
+    expect(result).toContain("@clawmasons/member-repo-ops");
   });
 
   it("runs as non-root node user", () => {

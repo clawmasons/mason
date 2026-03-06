@@ -235,7 +235,7 @@ function generateSkillReadme(skill: ResolvedSkill): string {
  * Claude Code runtime materializer.
  *
  * Generates a workspace directory optimized for the Claude Code CLI:
- * - .mcp.json — MCP server config pointing to forge-proxy
+ * - .mcp.json — MCP server config pointing to chapter-proxy
  * - .claude/settings.json — permissions (allow/deny)
  * - .claude/commands/*.md — slash commands scoped to roles
  * - AGENTS.md — agent identity and role documentation

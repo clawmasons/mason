@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Define the install pipeline and Docker generation for the forge proxy container. The proxy uses the native `forge proxy` command with pre-built forge artifacts (no TypeScript compilation in Docker).
+Define the install pipeline and Docker generation for the chapter proxy container. The proxy uses the native `chapter proxy` command with pre-built chapter artifacts (no TypeScript compilation in Docker).
 
 ## Requirements
 
 ### Requirement: Agent proxy schema has no image field
 
-The agent schema `proxy` field SHALL contain only `port` and `type` -- the `image` field is removed. The proxy is the forge binary itself.
+The agent schema `proxy` field SHALL contain only `port` and `type` -- the `image` field is removed. The proxy is the chapter binary itself.
 
 #### Scenario: Proxy field without image
 - **GIVEN** an agent package.json with `proxy: { port: 9090, type: "sse" }`
@@ -24,14 +24,14 @@ The agent schema `proxy` field SHALL contain only `port` and `type` -- the `imag
 
 The `generateProxyDockerfile(agentName)` function SHALL return a single-stage Dockerfile that:
 1. Uses `node:22-slim` as the sole base image (no `AS builder` stage)
-2. Copies `forge/package.json` and `forge/package-lock.json` first (for Docker layer caching)
-3. Runs `npm ci --omit=dev --ignore-scripts` to install production dependencies
-4. Copies pre-built `forge/dist` and `forge/bin` into the image
+2. Copies `chapter/package.json` first (for Docker layer caching)
+3. Runs `npm install --omit=dev` to install production dependencies
+4. Copies pre-built `chapter/dist` and `chapter/bin` into the image
 5. Copies the agent workspace as `workspace/` under `/app/`
 6. Creates `/home/node/data` and `/logs` directories with proper ownership
 7. Runs as the `node` user (non-root)
 8. Sets `WORKDIR /app/workspace`
-9. Sets `ENTRYPOINT ["node", "/app/forge/bin/forge.js"]` and `CMD ["proxy", "--agent", "<agentName>"]`
+9. Sets `ENTRYPOINT ["node", "/app/chapter/bin/chapter.js"]` and `CMD ["proxy", "--agent", "<agentName>"]`
 
 The Dockerfile SHALL NOT contain:
 - Any `AS builder` stage directive
@@ -41,13 +41,13 @@ The Dockerfile SHALL NOT contain:
 #### Scenario: Single-stage Dockerfile for any agent
 - **GIVEN** agent name `@test/agent-ops`
 - **WHEN** `generateProxyDockerfile("@test/agent-ops")` is called
-- **THEN** the returned Dockerfile starts with `FROM node:22-slim` (no `AS builder`), contains `npm ci --omit=dev`, `COPY forge/dist`, `COPY workspace/`, and `CMD ["proxy", "--agent", "@test/agent-ops"]`
+- **THEN** the returned Dockerfile starts with `FROM node:22-slim` (no `AS builder`), contains `npm install --omit=dev`, `COPY chapter/dist`, `COPY workspace/`, and `CMD ["proxy", "--agent", "@test/agent-ops"]`
 - **AND** does NOT contain `AS builder`, `npm run build`, or `COPY --from=builder`
 
-#### Scenario: Entrypoint uses forge/ prefix path
+#### Scenario: Entrypoint uses chapter/ prefix path
 - **GIVEN** any agent name
 - **WHEN** `generateProxyDockerfile(agentName)` is called
-- **THEN** the entrypoint is `["node", "/app/forge/bin/forge.js"]`
+- **THEN** the entrypoint is `["node", "/app/chapter/bin/chapter.js"]`
 
 #### Scenario: No null return
 - **GIVEN** any agent (stdio or remote-only)
@@ -58,35 +58,35 @@ The Dockerfile SHALL NOT contain:
 - **WHEN** `generateProxyDockerfile(agentName)` is called
 - **THEN** the returned Dockerfile does not contain "mcp-proxy", "tbxark", or "/main"
 
-### Requirement: Docker compose uses forge proxy build
+### Requirement: Docker compose uses chapter proxy build
 
 The `generateDockerCompose()` function SHALL generate a proxy service that:
-1. Always uses `build: ./forge-proxy` (no `image:` directive)
+1. Always uses `build: ./chapter-proxy` (no `image:` directive)
 2. Has no `entrypoint:` or `command:` directives (uses Dockerfile ENTRYPOINT/CMD)
-3. Does not mount `config.json` (forge proxy reads from workspace)
-4. Mounts `./forge-proxy/logs:/logs` for log persistence
+3. Does not mount `config.json` (chapter proxy reads from workspace)
+4. Mounts `./chapter-proxy/logs:/logs` for log persistence
 5. Passes `FORGE_PROXY_TOKEN` and app credential env vars
 
 #### Scenario: Proxy service configuration
 - **GIVEN** an agent with `proxy: { port: 9090 }`
 - **WHEN** `generateDockerCompose(agent, runtimeServices)` is called
-- **THEN** the proxy service has `build: ./forge-proxy`, no `image:`, no `config.json` mount, and correct port mapping
+- **THEN** the proxy service has `build: ./chapter-proxy`, no `image:`, no `config.json` mount, and correct port mapping
 
 #### Scenario: No hasProxyDockerfile parameter
 - **WHEN** `generateDockerCompose()` is called
 - **THEN** it accepts only `agent` and `runtimeServices` parameters (no boolean flag needed)
 
-### Requirement: Install command generates forge-proxy build context
+### Requirement: Install command generates chapter-proxy build context
 
 The `runInstall()` function SHALL:
 1. NOT generate `mcp-proxy/config.json`
 2. NOT import or call `generateProxyConfig()`
-3. Generate `forge-proxy/Dockerfile` using `generateProxyDockerfile(agentName)`
-4. Copy pre-built forge artifacts (`dist/`, `bin/`) from `getForgeProjectRoot()` into `forge-proxy/forge/`
-5. Copy `package.json` and `package-lock.json` from `getForgeProjectRoot()` into `forge-proxy/forge/`
-6. NOT copy forge source files (`src/`), TypeScript config files, or `node_modules/` into the build context
-7. Copy agent workspace directories (apps/, roles/, agents/, tasks/, skills/) into `forge-proxy/workspace/`
-8. Copy non-local packages from the resolved dependency graph into `forge-proxy/workspace/{type}s/{basename}/` — packages NOT in the agent's resolved graph SHALL be excluded
+3. Generate `chapter-proxy/Dockerfile` using `generateProxyDockerfile(agentName)`
+4. Copy pre-built chapter artifacts (`dist/`, `bin/`) from `getChapterProjectRoot()` into `chapter-proxy/chapter/`
+5. Copy `package.json` from `getChapterProjectRoot()` into `chapter-proxy/chapter/`
+6. NOT copy chapter source files (`src/`), TypeScript config files, or `node_modules/` into the build context
+7. Copy agent workspace directories (apps/, roles/, agents/, tasks/, skills/) into `chapter-proxy/workspace/`
+8. Copy non-local packages from the resolved dependency graph into `chapter-proxy/workspace/{type}s/{basename}/` — packages NOT in the agent's resolved graph SHALL be excluded
 
 The `copyDirToFiles()` helper accepts a configurable `skipDirs` parameter (default: `["node_modules", ".git"]`).
 
@@ -95,22 +95,22 @@ The `copyDirToFiles()` helper accepts a configurable `skipDirs` parameter (defau
 - **WHEN** `runInstall()` is called
 - **THEN** no `mcp-proxy/config.json` file exists in the output directory
 
-#### Scenario: Pre-built forge copied to build context
+#### Scenario: Pre-built chapter copied to build context
 - **GIVEN** a valid agent
 - **WHEN** `runInstall()` is called
-- **THEN** `forge-proxy/forge/package.json` and `forge-proxy/forge/package-lock.json` exist in the output
-- **AND** `forge-proxy/forge/dist/` and `forge-proxy/forge/bin/` directories exist
-- **AND** no `forge-proxy/forge/src/` or `forge-proxy/forge/tsconfig*` files exist
+- **THEN** `chapter-proxy/chapter/package.json` exists in the output
+- **AND** `chapter-proxy/chapter/dist/` and `chapter-proxy/chapter/bin/` directories exist
+- **AND** no `chapter-proxy/chapter/src/` or `chapter-proxy/chapter/tsconfig*` files exist
 
 #### Scenario: Workspace copied to build context
 - **GIVEN** a valid agent with packages in apps/ and agents/
 - **WHEN** `runInstall()` is called
-- **THEN** `forge-proxy/workspace/agents/` and `forge-proxy/workspace/apps/` exist with the package.json files
+- **THEN** `chapter-proxy/workspace/agents/` and `chapter-proxy/workspace/apps/` exist with the package.json files
 
 #### Scenario: Non-local packages outside resolved graph are excluded
-- **GIVEN** a local agent `@vis/agent-note-taker` and a node_modules package `@clawmasons/agent-note-taker` with the same directory basename
+- **GIVEN** a local agent `@vis/agent-note-taker` and a node_modules package `@clawmasons/member-note-taker` with the same directory basename
 - **WHEN** `runInstall()` is called for `@vis/agent-note-taker`
-- **THEN** `forge-proxy/workspace/agents/note-taker/package.json` SHALL contain `@vis/agent-note-taker` (not `@clawmasons`)
+- **THEN** `chapter-proxy/workspace/agents/note-taker/package.json` SHALL contain `@vis/agent-note-taker` (not `@clawmasons`)
 
 ### Requirement: Proxy config generator is deprecated
 

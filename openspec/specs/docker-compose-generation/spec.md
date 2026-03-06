@@ -3,7 +3,7 @@
 ### Requirement: generateDockerCompose produces a valid docker-compose.yml string
 
 The system SHALL provide a `generateDockerCompose(agent, runtimeServices)` function that returns a YAML string for `docker-compose.yml`. The generated compose file SHALL contain:
-- An `mcp-proxy` service built from `./forge-proxy` that runs the native forge proxy
+- An `mcp-proxy` service built from `./chapter-proxy` that runs the native forge proxy
 - One service per runtime, as provided by `runtimeServices` (a map of runtime name to `ComposeServiceDef`)
 - An `agent-net` bridge network connecting all services
 
@@ -14,10 +14,10 @@ The system SHALL provide a `generateDockerCompose(agent, runtimeServices)` funct
 ### Requirement: mcp-proxy service uses native forge proxy
 
 The `mcp-proxy` service SHALL include:
-- `build: ./forge-proxy` (always builds from the forge-proxy Dockerfile)
+- `build: ./chapter-proxy` (always builds from the chapter-proxy Dockerfile)
 - `restart: unless-stopped`
 - Port mapping `${FORGE_PROXY_PORT:-<port>}:<port>` where port comes from `agent.proxy.port` (default: 9090)
-- Volume mount `./forge-proxy/logs:/logs` for log persistence
+- Volume mount `./chapter-proxy/logs:/logs` for log persistence
 - `FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}` always present in environment
 - Environment variables for all app credentials collected from resolved apps' `env` fields
 - `networks: [agent-net]`
@@ -27,7 +27,7 @@ The `mcp-proxy` service SHALL include:
 
 #### Scenario: Proxy service has correct port and build
 - **WHEN** the agent has `proxy: { port: 8080 }`
-- **THEN** the proxy service SHALL use `build: ./forge-proxy` and port mapping `${FORGE_PROXY_PORT:-8080}:8080`
+- **THEN** the proxy service SHALL use `build: ./chapter-proxy` and port mapping `${FORGE_PROXY_PORT:-8080}:8080`
 
 #### Scenario: Proxy service always includes FORGE_PROXY_TOKEN
 - **WHEN** `generateDockerCompose()` is called

@@ -35,12 +35,12 @@ The system SHALL support registering commands as individual modules. Each comman
 - **THEN** it can be registered without modifying other command modules
 
 ### Requirement: Bin wrapper for npm global install
-The system SHALL provide a `bin/forge.js` file with a Node.js shebang (`#!/usr/bin/env node`) that imports and runs the compiled CLI entry point. The package.json `bin` field SHALL map `"forge"` to this file.
+The system SHALL provide a `bin/chapter.js` file with a Node.js shebang (`#!/usr/bin/env node`) that imports and runs the compiled CLI entry point. The package.json `bin` field SHALL map `"chapter"` to this file.
 
 #### Scenario: Global install execution
 - **WHEN** the package is installed globally via `npm install -g`
-- **THEN** running `forge` in a terminal invokes the CLI entry point
+- **THEN** running `chapter` in a terminal invokes the CLI entry point
 
 #### Scenario: npx execution
-- **WHEN** a user runs `npx @clawmasons/forge init`
+- **WHEN** a user runs `npx @clawmasons/chapter init`
 - **THEN** the CLI entry point is invoked with the `init` command
