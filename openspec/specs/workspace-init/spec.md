@@ -10,12 +10,12 @@ The `forge init` command SHALL create the following directory structure in the t
 - `tasks/` — for task packages
 - `skills/` — for skill packages
 - `roles/` — for role packages
-- `agents/` — for agent packages
+- `members/` — for agent packages
 - `.forge/` — for forge workspace configuration
 
 #### Scenario: Init in empty directory
 - **WHEN** `forge init` is run in an empty directory
-- **THEN** all six directories (`apps/`, `tasks/`, `skills/`, `roles/`, `agents/`, `.forge/`) are created
+- **THEN** all six directories (`apps/`, `tasks/`, `skills/`, `roles/`, `members/`, `.forge/`) are created
 
 #### Scenario: Init in directory with existing files
 - **WHEN** `forge init` is run in a directory that already has files but no `.forge/` directory
@@ -24,7 +24,7 @@ The `forge init` command SHALL create the following directory structure in the t
 ### Requirement: Generate root package.json with workspaces
 The `forge init` command SHALL create a root `package.json` with:
 - `"private": true`
-- `"workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"]`
+- `"workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "members/*"]`
 - `"name"` set to the directory name (or the value of `--name` if provided)
 - `"version"` set to `"0.1.0"`
 
@@ -90,24 +90,24 @@ The `forge init` command SHALL print a summary of created files and directories 
 
 #### Scenario: Success output with template
 - **WHEN** `forge init --template note-taker` completes in `/tmp/test-forge/`
-- **THEN** the CLI prints the template name and next-step commands using the project scope (e.g., `forge validate @test-forge/agent-note-taker`)
+- **THEN** the CLI prints the template name and next-step commands using the project scope (e.g., `forge validate @test-forge/member-note-taker`)
 
 ### Requirement: Template directory structure
-The `@clawmasons/forge` package SHALL contain a `templates/` directory with at least one template (`note-taker/`). Each template directory SHALL contain the files needed to bootstrap a working forge project.
+The `@clawmasons/chapter` package SHALL contain a `templates/` directory with at least one template (`note-taker/`). Each template directory SHALL contain the files needed to bootstrap a working forge project.
 
 #### Scenario: note-taker template exists
 - **WHEN** the `templates/` directory is inspected
-- **THEN** `note-taker/` exists containing `package.json`, `agents/note-taker/package.json`, and `roles/writer/package.json`
+- **THEN** `note-taker/` exists containing `package.json`, `members/note-taker/package.json`, and `roles/writer/package.json`
 
-#### Scenario: Template root package.json depends on forge-core
+#### Scenario: Template root package.json depends on chapter-core
 - **WHEN** `templates/note-taker/package.json` is read
-- **THEN** it lists `@clawmasons/forge-core` as a dependency with a version range
+- **THEN** it lists `@clawmasons/chapter-core` as a dependency with a version range
 
-#### Scenario: Template agent references local role
-- **WHEN** `templates/note-taker/agents/note-taker/package.json` is read
+#### Scenario: Template member references local role
+- **WHEN** `templates/note-taker/members/note-taker/package.json` is read
 - **THEN** the chapter field has `type: "agent"` and `roles` contains `@{{projectScope}}/role-writer`
 
-#### Scenario: Template role references forge-core components
+#### Scenario: Template role references chapter-core components
 - **WHEN** `templates/note-taker/roles/writer/package.json` is read
 - **THEN** the chapter field has `type: "role"`, tasks include `@clawmasons/task-take-notes`, skills include `@clawmasons/skill-markdown-conventions`, and permissions reference `@clawmasons/app-filesystem`
 
@@ -116,7 +116,7 @@ The `forge init` command SHALL accept a `--template <name>` option. When specifi
 
 #### Scenario: Init with template in empty directory
 - **WHEN** `forge init --template note-taker` is run in an empty directory
-- **THEN** template files are copied (package.json, agents/, roles/), `.forge/` is created, and `npm install` is run
+- **THEN** template files are copied (package.json, members/, roles/), `.forge/` is created, and `npm install` is run
 
 #### Scenario: Init with template and custom name
 - **WHEN** `forge init --template note-taker --name @acme/my-agent` is run
@@ -131,11 +131,11 @@ Template `package.json` files SHALL support `{{projectName}}` and `{{projectScop
 
 #### Scenario: Directory name used as project scope
 - **WHEN** `forge init --template note-taker` is run in `/tmp/test-forge/`
-- **THEN** `{{projectScope}}` is replaced with `test-forge`, so the local agent is named `@test-forge/agent-note-taker`
+- **THEN** `{{projectScope}}` is replaced with `test-forge`, so the local member is named `@test-forge/member-note-taker`
 
 #### Scenario: Scoped name extracts scope portion
 - **WHEN** `forge init --template note-taker --name @acme/my-agent` is run
-- **THEN** `{{projectScope}}` is replaced with `acme`, so the local agent is named `@acme/agent-note-taker`
+- **THEN** `{{projectScope}}` is replaced with `acme`, so the local member is named `@acme/member-note-taker`
 
 ### Requirement: forge init lists available templates
 When `forge init` is run without `--template`, the command SHALL display a list of available templates before proceeding with the bare scaffold.
@@ -151,7 +151,7 @@ When `forge init` is run with `--template`, the command SHALL run `npm install` 
 - **WHEN** `forge init --template note-taker` completes
 - **THEN** `npm install` has been executed in the target directory
 
-### Requirement: Templates bundled in forge package
+### Requirement: Templates bundled in chapter package
 The root `package.json` SHALL include `"templates"` in its `files` array so that templates are included when the package is published or packed via `npm pack`.
 
 #### Scenario: files array includes templates

@@ -1,7 +1,7 @@
 {
-  "name": "@clawmasons/agent-note-taker",
+  "name": "@clawmasons/member-note-taker",
   "version": "1.0.0",
-  "description": "Note-taker agent — creates and organizes markdown notes via filesystem MCP server",
+  "description": "Note-taker member — creates and organizes markdown notes via filesystem MCP server",
   "chapter": {
     "type": "agent",
     "description": "A note-taking agent that reads, writes, and organizes markdown files.",

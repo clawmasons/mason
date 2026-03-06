@@ -42,7 +42,7 @@ describe("runInstall", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "forge-install-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-install-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -206,7 +206,7 @@ describe("runInstall", () => {
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
     // Check all expected files exist
-    expect(fs.existsSync(path.join(outputDir, "forge-proxy/Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "chapter-proxy/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "claude-code/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "claude-code/workspace/.claude/settings.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "claude-code/workspace/AGENTS.md"))).toBe(true);
@@ -306,7 +306,7 @@ describe("runInstall", () => {
     expect(firstToken).not.toBe(secondToken);
 
     // Files still exist
-    expect(fs.existsSync(path.join(outputDir, "forge-proxy/Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "chapter-proxy/Dockerfile"))).toBe(true);
   });
 
   it("uses default output directory when --output-dir not specified", async () => {
@@ -314,7 +314,7 @@ describe("runInstall", () => {
     await runInstall(tmpDir, "@test/agent-ops", {});
 
     const defaultDir = path.join(tmpDir, ".forge", "agents", "ops");
-    expect(fs.existsSync(path.join(defaultDir, "forge-proxy/Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(defaultDir, "chapter-proxy/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(defaultDir, "docker-compose.yml"))).toBe(true);
   });
 
@@ -323,7 +323,7 @@ describe("runInstall", () => {
     const customDir = path.join(tmpDir, "custom-output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: customDir });
 
-    expect(fs.existsSync(path.join(customDir, "forge-proxy/Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(customDir, "chapter-proxy/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(customDir, "docker-compose.yml"))).toBe(true);
   });
 
@@ -395,12 +395,12 @@ describe("runInstall", () => {
     expect(proxySection).toContain("FORGE_PROXY_TOKEN=${FORGE_PROXY_TOKEN}");
   });
 
-  it("generates single-stage forge-proxy/Dockerfile with pre-built forge", async () => {
+  it("generates single-stage chapter-proxy/Dockerfile with pre-built chapter", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
-    const dockerfilePath = path.join(outputDir, "forge-proxy/Dockerfile");
+    const dockerfilePath = path.join(outputDir, "chapter-proxy/Dockerfile");
     expect(fs.existsSync(dockerfilePath)).toBe(true);
 
     const dockerfile = fs.readFileSync(dockerfilePath, "utf-8");
@@ -408,45 +408,45 @@ describe("runInstall", () => {
     expect(dockerfile).not.toContain("AS builder");
     expect(dockerfile).not.toContain("npm run build");
     expect(dockerfile).not.toContain("COPY --from=builder");
-    expect(dockerfile).toContain("forge.js");
+    expect(dockerfile).toContain("chapter.js");
     expect(dockerfile).toContain('"proxy"');
     expect(dockerfile).not.toContain("mcp-proxy");
   });
 
-  it("docker-compose.yml uses build: ./forge-proxy", async () => {
+  it("docker-compose.yml uses build: ./chapter-proxy", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
     const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
-    expect(composeContent).toContain("build: ./forge-proxy");
+    expect(composeContent).toContain("build: ./chapter-proxy");
     expect(composeContent).not.toContain("image: ghcr.io/tbxark/mcp-proxy");
   });
 
-  it("copies pre-built forge into forge-proxy/forge/ build context", async () => {
+  it("copies pre-built chapter into chapter-proxy/chapter/ build context", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
-    // Pre-built forge artifacts should be in the build context
-    expect(fs.existsSync(path.join(outputDir, "forge-proxy/forge/package.json"))).toBe(true);
+    // Pre-built chapter artifacts should be in the build context
+    expect(fs.existsSync(path.join(outputDir, "chapter-proxy/chapter/package.json"))).toBe(true);
 
     // Verify source files are NOT in the build context
-    const allFiles = fs.readdirSync(path.join(outputDir, "forge-proxy/forge"), { recursive: true }) as string[];
+    const allFiles = fs.readdirSync(path.join(outputDir, "chapter-proxy/chapter"), { recursive: true }) as string[];
     const srcFiles = allFiles.filter((f) => f.toString().startsWith("src"));
     const tsconfigFiles = allFiles.filter((f) => f.toString().includes("tsconfig"));
     expect(srcFiles).toHaveLength(0);
     expect(tsconfigFiles).toHaveLength(0);
   });
 
-  it("copies workspace directories into forge-proxy/workspace/", async () => {
+  it("copies workspace directories into chapter-proxy/workspace/", async () => {
     setupValidAgent();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/agent-ops", { outputDir: "output" });
 
     // Agent workspace should be in the build context
-    expect(fs.existsSync(path.join(outputDir, "forge-proxy/workspace/agents/ops/package.json"))).toBe(true);
-    expect(fs.existsSync(path.join(outputDir, "forge-proxy/workspace/apps/github/package.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/agents/ops/package.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/apps/github/package.json"))).toBe(true);
   });
 
   it("Dockerfile includes DISABLE_AUTOUPDATER but not OOBE (externalized)", async () => {
@@ -482,11 +482,11 @@ describe("runInstall", () => {
     expect(fs.statSync(claudeDir).isDirectory()).toBe(true);
   });
 
-  it("copies node_modules forge packages into forge-proxy/workspace/", async () => {
+  it("copies node_modules chapter packages into chapter-proxy/workspace/", async () => {
     setupValidAgent();
 
-    // Simulate a forge-core package in node_modules that bundles a task sub-component
-    const nmTaskDir = path.join(tmpDir, "node_modules", "@clawmasons", "forge-core", "tasks", "take-notes");
+    // Simulate a chapter-core package in node_modules that bundles a task sub-component
+    const nmTaskDir = path.join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "tasks", "take-notes");
     writePackage(nmTaskDir, {
       name: "@clawmasons/task-take-notes",
       version: "1.0.0",
@@ -514,17 +514,17 @@ describe("runInstall", () => {
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
-    // The node_modules task should be copied into forge-proxy/workspace/tasks/
+    // The node_modules task should be copied into chapter-proxy/workspace/tasks/
     expect(
-      fs.existsSync(path.join(outputDir, "forge-proxy/workspace/tasks/take-notes/package.json")),
+      fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/tasks/take-notes/package.json")),
     ).toBe(true);
     expect(
-      fs.existsSync(path.join(outputDir, "forge-proxy/workspace/tasks/take-notes/notes.md")),
+      fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/tasks/take-notes/notes.md")),
     ).toBe(true);
 
     // Local workspace packages should still be there too
     expect(
-      fs.existsSync(path.join(outputDir, "forge-proxy/workspace/agents/ops/package.json")),
+      fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/agents/ops/package.json")),
     ).toBe(true);
   });
 
@@ -532,7 +532,7 @@ describe("runInstall", () => {
     setupValidAgent();
 
     // Simulate an unrelated agent in node_modules with the same basename as our local agent
-    const nmAgentDir = path.join(tmpDir, "node_modules", "@clawmasons", "forge-core", "agents", "ops");
+    const nmAgentDir = path.join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "agents", "ops");
     writePackage(nmAgentDir, {
       name: "@clawmasons/agent-ops",
       version: "1.0.0",
@@ -550,7 +550,7 @@ describe("runInstall", () => {
 
     // The local agent package.json should be preserved (not overwritten by the node_modules one)
     const agentPkg = JSON.parse(
-      fs.readFileSync(path.join(outputDir, "forge-proxy/workspace/agents/ops/package.json"), "utf-8"),
+      fs.readFileSync(path.join(outputDir, "chapter-proxy/workspace/agents/ops/package.json"), "utf-8"),
     );
     expect(agentPkg.name).toBe("@test/agent-ops");
     expect(agentPkg.name).not.toBe("@clawmasons/agent-ops");

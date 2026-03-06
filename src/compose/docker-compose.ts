@@ -107,14 +107,14 @@ export function generateDockerCompose(
   lines.push("services:");
   lines.push("");
 
-  // forge proxy service (service name kept as mcp-proxy for depends_on compatibility)
+  // chapter proxy service (service name kept as mcp-proxy for depends_on compatibility)
   lines.push("  mcp-proxy:");
-  lines.push("    build: ./forge-proxy");
+  lines.push("    build: ./chapter-proxy");
   lines.push("    restart: unless-stopped");
   lines.push("    ports:");
   lines.push(`      - "\${FORGE_PROXY_PORT:-${port}}:${port}"`);
   lines.push("    volumes:");
-  lines.push("      - ./forge-proxy/logs:/logs");
+  lines.push("      - ./chapter-proxy/logs:/logs");
   lines.push("      - ./data:/home/node/data");
 
   lines.push("    environment:");

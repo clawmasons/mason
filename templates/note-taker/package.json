@@ -2,8 +2,8 @@
   "name": "{{projectName}}",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"],
+  "workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "members/*"],
   "dependencies": {
-    "@clawmasons/forge-core": "^0.1.0"
+    "@clawmasons/chapter-core": "^0.1.0"
   }
 }

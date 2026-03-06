@@ -94,13 +94,13 @@ function makeCodexService(): ComposeServiceDef {
 }
 
 describe("generateDockerCompose", () => {
-  describe("forge proxy service", () => {
-    it("always uses build: ./forge-proxy", () => {
+  describe("chapter proxy service", () => {
+    it("always uses build: ./chapter-proxy", () => {
       const agent = makeRepoOpsAgent();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      expect(yaml).toContain("build: ./forge-proxy");
+      expect(yaml).toContain("build: ./chapter-proxy");
     });
 
     it("does not reference mcp-proxy image or binary", () => {
@@ -129,12 +129,12 @@ describe("generateDockerCompose", () => {
       expect(yaml).toContain('"${FORGE_PROXY_PORT:-8080}:8080"');
     });
 
-    it("mounts forge-proxy logs directory", () => {
+    it("mounts chapter-proxy logs directory", () => {
       const agent = makeRepoOpsAgent();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      expect(yaml).toContain("./forge-proxy/logs:/logs");
+      expect(yaml).toContain("./chapter-proxy/logs:/logs");
     });
 
     it("mounts data directory for persistent DB", () => {
@@ -223,7 +223,7 @@ describe("generateDockerCompose", () => {
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(agent, services);
 
-      expect(yaml).toContain("build: ./forge-proxy");
+      expect(yaml).toContain("build: ./chapter-proxy");
       expect(yaml).toContain('"${FORGE_PROXY_PORT:-9090}:9090"');
     });
   });
