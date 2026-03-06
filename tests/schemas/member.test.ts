@@ -150,6 +150,83 @@ describe("memberChapterFieldSchema", () => {
       expect(result.success).toBe(false);
     });
 
+    it("validates agent member with llm configuration", () => {
+      const result = memberChapterFieldSchema.safeParse({
+        type: "member",
+        memberType: "agent",
+        name: "Coder",
+        slug: "coder",
+        email: "coder@chapter.local",
+        runtimes: ["pi-coding-agent"],
+        roles: ["@acme/role-developer"],
+        llm: {
+          provider: "openrouter",
+          model: "anthropic/claude-sonnet-4",
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.memberType).toBe("agent");
+        if (result.data.memberType === "agent") {
+          expect(result.data.llm).toEqual({
+            provider: "openrouter",
+            model: "anthropic/claude-sonnet-4",
+          });
+        }
+      }
+    });
+
+    it("validates agent member without llm (optional)", () => {
+      const result = memberChapterFieldSchema.safeParse({
+        type: "member",
+        memberType: "agent",
+        name: "Repo Ops",
+        slug: "repo-ops",
+        email: "repo-ops@chapter.local",
+        runtimes: ["claude-code"],
+        roles: ["@clawmasons/role-issue-manager"],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.memberType).toBe("agent");
+        if (result.data.memberType === "agent") {
+          expect(result.data.llm).toBeUndefined();
+        }
+      }
+    });
+
+    it("rejects agent member with llm missing model", () => {
+      const result = memberChapterFieldSchema.safeParse({
+        type: "member",
+        memberType: "agent",
+        name: "Coder",
+        slug: "coder",
+        email: "coder@chapter.local",
+        runtimes: ["pi-coding-agent"],
+        roles: ["@acme/role-developer"],
+        llm: {
+          provider: "openrouter",
+        },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects agent member with llm missing provider", () => {
+      const result = memberChapterFieldSchema.safeParse({
+        type: "member",
+        memberType: "agent",
+        name: "Coder",
+        slug: "coder",
+        email: "coder@chapter.local",
+        runtimes: ["pi-coding-agent"],
+        roles: ["@acme/role-developer"],
+        llm: {
+          model: "anthropic/claude-sonnet-4",
+        },
+      });
+      expect(result.success).toBe(false);
+    });
+
     it("validates PRD example: agent member", () => {
       const result = memberChapterFieldSchema.safeParse({
         type: "member",
@@ -210,6 +287,26 @@ describe("memberChapterFieldSchema", () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.authProviders).toEqual([]);
+      }
+    });
+
+    it("strips llm field from human member (not in human schema)", () => {
+      const result = memberChapterFieldSchema.safeParse({
+        type: "member",
+        memberType: "human",
+        name: "Alice Chen",
+        slug: "alice",
+        email: "alice@acme.com",
+        roles: ["@acme/role-admin"],
+        llm: {
+          provider: "openrouter",
+          model: "anthropic/claude-sonnet-4",
+        },
+      });
+      // human schema doesn't have llm field — extra fields are stripped by default
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect("llm" in result.data).toBe(false);
       }
     });
 

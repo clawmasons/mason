@@ -11,6 +11,11 @@ const proxySchema = z.object({
   type: z.enum(["sse", "streamable-http"]).optional(),
 });
 
+const llmSchema = z.object({
+  provider: z.string(),
+  model: z.string(),
+});
+
 const agentMemberSchema = z.object({
   type: z.literal("member"),
   memberType: z.literal("agent"),
@@ -23,6 +28,7 @@ const agentMemberSchema = z.object({
   roles: z.array(z.string()).min(1),
   resources: z.array(resourceSchema).optional().default([]),
   proxy: proxySchema.optional(),
+  llm: llmSchema.optional(),
 });
 
 const humanMemberSchema = z.object({

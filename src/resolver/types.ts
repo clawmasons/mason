@@ -90,4 +90,8 @@ export interface ResolvedMember {
     port?: number;
     type?: "sse" | "streamable-http";
   };
+  llm?: {
+    provider: string;
+    model: string;
+  };
 }
