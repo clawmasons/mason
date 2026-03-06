@@ -35,7 +35,7 @@
     "templates"
   ],
   "license": "MIT",
-  "workspaces": ["chapter-core"],
+  "workspaces": ["chapter-core", "e2e"],
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@types/better-sqlite3": "^7.6.13",
