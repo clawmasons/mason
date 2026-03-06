@@ -197,7 +197,12 @@ Create fixture packages for the E2E test: a test member using pi-coding-agent ru
 
 **Testable output:** The fixture `package.json` passes schema validation via `parseChapterField()`. The member declares `pi-coding-agent` runtime, `openrouter` provider, and depends on `@clawmasons/role-writer` from chapter-core. `npm install` in the fixture workspace resolves dependencies successfully.
 
-**Not Implemented Yet**
+**Implemented** -- 2026-03-06
+
+**Spec:** [openspec/changes/archive/2026-03-06-e2e-test-fixtures/](../../openspec/changes/archive/2026-03-06-e2e-test-fixtures/)
+- [Proposal](../../openspec/changes/archive/2026-03-06-e2e-test-fixtures/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-06-e2e-test-fixtures/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-06-e2e-test-fixtures/tasks.md)
 
 ---
 
