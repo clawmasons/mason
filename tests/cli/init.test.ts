@@ -8,6 +8,7 @@ import {
   deriveProjectScope,
   copyTemplateFiles,
 } from "../../src/cli/commands/init.js";
+import { parseChapterField } from "../../src/schemas/chapter-field.js";
 
 describe("chapter init", () => {
   let tmpDir: string;
@@ -245,6 +246,7 @@ describe("chapter init", () => {
               name: "Note Taker",
               slug: "note-taker",
               email: "note-taker@chapter.local",
+              authProviders: [],
               roles: ["@{{projectScope}}/role-writer"],
               runtimes: ["claude-code"],
             },
@@ -425,6 +427,38 @@ describe("chapter init", () => {
           fs.existsSync(path.join(targetDir, ".chapter", ".env.example")),
         ).toBe(true);
         expect(fs.existsSync(path.join(targetDir, ".gitignore"))).toBe(true);
+      } finally {
+        fs.rmSync(targetDir, { recursive: true, force: true });
+      }
+    });
+
+    it("generates member package.json that validates against member schema", async () => {
+      const targetDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "test-chapter-"),
+      );
+      try {
+        await runInit(
+          targetDir,
+          { template: "test-template", name: "@acme/my-project" },
+          { templatesDir, skipNpmInstall: true },
+        );
+
+        const memberPkg = JSON.parse(
+          fs.readFileSync(
+            path.join(targetDir, "members", "note-taker", "package.json"),
+            "utf-8",
+          ),
+        );
+
+        // Verify the chapter field validates against the member schema
+        const result = parseChapterField(memberPkg.chapter);
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.type).toBe("member");
+          if (result.data.type === "member") {
+            expect(result.data.memberType).toBe("agent");
+          }
+        }
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }

@@ -345,19 +345,26 @@ Update the `templates/note-taker/` template to use chapter terminology, member p
 
 **PRD refs:** REQ-004 (Rename npm Packages — template portion), REQ-005 (Member Package Type — template component)
 
-**Summary:** Update `templates/note-taker/package.json` to depend on `@clawmasons/chapter-core` instead of `@clawmasons/forge-core`. Rename `templates/note-taker/agents/` directory to `templates/note-taker/members/`. Update the template member package.json to use the new member schema (`type: "member"`, `memberType: "agent"`, `name`, `slug`, `email` fields with `{{projectName}}` and `{{projectScope}}` placeholders). Update all `"chapter"` metadata keys (instead of `"forge"`). Update `chapter init` template copying logic if directory names changed.
+**Summary:** Finalized the `templates/note-taker/` template for the chapter + member model. Most heavy lifting was done in prior changes (#1 renamed metadata field, #2 renamed packages/directories, #5 introduced member schema). This change added `authProviders: []` to the template member package.json to match the PRD agent member example, added a schema validation test to verify template output validates against the member schema via `parseChapterField()`, and updated the workspace-init spec with template validation scenarios.
 
 **User Story:** As a new user, when I run `chapter init --template note-taker --name @acme/my-project`, the generated workspace has members (not agents), uses the `chapter` metadata field, and depends on `@clawmasons/chapter-core`.
 
 **Scope:**
-- Modify: `templates/note-taker/members/note-taker/package.json` — member schema with placeholders (directory already renamed in Change #2, dependency already updated in Change #2)
-- Modify: `templates/note-taker/roles/writer/package.json` — `chapter` field
-- Modify: `src/cli/commands/init.ts` — update template detection if needed (look for `members/` instead of `agents/`)
-- Update tests: `tests/cli/init.test.ts`
+- Modify: `templates/note-taker/members/note-taker/package.json` — added `authProviders: []` to match PRD example
+- Update tests: `tests/cli/init.test.ts` — added schema validation test for template output, updated test fixture to include `authProviders: []`
+- Update spec: `openspec/specs/workspace-init/spec.md` — added template identity fields and schema validation scenarios
 
-**Testable output:** `chapter init --template note-taker` produces a workspace with `members/note-taker/package.json` using `"chapter"` metadata key and `"type": "member"`. The generated `package.json` depends on `@clawmasons/chapter-core`. `chapter validate` succeeds on the init output. All init tests pass.
+**Testable output:** `chapter init --template note-taker` produces a workspace with `members/note-taker/package.json` using `"chapter"` metadata key and `"type": "member"`. The generated `package.json` depends on `@clawmasons/chapter-core`. `parseChapterField()` succeeds on the template output. All 628 tests pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-06-update-templates-chapter-member/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-06-update-templates-chapter-member/proposal.md)
+- [Design](../../changes/archive/2026-03-06-update-templates-chapter-member/design.md)
+- [Tasks](../../changes/archive/2026-03-06-update-templates-chapter-member/tasks.md)
+
+**Specs updated:**
+- [workspace-init](../../specs/workspace-init/spec.md) -- added template identity fields scenario and schema validation scenario
 
 ---
 
