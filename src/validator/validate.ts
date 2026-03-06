@@ -1,5 +1,5 @@
 import type { ResolvedMember, ResolvedApp, ResolvedRole, ResolvedTask } from "../resolver/types.js";
-import type { ValidationError, ValidationResult } from "./types.js";
+import type { ValidationError, ValidationWarning, ValidationResult } from "./types.js";
 
 /**
  * Check requirement coverage: every app a task requires must have
@@ -183,11 +183,47 @@ function collectAppsFromTask(
 }
 
 /**
+ * Check LLM configuration: pi-coding-agent requires an `llm` field,
+ * claude-code warns when `llm` is present (it only supports Anthropic).
+ */
+function checkLlmConfig(
+  member: ResolvedMember,
+  errors: ValidationError[],
+  warnings: ValidationWarning[],
+): void {
+  // Only applies to agent members (humans don't have runtimes or llm)
+  if (member.memberType !== "agent") return;
+
+  const hasPi = member.runtimes.includes("pi-coding-agent");
+  const hasClaude = member.runtimes.includes("claude-code");
+  const hasLlm = member.llm !== undefined;
+
+  // Pi requires LLM config — it has no default provider
+  if (hasPi && !hasLlm) {
+    errors.push({
+      category: "llm-config",
+      message: `Member "${member.memberName}" uses runtime "pi-coding-agent" but has no "llm" configuration. Pi requires explicit provider and model.`,
+      context: { member: member.name, runtime: "pi-coding-agent" },
+    });
+  }
+
+  // Claude Code ignores LLM config — it only uses Anthropic
+  if (hasClaude && hasLlm) {
+    warnings.push({
+      category: "llm-config",
+      message: `Member "${member.memberName}" uses runtime "claude-code" with an "llm" configuration. Claude Code only supports Anthropic — the "llm" field will be ignored.`,
+      context: { member: member.name, runtime: "claude-code" },
+    });
+  }
+}
+
+/**
  * Validate a resolved member graph for semantic correctness.
- * Runs all validation checks and collects errors.
+ * Runs all validation checks and collects errors and warnings.
  */
 export function validateMember(member: ResolvedMember): ValidationResult {
   const errors: ValidationError[] = [];
+  const warnings: ValidationWarning[] = [];
 
   // Check each role
   for (const role of member.roles) {
@@ -202,8 +238,12 @@ export function validateMember(member: ResolvedMember): ValidationResult {
     checkAppLaunchConfig(app, errors);
   }
 
+  // Check LLM configuration
+  checkLlmConfig(member, errors, warnings);
+
   return {
     valid: errors.length === 0,
     errors,
+    warnings,
   };
 }

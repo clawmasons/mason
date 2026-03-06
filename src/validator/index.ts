@@ -1,6 +1,8 @@
 export type {
   ValidationError,
   ValidationErrorCategory,
+  ValidationWarning,
+  ValidationWarningCategory,
   ValidationResult,
 } from "./types.js";
 

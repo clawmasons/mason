@@ -46,13 +46,23 @@ Add validation rules that enforce `llm` is required when runtime is `pi-coding-a
 **User Story:** As a package author, if I declare `runtimes: ["pi-coding-agent"]` without an `llm` field, `chapter validate` tells me I need to specify a provider and model. If I declare `llm` on a `claude-code` member, it warns me the field will be ignored.
 
 **Scope:**
-- Modify: `src/validator/types.ts` — add `"llm-config"` to `ValidationErrorCategory` (if enumerated)
+- Modify: `src/validator/types.ts` — add `"llm-config"` to `ValidationErrorCategory`, add `ValidationWarning` and `ValidationWarningCategory` types, add `warnings` to `ValidationResult`
 - Modify: `src/validator/validate.ts` — add `checkLlmConfig()` function, call from `validateMember()`
-- Update tests: `tests/validator/validate.test.ts` — pi-coding-agent without llm → error, claude-code with llm → warning, pi-coding-agent with llm → no error
+- Modify: `src/validator/index.ts` — export new types
+- Modify: `src/index.ts` — re-export new types
+- Modify: `src/cli/commands/validate.ts` — display warnings
+- Modify: `src/cli/commands/build.ts` — display warnings
+- Modify: `src/cli/commands/install.ts` — display warnings
+- Update tests: `tests/validator/validate.test.ts` — 8 new tests covering all llm-config validation cases
 
 **Testable output:** `chapter validate @member` with pi-coding-agent runtime and no `llm` shows an error. Same with claude-code runtime and `llm` present shows a warning. `npx tsc --noEmit` and `npx vitest run` pass.
 
-**Not Implemented Yet**
+**Implemented** -- 2026-03-06
+
+**Spec:** [openspec/changes/archive/2026-03-06-llm-validation-rules/](../../openspec/changes/archive/2026-03-06-llm-validation-rules/)
+- [Proposal](../../openspec/changes/archive/2026-03-06-llm-validation-rules/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-06-llm-validation-rules/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-06-llm-validation-rules/tasks.md)
 
 ---
 
