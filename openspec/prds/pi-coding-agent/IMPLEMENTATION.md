@@ -128,22 +128,22 @@ Register `piCodingAgentMaterializer` in the materializer registry and update `.e
 
 **PRD refs:** REQ-003 (Materializer Registry), PRD §7.3
 
-**Summary:** Add `piCodingAgentMaterializer` to the `materializerRegistry` Map in `src/cli/commands/install.ts` (line ~24). Export it from `src/materializer/index.ts`. Update `src/compose/env.ts` to add the LLM provider env var (from `member.llm.provider` → `PROVIDER_ENV_VARS` mapping) to the `.env.example` template. Update Docker Compose generation in `src/compose/docker-compose.ts` if needed to pass through the LLM env var to the runtime service. Add integration tests.
+**Summary:** Add `piCodingAgentMaterializer` to the `materializerRegistry` Map in `src/cli/commands/install.ts`. The materializer export from `src/materializer/index.ts` and the `.env` LLM provider integration in `src/compose/env.ts` were already completed in Changes 3-4. No changes to `src/compose/docker-compose.ts` were needed since the materializer's `ComposeServiceDef` already includes the LLM env var. Added 11 integration tests for pi-coding-agent and multi-runtime install scenarios.
 
-**User Story:** As a user running `chapter install @coder` where coder has `runtimes: ["pi-coding-agent"]`, the install pipeline finds and invokes the pi materializer automatically. The generated `.env.example` includes `OPENROUTER_API_KEY=` (or whatever provider is configured).
+**User Story:** As a user running `chapter install @coder` where coder has `runtimes: ["pi-coding-agent"]`, the install pipeline finds and invokes the pi materializer automatically. The generated `.env` includes `OPENROUTER_API_KEY=` (or whatever provider is configured).
 
 **Scope:**
-- Modify: `src/materializer/index.ts` — export `piCodingAgentMaterializer`
-- Modify: `src/cli/commands/install.ts` — add to `materializerRegistry` Map
-- Modify: `src/compose/env.ts` — add LLM provider env var collection
-- Modify: `src/compose/docker-compose.ts` — pass LLM env var to runtime service (if not already handled by materializer's ComposeServiceDef)
-- Update tests: `tests/cli/install.test.ts` — pi-coding-agent member installs successfully
-- Update tests: `tests/compose/docker-compose.test.ts` — pi service env vars
-- Update tests: `tests/integration/install-flow.test.ts` — full install with pi runtime
+- Modify: `src/cli/commands/install.ts` — import `piCodingAgentMaterializer`, add to `materializerRegistry` Map
+- Update tests: `tests/cli/install.test.ts` — 11 new tests: pi-coding-agent member installs, workspace files, extension files, .env LLM key, docker-compose service, no .claude artifacts, multi-runtime (claude-code + pi), proxy token baking, settings.json model, success summary
 
-**Testable output:** `chapter install @member-with-pi-runtime` succeeds. `.chapter/members/<slug>/pi-coding-agent/workspace/` directory is scaffolded with all expected files. `.env.example` includes the LLM provider API key. Docker Compose includes pi-coding-agent service. `npx tsc --noEmit` and `npx vitest run` pass.
+**Testable output:** `chapter install @member-with-pi-runtime` succeeds. `.chapter/members/<slug>/pi-coding-agent/workspace/` directory is scaffolded with all expected files. `.env` includes the LLM provider API key. Docker Compose includes pi-coding-agent service. `npx tsc --noEmit` and `npx vitest run` pass (733 tests, 0 failures).
 
-**Not Implemented Yet**
+**Implemented** -- 2026-03-06
+
+**Spec:** [openspec/changes/archive/2026-03-06-materializer-registry-integration/](../../openspec/changes/archive/2026-03-06-materializer-registry-integration/)
+- [Proposal](../../openspec/changes/archive/2026-03-06-materializer-registry-integration/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-06-materializer-registry-integration/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-06-materializer-registry-integration/tasks.md)
 
 ---
 

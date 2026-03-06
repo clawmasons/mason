@@ -8,6 +8,7 @@ import { resolveMember } from "../../resolver/resolve.js";
 import { validateMember } from "../../validator/validate.js";
 import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
 import { claudeCodeMaterializer } from "../../materializer/claude-code.js";
+import { piCodingAgentMaterializer } from "../../materializer/pi-coding-agent.js";
 import type { RuntimeMaterializer, ComposeServiceDef } from "../../materializer/types.js";
 import type { ResolvedMember, ResolvedTask } from "../../resolver/types.js";
 import { generateDockerCompose } from "../../compose/docker-compose.js";
@@ -22,6 +23,7 @@ interface InstallOptions {
 /** Registry of runtime name → materializer. */
 const materializerRegistry = new Map<string, RuntimeMaterializer>([
   ["claude-code", claudeCodeMaterializer],
+  ["pi-coding-agent", piCodingAgentMaterializer],
 ]);
 
 /** Workspace directories that contain member packages. */
