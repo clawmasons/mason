@@ -192,7 +192,7 @@ export async function runInstall(
 
     // Also copy packages discovered from outside the local workspace (e.g., node_modules/forge-core)
     // Only copy packages that are in the resolved agent's dependency graph to avoid
-    // basename collisions (e.g., @clawforge/agent-note-taker overwriting @vis/agent-note-taker).
+    // basename collisions (e.g., @clawmasons/agent-note-taker overwriting @vis/agent-note-taker).
     const resolvedNames = collectResolvedNames(agent);
     for (const [, pkg] of packages) {
       if (!resolvedNames.has(pkg.name)) continue;

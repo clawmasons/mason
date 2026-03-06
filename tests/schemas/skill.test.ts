@@ -42,7 +42,7 @@ describe("skillForgeFieldSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("validates PRD example: @clawforge/skill-labeling", () => {
+  it("validates PRD example: @clawmasons/skill-labeling", () => {
     const result = skillForgeFieldSchema.safeParse({
       type: "skill",
       artifacts: ["./SKILL.md", "./examples/", "./schemas/"],

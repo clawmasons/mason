@@ -1,5 +1,5 @@
 {
-  "name": "@clawforge/forge",
+  "name": "@clawmasons/forge",
   "version": "0.1.0",
   "description": "Agent Forge System — npm-native packaging, governance, and runtime portability for AI agents",
   "type": "module",

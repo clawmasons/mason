@@ -71,9 +71,9 @@ describe("generateProxyDockerfile", () => {
   });
 
   it("embeds the provided agent name in CMD", () => {
-    const result = generateProxyDockerfile("@clawforge/agent-repo-ops");
+    const result = generateProxyDockerfile("@clawmasons/agent-repo-ops");
 
-    expect(result).toContain("@clawforge/agent-repo-ops");
+    expect(result).toContain("@clawmasons/agent-repo-ops");
   });
 
   it("runs as non-root node user", () => {

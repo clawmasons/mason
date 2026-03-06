@@ -16,7 +16,7 @@ import type { ResolvedApp } from "../resolver/types.js";
 // ── Types ──────────────────────────────────────────────────────────────
 
 export interface UpstreamAppConfig {
-  /** Full package name, e.g., "@clawforge/app-github". Used as lookup key. */
+  /** Full package name, e.g., "@clawmasons/app-github". Used as lookup key. */
   name: string;
   app: ResolvedApp;
   env?: Record<string, string>;

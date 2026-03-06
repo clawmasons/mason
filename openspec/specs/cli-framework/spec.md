@@ -42,5 +42,5 @@ The system SHALL provide a `bin/forge.js` file with a Node.js shebang (`#!/usr/b
 - **THEN** running `forge` in a terminal invokes the CLI entry point
 
 #### Scenario: npx execution
-- **WHEN** a user runs `npx @clawforge/forge init`
+- **WHEN** a user runs `npx @clawmasons/forge init`
 - **THEN** the CLI entry point is invoked with the `init` command

@@ -1,8 +1,8 @@
 ## 1. Create templates/note-taker/ directory
 
-- [x] 1.1 Create `templates/note-taker/package.json` with `@clawforge/forge-core` dependency and npm workspace config using `{{projectName}}` for the package name
+- [x] 1.1 Create `templates/note-taker/package.json` with `@clawmasons/forge-core` dependency and npm workspace config using `{{projectName}}` for the package name
 - [x] 1.2 Create `templates/note-taker/agents/note-taker/package.json` with `@{{projectScope}}/agent-note-taker` name and forge agent type referencing `@{{projectScope}}/role-writer`
-- [x] 1.3 Create `templates/note-taker/roles/writer/package.json` with `@{{projectScope}}/role-writer` name and forge role type referencing `@clawforge/*` tasks, skills, and apps
+- [x] 1.3 Create `templates/note-taker/roles/writer/package.json` with `@{{projectScope}}/role-writer` name and forge role type referencing `@clawmasons/*` tasks, skills, and apps
 
 ## 2. Enhance forge init with template support
 

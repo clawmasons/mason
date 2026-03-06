@@ -108,9 +108,9 @@ The `copyDirToFiles()` helper accepts a configurable `skipDirs` parameter (defau
 - **THEN** `forge-proxy/workspace/agents/` and `forge-proxy/workspace/apps/` exist with the package.json files
 
 #### Scenario: Non-local packages outside resolved graph are excluded
-- **GIVEN** a local agent `@vis/agent-note-taker` and a node_modules package `@clawforge/agent-note-taker` with the same directory basename
+- **GIVEN** a local agent `@vis/agent-note-taker` and a node_modules package `@clawmasons/agent-note-taker` with the same directory basename
 - **WHEN** `runInstall()` is called for `@vis/agent-note-taker`
-- **THEN** `forge-proxy/workspace/agents/note-taker/package.json` SHALL contain `@vis/agent-note-taker` (not `@clawforge`)
+- **THEN** `forge-proxy/workspace/agents/note-taker/package.json` SHALL contain `@vis/agent-note-taker` (not `@clawmasons`)
 
 ### Requirement: Proxy config generator is deprecated
 

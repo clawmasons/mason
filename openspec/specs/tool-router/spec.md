@@ -9,13 +9,13 @@ Build a routing table that prefixes upstream MCP tool names with their app short
 The system SHALL prefix all upstream tool names with the app's short name (derived by `getAppShortName()`) using the format `<appShortName>_<toolName>`.
 
 #### Scenario: Standard prefixing
-- **GIVEN** app `@clawforge/app-github` exposes tool `create_pr`
+- **GIVEN** app `@clawmasons/app-github` exposes tool `create_pr`
 - **WHEN** the routing table is built
 - **THEN** the tool appears as `github_create_pr`
 - **AND** the tool's description and inputSchema are preserved unchanged
 
 #### Scenario: Multiple apps
-- **GIVEN** app `@clawforge/app-github` exposes `create_pr` and app `@clawforge/app-slack` exposes `send_message`
+- **GIVEN** app `@clawmasons/app-github` exposes `create_pr` and app `@clawmasons/app-slack` exposes `send_message`
 - **WHEN** the routing table is built
 - **THEN** tools `github_create_pr` and `slack_send_message` are both listed
 
@@ -45,7 +45,7 @@ The system SHALL resolve a prefixed tool name back to the original app name, sho
 
 #### Scenario: Known prefixed name
 - **WHEN** `resolve("github_create_pr")` is called
-- **THEN** it returns `{ appName: "@clawforge/app-github", appShortName: "github", originalToolName: "create_pr", prefixedToolName: "github_create_pr", tool: <Tool> }`
+- **THEN** it returns `{ appName: "@clawmasons/app-github", appShortName: "github", originalToolName: "create_pr", prefixedToolName: "github_create_pr", tool: <Tool> }`
 
 #### Scenario: Unknown prefixed name
 - **WHEN** `resolve("github_delete_repo")` is called and `delete_repo` was filtered out

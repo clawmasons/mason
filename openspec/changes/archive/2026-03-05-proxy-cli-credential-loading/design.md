@@ -70,7 +70,7 @@ The existing CLI uses Commander.js with a `registerXxxCommand(program)` pattern.
 
 **Choice:** When collecting apps from all roles, deduplicate by package name. Each unique app gets one upstream client connection.
 
-**Rationale:** Multiple roles may reference the same app (e.g., both "developer" and "reviewer" roles use `@clawforge/app-github`). We only need one upstream connection per app.
+**Rationale:** Multiple roles may reference the same app (e.g., both "developer" and "reviewer" roles use `@clawmasons/app-github`). We only need one upstream connection per app.
 
 ## Risks / Trade-offs
 

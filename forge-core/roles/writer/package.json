@@ -1,14 +1,14 @@
 {
-  "name": "@clawforge/role-writer",
+  "name": "@clawmasons/role-writer",
   "version": "1.0.0",
   "description": "Writer role — permission boundary for filesystem note operations",
   "forge": {
     "type": "role",
     "description": "Manages notes on the filesystem: read, write, list, and create directories.",
-    "tasks": ["@clawforge/task-take-notes"],
-    "skills": ["@clawforge/skill-markdown-conventions"],
+    "tasks": ["@clawmasons/task-take-notes"],
+    "skills": ["@clawmasons/skill-markdown-conventions"],
     "permissions": {
-      "@clawforge/app-filesystem": {
+      "@clawmasons/app-filesystem": {
         "allow": ["read_file", "write_file", "list_directory", "create_directory"],
         "deny": []
       }

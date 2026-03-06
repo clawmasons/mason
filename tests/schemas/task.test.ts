@@ -8,8 +8,8 @@ describe("taskForgeFieldSchema", () => {
       taskType: "subagent",
       prompt: "./prompts/triage.md",
       requires: {
-        apps: ["@clawforge/app-github"],
-        skills: ["@clawforge/skill-labeling"],
+        apps: ["@clawmasons/app-github"],
+        skills: ["@clawmasons/skill-labeling"],
       },
       timeout: "5m",
       approval: "auto",
@@ -58,19 +58,19 @@ describe("taskForgeFieldSchema", () => {
     const result = taskForgeFieldSchema.safeParse({
       type: "task",
       taskType: "subagent",
-      requires: { apps: ["@clawforge/app-github"] },
+      requires: { apps: ["@clawmasons/app-github"] },
     });
     expect(result.success).toBe(true);
   });
 
-  it("validates PRD example: @clawforge/task-triage-issue", () => {
+  it("validates PRD example: @clawmasons/task-triage-issue", () => {
     const result = taskForgeFieldSchema.safeParse({
       type: "task",
       taskType: "subagent",
       prompt: "./prompts/triage.md",
       requires: {
-        apps: ["@clawforge/app-github"],
-        skills: ["@clawforge/skill-labeling"],
+        apps: ["@clawmasons/app-github"],
+        skills: ["@clawmasons/skill-labeling"],
       },
       timeout: "5m",
       approval: "auto",

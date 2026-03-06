@@ -4,6 +4,6 @@
   "private": true,
   "workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"],
   "dependencies": {
-    "@clawforge/forge-core": "^0.1.0"
+    "@clawmasons/forge-core": "^0.1.0"
   }
 }

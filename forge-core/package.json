@@ -1,5 +1,5 @@
 {
-  "name": "@clawforge/forge-core",
+  "name": "@clawmasons/forge-core",
   "version": "0.1.0",
   "description": "Pre-built library of reusable forge components — apps, tasks, skills, roles, and agents",
   "files": [

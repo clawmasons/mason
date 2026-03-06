@@ -1,6 +1,6 @@
 ## 1. Project Setup
 
-- [x] 1.1 Create root package.json with name "@clawforge/forge", TypeScript dependencies (typescript, zod, vitest, eslint, typescript-eslint), and build/test scripts
+- [x] 1.1 Create root package.json with name "@clawmasons/forge", TypeScript dependencies (typescript, zod, vitest, eslint, typescript-eslint), and build/test scripts
 - [x] 1.2 Create tsconfig.json with strict mode, ESM output, and src/tests paths
 - [x] 1.3 Create vitest.config.ts
 - [x] 1.4 Create eslint.config.js with flat config and typescript-eslint

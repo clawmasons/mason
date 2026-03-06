@@ -17,7 +17,7 @@ Based on `ResolvedApp.transport`:
 
 ```typescript
 interface UpstreamAppConfig {
-  name: string;           // Full package name (e.g., "@clawforge/app-github")
+  name: string;           // Full package name (e.g., "@clawmasons/app-github")
   app: ResolvedApp;       // From resolver/types.ts
   env?: Record<string, string>;  // Resolved environment variables (credentials)
 }

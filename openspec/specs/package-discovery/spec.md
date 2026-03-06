@@ -20,11 +20,11 @@ The system SHALL scan workspace directories (`apps/`, `tasks/`, `skills/`, `role
 - **THEN** that package is skipped and not included in the result
 
 ### Requirement: Discover forge packages from node_modules
-The system SHALL scan `node_modules/` under the project root to find installed packages with valid `forge` fields, including scoped packages (e.g., `node_modules/@clawforge/app-github/`).
+The system SHALL scan `node_modules/` under the project root to find installed packages with valid `forge` fields, including scoped packages (e.g., `node_modules/@clawmasons/app-github/`).
 
 #### Scenario: Discover packages in node_modules
-- **WHEN** `discoverPackages(rootDir)` is called and `node_modules/@clawforge/app-github/package.json` contains a valid app forge field
-- **THEN** the result map contains an entry for `@clawforge/app-github` with the parsed forge field
+- **WHEN** `discoverPackages(rootDir)` is called and `node_modules/@clawmasons/app-github/package.json` contains a valid app forge field
+- **THEN** the result map contains an entry for `@clawmasons/app-github` with the parsed forge field
 
 #### Scenario: Handle scoped packages
 - **WHEN** `discoverPackages(rootDir)` is called and `node_modules/@org/` contains multiple packages with forge fields
@@ -38,12 +38,12 @@ The system SHALL scan `node_modules/` under the project root to find installed p
 When a package in `node_modules/` contains any of the standard workspace directories (`apps/`, `tasks/`, `skills/`, `roles/`, `agents/`), the system SHALL scan those directories for forge sub-packages and register them. Sub-packages are only registered if no package with the same name already exists in the map (preserving workspace-local precedence).
 
 #### Scenario: Discover sub-components inside a node_modules package with workspace dirs
-- **WHEN** `discoverPackages(rootDir)` is called and `node_modules/@clawforge/forge-core/apps/filesystem/package.json` contains a valid app forge field, `node_modules/@clawforge/forge-core/tasks/take-notes/package.json` contains a valid task forge field, and `node_modules/@clawforge/forge-core/skills/markdown-conventions/package.json` contains a valid skill forge field
-- **THEN** the result map contains entries for `@clawforge/app-filesystem`, `@clawforge/task-take-notes`, and `@clawforge/skill-markdown-conventions`
+- **WHEN** `discoverPackages(rootDir)` is called and `node_modules/@clawmasons/forge-core/apps/filesystem/package.json` contains a valid app forge field, `node_modules/@clawmasons/forge-core/tasks/take-notes/package.json` contains a valid task forge field, and `node_modules/@clawmasons/forge-core/skills/markdown-conventions/package.json` contains a valid skill forge field
+- **THEN** the result map contains entries for `@clawmasons/app-filesystem`, `@clawmasons/task-take-notes`, and `@clawmasons/skill-markdown-conventions`
 
 #### Scenario: Workspace-local packages take precedence over node_modules sub-components
-- **WHEN** `discoverPackages(rootDir)` is called and `apps/filesystem/package.json` exists locally with name `@clawforge/app-filesystem` version `2.0.0`, AND `node_modules/@clawforge/forge-core/apps/filesystem/package.json` also has name `@clawforge/app-filesystem` version `1.0.0`
-- **THEN** the result map contains `@clawforge/app-filesystem` with version `2.0.0` (the local version)
+- **WHEN** `discoverPackages(rootDir)` is called and `apps/filesystem/package.json` exists locally with name `@clawmasons/app-filesystem` version `2.0.0`, AND `node_modules/@clawmasons/forge-core/apps/filesystem/package.json` also has name `@clawmasons/app-filesystem` version `1.0.0`
+- **THEN** the result map contains `@clawmasons/app-filesystem` with version `2.0.0` (the local version)
 
 #### Scenario: Package with both direct forge field and workspace dirs
 - **WHEN** `discoverPackages(rootDir)` is called and `node_modules/@org/lib/package.json` has a valid forge field AND `node_modules/@org/lib/apps/tool/package.json` also has a valid forge field
@@ -53,12 +53,12 @@ When a package in `node_modules/` contains any of the standard workspace directo
 Each discovered package SHALL be represented as a `DiscoveredPackage` containing: `name` (string), `version` (string), `packagePath` (absolute filesystem path), and `forgeField` (validated ForgeField from Zod parsing).
 
 #### Scenario: DiscoveredPackage contains all fields
-- **WHEN** a valid forge package is discovered at `apps/github/package.json` with name `@clawforge/app-github` and version `1.2.0`
-- **THEN** the `DiscoveredPackage` has `name: "@clawforge/app-github"`, `version: "1.2.0"`, `packagePath` pointing to the package directory, and `forgeField` containing the validated app forge field
+- **WHEN** a valid forge package is discovered at `apps/github/package.json` with name `@clawmasons/app-github` and version `1.2.0`
+- **THEN** the `DiscoveredPackage` has `name: "@clawmasons/app-github"`, `version: "1.2.0"`, `packagePath` pointing to the package directory, and `forgeField` containing the validated app forge field
 
 ### Requirement: Workspace packages take precedence over node_modules
 When the same package name exists in both a workspace directory and node_modules, the workspace version SHALL take precedence (matching npm workspace behavior).
 
 #### Scenario: Workspace package overrides node_modules
-- **WHEN** `@clawforge/app-github` exists in both `apps/github/` and `node_modules/@clawforge/app-github/`
+- **WHEN** `@clawmasons/app-github` exists in both `apps/github/` and `node_modules/@clawmasons/app-github/`
 - **THEN** the discovery result contains only the workspace version

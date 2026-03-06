@@ -162,7 +162,7 @@ describe("ForgeProxyServer (SSE)", () => {
 
   it("tools/call with valid tool resolves and forwards to upstream", async () => {
     const port = getPort();
-    const route = makeRouteEntry("@clawforge/app-github", "github", "create_pr");
+    const route = makeRouteEntry("@clawmasons/app-github", "github", "create_pr");
     const routes = new Map([["github_create_pr", route]]);
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream({
@@ -181,7 +181,7 @@ describe("ForgeProxyServer (SSE)", () => {
     expect(result.content).toEqual([{ type: "text", text: "PR #42 created" }]);
     expect(router.resolve).toHaveBeenCalledWith("github_create_pr");
     expect(upstream.callTool).toHaveBeenCalledWith(
-      "@clawforge/app-github",
+      "@clawmasons/app-github",
       "create_pr",
       { title: "Fix bug" },
     );
@@ -209,7 +209,7 @@ describe("ForgeProxyServer (SSE)", () => {
 
   it("tools/call when upstream throws returns isError with message", async () => {
     const port = getPort();
-    const route = makeRouteEntry("@clawforge/app-github", "github", "create_pr");
+    const route = makeRouteEntry("@clawmasons/app-github", "github", "create_pr");
     const routes = new Map([["github_create_pr", route]]);
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream(
@@ -306,7 +306,7 @@ describe("ForgeProxyServer (streamable-http)", () => {
 
   it("tools/call with valid tool resolves and forwards to upstream", async () => {
     const port = getPort();
-    const route = makeRouteEntry("@clawforge/app-github", "github", "create_pr");
+    const route = makeRouteEntry("@clawmasons/app-github", "github", "create_pr");
     const routes = new Map([["github_create_pr", route]]);
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream({
@@ -324,7 +324,7 @@ describe("ForgeProxyServer (streamable-http)", () => {
 
     expect(result.content).toEqual([{ type: "text", text: "PR #42 created" }]);
     expect(upstream.callTool).toHaveBeenCalledWith(
-      "@clawforge/app-github",
+      "@clawmasons/app-github",
       "create_pr",
       { title: "Fix bug" },
     );
@@ -349,7 +349,7 @@ describe("ForgeProxyServer (streamable-http)", () => {
 
   it("tools/call when upstream throws returns isError with message", async () => {
     const port = getPort();
-    const route = makeRouteEntry("@clawforge/app-github", "github", "create_pr");
+    const route = makeRouteEntry("@clawmasons/app-github", "github", "create_pr");
     const routes = new Map([["github_create_pr", route]]);
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream(
@@ -389,7 +389,7 @@ describe("ForgeProxyServer (audit logging)", () => {
   it("logs successful tool call to audit_log", async () => {
     const port = getPort();
     db = openDatabase(":memory:");
-    const route = makeRouteEntry("@clawforge/app-github", "github", "create_pr");
+    const route = makeRouteEntry("@clawmasons/app-github", "github", "create_pr");
     const routes = new Map([["github_create_pr", route]]);
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream({
@@ -415,7 +415,7 @@ describe("ForgeProxyServer (audit logging)", () => {
     const entries = queryAuditLog(db);
     expect(entries).toHaveLength(1);
     expect(entries[0].agent_name).toBe("note-taker");
-    expect(entries[0].app_name).toBe("@clawforge/app-github");
+    expect(entries[0].app_name).toBe("@clawmasons/app-github");
     expect(entries[0].tool_name).toBe("create_pr");
     expect(entries[0].status).toBe("success");
     expect(entries[0].duration_ms).toBeGreaterThanOrEqual(0);
@@ -450,7 +450,7 @@ describe("ForgeProxyServer (audit logging)", () => {
   it("logs error tool call to audit_log", async () => {
     const port = getPort();
     db = openDatabase(":memory:");
-    const route = makeRouteEntry("@clawforge/app-github", "github", "create_pr");
+    const route = makeRouteEntry("@clawmasons/app-github", "github", "create_pr");
     const routes = new Map([["github_create_pr", route]]);
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream(undefined, new Error("Connection refused"));
@@ -476,7 +476,7 @@ describe("ForgeProxyServer (audit logging)", () => {
 
   it("does not log when db is not configured", async () => {
     const port = getPort();
-    const route = makeRouteEntry("@clawforge/app-github", "github", "create_pr");
+    const route = makeRouteEntry("@clawmasons/app-github", "github", "create_pr");
     const routes = new Map([["github_create_pr", route]]);
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream({
@@ -514,7 +514,7 @@ describe("ForgeProxyServer (approval workflow)", () => {
   it("tool matching approval pattern is approved and call proceeds", async () => {
     const port = getPort();
     db = openDatabase(":memory:");
-    const route = makeRouteEntry("@clawforge/app-github", "github", "delete_repo");
+    const route = makeRouteEntry("@clawmasons/app-github", "github", "delete_repo");
     const routes = new Map([["github_delete_repo", route]]);
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream({
@@ -562,7 +562,7 @@ describe("ForgeProxyServer (approval workflow)", () => {
   it("tool matching approval pattern is denied and call is blocked", async () => {
     const port = getPort();
     db = openDatabase(":memory:");
-    const route = makeRouteEntry("@clawforge/app-github", "github", "delete_repo");
+    const route = makeRouteEntry("@clawmasons/app-github", "github", "delete_repo");
     const routes = new Map([["github_delete_repo", route]]);
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream();
@@ -610,7 +610,7 @@ describe("ForgeProxyServer (approval workflow)", () => {
   it("tool matching approval pattern times out and auto-denies", async () => {
     const port = getPort();
     db = openDatabase(":memory:");
-    const route = makeRouteEntry("@clawforge/app-github", "github", "delete_repo");
+    const route = makeRouteEntry("@clawmasons/app-github", "github", "delete_repo");
     const routes = new Map([["github_delete_repo", route]]);
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream();
@@ -647,7 +647,7 @@ describe("ForgeProxyServer (approval workflow)", () => {
   it("tool not matching approval patterns proceeds without approval", async () => {
     const port = getPort();
     db = openDatabase(":memory:");
-    const route = makeRouteEntry("@clawforge/app-github", "github", "list_repos");
+    const route = makeRouteEntry("@clawmasons/app-github", "github", "list_repos");
     const routes = new Map([["github_list_repos", route]]);
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream({
@@ -714,7 +714,7 @@ describe("ForgeProxyServer (resources)", () => {
   it("resources/read with valid URI forwards to upstream", async () => {
     const port = getPort();
     const uriMap = new Map([
-      ["repo://owner/name", { appName: "@clawforge/app-github", originalUri: "repo://owner/name" }],
+      ["repo://owner/name", { appName: "@clawmasons/app-github", originalUri: "repo://owner/name" }],
     ]);
     const resourceRouter = createMockResourceRouter([], uriMap);
     const router = createMockRouter([], new Map());
@@ -728,7 +728,7 @@ describe("ForgeProxyServer (resources)", () => {
 
     expect(result.contents).toHaveLength(1);
     expect((result.contents[0] as { text: string }).text).toBe("resource data");
-    expect(upstream.readResource).toHaveBeenCalledWith("@clawforge/app-github", "repo://owner/name");
+    expect(upstream.readResource).toHaveBeenCalledWith("@clawmasons/app-github", "repo://owner/name");
   });
 
   it("resources/read with unknown URI returns error", async () => {
@@ -793,7 +793,7 @@ describe("ForgeProxyServer (prompts)", () => {
   it("prompts/get with valid name forwards to upstream", async () => {
     const port = getPort();
     const entry: PromptRouteEntry = {
-      appName: "@clawforge/app-github",
+      appName: "@clawmasons/app-github",
       appShortName: "github",
       originalName: "pr_review",
       prefixedName: "github_pr_review",
@@ -812,7 +812,7 @@ describe("ForgeProxyServer (prompts)", () => {
 
     expect(result.messages).toHaveLength(1);
     expect(upstream.getPrompt).toHaveBeenCalledWith(
-      "@clawforge/app-github",
+      "@clawmasons/app-github",
       "pr_review",
       { pr_number: "42" },
     );

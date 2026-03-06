@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Template directory structure
-The `@clawforge/forge` package SHALL contain a `templates/` directory with at least one template (`note-taker/`). Each template directory SHALL contain the files needed to bootstrap a working forge project.
+The `@clawmasons/forge` package SHALL contain a `templates/` directory with at least one template (`note-taker/`). Each template directory SHALL contain the files needed to bootstrap a working forge project.
 
 #### Scenario: note-taker template exists
 - **WHEN** the `templates/` directory is inspected
@@ -9,7 +9,7 @@ The `@clawforge/forge` package SHALL contain a `templates/` directory with at le
 
 #### Scenario: Template root package.json depends on forge-core
 - **WHEN** `templates/note-taker/package.json` is read
-- **THEN** it lists `@clawforge/forge-core` as a dependency with a version range
+- **THEN** it lists `@clawmasons/forge-core` as a dependency with a version range
 
 #### Scenario: Template agent references local role
 - **WHEN** `templates/note-taker/agents/note-taker/package.json` is read
@@ -17,7 +17,7 @@ The `@clawforge/forge` package SHALL contain a `templates/` directory with at le
 
 #### Scenario: Template role references forge-core components
 - **WHEN** `templates/note-taker/roles/writer/package.json` is read
-- **THEN** the forge field has `type: "role"`, tasks include `@clawforge/task-take-notes`, skills include `@clawforge/skill-markdown-conventions`, and permissions reference `@clawforge/app-filesystem`
+- **THEN** the forge field has `type: "role"`, tasks include `@clawmasons/task-take-notes`, skills include `@clawmasons/skill-markdown-conventions`, and permissions reference `@clawmasons/app-filesystem`
 
 ### Requirement: forge init --template copies template files
 The `forge init` command SHALL accept a `--template <name>` option. When specified, it SHALL copy all files from the named template directory into the target directory before creating the forge scaffold.

@@ -25,7 +25,7 @@ import type { ToolFilter } from "../../src/generator/types.js";
 // ── Constants ──────────────────────────────────────────────────────────
 
 const TEST_PORT = 19200;
-const APP_NAME = "@clawforge/app-filesystem";
+const APP_NAME = "@clawmasons/app-filesystem";
 const AGENT_NAME = "integration-test";
 
 // ── Shared State ───────────────────────────────────────────────────────

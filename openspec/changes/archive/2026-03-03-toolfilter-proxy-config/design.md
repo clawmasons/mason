@@ -60,9 +60,9 @@ src/generator/
 
 ### 5. App short name as mcpServers key
 
-**Decision:** Use the unscoped package name as the mcpServers key (e.g., `@clawforge/app-github` → `github`). Extract by taking the last segment after `/` and stripping the `app-` prefix if present.
+**Decision:** Use the unscoped package name as the mcpServers key (e.g., `@clawmasons/app-github` → `github`). Extract by taking the last segment after `/` and stripping the `app-` prefix if present.
 
-**Rationale:** tbxark/mcp-proxy uses short names as server identifiers. The full npm package name is too verbose for config keys. This matches the PRD examples where `@clawforge/app-github` appears as `github`.
+**Rationale:** tbxark/mcp-proxy uses short names as server identifiers. The full npm package name is too verbose for config keys. This matches the PRD examples where `@clawmasons/app-github` appears as `github`.
 
 ### 6. Token generation uses crypto.randomUUID
 

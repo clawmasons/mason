@@ -74,7 +74,7 @@ vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
 
 function makeStdioApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
   return {
-    name: "@clawforge/app-github",
+    name: "@clawmasons/app-github",
     version: "1.0.0",
     transport: "stdio",
     command: "node",
@@ -87,7 +87,7 @@ function makeStdioApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
 
 function makeSseApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
   return {
-    name: "@clawforge/app-slack",
+    name: "@clawmasons/app-slack",
     version: "1.0.0",
     transport: "sse",
     url: "http://localhost:3000/sse",
@@ -99,7 +99,7 @@ function makeSseApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
 
 function makeStreamableApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
   return {
-    name: "@clawforge/app-atlassian",
+    name: "@clawmasons/app-atlassian",
     version: "1.0.0",
     transport: "streamable-http",
     url: "http://localhost:4000/mcp",

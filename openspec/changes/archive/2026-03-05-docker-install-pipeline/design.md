@@ -34,7 +34,7 @@ The key insight: `forge proxy` reads its configuration from the agent package in
 
 **Choice:** The Dockerfile copies the forge project source and runs `npm ci && npm run build` to produce a working `forge` CLI inside the container.
 
-**Rationale:** The forge package is not published to npm yet, so we can't `npm install -g @clawforge/forge`. Copying from local source and building is the reliable approach. The multi-stage build keeps the final image lean.
+**Rationale:** The forge package is not published to npm yet, so we can't `npm install -g @clawmasons/forge`. Copying from local source and building is the reliable approach. The multi-stage build keeps the final image lean.
 
 ### D3: Copy agent workspace into proxy build context
 

@@ -40,7 +40,7 @@ The system SHALL create the correct MCP transport based on `ResolvedApp.transpor
 The system SHALL list all tools from a specific upstream app by name, handling pagination internally.
 
 #### Scenario: List tools for a known app
-- **WHEN** `getTools("@clawforge/app-github")` is called
+- **WHEN** `getTools("@clawmasons/app-github")` is called
 - **THEN** all tools from the github upstream client are returned as `Tool[]`
 
 #### Scenario: List tools for unknown app
@@ -51,21 +51,21 @@ The system SHALL list all tools from a specific upstream app by name, handling p
 The system SHALL list all resources from a specific upstream app by name.
 
 #### Scenario: List resources for a known app
-- **WHEN** `getResources("@clawforge/app-github")` is called
+- **WHEN** `getResources("@clawmasons/app-github")` is called
 - **THEN** all resources from the github upstream client are returned as `Resource[]`
 
 ### Requirement: List prompts from upstream
 The system SHALL list all prompts from a specific upstream app by name.
 
 #### Scenario: List prompts for a known app
-- **WHEN** `getPrompts("@clawforge/app-github")` is called
+- **WHEN** `getPrompts("@clawmasons/app-github")` is called
 - **THEN** all prompts from the github upstream client are returned as `Prompt[]`
 
 ### Requirement: Forward tool calls
 The system SHALL forward tool calls to the correct upstream app and return the result.
 
 #### Scenario: Successful tool call
-- **WHEN** `callTool("@clawforge/app-github", "create_pr", { title: "fix" })` is called
+- **WHEN** `callTool("@clawmasons/app-github", "create_pr", { title: "fix" })` is called
 - **THEN** `create_pr` is called on the github upstream client with the given arguments
 - **AND** the `CallToolResult` is returned
 
@@ -77,7 +77,7 @@ The system SHALL forward tool calls to the correct upstream app and return the r
 The system SHALL forward resource read requests to the correct upstream app.
 
 #### Scenario: Read resource
-- **WHEN** `readResource("@clawforge/app-github", "repo://owner/name")` is called
+- **WHEN** `readResource("@clawmasons/app-github", "repo://owner/name")` is called
 - **THEN** the resource is read from the github upstream client
 - **AND** the `ReadResourceResult` is returned
 
@@ -85,7 +85,7 @@ The system SHALL forward resource read requests to the correct upstream app.
 The system SHALL forward prompt get requests to the correct upstream app.
 
 #### Scenario: Get prompt
-- **WHEN** `getPrompt("@clawforge/app-github", "pr_review", { code: "..." })` is called
+- **WHEN** `getPrompt("@clawmasons/app-github", "pr_review", { code: "..." })` is called
 - **THEN** the prompt is retrieved from the github upstream client
 - **AND** the `GetPromptResult` is returned
 

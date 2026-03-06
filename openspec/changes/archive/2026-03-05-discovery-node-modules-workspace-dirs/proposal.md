@@ -1,8 +1,8 @@
 ## Why
 
-Forge's discovery system (`discoverPackages()`) currently scans two locations: local workspace directories (`apps/`, `tasks/`, `skills/`, `roles/`, `agents/`) and top-level packages in `node_modules/` that have a `forge` field. This means that component library packages like `@clawforge/forge-core` — which bundle multiple forge components inside workspace-style subdirectories — are invisible to discovery. Only the library's own `package.json` would be found, not the individual components it contains.
+Forge's discovery system (`discoverPackages()`) currently scans two locations: local workspace directories (`apps/`, `tasks/`, `skills/`, `roles/`, `agents/`) and top-level packages in `node_modules/` that have a `forge` field. This means that component library packages like `@clawmasons/forge-core` — which bundle multiple forge components inside workspace-style subdirectories — are invisible to discovery. Only the library's own `package.json` would be found, not the individual components it contains.
 
-With `forge-core` now existing as an npm workspace member (Change 1), we need discovery to look *inside* node_modules packages that contain workspace directories and register the sub-components they contain. This is the critical link that makes `npm install @clawforge/forge-core` result in all its components being automatically discoverable.
+With `forge-core` now existing as an npm workspace member (Change 1), we need discovery to look *inside* node_modules packages that contain workspace directories and register the sub-components they contain. This is the critical link that makes `npm install @clawmasons/forge-core` result in all its components being automatically discoverable.
 
 ## What Changes
 

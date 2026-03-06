@@ -1,6 +1,6 @@
 ## Context
 
-Forge discovers packages by scanning local workspace directories and `node_modules`. The current `scanNodeModules()` function only checks each top-level package (including scoped) for a direct `forge` field in its `package.json`. Component library packages like `@clawforge/forge-core` use the standard forge workspace layout internally (`apps/`, `tasks/`, `skills/`, `roles/`, `agents/`), but their sub-components are not discovered because `scanNodeModules()` does not recurse into workspace-style directories within node_modules packages.
+Forge discovers packages by scanning local workspace directories and `node_modules`. The current `scanNodeModules()` function only checks each top-level package (including scoped) for a direct `forge` field in its `package.json`. Component library packages like `@clawmasons/forge-core` use the standard forge workspace layout internally (`apps/`, `tasks/`, `skills/`, `roles/`, `agents/`), but their sub-components are not discovered because `scanNodeModules()` does not recurse into workspace-style directories within node_modules packages.
 
 The PRD (REQ-003) requires that `discoverPackages()` scan inside installed npm packages that contain forge workspace directories, registering sub-components the same way local workspace directories are scanned.
 

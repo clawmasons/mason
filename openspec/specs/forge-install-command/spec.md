@@ -75,11 +75,11 @@ The install command SHALL maintain a registry mapping runtime names to `RuntimeM
 The `--output-dir` option SHALL override the default output location. When not specified, the output directory SHALL default to `.forge/agents/{agent-short-name}/` relative to the working directory.
 
 #### Scenario: Default output directory
-- **WHEN** `forge install @clawforge/agent-repo-ops` is run without `--output-dir`
+- **WHEN** `forge install @clawmasons/agent-repo-ops` is run without `--output-dir`
 - **THEN** files SHALL be written to `.forge/agents/repo-ops/`
 
 #### Scenario: Custom output directory
-- **WHEN** `forge install @clawforge/agent-repo-ops --output-dir ./my-output` is run
+- **WHEN** `forge install @clawmasons/agent-repo-ops --output-dir ./my-output` is run
 - **THEN** files SHALL be written to `./my-output/`
 
 ### Requirement: forge install is idempotent

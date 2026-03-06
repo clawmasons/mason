@@ -225,7 +225,7 @@ describe("forge init", () => {
             version: "0.1.0",
             private: true,
             workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"],
-            dependencies: { "@clawforge/forge-core": "^0.1.0" },
+            dependencies: { "@clawmasons/forge-core": "^0.1.0" },
           },
           null,
           2,
@@ -258,10 +258,10 @@ describe("forge init", () => {
             version: "1.0.0",
             forge: {
               type: "role",
-              tasks: ["@clawforge/task-take-notes"],
-              skills: ["@clawforge/skill-markdown-conventions"],
+              tasks: ["@clawmasons/task-take-notes"],
+              skills: ["@clawmasons/skill-markdown-conventions"],
               permissions: {
-                "@clawforge/app-filesystem": {
+                "@clawmasons/app-filesystem": {
                   allow: ["read_file", "write_file"],
                   deny: [],
                 },
@@ -348,7 +348,7 @@ describe("forge init", () => {
         );
         expect(rolePkg.name).toBe(`@${dirName}/role-writer`);
         // forge-core references should remain unchanged
-        expect(rolePkg.forge.tasks).toEqual(["@clawforge/task-take-notes"]);
+        expect(rolePkg.forge.tasks).toEqual(["@clawmasons/task-take-notes"]);
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }

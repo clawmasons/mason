@@ -9,8 +9,8 @@ The `HookContext` interface SHALL contain fields for: `agentName` (string), `rol
 
 #### Scenario: HookContext populated from route entry
 - **WHEN** a tool call is received with prefixed name `github_create_pr` and arguments `{ title: "Fix bug" }`
-- **AND** the route resolves to appName `@clawforge/app-github`, originalToolName `create_pr`, appShortName `github`
-- **THEN** the HookContext SHALL contain `agentName` from server config, `roleName: "unknown"`, `appName: "@clawforge/app-github"`, `toolName: "create_pr"`, `prefixedToolName: "github_create_pr"`, and `arguments: { title: "Fix bug" }`
+- **AND** the route resolves to appName `@clawmasons/app-github`, originalToolName `create_pr`, appShortName `github`
+- **THEN** the HookContext SHALL contain `agentName` from server config, `roleName: "unknown"`, `appName: "@clawmasons/app-github"`, `toolName: "create_pr"`, `prefixedToolName: "github_create_pr"`, and `arguments: { title: "Fix bug" }`
 
 ### Requirement: auditPreHook captures start time and generates entry ID
 The `auditPreHook(context: HookContext)` function SHALL record the current timestamp and generate a unique ID (UUID). It SHALL return an `AuditPreHookResult` containing the `id` and `startTime` (number, from `Date.now()`).

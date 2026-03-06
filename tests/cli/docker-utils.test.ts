@@ -14,7 +14,7 @@ describe("resolveAgentDir", () => {
   });
 
   it("strips scope and agent- prefix", () => {
-    const result = resolveAgentDir("/workspace", "@clawforge/agent-repo-ops");
+    const result = resolveAgentDir("/workspace", "@clawmasons/agent-repo-ops");
     expect(result).toBe(path.join("/workspace", ".forge", "agents", "repo-ops"));
   });
 

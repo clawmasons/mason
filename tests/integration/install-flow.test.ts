@@ -63,13 +63,13 @@ beforeAll(() => {
   // 1. Build forge
   run("npm", ["run", "build"], FORGE_ROOT);
 
-  // 2. Pack @clawforge/forge
+  // 2. Pack @clawmasons/forge
   const forgePackJson = run("npm", ["pack", "--json"], FORGE_ROOT);
   const forgePackResult = JSON.parse(forgePackJson) as Array<{ filename: string }>;
   const forgeFilename = forgePackResult[0]!.filename;
   forgeTgzPath = join(FORGE_ROOT, forgeFilename);
 
-  // 3. Pack @clawforge/forge-core
+  // 3. Pack @clawmasons/forge-core
   const corePackJson = run("npm", ["pack", "--json"], FORGE_CORE_DIR);
   const corePackResult = JSON.parse(corePackJson) as Array<{ filename: string }>;
   const coreFilename = corePackResult[0]!.filename;
@@ -123,9 +123,9 @@ describe("E2E Install Flow (Local tgz)", () => {
     expect(existsSync(join(tmpDir, "node_modules", ".bin", "forge"))).toBe(true);
 
     // Run forge init --template note-taker
-    // This will copy template files (including package.json with @clawforge/forge-core dep),
+    // This will copy template files (including package.json with @clawmasons/forge-core dep),
     // create .forge/ scaffold, and attempt npm install. The npm install inside init
-    // may warn about @clawforge/forge-core not being on the registry — that's expected
+    // may warn about @clawmasons/forge-core not being on the registry — that's expected
     // for local tgz testing. The template files are still copied correctly.
     forgeCli(["init", "--template", "note-taker"], tmpDir);
 
@@ -157,21 +157,21 @@ describe("E2E Install Flow (Local tgz)", () => {
     run("npm", ["install", forgeTgzPath, forgeCoreTgzPath], tmpDir);
 
     // Verify both packages are installed
-    expect(existsSync(join(tmpDir, "node_modules", "@clawforge", "forge"))).toBe(true);
-    expect(existsSync(join(tmpDir, "node_modules", "@clawforge", "forge-core"))).toBe(true);
+    expect(existsSync(join(tmpDir, "node_modules", "@clawmasons", "forge"))).toBe(true);
+    expect(existsSync(join(tmpDir, "node_modules", "@clawmasons", "forge-core"))).toBe(true);
 
     // Verify forge CLI binary is linked
     expect(existsSync(join(tmpDir, "node_modules", ".bin", "forge"))).toBe(true);
 
     // Verify forge-core contains expected component structure
     expect(
-      existsSync(join(tmpDir, "node_modules", "@clawforge", "forge-core", "apps", "filesystem", "package.json")),
+      existsSync(join(tmpDir, "node_modules", "@clawmasons", "forge-core", "apps", "filesystem", "package.json")),
     ).toBe(true);
     expect(
-      existsSync(join(tmpDir, "node_modules", "@clawforge", "forge-core", "tasks", "take-notes", "package.json")),
+      existsSync(join(tmpDir, "node_modules", "@clawmasons", "forge-core", "tasks", "take-notes", "package.json")),
     ).toBe(true);
     expect(
-      existsSync(join(tmpDir, "node_modules", "@clawforge", "forge-core", "skills", "markdown-conventions", "package.json")),
+      existsSync(join(tmpDir, "node_modules", "@clawmasons", "forge-core", "skills", "markdown-conventions", "package.json")),
     ).toBe(true);
   }, TIMEOUT);
 
@@ -205,9 +205,9 @@ describe("E2E Install Flow (Local tgz)", () => {
     expect(role).toBeDefined();
 
     // Role should reference forge-core components
-    expect(role!.tasks.some((t) => t.name === "@clawforge/task-take-notes")).toBe(true);
-    expect(role!.skills.some((s) => s.name === "@clawforge/skill-markdown-conventions")).toBe(true);
-    expect(role!.apps.some((a) => a.name === "@clawforge/app-filesystem")).toBe(true);
+    expect(role!.tasks.some((t) => t.name === "@clawmasons/task-take-notes")).toBe(true);
+    expect(role!.skills.some((s) => s.name === "@clawmasons/skill-markdown-conventions")).toBe(true);
+    expect(role!.apps.some((a) => a.name === "@clawmasons/app-filesystem")).toBe(true);
   }, TIMEOUT);
 
   it("step 5: forge install generates single-stage Dockerfile", () => {

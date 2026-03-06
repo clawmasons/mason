@@ -16,15 +16,15 @@ The lock file SHALL include:
 - `agent.runtimes` — declared runtimes
 
 #### Scenario: Agent metadata is captured
-- **WHEN** the agent is `@clawforge/agent-repo-ops` version `1.0.0`
-- **THEN** the lock file SHALL contain `agent: { name: "@clawforge/agent-repo-ops", version: "1.0.0", runtimes: [...] }`
+- **WHEN** the agent is `@clawmasons/agent-repo-ops` version `1.0.0`
+- **THEN** the lock file SHALL contain `agent: { name: "@clawmasons/agent-repo-ops", version: "1.0.0", runtimes: [...] }`
 
 ### Requirement: Lock file contains resolved roles with versions
 
 The lock file SHALL include a `roles` array where each entry has the role's `name`, `version`, and arrays of `tasks`, `apps`, and `skills` (each with `name` and `version`).
 
 #### Scenario: Roles and their dependencies are captured
-- **WHEN** the agent has a role `@clawforge/role-issue-manager` with tasks and apps
+- **WHEN** the agent has a role `@clawmasons/role-issue-manager` with tasks and apps
 - **THEN** the lock file SHALL include the role with its tasks, apps, and skills listed by name and version
 
 ### Requirement: Lock file contains generated files list

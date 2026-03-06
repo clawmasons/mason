@@ -9,13 +9,13 @@ const TYPE_PREFIXES = ["app-", "agent-", "role-", "task-", "skill-"];
  * Strips the npm scope and any known forge type prefix.
  *
  * Examples:
- *   "@clawforge/app-github" → "github"
- *   "@clawforge/agent-repo-ops" → "repo-ops"
- *   "@clawforge/slack-server" → "slack-server"
+ *   "@clawmasons/app-github" → "github"
+ *   "@clawmasons/agent-repo-ops" → "repo-ops"
+ *   "@clawmasons/slack-server" → "slack-server"
  *   "app-github" → "github"
  */
 export function getAppShortName(packageName: string): string {
-  // Strip scope (e.g., "@clawforge/app-github" → "app-github")
+  // Strip scope (e.g., "@clawmasons/app-github" → "app-github")
   const parts = packageName.split("/");
   const unscoped = parts[parts.length - 1] ?? packageName;
 

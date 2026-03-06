@@ -486,9 +486,9 @@ describe("runInstall", () => {
     setupValidAgent();
 
     // Simulate a forge-core package in node_modules that bundles a task sub-component
-    const nmTaskDir = path.join(tmpDir, "node_modules", "@clawforge", "forge-core", "tasks", "take-notes");
+    const nmTaskDir = path.join(tmpDir, "node_modules", "@clawmasons", "forge-core", "tasks", "take-notes");
     writePackage(nmTaskDir, {
-      name: "@clawforge/task-take-notes",
+      name: "@clawmasons/task-take-notes",
       version: "1.0.0",
       forge: {
         type: "task",
@@ -503,7 +503,7 @@ describe("runInstall", () => {
     const rolePkg = JSON.parse(
       fs.readFileSync(path.join(tmpDir, "roles", "manager", "package.json"), "utf-8"),
     );
-    rolePkg.forge.tasks.push("@clawforge/task-take-notes");
+    rolePkg.forge.tasks.push("@clawmasons/task-take-notes");
     fs.writeFileSync(
       path.join(tmpDir, "roles", "manager", "package.json"),
       JSON.stringify(rolePkg, null, 2),
@@ -532,9 +532,9 @@ describe("runInstall", () => {
     setupValidAgent();
 
     // Simulate an unrelated agent in node_modules with the same basename as our local agent
-    const nmAgentDir = path.join(tmpDir, "node_modules", "@clawforge", "forge-core", "agents", "ops");
+    const nmAgentDir = path.join(tmpDir, "node_modules", "@clawmasons", "forge-core", "agents", "ops");
     writePackage(nmAgentDir, {
-      name: "@clawforge/agent-ops",
+      name: "@clawmasons/agent-ops",
       version: "1.0.0",
       forge: {
         type: "agent",
@@ -553,7 +553,7 @@ describe("runInstall", () => {
       fs.readFileSync(path.join(outputDir, "forge-proxy/workspace/agents/ops/package.json"), "utf-8"),
     );
     expect(agentPkg.name).toBe("@test/agent-ops");
-    expect(agentPkg.name).not.toBe("@clawforge/agent-ops");
+    expect(agentPkg.name).not.toBe("@clawmasons/agent-ops");
   });
 
   it("claude-code compose service has restart no", async () => {

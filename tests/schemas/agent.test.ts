@@ -6,7 +6,7 @@ describe("agentForgeFieldSchema", () => {
     const result = agentForgeFieldSchema.safeParse({
       type: "agent",
       runtimes: ["claude-code", "codex"],
-      roles: ["@clawforge/role-issue-manager"],
+      roles: ["@clawmasons/role-issue-manager"],
       proxy: {
         port: 9090,
         type: "sse",
@@ -19,11 +19,11 @@ describe("agentForgeFieldSchema", () => {
     const result = agentForgeFieldSchema.safeParse({
       type: "agent",
       runtimes: ["claude-code"],
-      roles: ["@clawforge/role-issue-manager"],
+      roles: ["@clawmasons/role-issue-manager"],
       resources: [
         {
           type: "github-repo",
-          ref: "clawforge/openclaw",
+          ref: "clawmasons/openclaw",
           access: "read-write",
         },
       ],
@@ -31,14 +31,14 @@ describe("agentForgeFieldSchema", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.resources).toHaveLength(1);
-      expect(result.data.resources?.[0].ref).toBe("clawforge/openclaw");
+      expect(result.data.resources?.[0].ref).toBe("clawmasons/openclaw");
     }
   });
 
   it("rejects agent missing runtimes", () => {
     const result = agentForgeFieldSchema.safeParse({
       type: "agent",
-      roles: ["@clawforge/role-issue-manager"],
+      roles: ["@clawmasons/role-issue-manager"],
     });
     expect(result.success).toBe(false);
   });
@@ -47,7 +47,7 @@ describe("agentForgeFieldSchema", () => {
     const result = agentForgeFieldSchema.safeParse({
       type: "agent",
       runtimes: [],
-      roles: ["@clawforge/role-issue-manager"],
+      roles: ["@clawmasons/role-issue-manager"],
     });
     expect(result.success).toBe(false);
   });
@@ -60,19 +60,19 @@ describe("agentForgeFieldSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("validates PRD example: @clawforge/agent-repo-ops", () => {
+  it("validates PRD example: @clawmasons/agent-repo-ops", () => {
     const result = agentForgeFieldSchema.safeParse({
       type: "agent",
       description: "Repository operations agent for GitHub.",
       runtimes: ["claude-code", "codex"],
       roles: [
-        "@clawforge/role-issue-manager",
-        "@clawforge/role-pr-reviewer",
+        "@clawmasons/role-issue-manager",
+        "@clawmasons/role-pr-reviewer",
       ],
       resources: [
         {
           type: "github-repo",
-          ref: "clawforge/openclaw",
+          ref: "clawmasons/openclaw",
           access: "read-write",
         },
       ],
@@ -88,7 +88,7 @@ describe("agentForgeFieldSchema", () => {
     const result = agentForgeFieldSchema.safeParse({
       type: "agent",
       runtimes: ["claude-code"],
-      roles: ["@clawforge/role-issue-manager"],
+      roles: ["@clawmasons/role-issue-manager"],
     });
     expect(result.success).toBe(true);
     if (result.success) {

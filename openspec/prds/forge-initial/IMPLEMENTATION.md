@@ -22,13 +22,13 @@ Set up the TypeScript project with build tooling (tsconfig, vitest, eslint) and 
 
 **References:** PRD §3 (Package Taxonomy), PRD Appendix A (forge Field JSON Schema Reference)
 
-**User Story:** As a forge developer, I can import `@clawforge/forge` schema validators and validate any package.json's `forge` field against the correct type schema, so I know the metadata is well-formed before any runtime operations.
+**User Story:** As a forge developer, I can import `@clawmasons/forge` schema validators and validate any package.json's `forge` field against the correct type schema, so I know the metadata is well-formed before any runtime operations.
 
 **Testable output:**
 - `npm test` passes with unit tests covering all five package type schemas
 - Valid PRD example package.json snippets pass validation
 - Invalid/missing fields produce clear Zod error messages
-- Published types are importable: `import { AppSchema, RoleSchema, ... } from '@clawforge/forge'`
+- Published types are importable: `import { AppSchema, RoleSchema, ... } from '@clawmasons/forge'`
 
 **Implemented:** 2026-03-03
 - [Proposal](../../changes/archive/2026-03-03-project-bootstrap-schema-types/proposal.md)
@@ -74,7 +74,7 @@ Implement the graph resolver that reads installed npm packages, parses their `fo
 
 **Testable output:**
 - Unit tests with fixture package.json files produce correct `ResolvedAgent` structures
-- Resolving the PRD's `@clawforge/agent-repo-ops` example yields 2 roles, their tasks, apps, and skills
+- Resolving the PRD's `@clawmasons/agent-repo-ops` example yields 2 roles, their tasks, apps, and skills
 - Circular dependency detection throws a clear error for composite task cycles
 - Missing dependencies produce actionable error messages (e.g., "task X requires app Y which is not installed")
 
@@ -203,7 +203,7 @@ Wire together all preceding components into the `forge install <agent-pkg>` comm
 
 **References:** PRD §8 (forge install Flow — all 9 steps)
 
-**User Story:** As an agent developer, I can run `forge install @clawforge/agent-repo-ops` and get a complete, ready-to-run scaffolded directory with proxy config, runtime workspaces, docker-compose, and credentials prompting — so I go from package to deployment in one command.
+**User Story:** As an agent developer, I can run `forge install @clawmasons/agent-repo-ops` and get a complete, ready-to-run scaffolded directory with proxy config, runtime workspaces, docker-compose, and credentials prompting — so I go from package to deployment in one command.
 
 **Testable output:**
 - Integration test: `forge install` on a fixture agent package produces the full directory layout from PRD §6.1
@@ -282,7 +282,7 @@ Implement `forge add <pkg>` (wraps `npm install` with forge field validation and
 
 **References:** PRD §5.1 (Command Reference — add, remove)
 
-**User Story:** As an agent developer, I can run `forge add @clawforge/app-github` to add an app dependency with validation that it's a real forge package, and `forge remove` warns me if other packages depend on it — so the dependency graph stays consistent.
+**User Story:** As an agent developer, I can run `forge add @clawmasons/app-github` to add an app dependency with validation that it's a real forge package, and `forge remove` warns me if other packages depend on it — so the dependency graph stays consistent.
 
 **Testable output:**
 - `forge add` with a valid forge package runs npm install and succeeds

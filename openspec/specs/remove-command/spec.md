@@ -15,18 +15,18 @@ The `forge remove` command SHALL be registered as a Commander.js command with a 
 Before removing a package, the command SHALL scan all discovered forge packages in the workspace to find packages that reference the target package in their `forge` field.
 
 #### Scenario: No dependents found
-- **WHEN** `forge remove @clawforge/app-unused` is run and no other package references it
+- **WHEN** `forge remove @clawmasons/app-unused` is run and no other package references it
 - **THEN** the command SHALL proceed with npm uninstall
 
 #### Scenario: Dependents found without --force
-- **WHEN** `forge remove @clawforge/app-github` is run and `@clawforge/role-manager` references it in `permissions`
+- **WHEN** `forge remove @clawmasons/app-github` is run and `@clawmasons/role-manager` references it in `permissions`
 - **THEN** the command SHALL NOT run npm uninstall
 - **AND** SHALL print an error listing the dependent packages
 - **AND** SHALL suggest using `--force` to override
 - **AND** SHALL exit with code 1
 
 #### Scenario: Dependents found with --force
-- **WHEN** `forge remove @clawforge/app-github --force` is run and dependents exist
+- **WHEN** `forge remove @clawmasons/app-github --force` is run and dependents exist
 - **THEN** the command SHALL print a warning listing the dependent packages
 - **AND** SHALL proceed with npm uninstall despite the dependents
 
@@ -71,5 +71,5 @@ When removal is permitted (no dependents or `--force`), the command SHALL delega
 - **AND** SHALL print an error message containing "Remove failed"
 
 #### Scenario: Remove with extra npm flags
-- **WHEN** `forge remove @clawforge/app-github --force -- --no-save` is run
-- **THEN** the command SHALL execute `npm uninstall @clawforge/app-github --no-save`
+- **WHEN** `forge remove @clawmasons/app-github --force -- --no-save` is run
+- **THEN** the command SHALL execute `npm uninstall @clawmasons/app-github --no-save`

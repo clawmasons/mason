@@ -1,14 +1,14 @@
 ## Context
 
-Forge's `example/` directory contains a complete note-taker agent with all 5 component types (`@example/*` scope). These components are useful building blocks but are inaccessible outside the repo. The forge-packaging PRD (REQ-001, REQ-002) requires a publishable `@clawforge/forge-core` workspace package containing these components with `@clawforge/*` naming.
+Forge's `example/` directory contains a complete note-taker agent with all 5 component types (`@example/*` scope). These components are useful building blocks but are inaccessible outside the repo. The forge-packaging PRD (REQ-001, REQ-002) requires a publishable `@clawmasons/forge-core` workspace package containing these components with `@clawmasons/*` naming.
 
-The root `package.json` is `@clawforge/forge` (version 0.1.0) — a standard npm package with `bin`, `main`, `types`, and build scripts. It does not currently use npm workspaces.
+The root `package.json` is `@clawmasons/forge` (version 0.1.0) — a standard npm package with `bin`, `main`, `types`, and build scripts. It does not currently use npm workspaces.
 
 ## Goals / Non-Goals
 
 **Goals:**
 - Create `forge-core/` as an npm workspace member with correct package structure
-- Copy all 5 component types from `example/` with `@clawforge/*` naming
+- Copy all 5 component types from `example/` with `@clawmasons/*` naming
 - Ensure `npm install` at root succeeds with the workspace config
 - Ensure `npm pack` in forge-core produces a valid tarball with all components
 
@@ -32,8 +32,8 @@ The package contains only `package.json` files, markdown prompts, and skill arti
 ### 4. Root workspaces config is `["forge-core"]` (not `["forge-core/*"]`)
 The root `package.json` adds `"workspaces": ["forge-core"]` — treating forge-core itself as the workspace member. The sub-component package.json files inside forge-core are for forge's resolver, not npm's workspace system. npm doesn't need to manage them as individual packages.
 
-### 5. Scope naming: `@clawforge/<type>-<name>`
-All components follow the pattern: `@clawforge/app-filesystem`, `@clawforge/task-take-notes`, `@clawforge/skill-markdown-conventions`, `@clawforge/role-writer`, `@clawforge/agent-note-taker`. This matches the PRD naming convention.
+### 5. Scope naming: `@clawmasons/<type>-<name>`
+All components follow the pattern: `@clawmasons/app-filesystem`, `@clawmasons/task-take-notes`, `@clawmasons/skill-markdown-conventions`, `@clawmasons/role-writer`, `@clawmasons/agent-note-taker`. This matches the PRD naming convention.
 
 ## Risks / Trade-offs
 

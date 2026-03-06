@@ -4,7 +4,7 @@ import type { ResolvedAgent, ResolvedApp, ResolvedRole } from "../../src/resolve
 
 function makeGithubApp(): ResolvedApp {
   return {
-    name: "@clawforge/app-github",
+    name: "@clawmasons/app-github",
     version: "1.2.0",
     transport: "stdio",
     command: "npx",
@@ -17,7 +17,7 @@ function makeGithubApp(): ResolvedApp {
 
 function makeSlackApp(): ResolvedApp {
   return {
-    name: "@clawforge/app-slack",
+    name: "@clawmasons/app-slack",
     version: "1.0.0",
     transport: "stdio",
     command: "npx",
@@ -33,14 +33,14 @@ function makeRepoOpsAgent(): ResolvedAgent {
   const slackApp = makeSlackApp();
 
   const issueManager: ResolvedRole = {
-    name: "@clawforge/role-issue-manager",
+    name: "@clawmasons/role-issue-manager",
     version: "2.0.0",
     permissions: {
-      "@clawforge/app-github": {
+      "@clawmasons/app-github": {
         allow: ["create_issue", "list_repos"],
         deny: [],
       },
-      "@clawforge/app-slack": {
+      "@clawmasons/app-slack": {
         allow: ["send_message"],
         deny: [],
       },
@@ -51,7 +51,7 @@ function makeRepoOpsAgent(): ResolvedAgent {
   };
 
   return {
-    name: "@clawforge/agent-repo-ops",
+    name: "@clawmasons/agent-repo-ops",
     version: "1.0.0",
     runtimes: ["claude-code", "codex"],
     roles: [issueManager],

@@ -5,13 +5,13 @@ Agent Forge System — npm-native packaging, governance, and runtime portability
 ## Installation
 
 ```bash
-npm install @clawforge/forge
+npm install @clawmasons/forge
 ```
 
 Or install globally to use the `forge` CLI anywhere:
 
 ```bash
-npm install -g @clawforge/forge
+npm install -g @clawmasons/forge
 ```
 
 ## CLI Usage
@@ -24,16 +24,16 @@ forge init
 forge list
 
 # Validate an agent's dependency graph
-forge validate @clawforge/agent-note-taker
+forge validate @clawmasons/agent-note-taker
 
 # Install and generate deployment artifacts
-forge install @clawforge/agent-note-taker
+forge install @clawmasons/agent-note-taker
 
 # Run an installed agent
-forge run @clawforge/agent-note-taker
+forge run @clawmasons/agent-note-taker
 
 # Stop a running agent
-forge stop @clawforge/agent-note-taker
+forge stop @clawmasons/agent-note-taker
 ```
 
 ## Using a Local Build
@@ -55,7 +55,7 @@ npm run build
 npm link
 
 # In your consuming project — use the linked version
-npm link @clawforge/forge
+npm link @clawmasons/forge
 ```
 
 Now `forge` commands and library imports will resolve to your local build. Any changes you make to forge just need an `npm run build` to take effect.
@@ -67,7 +67,7 @@ Instead of `npm link`, you can point directly to the local path in your consumin
 ```json
 {
   "dependencies": {
-    "@clawforge/forge": "file:../path/to/forge"
+    "@clawmasons/forge": "file:../path/to/forge"
   }
 }
 ```
@@ -92,7 +92,7 @@ import {
   resolveAgent,
   validateAgent,
   claudeCodeMaterializer,
-} from "@clawforge/forge";
+} from "@clawmasons/forge";
 ```
 
 ## Getting Started
@@ -106,7 +106,7 @@ forge validate @my-project/agent-note-taker
 forge install @my-project/agent-note-taker
 ```
 
-The `note-taker` template creates a working agent project that uses pre-built components from [`@clawforge/forge-core`](./forge-core/) (apps, tasks, skills, roles) as building blocks.
+The `note-taker` template creates a working agent project that uses pre-built components from [`@clawmasons/forge-core`](./forge-core/) (apps, tasks, skills, roles) as building blocks.
 
 ## Development
 

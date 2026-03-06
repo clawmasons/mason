@@ -53,10 +53,10 @@ describe("ToolRouter.unprefixName", () => {
 describe("ToolRouter constructor", () => {
   it("builds routing table with prefixed tools", () => {
     const upstreamTools = new Map<string, Tool[]>([
-      ["@clawforge/app-github", [makeTool("create_pr"), makeTool("list_repos")]],
+      ["@clawmasons/app-github", [makeTool("create_pr"), makeTool("list_repos")]],
     ]);
     const filters = new Map<string, ToolFilter>([
-      ["@clawforge/app-github", makeFilter(["create_pr", "list_repos"])],
+      ["@clawmasons/app-github", makeFilter(["create_pr", "list_repos"])],
     ]);
 
     const router = new ToolRouter(upstreamTools, filters);
@@ -72,12 +72,12 @@ describe("ToolRouter constructor", () => {
   it("filters out tools not in the allow-list", () => {
     const upstreamTools = new Map<string, Tool[]>([
       [
-        "@clawforge/app-github",
+        "@clawmasons/app-github",
         [makeTool("create_pr"), makeTool("list_repos"), makeTool("delete_repo")],
       ],
     ]);
     const filters = new Map<string, ToolFilter>([
-      ["@clawforge/app-github", makeFilter(["create_pr", "list_repos"])],
+      ["@clawmasons/app-github", makeFilter(["create_pr", "list_repos"])],
     ]);
 
     const router = new ToolRouter(upstreamTools, filters);
@@ -93,7 +93,7 @@ describe("ToolRouter constructor", () => {
 
   it("excludes all tools for apps with no filter entry", () => {
     const upstreamTools = new Map<string, Tool[]>([
-      ["@clawforge/app-github", [makeTool("create_pr")]],
+      ["@clawmasons/app-github", [makeTool("create_pr")]],
     ]);
     const filters = new Map<string, ToolFilter>();
 
@@ -105,10 +105,10 @@ describe("ToolRouter constructor", () => {
 
   it("excludes all tools for apps with empty allow-list", () => {
     const upstreamTools = new Map<string, Tool[]>([
-      ["@clawforge/app-github", [makeTool("create_pr")]],
+      ["@clawmasons/app-github", [makeTool("create_pr")]],
     ]);
     const filters = new Map<string, ToolFilter>([
-      ["@clawforge/app-github", makeFilter([])],
+      ["@clawmasons/app-github", makeFilter([])],
     ]);
 
     const router = new ToolRouter(upstreamTools, filters);
@@ -120,11 +120,11 @@ describe("ToolRouter constructor", () => {
     // Two different apps that both resolve to short name "github"
     // (unlikely in practice but tests the guard)
     const upstreamTools = new Map<string, Tool[]>([
-      ["@clawforge/app-github", [makeTool("create_pr")]],
+      ["@clawmasons/app-github", [makeTool("create_pr")]],
       ["@other/app-github", [makeTool("create_pr")]],
     ]);
     const filters = new Map<string, ToolFilter>([
-      ["@clawforge/app-github", makeFilter(["create_pr"])],
+      ["@clawmasons/app-github", makeFilter(["create_pr"])],
       ["@other/app-github", makeFilter(["create_pr"])],
     ]);
 
@@ -141,12 +141,12 @@ describe("ToolRouter constructor", () => {
 
   it("merges tools from multiple apps correctly", () => {
     const upstreamTools = new Map<string, Tool[]>([
-      ["@clawforge/app-github", [makeTool("create_pr")]],
-      ["@clawforge/app-slack", [makeTool("send_message")]],
+      ["@clawmasons/app-github", [makeTool("create_pr")]],
+      ["@clawmasons/app-slack", [makeTool("send_message")]],
     ]);
     const filters = new Map<string, ToolFilter>([
-      ["@clawforge/app-github", makeFilter(["create_pr"])],
-      ["@clawforge/app-slack", makeFilter(["send_message"])],
+      ["@clawmasons/app-github", makeFilter(["create_pr"])],
+      ["@clawmasons/app-slack", makeFilter(["send_message"])],
     ]);
 
     const router = new ToolRouter(upstreamTools, filters);
@@ -166,10 +166,10 @@ describe("ToolRouter.listTools", () => {
   it("preserves tool description and inputSchema", () => {
     const tool = makeTool("create_pr", "Creates a pull request");
     const upstreamTools = new Map<string, Tool[]>([
-      ["@clawforge/app-github", [tool]],
+      ["@clawmasons/app-github", [tool]],
     ]);
     const filters = new Map<string, ToolFilter>([
-      ["@clawforge/app-github", makeFilter(["create_pr"])],
+      ["@clawmasons/app-github", makeFilter(["create_pr"])],
     ]);
 
     const router = new ToolRouter(upstreamTools, filters);
@@ -187,10 +187,10 @@ describe("ToolRouter.listTools", () => {
       annotations: { destructiveHint: true },
     };
     const upstreamTools = new Map<string, Tool[]>([
-      ["@clawforge/app-github", [tool]],
+      ["@clawmasons/app-github", [tool]],
     ]);
     const filters = new Map<string, ToolFilter>([
-      ["@clawforge/app-github", makeFilter(["delete_repo"])],
+      ["@clawmasons/app-github", makeFilter(["delete_repo"])],
     ]);
 
     const router = new ToolRouter(upstreamTools, filters);
@@ -204,12 +204,12 @@ describe("ToolRouter.listTools", () => {
 
 describe("ToolRouter.resolve", () => {
   const upstreamTools = new Map<string, Tool[]>([
-    ["@clawforge/app-github", [makeTool("create_pr"), makeTool("list_repos")]],
-    ["@clawforge/app-slack", [makeTool("send_message")]],
+    ["@clawmasons/app-github", [makeTool("create_pr"), makeTool("list_repos")]],
+    ["@clawmasons/app-slack", [makeTool("send_message")]],
   ]);
   const filters = new Map<string, ToolFilter>([
-    ["@clawforge/app-github", makeFilter(["create_pr", "list_repos"])],
-    ["@clawforge/app-slack", makeFilter(["send_message"])],
+    ["@clawmasons/app-github", makeFilter(["create_pr", "list_repos"])],
+    ["@clawmasons/app-slack", makeFilter(["send_message"])],
   ]);
 
   it("returns correct RouteEntry for a known prefixed name", () => {
@@ -217,7 +217,7 @@ describe("ToolRouter.resolve", () => {
     const entry = router.resolve("github_create_pr");
 
     expect(entry).not.toBeNull();
-    expect(entry!.appName).toBe("@clawforge/app-github");
+    expect(entry!.appName).toBe("@clawmasons/app-github");
     expect(entry!.appShortName).toBe("github");
     expect(entry!.originalToolName).toBe("create_pr");
     expect(entry!.prefixedToolName).toBe("github_create_pr");
@@ -229,7 +229,7 @@ describe("ToolRouter.resolve", () => {
     const entry = router.resolve("slack_send_message");
 
     expect(entry).not.toBeNull();
-    expect(entry!.appName).toBe("@clawforge/app-slack");
+    expect(entry!.appName).toBe("@clawmasons/app-slack");
     expect(entry!.appShortName).toBe("slack");
     expect(entry!.originalToolName).toBe("send_message");
   });
@@ -266,7 +266,7 @@ function makeResource(name: string, uri: string, description?: string): Resource
 describe("ResourceRouter", () => {
   it("prefixes resource names with app short name", () => {
     const resources = new Map<string, Resource[]>([
-      ["@clawforge/app-github", [makeResource("repository", "repo://owner/name")]],
+      ["@clawmasons/app-github", [makeResource("repository", "repo://owner/name")]],
     ]);
 
     const router = new ResourceRouter(resources);
@@ -280,8 +280,8 @@ describe("ResourceRouter", () => {
 
   it("lists resources from multiple apps", () => {
     const resources = new Map<string, Resource[]>([
-      ["@clawforge/app-github", [makeResource("repository", "repo://owner/name")]],
-      ["@clawforge/app-slack", [makeResource("channel", "slack://channel/general")]],
+      ["@clawmasons/app-github", [makeResource("repository", "repo://owner/name")]],
+      ["@clawmasons/app-slack", [makeResource("channel", "slack://channel/general")]],
     ]);
 
     const router = new ResourceRouter(resources);
@@ -301,20 +301,20 @@ describe("ResourceRouter", () => {
 
   it("resolves known URI to app and original URI", () => {
     const resources = new Map<string, Resource[]>([
-      ["@clawforge/app-github", [makeResource("repository", "repo://owner/name")]],
+      ["@clawmasons/app-github", [makeResource("repository", "repo://owner/name")]],
     ]);
 
     const router = new ResourceRouter(resources);
     const result = router.resolveUri("repo://owner/name");
 
     expect(result).not.toBeNull();
-    expect(result!.appName).toBe("@clawforge/app-github");
+    expect(result!.appName).toBe("@clawmasons/app-github");
     expect(result!.originalUri).toBe("repo://owner/name");
   });
 
   it("returns null for unknown URI", () => {
     const resources = new Map<string, Resource[]>([
-      ["@clawforge/app-github", [makeResource("repository", "repo://owner/name")]],
+      ["@clawmasons/app-github", [makeResource("repository", "repo://owner/name")]],
     ]);
 
     const router = new ResourceRouter(resources);
@@ -329,7 +329,7 @@ describe("ResourceRouter", () => {
       annotations: { audience: ["user"] },
     };
     const resources = new Map<string, Resource[]>([
-      ["@clawforge/app-github", [resource]],
+      ["@clawmasons/app-github", [resource]],
     ]);
 
     const router = new ResourceRouter(resources);
@@ -341,14 +341,14 @@ describe("ResourceRouter", () => {
 
   it("first app wins on duplicate URI", () => {
     const resources = new Map<string, Resource[]>([
-      ["@clawforge/app-github", [makeResource("repo", "shared://data")]],
-      ["@clawforge/app-slack", [makeResource("data", "shared://data")]],
+      ["@clawmasons/app-github", [makeResource("repo", "shared://data")]],
+      ["@clawmasons/app-slack", [makeResource("data", "shared://data")]],
     ]);
 
     const router = new ResourceRouter(resources);
     const result = router.resolveUri("shared://data");
 
-    expect(result!.appName).toBe("@clawforge/app-github");
+    expect(result!.appName).toBe("@clawmasons/app-github");
   });
 });
 
@@ -364,7 +364,7 @@ function makePrompt(name: string, description?: string): Prompt {
 describe("PromptRouter", () => {
   it("prefixes prompt names with app short name", () => {
     const prompts = new Map<string, Prompt[]>([
-      ["@clawforge/app-github", [makePrompt("pr_review")]],
+      ["@clawmasons/app-github", [makePrompt("pr_review")]],
     ]);
 
     const router = new PromptRouter(prompts);
@@ -377,8 +377,8 @@ describe("PromptRouter", () => {
 
   it("lists prompts from multiple apps", () => {
     const prompts = new Map<string, Prompt[]>([
-      ["@clawforge/app-github", [makePrompt("pr_review")]],
-      ["@clawforge/app-slack", [makePrompt("standup")]],
+      ["@clawmasons/app-github", [makePrompt("pr_review")]],
+      ["@clawmasons/app-slack", [makePrompt("standup")]],
     ]);
 
     const router = new PromptRouter(prompts);
@@ -398,14 +398,14 @@ describe("PromptRouter", () => {
 
   it("resolves known prefixed name to route entry", () => {
     const prompts = new Map<string, Prompt[]>([
-      ["@clawforge/app-github", [makePrompt("pr_review")]],
+      ["@clawmasons/app-github", [makePrompt("pr_review")]],
     ]);
 
     const router = new PromptRouter(prompts);
     const entry = router.resolve("github_pr_review");
 
     expect(entry).not.toBeNull();
-    expect(entry!.appName).toBe("@clawforge/app-github");
+    expect(entry!.appName).toBe("@clawmasons/app-github");
     expect(entry!.appShortName).toBe("github");
     expect(entry!.originalName).toBe("pr_review");
     expect(entry!.prefixedName).toBe("github_pr_review");
@@ -413,7 +413,7 @@ describe("PromptRouter", () => {
 
   it("returns null for unknown prefixed name", () => {
     const prompts = new Map<string, Prompt[]>([
-      ["@clawforge/app-github", [makePrompt("pr_review")]],
+      ["@clawmasons/app-github", [makePrompt("pr_review")]],
     ]);
 
     const router = new PromptRouter(prompts);
@@ -435,7 +435,7 @@ describe("PromptRouter", () => {
       ],
     };
     const prompts = new Map<string, Prompt[]>([
-      ["@clawforge/app-github", [prompt]],
+      ["@clawmasons/app-github", [prompt]],
     ]);
 
     const router = new PromptRouter(prompts);

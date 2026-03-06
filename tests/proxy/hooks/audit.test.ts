@@ -10,7 +10,7 @@ function makeContext(overrides?: Partial<HookContext>): HookContext {
   return {
     agentName: "note-taker",
     roleName: "writer",
-    appName: "@clawforge/app-github",
+    appName: "@clawmasons/app-github",
     toolName: "create_pr",
     prefixedToolName: "github_create_pr",
     arguments: { title: "Fix bug" },
@@ -65,7 +65,7 @@ describe("auditPostHook", () => {
     expect(entry.id).toBe("test-id-1");
     expect(entry.agent_name).toBe("note-taker");
     expect(entry.role_name).toBe("writer");
-    expect(entry.app_name).toBe("@clawforge/app-github");
+    expect(entry.app_name).toBe("@clawmasons/app-github");
     expect(entry.tool_name).toBe("create_pr");
     expect(entry.arguments).toBe(JSON.stringify({ title: "Fix bug" }));
     expect(entry.result).toBe(JSON.stringify(result));

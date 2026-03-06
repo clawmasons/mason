@@ -9,24 +9,24 @@
 
 ### CHANGE 1: Create forge-core Package
 
-Migrate component definitions from `example/` to a new `forge-core/` workspace package. Rename all packages from `@example/*` to `@clawforge/*`.
+Migrate component definitions from `example/` to a new `forge-core/` workspace package. Rename all packages from `@example/*` to `@clawmasons/*`.
 
 **PRD refs:** REQ-001 (Monorepo Structure), REQ-002 (forge-core Package)
 
-**Summary:** Create `forge-core/` as an npm workspace member at the repo root. Move apps, tasks, skills, roles, and agents from `example/` into forge-core with `@clawforge/*` naming. Add `"workspaces": ["forge-core"]` to the root `package.json`. Update all internal forge-field references (e.g., `@example/role-writer` → `@clawforge/role-writer`).
+**Summary:** Create `forge-core/` as an npm workspace member at the repo root. Move apps, tasks, skills, roles, and agents from `example/` into forge-core with `@clawmasons/*` naming. Add `"workspaces": ["forge-core"]` to the root `package.json`. Update all internal forge-field references (e.g., `@example/role-writer` → `@clawmasons/role-writer`).
 
-**User Story:** US-2 — As an agent builder, I want to install `@clawforge/forge-core` and reference its components in my own projects.
+**User Story:** US-2 — As an agent builder, I want to install `@clawmasons/forge-core` and reference its components in my own projects.
 
 **Scope:**
 - New directory: `forge-core/`
-- New file: `forge-core/package.json` (`@clawforge/forge-core`, files array includes all component dirs)
+- New file: `forge-core/package.json` (`@clawmasons/forge-core`, files array includes all component dirs)
 - Migrate from `example/`: `apps/filesystem/`, `tasks/take-notes/`, `skills/markdown-conventions/`, `roles/writer/`, `agents/note-taker/`
-- Rename all package names: `@example/*` → `@clawforge/*`
+- Rename all package names: `@example/*` → `@clawmasons/*`
 - Update all forge-field references to use new names
 - Modify root `package.json`: add `"workspaces": ["forge-core"]`
 - Do NOT remove `example/` yet (done in CHANGE 6)
 
-**Testable output:** `npm install` succeeds at root. `forge-core/package.json` is valid. All sub-component package.json files parse correctly. `npm pack` in forge-core produces a `.tgz` tarball containing all component directories. The tgz installs cleanly in a fresh directory via `npm install <path>/clawforge-forge-core-0.1.0.tgz`.
+**Testable output:** `npm install` succeeds at root. `forge-core/package.json` is valid. All sub-component package.json files parse correctly. `npm pack` in forge-core produces a `.tgz` tarball containing all component directories. The tgz installs cleanly in a fresh directory via `npm install <path>/clawmasons-forge-core-0.1.0.tgz`.
 
 **Implemented:** 2026-03-05
 - [Proposal](../../changes/archive/2026-03-05-create-forge-core-package/proposal.md)
@@ -43,16 +43,16 @@ Enhance `discoverPackages()` to scan inside node_modules packages that contain f
 
 **PRD refs:** REQ-003 (Discovery Enhancement)
 
-**Summary:** When `scanNodeModules()` finds a package in node_modules, check if its directory contains any of the standard workspace subdirectories (`apps/`, `tasks/`, `skills/`, `roles/`, `agents/`). If so, scan those subdirectories for forge packages and register them (respecting existing workspace-local precedence). This allows `@clawforge/forge-core` (and any similar package) to provide discoverable forge components without being a monorepo of individual npm packages.
+**Summary:** When `scanNodeModules()` finds a package in node_modules, check if its directory contains any of the standard workspace subdirectories (`apps/`, `tasks/`, `skills/`, `roles/`, `agents/`). If so, scan those subdirectories for forge packages and register them (respecting existing workspace-local precedence). This allows `@clawmasons/forge-core` (and any similar package) to provide discoverable forge components without being a monorepo of individual npm packages.
 
-**User Story:** US-2 — As an agent builder, when I install `@clawforge/forge-core`, its components are automatically discoverable by forge.
+**User Story:** US-2 — As an agent builder, when I install `@clawmasons/forge-core`, its components are automatically discoverable by forge.
 
 **Scope:**
 - Modify: `src/resolver/discover.ts` — add workspace-dir scanning for node_modules packages
 - New test cases: `tests/resolver/discover.test.ts` — verify sub-package discovery, precedence
 - ~15-20 lines of new code in `scanNodeModules()`
 
-**Testable output:** Unit tests: (1) `discoverPackages()` on a directory with `node_modules/forge-core/apps/filesystem/package.json` finds `@clawforge/app-filesystem`. (2) Local `apps/filesystem/` takes precedence over the same package in node_modules. (3) Packages without workspace dirs are unaffected.
+**Testable output:** Unit tests: (1) `discoverPackages()` on a directory with `node_modules/forge-core/apps/filesystem/package.json` finds `@clawmasons/app-filesystem`. (2) Local `apps/filesystem/` takes precedence over the same package in node_modules. (3) Packages without workspace dirs are unaffected.
 
 **Implemented:** 2026-03-05
 - [Proposal](../../changes/archive/2026-03-05-discovery-node-modules-workspace-dirs/proposal.md)
@@ -69,9 +69,9 @@ Create the templates directory and enhance `forge init` with template support.
 
 **PRD refs:** REQ-004 (Templates Directory), REQ-005 (`forge init` with Template Support), REQ-008 (Package Configuration)
 
-**Summary:** Create `templates/note-taker/` with a package.json (depends on `@clawforge/forge-core`), local agent definition, and local role definition. Enhance `forge init` to accept `--template <name>` and `--name <name>` options. When a template is specified, copy its files first, then apply the standard forge scaffold. When no template is specified, list available templates. After scaffolding, run `npm install`. Add `templates/` to the forge package's `files` array.
+**Summary:** Create `templates/note-taker/` with a package.json (depends on `@clawmasons/forge-core`), local agent definition, and local role definition. Enhance `forge init` to accept `--template <name>` and `--name <name>` options. When a template is specified, copy its files first, then apply the standard forge scaffold. When no template is specified, list available templates. After scaffolding, run `npm install`. Add `templates/` to the forge package's `files` array.
 
-For local testing, the template's `package.json` references `@clawforge/forge-core` with a version range (e.g., `^0.1.0`). When testing with local `.tgz` packages, the user (or test script) installs the forge-core tgz first, then runs `forge init`. The template does NOT hardcode tgz paths — it uses standard version ranges so it works with both local tgz installs and future registry publishes.
+For local testing, the template's `package.json` references `@clawmasons/forge-core` with a version range (e.g., `^0.1.0`). When testing with local `.tgz` packages, the user (or test script) installs the forge-core tgz first, then runs `forge init`. The template does NOT hardcode tgz paths — it uses standard version ranges so it works with both local tgz installs and future registry publishes.
 
 **User Story:** US-1, US-3, US-4 — New users get a working project from a template; project names are configurable; templates are discoverable.
 
@@ -82,7 +82,7 @@ For local testing, the template's `package.json` references `@clawforge/forge-co
 - Modify: root `package.json` — add `"templates"` to `files` array
 - New/updated tests: `tests/cli/init.test.ts`
 
-**Testable output:** (1) `forge init --template note-taker` in `/tmp/test-forge/` copies template files with `@test-forge/*` scoped names, creates .forge/, runs npm install. (2) `forge init --name @acme/my-agent --template note-taker` scopes local components as `@acme/*`. (3) `forge init` with no template lists available templates. (4) After init, `forge list` shows the agent tree with `@test-forge/agent-note-taker` referencing `@test-forge/role-writer` which references `@clawforge/task-take-notes`, `@clawforge/skill-markdown-conventions`, and `@clawforge/app-filesystem`.
+**Testable output:** (1) `forge init --template note-taker` in `/tmp/test-forge/` copies template files with `@test-forge/*` scoped names, creates .forge/, runs npm install. (2) `forge init --name @acme/my-agent --template note-taker` scopes local components as `@acme/*`. (3) `forge init` with no template lists available templates. (4) After init, `forge list` shows the agent tree with `@test-forge/agent-note-taker` referencing `@test-forge/role-writer` which references `@clawmasons/task-take-notes`, `@clawmasons/skill-markdown-conventions`, and `@clawmasons/app-filesystem`.
 
 **Implemented:** 2026-03-05
 - [Proposal](../../changes/archive/2026-03-05-template-system-forge-init/proposal.md)
@@ -154,11 +154,11 @@ Create an integration test that validates the complete user journey using locall
 **Summary:** Write an integration test (or script) that exercises the full workflow using only local `.tgz` packages:
 
 1. Run `npm run build` to compile forge
-2. Run `npm pack` at repo root → produces `clawforge-forge-0.1.0.tgz`
-3. Run `npm pack` in `forge-core/` → produces `clawforge-forge-core-0.1.0.tgz`
+2. Run `npm pack` at repo root → produces `clawmasons-forge-0.1.0.tgz`
+3. Run `npm pack` in `forge-core/` → produces `clawmasons-forge-core-0.1.0.tgz`
 4. Create a temp directory (`/tmp/test-forge-<random>/`)
-5. Run `npm install <path>/clawforge-forge-0.1.0.tgz` in the temp directory
-6. Run `npm install <path>/clawforge-forge-core-0.1.0.tgz` in the temp directory
+5. Run `npm install <path>/clawmasons-forge-0.1.0.tgz` in the temp directory
+6. Run `npm install <path>/clawmasons-forge-core-0.1.0.tgz` in the temp directory
 7. Run `npx forge init --template note-taker`
 8. Run `npx forge validate @test-forge/agent-note-taker` (project name derived from folder `test-forge`)
 9. Run `npx forge list`
@@ -172,7 +172,7 @@ This test proves the entire packaging + template + discovery + install pipeline 
 
 **Scope:**
 - New test: `tests/integration/install-flow.test.ts` (or shell script)
-- Uses `npm pack` to create local `.tgz` tarballs for both `@clawforge/forge` and `@clawforge/forge-core`
+- Uses `npm pack` to create local `.tgz` tarballs for both `@clawmasons/forge` and `@clawmasons/forge-core`
 - Creates temp directory, installs both tgz files, runs the full forge command sequence
 - Verifies: package.json correct, node_modules populated, forge commands succeed, Dockerfile is single-stage
 - Cleans up temp directory after (pass or fail)
