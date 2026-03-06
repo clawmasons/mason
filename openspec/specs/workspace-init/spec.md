@@ -111,6 +111,14 @@ The `@clawmasons/chapter` package SHALL contain a `templates/` directory with at
 - **WHEN** `templates/note-taker/roles/writer/package.json` is read
 - **THEN** the chapter field has `type: "role"`, tasks include `@clawmasons/task-take-notes`, skills include `@clawmasons/skill-markdown-conventions`, and permissions reference `@clawmasons/app-filesystem`
 
+#### Scenario: Template member includes identity fields
+- **WHEN** `templates/note-taker/members/note-taker/package.json` is read
+- **THEN** the chapter field includes `name`, `slug`, `email`, and `authProviders` fields as required by the member schema
+
+#### Scenario: Template member validates against member schema after init
+- **WHEN** `chapter init --template note-taker --name @acme/my-project` is run and the generated `members/note-taker/package.json` chapter field is parsed with `parseChapterField()`
+- **THEN** the parse succeeds, `type` is `"member"`, and `memberType` is `"agent"`
+
 ### Requirement: chapter init --template copies template files
 The `chapter init` command SHALL accept a `--template <name>` option. When specified, it SHALL copy all files from the named template directory into the target directory before creating the chapter scaffold.
 
