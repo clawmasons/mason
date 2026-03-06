@@ -85,7 +85,12 @@ Implement `piCodingAgentMaterializer` satisfying the `RuntimeMaterializer` inter
 
 **Testable output:** `piCodingAgentMaterializer.materializeWorkspace()` returns Map with keys: `AGENTS.md`, `.pi/settings.json`, `.pi/extensions/chapter-mcp/package.json`, `.pi/extensions/chapter-mcp/index.ts`, `skills/{name}/README.md`. `.pi/settings.json` contains correct model ID. Extension code includes `registerMcpServer()` call with proxy endpoint. Extension code includes `registerCommand()` for each task with role context. `npx tsc --noEmit` and `npx vitest run` pass.
 
-**Not Implemented Yet**
+**Implemented** -- 2026-03-06
+
+**Spec:** [openspec/changes/archive/2026-03-06-pi-coding-agent-materializer/](../../openspec/changes/archive/2026-03-06-pi-coding-agent-materializer/)
+- [Proposal](../../openspec/changes/archive/2026-03-06-pi-coding-agent-materializer/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-06-pi-coding-agent-materializer/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-06-pi-coding-agent-materializer/tasks.md)
 
 ---
 
