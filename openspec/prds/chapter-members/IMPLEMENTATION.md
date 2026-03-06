@@ -274,21 +274,33 @@ Implement the members registry file and integrate it with `chapter install`.
 
 **PRD refs:** REQ-006 (Members Registry)
 
-**Summary:** Create a members registry module that manages `.chapter/members.json`. When `chapter install` runs, it adds or updates an entry in the registry with: package name, member type, status (`"enabled"`), and installation timestamp. The registry is a simple JSON file. Create functions: `readMembersRegistry()`, `writeMembersRegistry()`, `addMember()`, `updateMemberStatus()`, `getMember()`. Integrate with `chapter install` — after successful installation, update the registry. Integrate with `chapter list` — show member status from registry.
+**Summary:** Created a members registry module at `src/registry/members.ts` that manages `.chapter/members.json`. When `chapter install` runs (for both agent and human members), it adds or updates an entry in the registry with: package name, member type, status (`"enabled"`), and installation timestamp. The registry is a simple JSON file keyed by member slug. Created functions: `readMembersRegistry()`, `writeMembersRegistry()`, `addMember()`, `updateMemberStatus()`, `getMember()`. Integrated with `chapter install` -- after successful installation, the registry is updated. Integrated with `chapter list` -- shows member type and status (enabled/disabled) alongside the member name and version.
 
 **User Story:** As a user, after running `chapter install @acme/member-note-taker`, I can see in `.chapter/members.json` that `note-taker` is installed and enabled. Running `chapter list` shows the enabled/disabled status of each member.
 
 **Scope:**
-- New file: `src/registry/members.ts` — registry CRUD functions
 - New file: `src/registry/types.ts` — MembersRegistry, MemberEntry types
-- New test: `tests/registry/members.test.ts`
-- Modify: `src/cli/commands/install.ts` — call `addMember()` after install
-- Modify: `src/cli/commands/list.ts` — show member status
-- ~100-150 lines new code
+- New file: `src/registry/members.ts` — registry CRUD functions
+- New test: `tests/registry/members.test.ts` — 17 unit tests
+- Modify: `src/cli/commands/install.ts` — call `addMember()` after install (both agent and human paths)
+- Modify: `src/cli/commands/list.ts` — read registry and show member type and status
+- Modify: `tests/cli/install.test.ts` — 3 new tests for registry integration
+- Modify: `tests/cli/list.test.ts` — 3 new tests for status display
+- ~100 lines new source code, ~200 lines new test code
 
-**Testable output:** After `chapter install`, `.chapter/members.json` exists with correct entry. Reinstalling the same member updates (not duplicates) the entry. `chapter list` output includes member status. Unit tests for all registry functions pass.
+**Testable output:** After `chapter install`, `.chapter/members.json` exists with correct entry. Reinstalling the same member updates (not duplicates) the entry. `chapter list` output includes member type and status. Unit tests for all registry functions pass. All 606 tests pass.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-06-members-registry/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-06-members-registry/proposal.md)
+- [Design](../../changes/archive/2026-03-06-members-registry/design.md)
+- [Tasks](../../changes/archive/2026-03-06-members-registry/tasks.md)
+
+**Specs updated:**
+- [members-registry](../../specs/members-registry/spec.md) -- new spec for registry module
+- [forge-install-command](../../specs/forge-install-command/spec.md) -- added registry integration requirement
+- [list-command](../../specs/list-command/spec.md) -- updated to member terminology, added status display requirement
 
 ---
 

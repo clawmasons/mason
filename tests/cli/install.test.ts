@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { program } from "../../src/cli/index.js";
 import { runInstall } from "../../src/cli/commands/install.js";
+import { readMembersRegistry } from "../../src/registry/members.js";
 
 describe("CLI install command", () => {
   it("has the install command registered", () => {
@@ -667,6 +668,58 @@ describe("runInstall", () => {
 
       const defaultDir = path.join(tmpDir, ".chapter", "members", "alice");
       expect(fs.existsSync(path.join(defaultDir, "log"))).toBe(true);
+    });
+
+    it("updates members registry for human member", async () => {
+      setupHumanMember();
+      await runInstall(tmpDir, "@test/member-alice", { outputDir: "output" });
+
+      const chapterDir = path.join(tmpDir, ".chapter");
+      const registry = readMembersRegistry(chapterDir);
+      expect(registry.members.alice).toBeDefined();
+      expect(registry.members.alice.package).toBe("@test/member-alice");
+      expect(registry.members.alice.memberType).toBe("human");
+      expect(registry.members.alice.status).toBe("enabled");
+      expect(registry.members.alice.installedAt).toBeTruthy();
+    });
+  });
+
+  describe("members registry integration", () => {
+    it("creates members.json with correct entry after agent install", async () => {
+      setupValidMember();
+      await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
+
+      expect(exitSpy).not.toHaveBeenCalledWith(1);
+
+      const chapterDir = path.join(tmpDir, ".chapter");
+      const registry = readMembersRegistry(chapterDir);
+      expect(registry.members.ops).toBeDefined();
+      expect(registry.members.ops.package).toBe("@test/member-ops");
+      expect(registry.members.ops.memberType).toBe("agent");
+      expect(registry.members.ops.status).toBe("enabled");
+      expect(registry.members.ops.installedAt).toBeTruthy();
+    });
+
+    it("reinstall updates (not duplicates) the registry entry", async () => {
+      setupValidMember();
+
+      // First install
+      await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
+      const chapterDir = path.join(tmpDir, ".chapter");
+      const registry1 = readMembersRegistry(chapterDir);
+      const firstTimestamp = registry1.members.ops.installedAt;
+
+      // Small delay to ensure different timestamp
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Second install
+      await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
+      const registry2 = readMembersRegistry(chapterDir);
+
+      // Should still have exactly one entry
+      expect(Object.keys(registry2.members)).toHaveLength(1);
+      expect(registry2.members.ops).toBeDefined();
+      expect(registry2.members.ops.installedAt).not.toBe(firstTimestamp);
     });
   });
 });
