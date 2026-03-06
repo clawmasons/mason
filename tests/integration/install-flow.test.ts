@@ -219,7 +219,7 @@ describe("E2E Install Flow (Local tgz)", () => {
     expect(existsSync(installDir)).toBe(true);
 
     // Verify Dockerfile exists and is single-stage
-    const dockerfilePath = join(installDir, "chapter-proxy", "Dockerfile");
+    const dockerfilePath = join(installDir, "proxy", "Dockerfile");
     expect(existsSync(dockerfilePath)).toBe(true);
 
     const dockerfile = readFileSync(dockerfilePath, "utf-8");
@@ -230,9 +230,12 @@ describe("E2E Install Flow (Local tgz)", () => {
     // Verify docker-compose.yml exists
     expect(existsSync(join(installDir, "docker-compose.yml"))).toBe(true);
 
-    // Verify chapter proxy build context has pre-built artifacts (not source)
-    expect(existsSync(join(installDir, "chapter-proxy", "chapter", "dist"))).toBe(true);
-    expect(existsSync(join(installDir, "chapter-proxy", "chapter", "bin"))).toBe(true);
-    expect(existsSync(join(installDir, "chapter-proxy", "chapter", "package.json"))).toBe(true);
+    // Verify log/ directory exists
+    expect(existsSync(join(installDir, "log"))).toBe(true);
+
+    // Verify proxy build context has pre-built artifacts (not source)
+    expect(existsSync(join(installDir, "proxy", "chapter", "dist"))).toBe(true);
+    expect(existsSync(join(installDir, "proxy", "chapter", "bin"))).toBe(true);
+    expect(existsSync(join(installDir, "proxy", "chapter", "package.json"))).toBe(true);
   }, TIMEOUT);
 });

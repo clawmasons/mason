@@ -100,12 +100,13 @@ function makeCodexService(): ComposeServiceDef {
 
 describe("generateDockerCompose", () => {
   describe("chapter proxy service", () => {
-    it("always uses build: ./chapter-proxy", () => {
+    it("always uses build: ./proxy", () => {
       const member = makeRepoOpsMember();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(member, services);
 
-      expect(yaml).toContain("build: ./chapter-proxy");
+      expect(yaml).toContain("build: ./proxy");
+      expect(yaml).not.toContain("build: ./chapter-proxy");
     });
 
     it("does not reference mcp-proxy image or binary", () => {
@@ -134,12 +135,12 @@ describe("generateDockerCompose", () => {
       expect(yaml).toContain('"${CHAPTER_PROXY_PORT:-8080}:8080"');
     });
 
-    it("mounts chapter-proxy logs directory", () => {
+    it("mounts proxy logs directory", () => {
       const member = makeRepoOpsMember();
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(member, services);
 
-      expect(yaml).toContain("./chapter-proxy/logs:/logs");
+      expect(yaml).toContain("./proxy/logs:/logs");
     });
 
     it("mounts data directory for persistent DB", () => {
@@ -228,7 +229,7 @@ describe("generateDockerCompose", () => {
       const services = new Map([["claude-code", makeClaudeCodeService()]]);
       const yaml = generateDockerCompose(member, services);
 
-      expect(yaml).toContain("build: ./chapter-proxy");
+      expect(yaml).toContain("build: ./proxy");
       expect(yaml).toContain('"${CHAPTER_PROXY_PORT:-9090}:9090"');
     });
   });

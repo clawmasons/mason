@@ -7,7 +7,6 @@ import { discoverPackages } from "../../resolver/discover.js";
 import { resolveMember } from "../../resolver/resolve.js";
 import { validateMember } from "../../validator/validate.js";
 import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
-import { getAppShortName } from "../../generator/toolfilter.js";
 import { claudeCodeMaterializer } from "../../materializer/claude-code.js";
 import type { RuntimeMaterializer, ComposeServiceDef } from "../../materializer/types.js";
 import type { ResolvedMember, ResolvedTask } from "../../resolver/types.js";
@@ -110,7 +109,6 @@ export async function runInstall(
     // 2. Resolve member graph
     console.log("Resolving member dependency graph...");
     const member = resolveMember(memberName, packages);
-    const memberShortName = getAppShortName(member.name);
 
     // 3. Validate
     console.log("Validating member graph...");
@@ -121,6 +119,21 @@ export async function runInstall(
         `\n✘ Member "${memberName}" failed validation with ${validation.errors.length} error(s):\n${errorLines.join("\n")}\n`,
       );
       process.exit(1);
+      return;
+    }
+
+    // 3b. Determine output directory using member slug
+    const outputDir = options.outputDir
+      ? path.resolve(rootDir, options.outputDir)
+      : path.join(rootDir, ".chapter", "members", member.slug);
+
+    // 3c. Handle human member install (log/ directory only, no docker artifacts)
+    if (member.memberType === "human") {
+      fs.mkdirSync(path.join(outputDir, "log"), { recursive: true });
+      console.log(`\n✔ Member "${memberName}" installed successfully!\n`);
+      console.log(`  Output: ${outputDir}`);
+      console.log(`  Type: human`);
+      console.log(`  Directories: log/`);
       return;
     }
 
@@ -168,26 +181,26 @@ export async function runInstall(
       runtimeServices.set(runtime, service);
     }
 
-    // 7. Generate chapter-proxy build context
-    allFiles.set("chapter-proxy/Dockerfile", proxyDockerfile);
+    // 7. Generate proxy build context
+    allFiles.set("proxy/Dockerfile", proxyDockerfile);
 
-    // Copy pre-built chapter package into chapter-proxy/chapter/ for Docker build.
+    // Copy pre-built chapter package into proxy/chapter/ for Docker build.
     // Only dist/, bin/, and package.json are needed.
     // Production dependencies are installed via npm install in the Dockerfile.
     const chapterRoot = getChapterProjectRoot();
-    copyDirToFiles(path.join(chapterRoot, "dist"), "chapter-proxy/chapter/dist", allFiles, [".git"]);
-    copyDirToFiles(path.join(chapterRoot, "bin"), "chapter-proxy/chapter/bin", allFiles, [".git"]);
+    copyDirToFiles(path.join(chapterRoot, "dist"), "proxy/chapter/dist", allFiles, [".git"]);
+    copyDirToFiles(path.join(chapterRoot, "bin"), "proxy/chapter/bin", allFiles, [".git"]);
 
     // Copy package.json for dependency installation in Docker
     const pkgJsonPath = path.join(chapterRoot, "package.json");
     if (fs.existsSync(pkgJsonPath)) {
-      allFiles.set("chapter-proxy/chapter/package.json", fs.readFileSync(pkgJsonPath, "utf-8"));
+      allFiles.set("proxy/chapter/package.json", fs.readFileSync(pkgJsonPath, "utf-8"));
     }
 
-    // Copy member workspace directories into chapter-proxy/workspace/
+    // Copy member workspace directories into proxy/workspace/
     for (const wsDir of WORKSPACE_DIRS) {
       const wsDirPath = path.join(rootDir, wsDir);
-      copyDirToFiles(wsDirPath, `chapter-proxy/workspace/${wsDir}`, allFiles);
+      copyDirToFiles(wsDirPath, `proxy/workspace/${wsDir}`, allFiles);
     }
 
     // Also copy packages discovered from outside the local workspace (e.g., node_modules/chapter-core)
@@ -202,7 +215,7 @@ export async function runInstall(
       if (!isLocal) {
         const typeDir = `${pkg.chapterField.type}s`;
         const dirName = path.basename(pkg.packagePath);
-        copyDirToFiles(pkg.packagePath, `chapter-proxy/workspace/${typeDir}/${dirName}`, allFiles);
+        copyDirToFiles(pkg.packagePath, `proxy/workspace/${typeDir}/${dirName}`, allFiles);
       }
     }
 
@@ -221,10 +234,6 @@ export async function runInstall(
     allFiles.set("chapter.lock.json", JSON.stringify(lockFile, null, 2));
 
     // 11. Write files to output directory
-    const outputDir = options.outputDir
-      ? path.resolve(rootDir, options.outputDir)
-      : path.join(rootDir, ".chapter", "members", memberShortName);
-
     console.log(`Writing files to ${outputDir}...`);
 
     for (const [relPath, content] of allFiles) {
@@ -240,6 +249,9 @@ export async function runInstall(
         fs.mkdirSync(path.join(outputDir, runtime, ".claude"), { recursive: true });
       }
     }
+
+    // Create log/ directory for activity tracking
+    fs.mkdirSync(path.join(outputDir, "log"), { recursive: true });
 
     // Success summary
     const materializedRuntimes = member.runtimes.filter((r) => materializerRegistry.has(r));

@@ -14,10 +14,10 @@ The system SHALL provide a `generateDockerCompose(agent, runtimeServices)` funct
 ### Requirement: mcp-proxy service uses native chapter proxy
 
 The `mcp-proxy` service SHALL include:
-- `build: ./chapter-proxy` (always builds from the chapter-proxy Dockerfile)
+- `build: ./proxy` (always builds from the per-member proxy Dockerfile)
 - `restart: unless-stopped`
-- Port mapping `${CHAPTER_PROXY_PORT:-<port>}:<port>` where port comes from `agent.proxy.port` (default: 9090)
-- Volume mount `./chapter-proxy/logs:/logs` for log persistence
+- Port mapping `${CHAPTER_PROXY_PORT:-<port>}:<port>` where port comes from `member.proxy.port` (default: 9090)
+- Volume mount `./proxy/logs:/logs` for log persistence
 - `CHAPTER_PROXY_TOKEN=${CHAPTER_PROXY_TOKEN}` always present in environment
 - Environment variables for all app credentials collected from resolved apps' `env` fields
 - `networks: [chapter-net]`
@@ -26,8 +26,8 @@ The `mcp-proxy` service SHALL include:
 - No `config.json` mount (chapter proxy reads from workspace)
 
 #### Scenario: Proxy service has correct port and build
-- **WHEN** the agent has `proxy: { port: 8080 }`
-- **THEN** the proxy service SHALL use `build: ./chapter-proxy` and port mapping `${CHAPTER_PROXY_PORT:-8080}:8080`
+- **WHEN** the member has `proxy: { port: 8080 }`
+- **THEN** the proxy service SHALL use `build: ./proxy` and port mapping `${CHAPTER_PROXY_PORT:-8080}:8080`
 
 #### Scenario: Proxy service always includes CHAPTER_PROXY_TOKEN
 - **WHEN** `generateDockerCompose()` is called

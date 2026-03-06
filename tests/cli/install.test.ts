@@ -214,7 +214,7 @@ describe("runInstall", () => {
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
     // Check all expected files exist
-    expect(fs.existsSync(path.join(outputDir, "chapter-proxy/Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "proxy/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "claude-code/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "claude-code/workspace/.claude/settings.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "claude-code/workspace/AGENTS.md"))).toBe(true);
@@ -314,7 +314,7 @@ describe("runInstall", () => {
     expect(firstToken).not.toBe(secondToken);
 
     // Files still exist
-    expect(fs.existsSync(path.join(outputDir, "chapter-proxy/Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "proxy/Dockerfile"))).toBe(true);
   });
 
   it("uses default output directory when --output-dir not specified", async () => {
@@ -322,7 +322,7 @@ describe("runInstall", () => {
     await runInstall(tmpDir, "@test/member-ops", {});
 
     const defaultDir = path.join(tmpDir, ".chapter", "members", "ops");
-    expect(fs.existsSync(path.join(defaultDir, "chapter-proxy/Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(defaultDir, "proxy/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(defaultDir, "docker-compose.yml"))).toBe(true);
   });
 
@@ -331,7 +331,7 @@ describe("runInstall", () => {
     const customDir = path.join(tmpDir, "custom-output");
     await runInstall(tmpDir, "@test/member-ops", { outputDir: customDir });
 
-    expect(fs.existsSync(path.join(customDir, "chapter-proxy/Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(customDir, "proxy/Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(customDir, "docker-compose.yml"))).toBe(true);
   });
 
@@ -403,12 +403,12 @@ describe("runInstall", () => {
     expect(proxySection).toContain("CHAPTER_PROXY_TOKEN=${CHAPTER_PROXY_TOKEN}");
   });
 
-  it("generates single-stage chapter-proxy/Dockerfile with pre-built chapter", async () => {
+  it("generates single-stage proxy/Dockerfile with pre-built chapter", async () => {
     setupValidMember();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
-    const dockerfilePath = path.join(outputDir, "chapter-proxy/Dockerfile");
+    const dockerfilePath = path.join(outputDir, "proxy/Dockerfile");
     expect(fs.existsSync(dockerfilePath)).toBe(true);
 
     const dockerfile = fs.readFileSync(dockerfilePath, "utf-8");
@@ -421,40 +421,41 @@ describe("runInstall", () => {
     expect(dockerfile).not.toContain("mcp-proxy");
   });
 
-  it("docker-compose.yml uses build: ./chapter-proxy", async () => {
+  it("docker-compose.yml uses build: ./proxy", async () => {
     setupValidMember();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
-    expect(composeContent).toContain("build: ./chapter-proxy");
+    expect(composeContent).toContain("build: ./proxy");
+    expect(composeContent).not.toContain("build: ./chapter-proxy");
     expect(composeContent).not.toContain("image: ghcr.io/tbxark/mcp-proxy");
   });
 
-  it("copies pre-built chapter into chapter-proxy/chapter/ build context", async () => {
+  it("copies pre-built chapter into proxy/chapter/ build context", async () => {
     setupValidMember();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     // Pre-built chapter artifacts should be in the build context
-    expect(fs.existsSync(path.join(outputDir, "chapter-proxy/chapter/package.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "proxy/chapter/package.json"))).toBe(true);
 
     // Verify source files are NOT in the build context
-    const allFiles = fs.readdirSync(path.join(outputDir, "chapter-proxy/chapter"), { recursive: true }) as string[];
+    const allFiles = fs.readdirSync(path.join(outputDir, "proxy/chapter"), { recursive: true }) as string[];
     const srcFiles = allFiles.filter((f) => f.toString().startsWith("src"));
     const tsconfigFiles = allFiles.filter((f) => f.toString().includes("tsconfig"));
     expect(srcFiles).toHaveLength(0);
     expect(tsconfigFiles).toHaveLength(0);
   });
 
-  it("copies workspace directories into chapter-proxy/workspace/", async () => {
+  it("copies workspace directories into proxy/workspace/", async () => {
     setupValidMember();
     const outputDir = path.join(tmpDir, "output");
     await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
 
     // Member workspace should be in the build context
-    expect(fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/members/ops/package.json"))).toBe(true);
-    expect(fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/apps/github/package.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "proxy/workspace/members/ops/package.json"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "proxy/workspace/apps/github/package.json"))).toBe(true);
   });
 
   it("Dockerfile includes DISABLE_AUTOUPDATER but not OOBE (externalized)", async () => {
@@ -490,7 +491,7 @@ describe("runInstall", () => {
     expect(fs.statSync(claudeDir).isDirectory()).toBe(true);
   });
 
-  it("copies node_modules chapter packages into chapter-proxy/workspace/", async () => {
+  it("copies node_modules chapter packages into proxy/workspace/", async () => {
     setupValidMember();
 
     // Simulate a chapter-core package in node_modules that bundles a task sub-component
@@ -522,17 +523,17 @@ describe("runInstall", () => {
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
-    // The node_modules task should be copied into chapter-proxy/workspace/tasks/
+    // The node_modules task should be copied into proxy/workspace/tasks/
     expect(
-      fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/tasks/take-notes/package.json")),
+      fs.existsSync(path.join(outputDir, "proxy/workspace/tasks/take-notes/package.json")),
     ).toBe(true);
     expect(
-      fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/tasks/take-notes/notes.md")),
+      fs.existsSync(path.join(outputDir, "proxy/workspace/tasks/take-notes/notes.md")),
     ).toBe(true);
 
     // Local workspace packages should still be there too
     expect(
-      fs.existsSync(path.join(outputDir, "chapter-proxy/workspace/members/ops/package.json")),
+      fs.existsSync(path.join(outputDir, "proxy/workspace/members/ops/package.json")),
     ).toBe(true);
   });
 
@@ -562,7 +563,7 @@ describe("runInstall", () => {
 
     // The local member package.json should be preserved (not overwritten by the node_modules one)
     const memberPkg = JSON.parse(
-      fs.readFileSync(path.join(outputDir, "chapter-proxy/workspace/members/ops/package.json"), "utf-8"),
+      fs.readFileSync(path.join(outputDir, "proxy/workspace/members/ops/package.json"), "utf-8"),
     );
     expect(memberPkg.name).toBe("@test/member-ops");
     expect(memberPkg.name).not.toBe("@clawmasons/member-ops");
@@ -576,5 +577,96 @@ describe("runInstall", () => {
     const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
     const claudeSection = composeContent.split("claude-code:")[1];
     expect(claudeSection).toContain("restart: no");
+  });
+
+  it("creates log/ directory for agent member install", async () => {
+    setupValidMember();
+    const outputDir = path.join(tmpDir, "output");
+    await runInstall(tmpDir, "@test/member-ops", { outputDir: "output" });
+
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+    const logDir = path.join(outputDir, "log");
+    expect(fs.existsSync(logDir)).toBe(true);
+    expect(fs.statSync(logDir).isDirectory()).toBe(true);
+  });
+
+  it("uses member slug for default output directory", async () => {
+    setupValidMember();
+    // The member has slug: "ops"
+    await runInstall(tmpDir, "@test/member-ops", {});
+
+    const defaultDir = path.join(tmpDir, ".chapter", "members", "ops");
+    expect(fs.existsSync(path.join(defaultDir, "proxy/Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(defaultDir, "docker-compose.yml"))).toBe(true);
+    expect(fs.existsSync(path.join(defaultDir, "log"))).toBe(true);
+  });
+
+  describe("human member install", () => {
+    function setupHumanMember(): void {
+      // Role (required for human members too)
+      writePackage(path.join(tmpDir, "roles", "reviewer"), {
+        name: "@test/role-reviewer",
+        version: "1.0.0",
+        chapter: {
+          type: "role",
+          tasks: [],
+          permissions: {},
+        },
+      });
+
+      // Human member
+      writePackage(path.join(tmpDir, "members", "alice"), {
+        name: "@test/member-alice",
+        version: "1.0.0",
+        chapter: {
+          type: "member",
+          memberType: "human",
+          name: "Alice Chen",
+          slug: "alice",
+          email: "alice@acme.com",
+          roles: ["@test/role-reviewer"],
+        },
+      });
+    }
+
+    it("creates only log/ directory for human member", async () => {
+      setupHumanMember();
+      const outputDir = path.join(tmpDir, "output");
+      await runInstall(tmpDir, "@test/member-alice", { outputDir: "output" });
+
+      expect(exitSpy).not.toHaveBeenCalledWith(1);
+
+      // log/ directory should exist
+      expect(fs.existsSync(path.join(outputDir, "log"))).toBe(true);
+      expect(fs.statSync(path.join(outputDir, "log")).isDirectory()).toBe(true);
+
+      // Success message should indicate human type
+      const logOutput = logSpy.mock.calls.flat().join("\n");
+      expect(logOutput).toContain("installed successfully");
+      expect(logOutput).toContain("human");
+    });
+
+    it("does not create docker artifacts for human member", async () => {
+      setupHumanMember();
+      const outputDir = path.join(tmpDir, "output");
+      await runInstall(tmpDir, "@test/member-alice", { outputDir: "output" });
+
+      expect(exitSpy).not.toHaveBeenCalledWith(1);
+
+      // No docker artifacts should exist
+      expect(fs.existsSync(path.join(outputDir, "docker-compose.yml"))).toBe(false);
+      expect(fs.existsSync(path.join(outputDir, ".env"))).toBe(false);
+      expect(fs.existsSync(path.join(outputDir, "chapter.lock.json"))).toBe(false);
+      expect(fs.existsSync(path.join(outputDir, "proxy"))).toBe(false);
+      expect(fs.existsSync(path.join(outputDir, "claude-code"))).toBe(false);
+    });
+
+    it("uses slug for default directory of human member", async () => {
+      setupHumanMember();
+      await runInstall(tmpDir, "@test/member-alice", {});
+
+      const defaultDir = path.join(tmpDir, ".chapter", "members", "alice");
+      expect(fs.existsSync(path.join(defaultDir, "log"))).toBe(true);
+    });
   });
 });
