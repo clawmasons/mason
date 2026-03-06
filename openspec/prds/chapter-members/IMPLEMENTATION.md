@@ -237,27 +237,34 @@ Replace the `agent` package type with `member`. Add the discriminated union sche
 
 ### CHANGE 6: Per-Member Directory Structure & Install Pipeline
 
-Update `chapter install` to scaffold per-member directories under `.chapter/members/<slug>/` instead of the flat layout under `.forge/agents/<name>/`.
+Update `chapter install` to scaffold per-member directories under `.chapter/members/<slug>/` with `log/`, `proxy/`, and runtime directories for agent members, and only `log/` for human members.
 
 **PRD refs:** REQ-008 (Per-Member Directory Structure)
 
-**Summary:** Rewrite the install pipeline in `src/cli/commands/install.ts` and `src/cli/commands/docker-utils.ts` to create the per-member directory structure: `.chapter/members/<slug>/log/`, `.chapter/members/<slug>/proxy/` (agent only), `.chapter/members/<slug>/<runtime>/` (agent only). Update materializers to generate workspace files into the new paths. Update Docker Compose generation for the new layout. Update `chapter run` and `chapter stop` to work with per-member paths.
+**Summary:** Updated the install pipeline in `src/cli/commands/install.ts` to use `member.slug` for directory naming, create `log/` directories for all members, rename the proxy build context from `chapter-proxy/` to `proxy/`, and handle human member installs (log/ only, no docker artifacts). Updated `src/compose/docker-compose.ts` to reference `build: ./proxy` and `./proxy/logs:/logs`. Updated all related tests and the E2E integration test. No changes needed to `docker-utils.ts`, `run.ts`, or `stop.ts` (they already used `resolveMemberDir()` which derives from package name, aligning with slug).
 
 **User Story:** As a user, when I run `chapter install @acme/member-note-taker`, the scaffolded directory is at `.chapter/members/note-taker/` with `log/`, `proxy/`, and `claude-code/` subdirectories. When I install a human member, only `log/` is created.
 
 **Scope:**
-- Modify: `src/cli/commands/install.ts` — new directory layout
-- Modify: `src/cli/commands/docker-utils.ts` — path helpers for per-member layout
-- Modify: `src/cli/commands/run.ts` — find docker-compose at new path
-- Modify: `src/cli/commands/stop.ts` — find docker-compose at new path
-- Modify: `src/materializer/claude-code.ts` — output to per-member runtime dir
-- Modify: `src/compose/docker-compose.ts` — paths relative to per-member dir
-- Modify: `src/generator/proxy-dockerfile.ts` — per-member proxy dir
-- Update all related tests
+- Modify: `src/cli/commands/install.ts` — use member.slug for dir naming, create log/, handle human members, rename chapter-proxy/ to proxy/
+- Modify: `src/compose/docker-compose.ts` — build path `./proxy`, log mount `./proxy/logs:/logs`
+- Updated tests: `tests/cli/install.test.ts`, `tests/compose/docker-compose.test.ts`, `tests/compose/lock.test.ts`, `tests/integration/install-flow.test.ts`
 
-**Testable output:** `chapter install @member-note-taker` creates `.chapter/members/note-taker/log/`, `.chapter/members/note-taker/proxy/`, `.chapter/members/note-taker/claude-code/workspace/`. Human member install creates only `.chapter/members/<slug>/log/`. All tests pass. Docker Compose generation references the new paths.
+**Testable output:** `chapter install @member-note-taker` creates `.chapter/members/note-taker/log/`, `.chapter/members/note-taker/proxy/Dockerfile`, `.chapter/members/note-taker/claude-code/workspace/`. Human member install creates only `.chapter/members/<slug>/log/`. All 583 tests pass. Docker Compose generation references `build: ./proxy`.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived Change](../../changes/archive/2026-03-06-per-member-directory-structure/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-06-per-member-directory-structure/proposal.md)
+- [Design](../../changes/archive/2026-03-06-per-member-directory-structure/design.md)
+- [Tasks](../../changes/archive/2026-03-06-per-member-directory-structure/tasks.md)
+
+**Specs updated:**
+- [forge-install-command](../../specs/forge-install-command/spec.md) -- per-member layout, log/ dir, human member handling, proxy/ build path, slug-based directory naming
+- [docker-install-pipeline](../../specs/docker-install-pipeline/spec.md) -- `chapter-proxy/` replaced with `proxy/`
+- [docker-compose-generation](../../specs/docker-compose-generation/spec.md) -- `build: ./chapter-proxy` replaced with `build: ./proxy`
+- [run-command](../../specs/run-command/spec.md) -- updated to member terminology, `.chapter/members/<slug>/` paths
+- [stop-command](../../specs/stop-command/spec.md) -- updated to member terminology, `.chapter/members/<slug>/` paths
 
 ---
 

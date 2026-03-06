@@ -135,18 +135,18 @@ describe("generateLockFile", () => {
   describe("generated files", () => {
     it("includes provided file paths", () => {
       const member = makeRepoOpsMember();
-      const files = ["docker-compose.yml", "chapter-proxy/Dockerfile", ".env"];
+      const files = ["docker-compose.yml", "proxy/Dockerfile", ".env"];
       const lock = generateLockFile(member, files);
       expect(lock.generatedFiles).toContain("docker-compose.yml");
-      expect(lock.generatedFiles).toContain("chapter-proxy/Dockerfile");
+      expect(lock.generatedFiles).toContain("proxy/Dockerfile");
       expect(lock.generatedFiles).toContain(".env");
     });
 
     it("sorts generated files", () => {
       const member = makeRepoOpsMember();
-      const files = ["docker-compose.yml", ".env", "chapter-proxy/Dockerfile"];
+      const files = ["docker-compose.yml", ".env", "proxy/Dockerfile"];
       const lock = generateLockFile(member, files);
-      expect(lock.generatedFiles).toEqual([".env", "chapter-proxy/Dockerfile", "docker-compose.yml"]);
+      expect(lock.generatedFiles).toEqual([".env", "docker-compose.yml", "proxy/Dockerfile"]);
     });
   });
 
