@@ -217,7 +217,7 @@ Wire together all preceding components into the `forge install <agent-pkg>` comm
 - [Design](../../changes/archive/2026-03-03-forge-install-orchestrated-flow/design.md)
 - [Tasks](../../changes/archive/2026-03-03-forge-install-orchestrated-flow/tasks.md)
 - [Specs: forge-install-command](../../changes/archive/2026-03-03-forge-install-orchestrated-flow/specs/forge-install-command/spec.md)
-- [Main Spec: forge-install-command](../../specs/forge-install-command/spec.md)
+- [Main Spec: install-command](../../specs/install-command/spec.md)
 
 **Notes:** npm install delegation and interactive credential prompting are deferred to future changes. The command currently assumes packages are already in the workspace. Unknown runtimes are warned and skipped rather than failing.
 
