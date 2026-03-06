@@ -105,12 +105,20 @@ Implement `generateDockerfile()` and `generateComposeService()` on the pi materi
 **User Story:** As a DevOps engineer, when `chapter install` scaffolds the Docker stack for a pi-coding-agent member, the Dockerfile and Compose service are correctly configured with the right LLM provider credentials passed through.
 
 **Scope:**
-- Modify: `src/materializer/pi-coding-agent.ts` — add `generateDockerfile()`, `generateComposeService()`, `PROVIDER_ENV_VARS` constant
-- Update tests: `tests/materializer/pi-coding-agent.test.ts` — Dockerfile content, Compose service structure, dynamic env var selection
+- Modify: `src/materializer/pi-coding-agent.ts` — add `PROVIDER_ENV_VARS` constant, update `generateComposeService()` with LLM provider env var, proxy token, proxy endpoint
+- Modify: `src/materializer/index.ts` — re-export `PROVIDER_ENV_VARS`
+- Modify: `src/compose/env.ts` — import `PROVIDER_ENV_VARS`, add LLM provider env var to `.env.example` template with deduplication
+- Update tests: `tests/materializer/pi-coding-agent.test.ts` — 21 new tests for Compose service env vars and PROVIDER_ENV_VARS constant
+- Update tests: `tests/compose/env.test.ts` — 5 new tests for LLM env var in template
 
 **Testable output:** Dockerfile installs `@mariozechner/pi-coding-agent`, CMD is `["pi", "--no-session", "--mode", "print"]`. Compose service includes `OPENROUTER_API_KEY` for openrouter provider, `ANTHROPIC_API_KEY` for anthropic provider, etc. Compose service has correct build path, volumes, networks. `npx tsc --noEmit` and `npx vitest run` pass.
 
-**Not Implemented Yet**
+**Implemented** -- 2026-03-06
+
+**Spec:** [openspec/changes/archive/2026-03-06-pi-materializer-docker/](../../openspec/changes/archive/2026-03-06-pi-materializer-docker/)
+- [Proposal](../../openspec/changes/archive/2026-03-06-pi-materializer-docker/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-06-pi-materializer-docker/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-06-pi-materializer-docker/tasks.md)
 
 ---
 

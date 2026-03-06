@@ -10,6 +10,27 @@ import {
 } from "./common.js";
 
 /**
+ * Mapping from LLM provider identifiers to their environment variable names.
+ *
+ * Used by the materializer to inject the correct API key into the
+ * Docker Compose service, and by env template generation to include
+ * the key in .env.example.
+ *
+ * @see PRD §3.3 — Supported Providers
+ * @see PRD §7.2 — Provider → Environment Variable Mapping
+ */
+export const PROVIDER_ENV_VARS: Record<string, string> = {
+  "openrouter": "OPENROUTER_API_KEY",
+  "anthropic": "ANTHROPIC_API_KEY",
+  "openai": "OPENAI_API_KEY",
+  "google": "GEMINI_API_KEY",
+  "mistral": "MISTRAL_API_KEY",
+  "groq": "GROQ_API_KEY",
+  "xai": "XAI_API_KEY",
+  "azure-openai": "AZURE_OPENAI_API_KEY",
+};
+
+/**
  * Generate the command prompt for a pi `registerCommand()` call.
  *
  * Same structure as claude-code's slash commands:
@@ -216,6 +237,23 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
       .map((r) => getAppShortName(r.name))
       .join(",");
 
+    const port = member.proxy?.port ?? 9090;
+    const environment: string[] = [
+      `CHAPTER_ROLES=${roleNames}`,
+    ];
+
+    // Add LLM provider API key env var (dynamic based on llm.provider)
+    if (member.llm) {
+      const envVar = PROVIDER_ENV_VARS[member.llm.provider];
+      if (envVar) {
+        environment.push(`${envVar}=\${${envVar}}`);
+      }
+    }
+
+    // Add proxy connection env vars
+    environment.push("CHAPTER_PROXY_TOKEN=${CHAPTER_PROXY_TOKEN}");
+    environment.push(`CHAPTER_PROXY_ENDPOINT=http://mcp-proxy:${port}`);
+
     return {
       build: "./pi-coding-agent",
       restart: "no",
@@ -223,9 +261,7 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
         "./pi-coding-agent/workspace:/home/node/workspace",
       ],
       working_dir: "/home/node/workspace",
-      environment: [
-        `CHAPTER_ROLES=${roleNames}`,
-      ],
+      environment,
       depends_on: ["mcp-proxy"],
       stdin_open: true,
       tty: true,
