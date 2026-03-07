@@ -684,6 +684,314 @@ describe("runInstall", () => {
     });
   });
 
+  describe("pi-coding-agent member install", () => {
+    function setupPiMember(): void {
+      // App
+      writePackage(path.join(tmpDir, "apps", "github"), {
+        name: "@test/app-github",
+        version: "1.0.0",
+        chapter: {
+          type: "app",
+          transport: "stdio",
+          command: "npx",
+          args: ["-y", "@modelcontextprotocol/server-github"],
+          env: { GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}" },
+          tools: ["create_issue", "list_repos"],
+          capabilities: ["tools"],
+        },
+      });
+
+      // Skill
+      writePackage(path.join(tmpDir, "skills", "labeling"), {
+        name: "@test/skill-labeling",
+        version: "1.0.0",
+        chapter: {
+          type: "skill",
+          artifacts: ["./SKILL.md"],
+          description: "Labeling taxonomy",
+        },
+      });
+
+      // Task
+      writePackage(path.join(tmpDir, "tasks", "triage"), {
+        name: "@test/task-triage",
+        version: "1.0.0",
+        chapter: {
+          type: "task",
+          taskType: "subagent",
+          prompt: "./triage.md",
+          requires: {
+            apps: ["@test/app-github"],
+            skills: ["@test/skill-labeling"],
+          },
+        },
+      });
+
+      // Role
+      writePackage(path.join(tmpDir, "roles", "manager"), {
+        name: "@test/role-manager",
+        version: "1.0.0",
+        chapter: {
+          type: "role",
+          tasks: ["@test/task-triage"],
+          skills: ["@test/skill-labeling"],
+          permissions: {
+            "@test/app-github": {
+              allow: ["create_issue", "list_repos"],
+              deny: [],
+            },
+          },
+        },
+      });
+
+      // Pi-coding-agent member
+      writePackage(path.join(tmpDir, "members", "pi-coder"), {
+        name: "@test/member-pi-coder",
+        version: "1.0.0",
+        chapter: {
+          type: "member",
+          memberType: "agent",
+          name: "Pi Coder",
+          slug: "pi-coder",
+          email: "pi-coder@chapter.local",
+          runtimes: ["pi-coding-agent"],
+          roles: ["@test/role-manager"],
+          llm: {
+            provider: "openrouter",
+            model: "anthropic/claude-sonnet-4",
+          },
+        },
+      });
+    }
+
+    it("creates complete directory structure for pi-coding-agent member", async () => {
+      setupPiMember();
+      const outputDir = path.join(tmpDir, "output");
+      await runInstall(tmpDir, "@test/member-pi-coder", { outputDir: "output" });
+
+      expect(exitSpy).not.toHaveBeenCalledWith(1);
+
+      // Pi workspace files exist
+      expect(fs.existsSync(path.join(outputDir, "pi-coding-agent/Dockerfile"))).toBe(true);
+      expect(fs.existsSync(path.join(outputDir, "pi-coding-agent/workspace/AGENTS.md"))).toBe(true);
+      expect(fs.existsSync(path.join(outputDir, "pi-coding-agent/workspace/.pi/settings.json"))).toBe(true);
+
+      // Other expected files
+      expect(fs.existsSync(path.join(outputDir, "proxy/Dockerfile"))).toBe(true);
+      expect(fs.existsSync(path.join(outputDir, "docker-compose.yml"))).toBe(true);
+      expect(fs.existsSync(path.join(outputDir, ".env"))).toBe(true);
+      expect(fs.existsSync(path.join(outputDir, "chapter.lock.json"))).toBe(true);
+    });
+
+    it("generates pi extension files and .pi/mcp.json", async () => {
+      setupPiMember();
+      const outputDir = path.join(tmpDir, "output");
+      await runInstall(tmpDir, "@test/member-pi-coder", { outputDir: "output" });
+
+      expect(exitSpy).not.toHaveBeenCalledWith(1);
+
+      const extensionIndexPath = path.join(outputDir, "pi-coding-agent/workspace/.pi/extensions/chapter-mcp/index.ts");
+      const extensionPkgPath = path.join(outputDir, "pi-coding-agent/workspace/.pi/extensions/chapter-mcp/package.json");
+      const mcpJsonPath = path.join(outputDir, "pi-coding-agent/workspace/.pi/mcp.json");
+
+      expect(fs.existsSync(extensionIndexPath)).toBe(true);
+      expect(fs.existsSync(extensionPkgPath)).toBe(true);
+      expect(fs.existsSync(mcpJsonPath)).toBe(true);
+
+      const indexTs = fs.readFileSync(extensionIndexPath, "utf-8");
+      expect(indexTs).not.toContain("pi.registerMcpServer(");
+      expect(indexTs).toContain("pi.registerCommand(");
+
+      const mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8"));
+      expect(mcpJson.mcpServers.chapter).toBeDefined();
+      expect(mcpJson.mcpServers.chapter.url).toContain("/sse");
+    });
+
+    it("generates .env with OPENROUTER_API_KEY for openrouter LLM provider", async () => {
+      setupPiMember();
+      const outputDir = path.join(tmpDir, "output");
+      await runInstall(tmpDir, "@test/member-pi-coder", { outputDir: "output" });
+
+      const envContent = fs.readFileSync(path.join(outputDir, ".env"), "utf-8");
+      expect(envContent).toContain("OPENROUTER_API_KEY=");
+    });
+
+    it("docker-compose.yml includes pi-coding-agent service", async () => {
+      setupPiMember();
+      const outputDir = path.join(tmpDir, "output");
+      await runInstall(tmpDir, "@test/member-pi-coder", { outputDir: "output" });
+
+      const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
+      expect(composeContent).toContain("pi-coding-agent:");
+      expect(composeContent).toContain("build: ./pi-coding-agent");
+    });
+
+    it("does NOT generate .claude.json or .claude/ directory", async () => {
+      setupPiMember();
+      const outputDir = path.join(tmpDir, "output");
+      await runInstall(tmpDir, "@test/member-pi-coder", { outputDir: "output" });
+
+      expect(fs.existsSync(path.join(outputDir, "pi-coding-agent/.claude.json"))).toBe(false);
+      expect(fs.existsSync(path.join(outputDir, "pi-coding-agent/.claude"))).toBe(false);
+      // Also no claude-code directory at all
+      expect(fs.existsSync(path.join(outputDir, "claude-code"))).toBe(false);
+    });
+
+    it("bakes proxy token into .pi/mcp.json", async () => {
+      setupPiMember();
+      const outputDir = path.join(tmpDir, "output");
+      await runInstall(tmpDir, "@test/member-pi-coder", { outputDir: "output" });
+
+      const mcpJsonPath = path.join(outputDir, "pi-coding-agent/workspace/.pi/mcp.json");
+      const mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8"));
+      const authHeader = mcpJson.mcpServers.chapter.headers.Authorization;
+
+      // Should contain actual token, not the placeholder
+      expect(authHeader).not.toContain("${CHAPTER_PROXY_TOKEN}");
+      expect(authHeader).toMatch(/^Bearer [a-f0-9]{64}$/);
+    });
+
+    it("pi-coding-agent .pi/settings.json has correct model", async () => {
+      setupPiMember();
+      const outputDir = path.join(tmpDir, "output");
+      await runInstall(tmpDir, "@test/member-pi-coder", { outputDir: "output" });
+
+      const settings = JSON.parse(
+        fs.readFileSync(path.join(outputDir, "pi-coding-agent/workspace/.pi/settings.json"), "utf-8"),
+      );
+      expect(settings.model).toBe("openrouter/anthropic/claude-sonnet-4");
+    });
+
+    it("prints pi-coding-agent as materialized runtime in summary", async () => {
+      setupPiMember();
+      await runInstall(tmpDir, "@test/member-pi-coder", { outputDir: "output" });
+
+      const logOutput = logSpy.mock.calls.flat().join("\n");
+      expect(logOutput).toContain("pi-coding-agent");
+      expect(logOutput).toContain("installed successfully");
+    });
+  });
+
+  describe("multi-runtime member install (claude-code + pi-coding-agent)", () => {
+    function setupMultiRuntimeMember(): void {
+      // App
+      writePackage(path.join(tmpDir, "apps", "github"), {
+        name: "@test/app-github",
+        version: "1.0.0",
+        chapter: {
+          type: "app",
+          transport: "stdio",
+          command: "npx",
+          args: ["-y", "@modelcontextprotocol/server-github"],
+          env: { GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}" },
+          tools: ["create_issue", "list_repos"],
+          capabilities: ["tools"],
+        },
+      });
+
+      // Skill
+      writePackage(path.join(tmpDir, "skills", "labeling"), {
+        name: "@test/skill-labeling",
+        version: "1.0.0",
+        chapter: {
+          type: "skill",
+          artifacts: ["./SKILL.md"],
+          description: "Labeling taxonomy",
+        },
+      });
+
+      // Task
+      writePackage(path.join(tmpDir, "tasks", "triage"), {
+        name: "@test/task-triage",
+        version: "1.0.0",
+        chapter: {
+          type: "task",
+          taskType: "subagent",
+          prompt: "./triage.md",
+          requires: {
+            apps: ["@test/app-github"],
+            skills: ["@test/skill-labeling"],
+          },
+        },
+      });
+
+      // Role
+      writePackage(path.join(tmpDir, "roles", "manager"), {
+        name: "@test/role-manager",
+        version: "1.0.0",
+        chapter: {
+          type: "role",
+          tasks: ["@test/task-triage"],
+          skills: ["@test/skill-labeling"],
+          permissions: {
+            "@test/app-github": {
+              allow: ["create_issue", "list_repos"],
+              deny: [],
+            },
+          },
+        },
+      });
+
+      // Multi-runtime member
+      writePackage(path.join(tmpDir, "members", "multi"), {
+        name: "@test/member-multi",
+        version: "1.0.0",
+        chapter: {
+          type: "member",
+          memberType: "agent",
+          name: "Multi Runtime",
+          slug: "multi",
+          email: "multi@chapter.local",
+          runtimes: ["claude-code", "pi-coding-agent"],
+          roles: ["@test/role-manager"],
+          llm: {
+            provider: "openrouter",
+            model: "anthropic/claude-sonnet-4",
+          },
+        },
+      });
+    }
+
+    it("generates both claude-code and pi-coding-agent workspaces", async () => {
+      setupMultiRuntimeMember();
+      const outputDir = path.join(tmpDir, "output");
+      await runInstall(tmpDir, "@test/member-multi", { outputDir: "output" });
+
+      expect(exitSpy).not.toHaveBeenCalledWith(1);
+
+      // Claude-code workspace
+      expect(fs.existsSync(path.join(outputDir, "claude-code/Dockerfile"))).toBe(true);
+      expect(fs.existsSync(path.join(outputDir, "claude-code/workspace/AGENTS.md"))).toBe(true);
+
+      // Pi-coding-agent workspace
+      expect(fs.existsSync(path.join(outputDir, "pi-coding-agent/Dockerfile"))).toBe(true);
+      expect(fs.existsSync(path.join(outputDir, "pi-coding-agent/workspace/AGENTS.md"))).toBe(true);
+      expect(fs.existsSync(path.join(outputDir, "pi-coding-agent/workspace/.pi/settings.json"))).toBe(true);
+    });
+
+    it("docker-compose.yml includes both runtime services", async () => {
+      setupMultiRuntimeMember();
+      const outputDir = path.join(tmpDir, "output");
+      await runInstall(tmpDir, "@test/member-multi", { outputDir: "output" });
+
+      const composeContent = fs.readFileSync(path.join(outputDir, "docker-compose.yml"), "utf-8");
+      expect(composeContent).toContain("claude-code:");
+      expect(composeContent).toContain("pi-coding-agent:");
+    });
+
+    it("creates .claude/ directory for claude-code but not for pi-coding-agent", async () => {
+      setupMultiRuntimeMember();
+      const outputDir = path.join(tmpDir, "output");
+      await runInstall(tmpDir, "@test/member-multi", { outputDir: "output" });
+
+      // Claude-code gets .claude/ dir for OOBE bypass
+      expect(fs.existsSync(path.join(outputDir, "claude-code/.claude"))).toBe(true);
+
+      // Pi-coding-agent does NOT get .claude/ dir
+      expect(fs.existsSync(path.join(outputDir, "pi-coding-agent/.claude"))).toBe(false);
+    });
+  });
+
   describe("members registry integration", () => {
     it("creates members.json with correct entry after agent install", async () => {
       setupValidMember();

@@ -1,0 +1,18 @@
+{
+  "name": "@clawmasons/app-filesystem",
+  "version": "1.0.0",
+  "description": "MCP filesystem server — read, write, and browse local files",
+  "chapter": {
+    "type": "app",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "./notes"],
+    "tools": [
+      "read_file",
+      "write_file",
+      "list_directory",
+      "create_directory"
+    ],
+    "capabilities": ["tools"]
+  }
+}

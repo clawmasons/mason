@@ -84,6 +84,7 @@ describe("validateMember", () => {
       const result = validateMember(makeMember());
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
+      expect(result.warnings).toHaveLength(0);
     });
 
     it("validates PRD repo-ops agent example", () => {
@@ -425,6 +426,102 @@ describe("validateMember", () => {
       const result = validateMember(makeMember({ roles: [role] }));
       const configErrors = result.errors.filter((e) => e.category === "app-launch-config");
       expect(configErrors).toHaveLength(0);
+    });
+  });
+
+  describe("llm-config", () => {
+    it("errors when pi-coding-agent runtime has no llm config", () => {
+      const result = validateMember(makeMember({
+        runtimes: ["pi-coding-agent"],
+        // no llm field
+      }));
+      expect(result.valid).toBe(false);
+      const llmErrors = result.errors.filter((e) => e.category === "llm-config");
+      expect(llmErrors).toHaveLength(1);
+      expect(llmErrors[0].message).toContain("pi-coding-agent");
+      expect(llmErrors[0].message).toContain("no \"llm\" configuration");
+      expect(llmErrors[0].context.member).toBe("@clawmasons/member-repo-ops");
+      expect(llmErrors[0].context.runtime).toBe("pi-coding-agent");
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it("passes when pi-coding-agent runtime has llm config", () => {
+      const result = validateMember(makeMember({
+        runtimes: ["pi-coding-agent"],
+        llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" },
+      }));
+      const llmErrors = result.errors.filter((e) => e.category === "llm-config");
+      expect(llmErrors).toHaveLength(0);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it("warns when claude-code runtime has llm config", () => {
+      const result = validateMember(makeMember({
+        runtimes: ["claude-code"],
+        llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" },
+      }));
+      expect(result.valid).toBe(true); // warnings don't affect validity
+      expect(result.errors.filter((e) => e.category === "llm-config")).toHaveLength(0);
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0].category).toBe("llm-config");
+      expect(result.warnings[0].message).toContain("claude-code");
+      expect(result.warnings[0].message).toContain("will be ignored");
+      expect(result.warnings[0].context.member).toBe("@clawmasons/member-repo-ops");
+      expect(result.warnings[0].context.runtime).toBe("claude-code");
+    });
+
+    it("no warning when claude-code runtime has no llm config", () => {
+      const result = validateMember(makeMember({
+        runtimes: ["claude-code"],
+        // no llm field — default behavior
+      }));
+      expect(result.valid).toBe(true);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it("errors for pi and warns for claude-code when both runtimes present without llm", () => {
+      const result = validateMember(makeMember({
+        runtimes: ["pi-coding-agent", "claude-code"],
+        // no llm — pi needs it, claude-code is fine
+      }));
+      expect(result.valid).toBe(false);
+      const llmErrors = result.errors.filter((e) => e.category === "llm-config");
+      expect(llmErrors).toHaveLength(1);
+      expect(llmErrors[0].context.runtime).toBe("pi-coding-agent");
+      expect(result.warnings).toHaveLength(0); // no llm → no claude-code warning
+    });
+
+    it("warns for claude-code when both runtimes present with llm", () => {
+      const result = validateMember(makeMember({
+        runtimes: ["pi-coding-agent", "claude-code"],
+        llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" },
+      }));
+      expect(result.valid).toBe(true); // pi is satisfied, claude-code just warns
+      const llmErrors = result.errors.filter((e) => e.category === "llm-config");
+      expect(llmErrors).toHaveLength(0);
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0].context.runtime).toBe("claude-code");
+    });
+
+    it("skips llm check for human members", () => {
+      const result = validateMember(makeMember({
+        memberType: "human",
+        runtimes: [], // humans don't have runtimes
+      }));
+      // Human members should not trigger any llm-config errors or warnings
+      const llmErrors = result.errors.filter((e) => e.category === "llm-config");
+      expect(llmErrors).toHaveLength(0);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it("no error for unknown runtime without llm config", () => {
+      const result = validateMember(makeMember({
+        runtimes: ["codex"],
+        // no llm — codex is not pi-coding-agent, so no error
+      }));
+      const llmErrors = result.errors.filter((e) => e.category === "llm-config");
+      expect(llmErrors).toHaveLength(0);
+      expect(result.warnings).toHaveLength(0);
     });
   });
 

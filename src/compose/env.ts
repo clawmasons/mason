@@ -1,4 +1,5 @@
 import type { ResolvedMember, ResolvedApp } from "../resolver/types.js";
+import { PROVIDER_ENV_VARS } from "../materializer/pi-coding-agent.js";
 
 /** Known runtime → auth variable mappings. */
 const RUNTIME_API_KEYS: Record<string, string> = {
@@ -69,12 +70,23 @@ export function generateEnvTemplate(member: ResolvedMember): string {
   }
 
   // Runtime auth section
+  const addedAuthVars = new Set<string>();
   lines.push("");
   lines.push("# Runtime Auth");
   for (const runtime of member.runtimes) {
     const apiKey = RUNTIME_API_KEYS[runtime];
-    if (apiKey) {
+    if (apiKey && !addedAuthVars.has(apiKey)) {
       lines.push(`${apiKey}=`);
+      addedAuthVars.add(apiKey);
+    }
+  }
+
+  // LLM provider API key (from member.llm.provider)
+  if (member.llm) {
+    const llmEnvVar = PROVIDER_ENV_VARS[member.llm.provider];
+    if (llmEnvVar && !addedAuthVars.has(llmEnvVar)) {
+      lines.push(`${llmEnvVar}=`);
+      addedAuthVars.add(llmEnvVar);
     }
   }
 

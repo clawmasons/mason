@@ -190,6 +190,49 @@ describe("generateEnvTemplate", () => {
       const env = generateEnvTemplate(member);
       expect(env).toContain("# Runtime Auth");
     });
+
+    it("includes OPENROUTER_API_KEY for pi-coding-agent member with openrouter llm", () => {
+      const member = makeRepoOpsMember();
+      member.runtimes = ["pi-coding-agent"];
+      member.llm = { provider: "openrouter", model: "anthropic/claude-sonnet-4" };
+      const env = generateEnvTemplate(member);
+      expect(env).toContain("OPENROUTER_API_KEY=");
+    });
+
+    it("includes ANTHROPIC_API_KEY for pi-coding-agent member with anthropic llm", () => {
+      const member = makeRepoOpsMember();
+      member.runtimes = ["pi-coding-agent"];
+      member.llm = { provider: "anthropic", model: "claude-opus-4" };
+      const env = generateEnvTemplate(member);
+      expect(env).toContain("ANTHROPIC_API_KEY=");
+    });
+
+    it("deduplicates when runtime and llm provider map to same env var", () => {
+      const member = makeRepoOpsMember();
+      member.runtimes = ["codex"];
+      member.llm = { provider: "openai", model: "gpt-4o" };
+      const env = generateEnvTemplate(member);
+      // Both codex runtime and openai llm provider map to OPENAI_API_KEY
+      const matches = env.match(/^OPENAI_API_KEY=/gm);
+      expect(matches).toHaveLength(1);
+    });
+
+    it("does not include LLM env var when member has no llm config", () => {
+      const member = makeRepoOpsMember();
+      member.runtimes = ["pi-coding-agent"];
+      delete member.llm;
+      const env = generateEnvTemplate(member);
+      expect(env).not.toContain("OPENROUTER_API_KEY=");
+    });
+
+    it("skips LLM env var for unknown provider", () => {
+      const member = makeRepoOpsMember();
+      member.runtimes = ["pi-coding-agent"];
+      member.llm = { provider: "custom-self-hosted", model: "my-model" };
+      const env = generateEnvTemplate(member);
+      // Should not crash and should not add any unknown env var
+      expect(env).toContain("# Runtime Auth");
+    });
   });
 
   describe("section ordering", () => {
