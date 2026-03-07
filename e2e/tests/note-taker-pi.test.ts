@@ -194,22 +194,20 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
       expect(pkg.type).toBe("module");
     });
 
-    it("extension code registers MCP server", () => {
-      const indexTs = fs.readFileSync(
-        path.join(
-          memberOutputDir,
-          "pi-coding-agent",
-          "workspace",
-          ".pi",
-          "extensions",
-          "chapter-mcp",
-          "index.ts",
-        ),
-        "utf-8",
+    it("mcp.json configures MCP server", () => {
+      const mcpJsonPath = path.join(
+        memberOutputDir,
+        "pi-coding-agent",
+        "workspace",
+        ".pi",
+        "mcp.json",
       );
+      expect(fs.existsSync(mcpJsonPath)).toBe(true);
 
-      expect(indexTs).toContain("pi.registerMcpServer(");
-      expect(indexTs).toContain('"chapter"');
+      const mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8"));
+      expect(mcpJson.mcpServers.chapter).toBeDefined();
+      expect(mcpJson.mcpServers.chapter.url).toContain("/sse");
+      expect(mcpJson.mcpServers.chapter.headers.Authorization).toContain("Bearer ");
     });
 
     it("extension code registers take-notes command", () => {
@@ -230,23 +228,20 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
       expect(indexTs).toContain('"take-notes"');
     });
 
-    it("extension code has baked proxy token (not process.env placeholder)", () => {
-      const indexTs = fs.readFileSync(
-        path.join(
-          memberOutputDir,
-          "pi-coding-agent",
-          "workspace",
-          ".pi",
-          "extensions",
-          "chapter-mcp",
-          "index.ts",
-        ),
-        "utf-8",
+    it("mcp.json has baked proxy token (not env placeholder)", () => {
+      const mcpJsonPath = path.join(
+        memberOutputDir,
+        "pi-coding-agent",
+        "workspace",
+        ".pi",
+        "mcp.json",
       );
+      const mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8"));
+      const authHeader = mcpJson.mcpServers.chapter.headers.Authorization;
 
-      // Should have a baked Bearer token (hex string), not the process.env reference
-      expect(indexTs).toContain("Bearer ");
-      expect(indexTs).not.toContain("process.env.CHAPTER_PROXY_TOKEN");
+      // Should have a baked Bearer token (hex string), not the env placeholder
+      expect(authHeader).toContain("Bearer ");
+      expect(authHeader).not.toContain("${CHAPTER_PROXY_TOKEN}");
     });
 
     it("generates skills/markdown-conventions/README.md", () => {

@@ -783,7 +783,7 @@ describe("runInstall", () => {
       expect(fs.existsSync(path.join(outputDir, "chapter.lock.json"))).toBe(true);
     });
 
-    it("generates pi extension files", async () => {
+    it("generates pi extension files and .pi/mcp.json", async () => {
       setupPiMember();
       const outputDir = path.join(tmpDir, "output");
       await runInstall(tmpDir, "@test/member-pi-coder", { outputDir: "output" });
@@ -792,13 +792,19 @@ describe("runInstall", () => {
 
       const extensionIndexPath = path.join(outputDir, "pi-coding-agent/workspace/.pi/extensions/chapter-mcp/index.ts");
       const extensionPkgPath = path.join(outputDir, "pi-coding-agent/workspace/.pi/extensions/chapter-mcp/package.json");
+      const mcpJsonPath = path.join(outputDir, "pi-coding-agent/workspace/.pi/mcp.json");
 
       expect(fs.existsSync(extensionIndexPath)).toBe(true);
       expect(fs.existsSync(extensionPkgPath)).toBe(true);
+      expect(fs.existsSync(mcpJsonPath)).toBe(true);
 
       const indexTs = fs.readFileSync(extensionIndexPath, "utf-8");
-      expect(indexTs).toContain("pi.registerMcpServer(");
+      expect(indexTs).not.toContain("pi.registerMcpServer(");
       expect(indexTs).toContain("pi.registerCommand(");
+
+      const mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8"));
+      expect(mcpJson.mcpServers.chapter).toBeDefined();
+      expect(mcpJson.mcpServers.chapter.url).toContain("/sse");
     });
 
     it("generates .env with OPENROUTER_API_KEY for openrouter LLM provider", async () => {
@@ -831,18 +837,18 @@ describe("runInstall", () => {
       expect(fs.existsSync(path.join(outputDir, "claude-code"))).toBe(false);
     });
 
-    it("bakes proxy token into extension index.ts", async () => {
+    it("bakes proxy token into .pi/mcp.json", async () => {
       setupPiMember();
       const outputDir = path.join(tmpDir, "output");
       await runInstall(tmpDir, "@test/member-pi-coder", { outputDir: "output" });
 
-      const indexTs = fs.readFileSync(
-        path.join(outputDir, "pi-coding-agent/workspace/.pi/extensions/chapter-mcp/index.ts"),
-        "utf-8",
-      );
-      // Should contain an actual hex token, not the placeholder
-      expect(indexTs).toMatch(/Bearer [a-f0-9]{64}/);
-      expect(indexTs).not.toContain("process.env.CHAPTER_PROXY_TOKEN");
+      const mcpJsonPath = path.join(outputDir, "pi-coding-agent/workspace/.pi/mcp.json");
+      const mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8"));
+      const authHeader = mcpJson.mcpServers.chapter.headers.Authorization;
+
+      // Should contain actual token, not the placeholder
+      expect(authHeader).not.toContain("${CHAPTER_PROXY_TOKEN}");
+      expect(authHeader).toMatch(/^Bearer [a-f0-9]{64}$/);
     });
 
     it("pi-coding-agent .pi/settings.json has correct model", async () => {
