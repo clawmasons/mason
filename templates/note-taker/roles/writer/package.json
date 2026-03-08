@@ -5,10 +5,10 @@
   "chapter": {
     "type": "role",
     "description": "Manages notes on the filesystem: read, write, list, and create directories.",
-    "tasks": ["@clawmasons/task-take-notes"],
-    "skills": ["@clawmasons/skill-markdown-conventions"],
+    "tasks": ["@{{projectScope}}/task-take-notes"],
+    "skills": ["@{{projectScope}}/skill-markdown-conventions"],
     "permissions": {
-      "@clawmasons/app-filesystem": {
+      "@{{projectScope}}/app-filesystem": {
         "allow": ["read_file", "write_file", "list_directory", "create_directory"],
         "deny": []
       }

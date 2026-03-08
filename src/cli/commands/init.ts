@@ -5,21 +5,11 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export interface InitOptions {
-  name?: string;
+  name: string;
   template?: string;
 }
 
-const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "members", ".chapter"];
-
-const ENV_EXAMPLE = `# Credential bindings for chapter member deployments
-# Copy this file to .env and fill in your values
-# NEVER commit .env files to version control
-
-# GITHUB_TOKEN=
-# ANTHROPIC_API_KEY=
-# OPENAI_API_KEY=
-# SLACK_BOT_TOKEN=
-`;
+const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "members", ".clawmasons"];
 
 const GITIGNORE = `node_modules/
 dist/
@@ -58,20 +48,6 @@ export function listTemplates(templatesDir?: string): string[] {
     .map((entry) => entry.name);
 }
 
-/**
- * Derive the project scope from a --name value or directory basename.
- *
- * - "@acme/my-agent" -> "acme"
- * - "test-chapter" -> "test-chapter"
- * - "@myorg/cool-project" -> "myorg"
- */
-export function deriveProjectScope(nameOrDir: string): string {
-  if (nameOrDir.startsWith("@") && nameOrDir.includes("/")) {
-    // Scoped package: extract the scope without the @
-    return nameOrDir.slice(1, nameOrDir.indexOf("/"));
-  }
-  return nameOrDir;
-}
 
 /**
  * Recursively copy template files from srcDir to destDir.
@@ -110,7 +86,7 @@ export function registerInitCommand(program: Command): void {
   program
     .command("init")
     .description("Initialize a new chapter workspace")
-    .option("--name <name>", "Set the workspace package name")
+    .requiredOption("--name <name>", "Set the workspace name in <lodge>.<chapter> format (e.g., acme.platform)")
     .option("--template <template>", "Use a project template")
     .action(async (options: InitOptions) => {
       await runInit(process.cwd(), options);
@@ -122,19 +98,27 @@ export async function runInit(
   options: InitOptions,
   deps?: { templatesDir?: string; skipNpmInstall?: boolean },
 ): Promise<void> {
-  const chapterDir = path.join(targetDir, ".chapter");
+  const clawmasonsDir = path.join(targetDir, ".clawmasons");
 
   // Idempotency check
-  if (fs.existsSync(chapterDir)) {
+  if (fs.existsSync(clawmasonsDir)) {
     console.log(
-      "⚠ Workspace already initialized (.chapter/ directory exists). Nothing to do.",
+      "⚠ Workspace already initialized (.clawmasons/ directory exists). Nothing to do.",
     );
     return;
   }
 
-  // Determine project name and scope
-  const projectName = options.name ?? path.basename(path.resolve(targetDir));
-  const projectScope = deriveProjectScope(projectName);
+  // Validate name format: must be <lodge>.<chapter>
+  const name = options.name;
+  if (!name || !name.includes(".") || name.startsWith(".") || name.endsWith(".")) {
+    console.error('✘ --name must be in <lodge>.<chapter> format (e.g., "acme.platform")');
+    process.exit(1);
+    return;
+  }
+
+  // Derive scope and package name from validated name
+  const projectScope = name;
+  const projectName = `@${projectScope}/chapter`;
 
   // Resolve templates directory
   const templatesDir = deps?.templatesDir ?? getTemplatesDir();
@@ -204,16 +188,15 @@ export async function runInit(
     created.push("package.json");
   }
 
-  // Generate .chapter/config.json
-  const configPath = path.join(chapterDir, "config.json");
-  const config = { version: "0.1.0" };
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
-  created.push(".chapter/config.json");
+  // Generate .clawmasons/chapter.json
+  const configPath = path.join(targetDir, "/.clawmasons/", "chapter.json");
+  const managingChapter = { 
+    chapter: "grand.chapter-builder",
+    version: "0.1.0" 
+  };
+  fs.writeFileSync(configPath, JSON.stringify(managingChapter, null, 2) + "\n");
+  created.push(".clawmasons/chapter.json");
 
-  // Generate .chapter/.env.example
-  const envExamplePath = path.join(chapterDir, ".env.example");
-  fs.writeFileSync(envExamplePath, ENV_EXAMPLE);
-  created.push(".chapter/.env.example");
 
   // Generate .gitignore (only if it doesn't exist)
   const gitignorePath = path.join(targetDir, ".gitignore");

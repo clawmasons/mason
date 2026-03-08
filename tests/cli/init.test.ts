@@ -5,7 +5,6 @@ import * as path from "node:path";
 import {
   runInit,
   listTemplates,
-  deriveProjectScope,
   copyTemplateFiles,
 } from "../../src/cli/commands/init.js";
 import { parseChapterField } from "../../src/schemas/chapter-field.js";
@@ -26,9 +25,9 @@ describe("chapter init", () => {
 
   describe("init in empty directory", () => {
     it("creates all workspace directories", async () => {
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
+      await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
-      const expectedDirs = ["apps", "tasks", "skills", "roles", "members", ".chapter"];
+      const expectedDirs = ["apps", "tasks", "skills", "roles", "members", ".clawmasons"];
       for (const dir of expectedDirs) {
         const stat = fs.statSync(path.join(tmpDir, dir));
         expect(stat.isDirectory()).toBe(true);
@@ -36,10 +35,11 @@ describe("chapter init", () => {
     });
 
     it("creates package.json with correct content", async () => {
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
+      await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
       const pkgPath = path.join(tmpDir, "package.json");
       const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+      expect(pkg.name).toBe("@test.unit/chapter");
       expect(pkg.private).toBe(true);
       expect(pkg.version).toBe("0.1.0");
       expect(pkg.workspaces).toEqual([
@@ -51,33 +51,16 @@ describe("chapter init", () => {
       ]);
     });
 
-    it("defaults package name to directory name", async () => {
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
+    it("creates .clawmasons/chapter.json with defaults", async () => {
+      await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
-      const pkgPath = path.join(tmpDir, "package.json");
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-      expect(pkg.name).toBe(path.basename(tmpDir));
-    });
-
-    it("creates .chapter/config.json with defaults", async () => {
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
-
-      const configPath = path.join(tmpDir, ".chapter", "config.json");
+      const configPath = path.join(tmpDir, ".clawmasons", "chapter.json");
       const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      expect(config).toEqual({ version: "0.1.0" });
-    });
-
-    it("creates .chapter/.env.example with credential placeholders", async () => {
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
-
-      const envPath = path.join(tmpDir, ".chapter", ".env.example");
-      const content = fs.readFileSync(envPath, "utf-8");
-      expect(content).toContain("GITHUB_TOKEN");
-      expect(content).toContain("ANTHROPIC_API_KEY");
+      expect(config).toEqual({ chapter: "grand.chapter-builder", version: "0.1.0" });
     });
 
     it("creates .gitignore with standard entries", async () => {
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
+      await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
       const gitignorePath = path.join(tmpDir, ".gitignore");
       const content = fs.readFileSync(gitignorePath, "utf-8");
@@ -88,7 +71,7 @@ describe("chapter init", () => {
     });
 
     it("prints success output with created files", async () => {
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
+      await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
       const logCalls = vi.mocked(console.log).mock.calls.flat().join("\n");
       expect(logCalls).toContain("chapter workspace initialized");
@@ -98,29 +81,54 @@ describe("chapter init", () => {
   });
 
   describe("--name flag", () => {
-    it("sets package name from --name flag", async () => {
-      await runInit(tmpDir, { name: "@myorg/agent-workspace" }, { skipNpmInstall: true });
+    it("sets package name from --name in lodge.chapter format", async () => {
+      await runInit(tmpDir, { name: "myorg.workspace" }, { skipNpmInstall: true });
 
       const pkgPath = path.join(tmpDir, "package.json");
       const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-      expect(pkg.name).toBe("@myorg/agent-workspace");
+      expect(pkg.name).toBe("@myorg.workspace/chapter");
     });
 
-    it("sets custom name from --name flag", async () => {
-      await runInit(tmpDir, { name: "my-custom-name" }, { skipNpmInstall: true });
+    it("rejects name without a dot", async () => {
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
 
-      const pkgPath = path.join(tmpDir, "package.json");
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-      expect(pkg.name).toBe("my-custom-name");
+      await runInit(tmpDir, { name: "no-dot" }, { skipNpmInstall: true });
+
+      const errorCalls = vi.mocked(console.error).mock.calls.flat().join("\n");
+      expect(errorCalls).toContain("<lodge>.<chapter> format");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      exitSpy.mockRestore();
+    });
+
+    it("rejects name starting with a dot", async () => {
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+      await runInit(tmpDir, { name: ".starts-with-dot" }, { skipNpmInstall: true });
+
+      const errorCalls = vi.mocked(console.error).mock.calls.flat().join("\n");
+      expect(errorCalls).toContain("<lodge>.<chapter> format");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      exitSpy.mockRestore();
+    });
+
+    it("rejects name ending with a dot", async () => {
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+      await runInit(tmpDir, { name: "ends-with-dot." }, { skipNpmInstall: true });
+
+      const errorCalls = vi.mocked(console.error).mock.calls.flat().join("\n");
+      expect(errorCalls).toContain("<lodge>.<chapter> format");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      exitSpy.mockRestore();
     });
   });
 
   describe("idempotency", () => {
-    it("warns and exits if .chapter/ directory already exists", async () => {
-      // Create .chapter directory to simulate existing workspace
-      fs.mkdirSync(path.join(tmpDir, ".chapter"), { recursive: true });
+    it("warns and exits if .clawmasons/ directory already exists", async () => {
+      // Create .clawmasons directory to simulate existing workspace
+      fs.mkdirSync(path.join(tmpDir, ".clawmasons"), { recursive: true });
 
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
+      await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
       const logCalls = vi.mocked(console.log).mock.calls.flat().join("\n");
       expect(logCalls).toContain("already initialized");
@@ -130,18 +138,18 @@ describe("chapter init", () => {
     });
 
     it("does not modify existing files when workspace exists", async () => {
-      // Create .chapter directory and a config file
-      fs.mkdirSync(path.join(tmpDir, ".chapter"), { recursive: true });
+      // Create .clawmasons directory and a config file
+      fs.mkdirSync(path.join(tmpDir, ".clawmasons"), { recursive: true });
       fs.writeFileSync(
-        path.join(tmpDir, ".chapter", "config.json"),
+        path.join(tmpDir, ".clawmasons", "chapter.json"),
         '{"version":"0.0.1"}',
       );
 
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
+      await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
       // Config should be untouched
       const config = JSON.parse(
-        fs.readFileSync(path.join(tmpDir, ".chapter", "config.json"), "utf-8"),
+        fs.readFileSync(path.join(tmpDir, ".clawmasons", "chapter.json"), "utf-8"),
       );
       expect(config.version).toBe("0.0.1");
     });
@@ -155,7 +163,7 @@ describe("chapter init", () => {
         JSON.stringify(existingPkg),
       );
 
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
+      await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
       const pkg = JSON.parse(
         fs.readFileSync(path.join(tmpDir, "package.json"), "utf-8"),
@@ -171,7 +179,7 @@ describe("chapter init", () => {
         JSON.stringify({ name: "existing" }),
       );
 
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
+      await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
       const logCalls = vi.mocked(console.log).mock.calls.flat().join("\n");
       expect(logCalls).toContain("package.json already exists");
@@ -184,7 +192,7 @@ describe("chapter init", () => {
       const existingContent = "# my custom gitignore\n*.log\n";
       fs.writeFileSync(path.join(tmpDir, ".gitignore"), existingContent);
 
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
+      await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
       const content = fs.readFileSync(
         path.join(tmpDir, ".gitignore"),
@@ -196,7 +204,7 @@ describe("chapter init", () => {
     it("warns that .gitignore was skipped", async () => {
       fs.writeFileSync(path.join(tmpDir, ".gitignore"), "*.log\n");
 
-      await runInit(tmpDir, {}, { skipNpmInstall: true });
+      await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
       const logCalls = vi.mocked(console.log).mock.calls.flat().join("\n");
       expect(logCalls).toContain(".gitignore already exists");
@@ -226,7 +234,7 @@ describe("chapter init", () => {
             version: "0.1.0",
             private: true,
             workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "members/*"],
-            dependencies: { "@clawmasons/chapter-core": "^0.1.0" },
+            dependencies: {},
           },
           null,
           2,
@@ -265,10 +273,10 @@ describe("chapter init", () => {
             version: "1.0.0",
             chapter: {
               type: "role",
-              tasks: ["@clawmasons/task-take-notes"],
-              skills: ["@clawmasons/skill-markdown-conventions"],
+              tasks: ["@{{projectScope}}/task-take-notes"],
+              skills: ["@{{projectScope}}/skill-markdown-conventions"],
               permissions: {
-                "@clawmasons/app-filesystem": {
+                "@{{projectScope}}/app-filesystem": {
                   allow: ["read_file", "write_file"],
                   deny: [],
                 },
@@ -286,7 +294,7 @@ describe("chapter init", () => {
       try {
         await runInit(
           targetDir,
-          { template: "test-template" },
+          { template: "test-template", name: "test.unit" },
           { templatesDir, skipNpmInstall: true },
         );
 
@@ -306,21 +314,21 @@ describe("chapter init", () => {
       }
     });
 
-    it("replaces {{projectName}} with directory name in package.json", async () => {
+    it("replaces {{projectName}} in package.json with scoped chapter name", async () => {
       const targetDir = fs.mkdtempSync(
         path.join(os.tmpdir(), "test-chapter-"),
       );
       try {
         await runInit(
           targetDir,
-          { template: "test-template" },
+          { template: "test-template", name: "test.unit" },
           { templatesDir, skipNpmInstall: true },
         );
 
         const pkg = JSON.parse(
           fs.readFileSync(path.join(targetDir, "package.json"), "utf-8"),
         );
-        expect(pkg.name).toBe(path.basename(targetDir));
+        expect(pkg.name).toBe("@test.unit/chapter");
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }
@@ -333,19 +341,18 @@ describe("chapter init", () => {
       try {
         await runInit(
           targetDir,
-          { template: "test-template" },
+          { template: "test-template", name: "test.unit" },
           { templatesDir, skipNpmInstall: true },
         );
 
-        const dirName = path.basename(targetDir);
         const memberPkg = JSON.parse(
           fs.readFileSync(
             path.join(targetDir, "members", "note-taker", "package.json"),
             "utf-8",
           ),
         );
-        expect(memberPkg.name).toBe(`@${dirName}/member-note-taker`);
-        expect(memberPkg.chapter.roles).toEqual([`@${dirName}/role-writer`]);
+        expect(memberPkg.name).toBe("@test.unit/member-note-taker");
+        expect(memberPkg.chapter.roles).toEqual(["@test.unit/role-writer"]);
 
         const rolePkg = JSON.parse(
           fs.readFileSync(
@@ -353,9 +360,9 @@ describe("chapter init", () => {
             "utf-8",
           ),
         );
-        expect(rolePkg.name).toBe(`@${dirName}/role-writer`);
-        // chapter-core references should remain unchanged
-        expect(rolePkg.chapter.tasks).toEqual(["@clawmasons/task-take-notes"]);
+        expect(rolePkg.name).toBe("@test.unit/role-writer");
+        // projectScope references should be substituted
+        expect(rolePkg.chapter.tasks).toEqual(["@test.unit/task-take-notes"]);
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }
@@ -366,14 +373,14 @@ describe("chapter init", () => {
       try {
         await runInit(
           targetDir,
-          { template: "test-template", name: "@acme/my-agent" },
+          { template: "test-template", name: "acme.agent" },
           { templatesDir, skipNpmInstall: true },
         );
 
         const pkg = JSON.parse(
           fs.readFileSync(path.join(targetDir, "package.json"), "utf-8"),
         );
-        expect(pkg.name).toBe("@acme/my-agent");
+        expect(pkg.name).toBe("@acme.agent/chapter");
 
         const memberPkg = JSON.parse(
           fs.readFileSync(
@@ -381,8 +388,8 @@ describe("chapter init", () => {
             "utf-8",
           ),
         );
-        expect(memberPkg.name).toBe("@acme/member-note-taker");
-        expect(memberPkg.chapter.roles).toEqual(["@acme/role-writer"]);
+        expect(memberPkg.name).toBe("@acme.agent/member-note-taker");
+        expect(memberPkg.chapter.roles).toEqual(["@acme.agent/role-writer"]);
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }
@@ -395,7 +402,7 @@ describe("chapter init", () => {
 
       await runInit(
         tmpDir,
-        { template: "nonexistent" },
+        { template: "nonexistent", name: "test.unit" },
         { templatesDir, skipNpmInstall: true },
       );
 
@@ -415,16 +422,13 @@ describe("chapter init", () => {
       try {
         await runInit(
           targetDir,
-          { template: "test-template" },
+          { template: "test-template", name: "test.unit" },
           { templatesDir, skipNpmInstall: true },
         );
 
         // Chapter scaffold should exist
         expect(
-          fs.existsSync(path.join(targetDir, ".chapter", "config.json")),
-        ).toBe(true);
-        expect(
-          fs.existsSync(path.join(targetDir, ".chapter", ".env.example")),
+          fs.existsSync(path.join(targetDir, ".clawmasons", "chapter.json")),
         ).toBe(true);
         expect(fs.existsSync(path.join(targetDir, ".gitignore"))).toBe(true);
       } finally {
@@ -439,7 +443,7 @@ describe("chapter init", () => {
       try {
         await runInit(
           targetDir,
-          { template: "test-template", name: "@acme/my-project" },
+          { template: "test-template", name: "acme.project" },
           { templatesDir, skipNpmInstall: true },
         );
 
@@ -471,14 +475,13 @@ describe("chapter init", () => {
       try {
         await runInit(
           targetDir,
-          { template: "test-template" },
+          { template: "test-template", name: "test.unit" },
           { templatesDir, skipNpmInstall: true },
         );
 
-        const dirName = path.basename(targetDir);
         const logCalls = vi.mocked(console.log).mock.calls.flat().join("\n");
         expect(logCalls).toContain("Template: test-template");
-        expect(logCalls).toContain(`chapter validate @${dirName}/member-note-taker`);
+        expect(logCalls).toContain("chapter validate @test.unit/member-note-taker");
         expect(logCalls).toContain("chapter list");
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
@@ -496,7 +499,7 @@ describe("chapter init", () => {
       try {
         await runInit(
           targetDir,
-          {},
+          { name: "test.unit" },
           { templatesDir, skipNpmInstall: true },
         );
 
@@ -518,7 +521,7 @@ describe("chapter init", () => {
       try {
         await runInit(
           targetDir,
-          {},
+          { name: "test.unit" },
           { templatesDir, skipNpmInstall: true },
         );
 
@@ -528,23 +531,6 @@ describe("chapter init", () => {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }
     });
-  });
-});
-
-describe("deriveProjectScope", () => {
-  it("extracts scope from scoped package name", () => {
-    expect(deriveProjectScope("@acme/my-agent")).toBe("acme");
-    expect(deriveProjectScope("@myorg/cool-project")).toBe("myorg");
-  });
-
-  it("returns name as-is for unscoped names", () => {
-    expect(deriveProjectScope("test-chapter")).toBe("test-chapter");
-    expect(deriveProjectScope("my-project")).toBe("my-project");
-  });
-
-  it("handles edge cases", () => {
-    expect(deriveProjectScope("@scope/name")).toBe("scope");
-    expect(deriveProjectScope("simple")).toBe("simple");
   });
 });
 

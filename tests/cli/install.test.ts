@@ -495,8 +495,8 @@ describe("runInstall", () => {
   it("copies node_modules chapter packages into proxy/workspace/", async () => {
     setupValidMember();
 
-    // Simulate a chapter-core package in node_modules that bundles a task sub-component
-    const nmTaskDir = path.join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "tasks", "take-notes");
+    // Simulate a task package installed directly in node_modules
+    const nmTaskDir = path.join(tmpDir, "node_modules", "@clawmasons", "task-take-notes");
     writePackage(nmTaskDir, {
       name: "@clawmasons/task-take-notes",
       version: "1.0.0",
@@ -526,10 +526,10 @@ describe("runInstall", () => {
 
     // The node_modules task should be copied into proxy/workspace/tasks/
     expect(
-      fs.existsSync(path.join(outputDir, "proxy/workspace/tasks/take-notes/package.json")),
+      fs.existsSync(path.join(outputDir, "proxy/workspace/tasks/task-take-notes/package.json")),
     ).toBe(true);
     expect(
-      fs.existsSync(path.join(outputDir, "proxy/workspace/tasks/take-notes/notes.md")),
+      fs.existsSync(path.join(outputDir, "proxy/workspace/tasks/task-take-notes/notes.md")),
     ).toBe(true);
 
     // Local workspace packages should still be there too
@@ -542,7 +542,7 @@ describe("runInstall", () => {
     setupValidMember();
 
     // Simulate an unrelated member in node_modules with the same basename as our local member
-    const nmMemberDir = path.join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "members", "ops");
+    const nmMemberDir = path.join(tmpDir, "node_modules", "@clawmasons", "member-ops");
     writePackage(nmMemberDir, {
       name: "@clawmasons/member-ops",
       version: "1.0.0",
