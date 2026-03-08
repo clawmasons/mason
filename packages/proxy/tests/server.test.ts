@@ -3,10 +3,10 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Tool, Resource, Prompt, CallToolResult, ReadResourceResult, GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
-import { ChapterProxyServer } from "../../src/proxy/server.js";
-import type { ToolRouter, RouteEntry, ResourceRouter, PromptRouter, PromptRouteEntry } from "../../src/proxy/router.js";
-import type { UpstreamManager } from "../../src/proxy/upstream.js";
-import { openDatabase, queryAuditLog, updateApprovalStatus } from "../../src/proxy/db.js";
+import { ChapterProxyServer } from "../src/server.js";
+import type { ToolRouter, RouteEntry, ResourceRouter, PromptRouter, PromptRouteEntry } from "../src/router.js";
+import type { UpstreamManager } from "../src/upstream.js";
+import { openDatabase, queryAuditLog, updateApprovalStatus } from "../src/db.js";
 import type Database from "better-sqlite3";
 
 // ── Fixtures ────────────────────────────────────────────────────────────

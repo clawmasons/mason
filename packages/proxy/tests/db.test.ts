@@ -12,7 +12,7 @@ import {
   updateApprovalStatus,
   type AuditLogEntry,
   type ApprovalRequest,
-} from "../../src/proxy/db.js";
+} from "../src/db.js";
 
 describe("proxy/db", () => {
   let db: Database.Database;

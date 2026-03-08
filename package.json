@@ -1,43 +1,16 @@
 {
-  "name": "@clawmasons/chapter",
+  "name": "@clawmasons/chapter-monorepo",
   "version": "0.1.0",
-  "description": "Clawmasons Chapter — npm-native packaging, governance, and runtime portability for AI agents and human members",
+  "private": true,
+  "description": "Clawmasons Chapter — npm-native packaging, governance, and runtime portability for AI agents",
   "type": "module",
-  "bin": {
-    "chapter": "./bin/chapter.js"
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./cli": {
-      "import": "./dist/cli/index.js",
-      "types": "./dist/cli/index.d.ts"
-    }
-  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -b packages/shared packages/proxy packages/cli",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src/ tests/",
+    "lint": "eslint packages/*/src/ packages/*/tests/",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": [
-    "ai",
-    "agent",
-    "chapter",
-    "mcp",
-    "npm",
-    "governance"
-  ],
-  "files": [
-    "dist",
-    "bin",
-    "templates"
-  ],
   "license": "MIT",
   "workspaces": ["packages/*", "e2e"],
   "devDependencies": {
@@ -48,11 +21,5 @@
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.0.0",
     "vitest": "^3.0.0"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.1",
-    "better-sqlite3": "^12.6.2",
-    "commander": "^14.0.3",
-    "zod": "^3.24.0"
   }
 }

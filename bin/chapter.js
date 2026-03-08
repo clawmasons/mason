@@ -1,3 +1,3 @@
 #!/usr/bin/env node
-import { run } from "../dist/cli/index.js";
+import { run } from "../packages/cli/dist/cli/index.js";
 run();

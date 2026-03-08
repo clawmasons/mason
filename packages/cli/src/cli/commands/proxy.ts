@@ -4,12 +4,17 @@ import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import type { ResolvedAgent } from "@clawmasons/shared";
 import { computeToolFilters } from "@clawmasons/shared";
-import { loadEnvFile, resolveEnvVars } from "../../proxy/credentials.js";
-import { openDatabase } from "../../proxy/db.js";
-import { UpstreamManager } from "../../proxy/upstream.js";
-import type { UpstreamAppConfig } from "../../proxy/upstream.js";
-import { ToolRouter, ResourceRouter, PromptRouter } from "../../proxy/router.js";
-import { ChapterProxyServer } from "../../proxy/server.js";
+import {
+  loadEnvFile,
+  resolveEnvVars,
+  openDatabase,
+  UpstreamManager,
+  ToolRouter,
+  ResourceRouter,
+  PromptRouter,
+  ChapterProxyServer,
+} from "@clawmasons/proxy";
+import type { UpstreamAppConfig } from "@clawmasons/proxy";
 import type Database from "better-sqlite3";
 
 // ── Types ──────────────────────────────────────────────────────────────

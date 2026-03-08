@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ToolRouter, ResourceRouter, PromptRouter } from "../../src/proxy/router.js";
+import { ToolRouter, ResourceRouter, PromptRouter } from "../src/router.js";
 import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolFilter } from "@clawmasons/shared";
 
