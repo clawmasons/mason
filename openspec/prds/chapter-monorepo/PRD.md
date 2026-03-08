@@ -170,10 +170,15 @@ The following commands from the previous CLI are removed:
 ### 5.3 Removed Infrastructure
 
 - Member registry (`.chapter/members.json`, enable/disable tracking)
-- Docker Compose generation during install
-- Environment file generation during install
+- Docker Compose generation during install (`src/compose/docker-compose.ts`, `src/compose/env.ts`, `src/compose/lock.ts`)
 - Lock file generation during install
-- All docker-utils code used by the old install/run/stop flow
+- Proxy Dockerfile generation tied to old install flow (`src/generator/proxy-dockerfile.ts`)
+
+### 5.4 Retained and Refactored Infrastructure
+
+- **Materializer** (`src/materializer/`): The `RuntimeMaterializer` interface and per-runtime implementations (claude-code, pi-coding-agent) are retained as the core mechanism for materializing agent workspaces. Docker-specific methods (`generateDockerfile`, `generateComposeService`, `generateConfigJson`) are removed from the interface, leaving only `materializeWorkspace()`. Docker generation is re-introduced in `docker-init` (Section 6) as a separate concern.
+- **Docker utilities**: General-purpose docker utilities (`checkDockerCompose`, `validateEnvFile`, `execDockerCompose`) are retained for reuse by `docker-init` and `run-agent`. The install-specific `resolveMemberDir` is removed.
+- **`PROVIDER_ENV_VARS`**: Provider-to-environment-variable mapping is relocated to `materializer/common.ts` for reuse by materializers and future docker environment generation.
 
 ---
 
@@ -438,9 +443,11 @@ Acceptance criteria:
 - Given `chapter install`, when run, then the command is not found.
 - Given `chapter run @agent`, when run, then the command is not found (note: `run-agent` is the new command).
 - Given `chapter stop`, when run, then the command is not found.
-- Files removed: `src/cli/commands/install.ts`, `src/cli/commands/run.ts`, `src/cli/commands/stop.ts`, and corresponding test files.
-- Associated code removed: docker-utils, compose generation, env generation, lock file generation.
-- Member registry removed: enable/disable commands, `members.json` handling.
+- Files removed: `src/cli/commands/install.ts`, `src/cli/commands/run.ts`, `src/cli/commands/stop.ts`, `src/cli/commands/enable.ts`, `src/cli/commands/disable.ts`, and corresponding test files.
+- Associated code removed: compose generation (`src/compose/`), lock file generation, proxy Dockerfile generation (`src/generator/proxy-dockerfile.ts`).
+- Member registry removed: `src/registry/members.ts`, `src/registry/types.ts`, `members.json` handling.
+- Materializer refactored: Docker-specific methods removed from `RuntimeMaterializer` interface; workspace materialization retained as core agent infrastructure.
+- Docker utilities refactored: `resolveMemberDir` removed; `checkDockerCompose`, `validateEnvFile`, `execDockerCompose` retained for reuse by new commands.
 
 **REQ-009: `chapter docker-init` — Read Chapter Config**
 
@@ -696,18 +703,47 @@ chapter run-agent <agent> <role> [<task>]
 | `src/cli/commands/install.ts` | Replaced by docker-init workflow |
 | `src/cli/commands/run.ts` | Replaced by run-agent |
 | `src/cli/commands/stop.ts` | No longer needed |
-| `src/cli/commands/docker-utils.ts` | Refactored into docker-init |
+| `src/cli/commands/enable.ts` | No member registry |
+| `src/cli/commands/disable.ts` | No member registry |
 | `src/schemas/member.ts` | Replaced by agent schema |
 | `src/registry/members.ts` | No member registry |
+| `src/registry/types.ts` | No member registry |
+| `src/compose/docker-compose.ts` | Old install-time compose generation |
+| `src/compose/env.ts` | Old install-time env generation |
+| `src/compose/lock.ts` | Lock file concept removed |
+| `src/compose/types.ts` | Lock file types removed |
+| `src/compose/index.ts` | Barrel export for removed compose module |
+| `src/generator/proxy-dockerfile.ts` | Reimplemented in docker-init (CHANGE 6) |
 | `tests/cli/install.test.ts` | Command removed |
+| `tests/cli/run.test.ts` | Command removed |
+| `tests/cli/stop.test.ts` | Command removed |
+| `tests/cli/enable.test.ts` | Command removed |
+| `tests/cli/disable.test.ts` | Command removed |
+| `tests/registry/members.test.ts` | Registry removed |
+| `tests/compose/*.test.ts` | Compose module removed |
+| `tests/generator/proxy-dockerfile.test.ts` | Generator removed |
 | `tests/integration/install-flow.test.ts` | Command removed |
 
-### 12.4 Modified Files
+### 12.4 Refactored Files (Retained)
+
+| File | Change |
+|------|--------|
+| `src/materializer/types.ts` | Remove docker methods from `RuntimeMaterializer`; remove `ComposeServiceDef` |
+| `src/materializer/common.ts` | Add `PROVIDER_ENV_VARS` (moved from pi-coding-agent.ts); rename member→agent |
+| `src/materializer/claude-code.ts` | Remove `generateDockerfile`, `generateComposeService`, `generateConfigJson`; rename member→agent |
+| `src/materializer/pi-coding-agent.ts` | Remove `generateDockerfile`, `generateComposeService`; move `PROVIDER_ENV_VARS` out; rename member→agent |
+| `src/materializer/index.ts` | Update exports |
+| `src/cli/commands/docker-utils.ts` | Remove `resolveMemberDir`; keep general docker utilities |
+| `tests/materializer/*.test.ts` | Remove docker method tests; keep workspace tests; rename member→agent |
+| `tests/cli/docker-utils.test.ts` | Remove `resolveMemberDir` tests; keep general utility tests |
+
+### 12.5 Modified Files
 
 | File | Change |
 |------|--------|
 | `package.json` (root) | Add `workspaces`, shared dev deps, build orchestration |
 | `src/cli/commands/index.ts` | Remove old commands, add new commands |
+| `src/index.ts` | Remove compose exports, update materializer exports |
 
 ---
 

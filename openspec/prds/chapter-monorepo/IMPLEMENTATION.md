@@ -25,8 +25,8 @@ Revert the "member" package type (introduced in chapter-members PRD) back to a s
 - Modify: `src/resolver/resolve.ts` — `resolveMember()` → `resolveAgent()`
 - Modify: `src/validator/validate.ts` — `validateMember()` → `validateAgent()`
 - Modify: all CLI commands referencing `ResolvedMember`, `resolveMember`, `validateMember`
-- Modify: materializers (`src/materializer/`) — update to use `ResolvedAgent`
-- Modify: compose code (`src/compose/`) — update member references
+- Modify: materializers (`src/materializer/`) — update to use `ResolvedAgent` (docker methods will be removed in CHANGE 2; update all methods here to keep each change self-contained)
+- Modify: compose code (`src/compose/`) — update member references (compose module will be deleted in CHANGE 2; update here for clean compilation between changes)
 - Modify: `chapter-core/members/note-taker/package.json` — use `"type": "agent"` schema
 - Modify: `templates/note-taker/members/note-taker/package.json` — use `"type": "agent"` schema
 - Update all test files referencing member types, schemas, and resolver functions
@@ -37,30 +37,62 @@ Revert the "member" package type (introduced in chapter-members PRD) back to a s
 
 ---
 
-### CHANGE 2: Remove install/run/stop Commands and Member Registry
+### CHANGE 2: Remove Old CLI Commands and Compose Infrastructure; Refactor Materializer and Docker Utils
 
-Remove dead CLI commands, the member registry, and all associated infrastructure code.
+Remove dead CLI commands, member registry, and compose infrastructure. Refactor the materializer into a workspace-only interface and retain general docker utilities.
 
 **PRD refs:** REQ-008 (Remove `install`, `run`, `stop` Commands)
 
-**Summary:** Remove the `install`, `run`, `stop`, `enable`, and `disable` CLI commands and all associated code. This includes: docker-utils (used by the old install/run/stop flow), the member registry (`members.json` handling), Docker Compose generation during install, environment file generation, and lock file generation. Remove while the codebase is still a single package — simpler than after monorepo split.
+**Summary:** Three parts: (1) delete the old `install`, `run`, `stop`, `enable`, and `disable` CLI commands plus the member registry and compose/lock infrastructure; (2) refactor the materializer to remove docker-specific methods, keeping only workspace materialization as the core contract for the "agent" type; (3) retain general-purpose docker utilities for reuse by `docker-init` and `run-agent`. The materializer has been iterated across two runtimes (claude-code, pi-coding-agent) and represents proven, working code for translating the chapter dependency graph into runtime-native workspace configurations. Docker-specific Dockerfile and compose generation will be re-introduced as a separate concern in CHANGE 5/6.
 
-**User Story:** As a user, when I run `chapter install`, `chapter run`, `chapter stop`, `chapter enable`, or `chapter disable`, the command is not found. Only the core commands (`init`, `add`, `remove`, `list`, `validate`, `proxy`, `publish`) remain.
+**User Story:** As a user, when I run `chapter install`, `chapter run`, `chapter stop`, `chapter enable`, or `chapter disable`, the command is not found. Only the core commands (`init`, `add`, `remove`, `list`, `validate`, `proxy`, `publish`) remain. The materializer module still exists but only handles workspace file generation.
 
 **Scope:**
+
+*Delete — CLI commands:*
 - Delete: `src/cli/commands/install.ts` (~306 lines)
 - Delete: `src/cli/commands/run.ts` (~179 lines)
 - Delete: `src/cli/commands/stop.ts` (~75 lines)
 - Delete: `src/cli/commands/enable.ts`
 - Delete: `src/cli/commands/disable.ts`
-- Delete: `src/cli/commands/docker-utils.ts`
-- Delete: `src/registry/members.ts` (~66 lines), `src/registry/types.ts` (~21 lines)
-- Delete: `src/compose/docker-compose.ts`, `src/compose/env.ts`, `src/compose/lock.ts`
-- Delete: `src/materializer/claude-code.ts`, `src/materializer/pi-coding-agent.ts`, `src/materializer/common.ts`, `src/materializer/types.ts`, `src/materializer/index.ts`
-- Delete: corresponding test files (`tests/cli/install.test.ts`, `tests/cli/run.test.ts`, `tests/cli/stop.test.ts`, `tests/cli/enable.test.ts`, `tests/cli/disable.test.ts`, `tests/registry/members.test.ts`, `tests/compose/*.test.ts`, `tests/materializer/*.test.ts`, `tests/integration/install-flow.test.ts`)
 - Modify: `src/cli/commands/index.ts` — remove registrations for deleted commands
 
-**Testable output:** `chapter install`, `chapter run`, `chapter stop`, `chapter enable`, `chapter disable` are all not found. `npx tsc --noEmit` compiles with no errors. `npx vitest run` passes all remaining tests. No imports reference deleted files.
+*Delete — Member registry:*
+- Delete: `src/registry/members.ts` (~66 lines)
+- Delete: `src/registry/types.ts` (~21 lines)
+
+*Delete — Compose and old generator infrastructure:*
+- Delete: `src/compose/docker-compose.ts`
+- Delete: `src/compose/env.ts`
+- Delete: `src/compose/lock.ts`
+- Delete: `src/compose/types.ts`
+- Delete: `src/compose/index.ts`
+- Delete: `src/generator/proxy-dockerfile.ts` (will be reimplemented in CHANGE 6)
+
+*Delete — Test files:*
+- Delete: `tests/cli/install.test.ts`, `tests/cli/run.test.ts`, `tests/cli/stop.test.ts`, `tests/cli/enable.test.ts`, `tests/cli/disable.test.ts`
+- Delete: `tests/registry/members.test.ts`
+- Delete: `tests/compose/docker-compose.test.ts`, `tests/compose/env.test.ts`, `tests/compose/lock.test.ts`
+- Delete: `tests/generator/proxy-dockerfile.test.ts`
+- Delete: `tests/integration/install-flow.test.ts`
+
+*Refactor — Materializer (keep, strip docker methods):*
+- Modify: `src/materializer/types.ts` — Remove `generateDockerfile`, `generateComposeService`, `generateConfigJson` from `RuntimeMaterializer` interface. Remove `ComposeServiceDef` type. Interface retains only `name` and `materializeWorkspace()`. Update `ResolvedMember` → `ResolvedAgent` (from CHANGE 1).
+- Modify: `src/materializer/common.ts` — Add `PROVIDER_ENV_VARS` (moved from pi-coding-agent.ts). Update `ResolvedMember` → `ResolvedAgent`. All functions retained: `formatPermittedTools`, `findRolesForTask`, `collectAllSkills`, `collectAllTasks`, `generateAgentsMd`, `generateSkillReadme`.
+- Modify: `src/materializer/claude-code.ts` — Remove `generateDockerfile()`, `generateComposeService()`, `generateConfigJson()`. Keep `materializeWorkspace()` and helpers (`generateMcpJson`, `generateSettingsJson`, `generateSlashCommand`). Update member → agent.
+- Modify: `src/materializer/pi-coding-agent.ts` — Remove `generateDockerfile()`, `generateComposeService()`. Move `PROVIDER_ENV_VARS` to `common.ts`. Keep `materializeWorkspace()` and helpers. Update member → agent.
+- Modify: `src/materializer/index.ts` — Update exports.
+- Modify: `tests/materializer/claude-code.test.ts` — Remove docker method tests, keep workspace tests, update member → agent.
+- Modify: `tests/materializer/pi-coding-agent.test.ts` — Remove docker method tests, keep workspace tests, update member → agent.
+
+*Refactor — Docker utilities (keep general functions):*
+- Modify: `src/cli/commands/docker-utils.ts` — Remove `resolveMemberDir()`. Keep `checkDockerCompose()`, `validateEnvFile()`, `execDockerCompose()`.
+- Modify: `tests/cli/docker-utils.test.ts` — Remove `resolveMemberDir` tests, keep general utility tests.
+
+*Update — Package exports:*
+- Modify: `src/index.ts` — Remove compose exports. Update materializer exports (remove `ComposeServiceDef`).
+
+**Testable output:** `chapter install`, `chapter run`, `chapter stop`, `chapter enable`, `chapter disable` are all not found. `npx tsc --noEmit` compiles. `npx vitest run` passes. No imports reference deleted files. Materializer workspace tests pass. `RuntimeMaterializer` interface has only `name` and `materializeWorkspace()`. Grepping for `generateDockerfile` or `ComposeServiceDef` in materializer source returns zero results. Grepping for `resolveMemberDir` returns zero results.
 
 **Not Implemented Yet**
 
@@ -83,6 +115,7 @@ Extract shared types, schemas, and utilities into `packages/shared` so both CLI 
 - Move: `src/schemas/*` → `packages/shared/src/schemas/`
 - Move: `src/resolver/types.ts` → `packages/shared/src/types.ts`
 - Move: `src/generator/toolfilter.ts` → `packages/shared/src/toolfilter.ts`
+- Modify: `src/materializer/*.ts` — update imports from `../resolver/types.js` and `../generator/toolfilter.js` to `@clawmasons/shared`
 - Modify: all remaining `src/` files importing from moved locations — update to `@clawmasons/shared`
 - Modify: all remaining test files importing from moved locations
 
@@ -148,14 +181,16 @@ Extend docker-init to generate proxy and agent Dockerfiles for all role and agen
 
 **PRD refs:** REQ-012 (Proxy Dockerfiles), REQ-013 (Agent Dockerfiles), REQ-014 (Role Dependency Resolution), REQ-015 (Local Build Only), REQ-024 (mason User), REQ-025 (Proxy Per Role), REQ-026 (Agent Per Agent × Role), REQ-027 (Local Registry Only)
 
-**Summary:** Extend the docker-init command to scan `docker/node_modules/` for roles and agents, then generate Dockerfiles. For each role, generate a proxy Dockerfile at `docker/proxy/<role-name>/Dockerfile` that boots `@clawmasons/proxy` configured for that role's apps. For each agent×role combination, generate an agent Dockerfile at `docker/agent/<agent-name>/<role-name>/Dockerfile`. Agent Dockerfiles follow role dependencies to include all required apps, tasks, and skills. All generated images use `USER mason`. All Dockerfiles reference local paths only (no registry pulls). Adapt the existing `src/generator/proxy-dockerfile.ts` patterns for the new structure.
+**Summary:** Extend the docker-init command to scan `docker/node_modules/` for roles and agents, then generate Dockerfiles. For each role, generate a proxy Dockerfile at `docker/proxy/<role-name>/Dockerfile` that boots `@clawmasons/proxy` configured for that role's apps. For each agent×role combination, generate an agent Dockerfile at `docker/agent/<agent-name>/<role-name>/Dockerfile`. Agent Dockerfiles follow role dependencies to include all required apps, tasks, and skills. All generated images use `USER mason`. All Dockerfiles reference local paths only (no registry pulls). Create new proxy and agent Dockerfile generators. The old `src/generator/proxy-dockerfile.ts` was removed in CHANGE 2; reference its patterns from git history.
 
 **User Story:** As a chapter author, after running `chapter docker-init`, I see proxy Dockerfiles (one per role) and agent Dockerfiles (one per agent×role pair) in the `docker/` directory. I can build these images with `docker build` and they all run as the `mason` user.
 
 **Scope:**
 - Modify: `packages/cli/src/commands/docker-init.ts` — add Dockerfile generation after install
-- New or modify: `packages/cli/src/generator/proxy-dockerfile.ts` — proxy Dockerfile generation per role
+- New: `packages/cli/src/generator/proxy-dockerfile.ts` — proxy Dockerfile generation per role (new implementation)
 - New: `packages/cli/src/generator/agent-dockerfile.ts` — agent Dockerfile generation per agent×role
+- Reuse: `packages/cli/src/materializer/` — call `materializeWorkspace()` to generate workspace files COPY'd into agent Docker images
+- Reuse: `packages/cli/src/materializer/common.ts` — `PROVIDER_ENV_VARS` for environment variable injection
 - New: `packages/cli/tests/generator/agent-dockerfile.test.ts` — unit tests
 - Modify: `packages/cli/tests/commands/docker-init.test.ts` — integration tests for full Dockerfile tree
 - Reuse: `src/resolver/resolve.ts` for role dependency resolution
@@ -201,6 +236,7 @@ Implement the run-agent command to run a chapter agent interactively against a p
 - New: `packages/cli/src/commands/run-agent.ts` — command implementation
 - New: `packages/cli/tests/commands/run-agent.test.ts` — unit tests
 - Modify: `packages/cli/src/commands/index.ts` — register `run-agent` command
+- Reuse: `packages/cli/src/cli/commands/docker-utils.ts` — `checkDockerCompose()` for pre-flight check, `execDockerCompose()` for `docker compose up/down`
 
 **Testable output:** Running `chapter run-agent note-taker writer` creates `.clawmasons/sessions/<sessionid>/docker/docker-compose.yml`. The compose file references correct Dockerfiles from the `docker-build` path. Each invocation generates a unique session ID. Proxy starts detached, agent starts interactively. On agent exit, proxy is torn down. Session directory is retained after exit. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
