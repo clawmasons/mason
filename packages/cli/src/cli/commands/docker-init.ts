@@ -120,14 +120,14 @@ export function runInstallLocal(rootDir: string): void {
 
   if (!fs.existsSync(distDir)) {
     throw new Error(
-      `No dist/ directory found. Pack your chapter packages first (e.g., "npm pack" in each workspace package).`,
+      `No dist/ directory found. Run "chapter pack" first to build and pack all workspace packages.`,
     );
   }
 
   const tgzFiles = fs.readdirSync(distDir).filter((f) => f.endsWith(".tgz"));
   if (tgzFiles.length === 0) {
     throw new Error(
-      `No .tgz files found in dist/. Pack your chapter packages first.`,
+      `No .tgz files found in dist/. Run "chapter pack" first.`,
     );
   }
 
