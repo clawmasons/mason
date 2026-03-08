@@ -4,8 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { program } from "../../src/cli/index.js";
 import { runAgent } from "../../src/cli/commands/run.js";
-import { addMember } from "../../src/registry/members.js";
-import type { MemberEntry } from "../../src/registry/types.js";
+import { addAgent } from "../../src/registry/members.js";
+import type { AgentEntry } from "../../src/registry/types.js";
 
 // Mock docker-utils to avoid real docker compose checks
 vi.mock("../../src/cli/commands/docker-utils.js", async () => {
@@ -56,7 +56,7 @@ describe("CLI run command", () => {
     if (runCmd) {
       const args = runCmd.registeredArguments;
       expect(args).toHaveLength(1);
-      expect(args[0].name()).toBe("member");
+      expect(args[0].name()).toBe("agent");
       expect(args[0].required).toBe(true);
     }
   });
@@ -93,7 +93,7 @@ describe("runAgent", () => {
   });
 
   function setupMemberDir(envContent: string, composeContent?: string): string {
-    const memberDir = path.join(tmpDir, ".chapter", "members", "ops");
+    const memberDir = path.join(tmpDir, ".chapter", "agents", "ops");
     fs.mkdirSync(memberDir, { recursive: true });
     fs.writeFileSync(
       path.join(memberDir, "docker-compose.yml"),
@@ -104,19 +104,19 @@ describe("runAgent", () => {
   }
 
   it("exits 1 when docker-compose.yml is missing", async () => {
-    const memberDir = path.join(tmpDir, ".chapter", "members", "ops");
+    const memberDir = path.join(tmpDir, ".chapter", "agents", "ops");
     fs.mkdirSync(memberDir, { recursive: true });
     fs.writeFileSync(path.join(memberDir, ".env"), "TOKEN=abc\n");
     // No docker-compose.yml
 
-    await runAgent(tmpDir, "@test/member-ops", {});
+    await runAgent(tmpDir, "@test/agent-ops", {});
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("docker-compose.yml");
   });
 
   it("exits 1 when member directory does not exist", async () => {
-    await runAgent(tmpDir, "@test/member-ops", {});
+    await runAgent(tmpDir, "@test/agent-ops", {});
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("not found");
@@ -124,7 +124,7 @@ describe("runAgent", () => {
 
   it("exits 1 when .env has missing values", async () => {
     setupMemberDir("GITHUB_TOKEN=\nCHAPTER_PROXY_TOKEN=abc\n");
-    await runAgent(tmpDir, "@test/member-ops", {});
+    await runAgent(tmpDir, "@test/agent-ops", {});
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("GITHUB_TOKEN");
@@ -132,7 +132,7 @@ describe("runAgent", () => {
 
   it("succeeds with valid configuration and auto-detects single runtime", async () => {
     setupMemberDir("GITHUB_TOKEN=abc123\nCHAPTER_PROXY_TOKEN=xyz\n");
-    await runAgent(tmpDir, "@test/member-ops", {});
+    await runAgent(tmpDir, "@test/agent-ops", {});
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("session complete");
@@ -140,7 +140,7 @@ describe("runAgent", () => {
 
   it("exits 1 when runtime not found in compose file", async () => {
     setupMemberDir("GITHUB_TOKEN=abc\nCHAPTER_PROXY_TOKEN=xyz\n");
-    await runAgent(tmpDir, "@test/member-ops", { runtime: "unknown-runtime" });
+    await runAgent(tmpDir, "@test/agent-ops", { runtime: "unknown-runtime" });
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("not found");
@@ -148,7 +148,7 @@ describe("runAgent", () => {
 
   it("accepts valid runtime from compose file", async () => {
     setupMemberDir("GITHUB_TOKEN=abc\nCHAPTER_PROXY_TOKEN=xyz\n");
-    await runAgent(tmpDir, "@test/member-ops", { runtime: "claude-code" });
+    await runAgent(tmpDir, "@test/agent-ops", { runtime: "claude-code" });
     expect(exitSpy).not.toHaveBeenCalledWith(1);
   });
 
@@ -161,13 +161,13 @@ describe("runAgent", () => {
     );
     fs.writeFileSync(path.join(customDir, ".env"), "TOKEN=abc\n");
 
-    await runAgent(tmpDir, "@test/member-ops", { outputDir: customDir });
+    await runAgent(tmpDir, "@test/agent-ops", { outputDir: customDir });
     expect(exitSpy).not.toHaveBeenCalledWith(1);
   });
 
   it("runs two-phase: mcp-proxy detached then runtime interactive", async () => {
     setupMemberDir("GITHUB_TOKEN=abc\nCHAPTER_PROXY_TOKEN=xyz\n");
-    await runAgent(tmpDir, "@test/member-ops", {});
+    await runAgent(tmpDir, "@test/agent-ops", {});
 
     // Should have 2 spawn calls
     expect(spawnCalls.length).toBe(2);
@@ -188,7 +188,7 @@ describe("runAgent", () => {
       "TOKEN=abc\n",
       `services:\n  mcp-proxy:\n    image: proxy\n  claude-code:\n    build: ./cc\n  codex:\n    build: ./codex\n`,
     );
-    await runAgent(tmpDir, "@test/member-ops", {});
+    await runAgent(tmpDir, "@test/agent-ops", {});
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("Multiple runtimes");
@@ -200,22 +200,21 @@ describe("runAgent", () => {
       "TOKEN=abc\n",
       `services:\n  mcp-proxy:\n    image: proxy\n  claude-code:\n    build: ./cc\n  codex:\n    build: ./codex\n`,
     );
-    await runAgent(tmpDir, "@test/member-ops", { runtime: "claude-code" });
+    await runAgent(tmpDir, "@test/agent-ops", { runtime: "claude-code" });
     expect(exitSpy).not.toHaveBeenCalledWith(1);
   });
 
   it("exits 1 when member is disabled in registry", async () => {
     setupMemberDir("GITHUB_TOKEN=abc\nCHAPTER_PROXY_TOKEN=xyz\n");
     const chapterDir = path.join(tmpDir, ".chapter");
-    const disabledEntry: MemberEntry = {
-      package: "@test/member-ops",
-      memberType: "agent",
-      status: "disabled",
+    const disabledEntry: AgentEntry = {
+      package: "@test/agent-ops",
+            status: "disabled",
       installedAt: "2026-03-06T10:30:00.000Z",
     };
-    addMember(chapterDir, "ops", disabledEntry);
+    addAgent(chapterDir, "ops", disabledEntry);
 
-    await runAgent(tmpDir, "@test/member-ops", {});
+    await runAgent(tmpDir, "@test/agent-ops", {});
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("disabled");
@@ -225,15 +224,14 @@ describe("runAgent", () => {
   it("proceeds normally when member is enabled in registry", async () => {
     setupMemberDir("GITHUB_TOKEN=abc\nCHAPTER_PROXY_TOKEN=xyz\n");
     const chapterDir = path.join(tmpDir, ".chapter");
-    const enabledEntry: MemberEntry = {
-      package: "@test/member-ops",
-      memberType: "agent",
-      status: "enabled",
+    const enabledEntry: AgentEntry = {
+      package: "@test/agent-ops",
+            status: "enabled",
       installedAt: "2026-03-06T10:30:00.000Z",
     };
-    addMember(chapterDir, "ops", enabledEntry);
+    addAgent(chapterDir, "ops", enabledEntry);
 
-    await runAgent(tmpDir, "@test/member-ops", {});
+    await runAgent(tmpDir, "@test/agent-ops", {});
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("session complete");
@@ -242,7 +240,7 @@ describe("runAgent", () => {
   it("proceeds normally when member is not in registry (lenient)", async () => {
     setupMemberDir("GITHUB_TOKEN=abc\nCHAPTER_PROXY_TOKEN=xyz\n");
     // No registry entry at all — should still work
-    await runAgent(tmpDir, "@test/member-ops", {});
+    await runAgent(tmpDir, "@test/agent-ops", {});
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("session complete");

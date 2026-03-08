@@ -1,4 +1,4 @@
-import type { ResolvedMember, ResolvedRole, ResolvedTask } from "../resolver/types.js";
+import type { ResolvedAgent, ResolvedRole, ResolvedTask } from "../resolver/types.js";
 import { getAppShortName } from "../generator/toolfilter.js";
 import type { RuntimeMaterializer, MaterializationResult, ComposeServiceDef } from "./types.js";
 import {
@@ -112,12 +112,12 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
   name: "claude-code",
 
   materializeWorkspace(
-    member: ResolvedMember,
+    agent: ResolvedAgent,
     proxyEndpoint: string,
     proxyToken?: string,
   ): MaterializationResult {
     const result: MaterializationResult = new Map();
-    const proxyType = member.proxy?.type ?? "sse";
+    const proxyType = agent.proxy?.type ?? "sse";
 
     // .mcp.json — MCP server config at workspace root
     result.set(
@@ -132,7 +132,7 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     );
 
     // .claude/commands/{task-short-name}.md
-    const allTasks = collectAllTasks(member.roles);
+    const allTasks = collectAllTasks(agent.roles);
     for (const [task, owningRoles] of allTasks) {
       const taskShortName = getAppShortName(task.name);
       result.set(
@@ -142,10 +142,10 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     }
 
     // AGENTS.md
-    result.set("AGENTS.md", generateAgentsMd(member));
+    result.set("AGENTS.md", generateAgentsMd(agent));
 
     // skills/{skill-short-name}/README.md
-    const allSkills = collectAllSkills(member.roles);
+    const allSkills = collectAllSkills(agent.roles);
     for (const [, skill] of allSkills) {
       const skillShortName = getAppShortName(skill.name);
       result.set(
@@ -173,8 +173,8 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     ].join("\n");
   },
 
-  generateComposeService(member: ResolvedMember): ComposeServiceDef {
-    const roleNames = member.roles
+  generateComposeService(agent: ResolvedAgent): ComposeServiceDef {
+    const roleNames = agent.roles
       .map((r) => getAppShortName(r.name))
       .join(",");
 

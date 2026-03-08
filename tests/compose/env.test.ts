@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateEnvTemplate } from "../../src/compose/env.js";
-import type { ResolvedMember, ResolvedApp, ResolvedRole } from "../../src/resolver/types.js";
+import type { ResolvedAgent, ResolvedApp, ResolvedRole } from "../../src/resolver/types.js";
 
 function makeGithubApp(): ResolvedApp {
   return {
@@ -28,7 +28,7 @@ function makeSlackApp(): ResolvedApp {
   };
 }
 
-function makeRepoOpsMember(): ResolvedMember {
+function makeRepoOpsMember(): ResolvedAgent {
   const githubApp = makeGithubApp();
   const slackApp = makeSlackApp();
 
@@ -51,13 +51,10 @@ function makeRepoOpsMember(): ResolvedMember {
   };
 
   return {
-    name: "@clawmasons/member-repo-ops",
+    name: "@clawmasons/agent-repo-ops",
     version: "1.0.0",
-    memberType: "agent",
-    memberName: "Repo Ops",
+    agentName: "Repo Ops",
     slug: "repo-ops",
-    email: "repo-ops@chapter.local",
-    authProviders: [],
     runtimes: ["claude-code", "codex"],
     roles: [issueManager],
     proxy: {

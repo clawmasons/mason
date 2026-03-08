@@ -6,4 +6,4 @@ export type {
   ValidationResult,
 } from "./types.js";
 
-export { validateMember } from "./validate.js";
+export { validateAgent } from "./validate.js";

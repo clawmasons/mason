@@ -1,4 +1,4 @@
-import type { ResolvedMember } from "../resolver/types.js";
+import type { ResolvedAgent } from "../resolver/types.js";
 import type { ToolFilter } from "./types.js";
 
 /** Known chapter package type prefixes. */
@@ -37,11 +37,11 @@ export function getAppShortName(packageName: string): string {
  * computes the set union. Returns a Map keyed by full app package name.
  */
 export function computeToolFilters(
-  member: ResolvedMember,
+  agent: ResolvedAgent,
 ): Map<string, ToolFilter> {
   const toolSets = new Map<string, Set<string>>();
 
-  for (const role of member.roles) {
+  for (const role of agent.roles) {
     for (const [appName, perms] of Object.entries(role.permissions)) {
       let toolSet = toolSets.get(appName);
       if (!toolSet) {

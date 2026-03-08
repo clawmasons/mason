@@ -1,4 +1,4 @@
-import type { ResolvedMember, ResolvedRole, ResolvedTask, ResolvedSkill } from "../resolver/types.js";
+import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from "../resolver/types.js";
 import { getAppShortName } from "../generator/toolfilter.js";
 
 /**
@@ -78,8 +78,8 @@ export function collectAllTasks(
 /**
  * Generate AGENTS.md content.
  */
-export function generateAgentsMd(member: ResolvedMember): string {
-  const agentShortName = getAppShortName(member.name);
+export function generateAgentsMd(agent: ResolvedAgent): string {
+  const agentShortName = getAppShortName(agent.name);
   const lines: string[] = [];
 
   lines.push(`# Agent: ${agentShortName}`);
@@ -90,7 +90,7 @@ export function generateAgentsMd(member: ResolvedMember): string {
   lines.push("");
   lines.push("## Roles");
 
-  for (const role of member.roles) {
+  for (const role of agent.roles) {
     const roleShortName = getAppShortName(role.name);
     lines.push("");
     lines.push(`### ${roleShortName}`);

@@ -1,401 +1,237 @@
 import { describe, it, expect } from "vitest";
-import { memberChapterFieldSchema } from "../../src/schemas/member.js";
+import { agentChapterFieldSchema } from "../../src/schemas/agent.js";
 
-describe("memberChapterFieldSchema", () => {
-  describe("agent member", () => {
-    it("validates a valid agent member", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Repo Ops",
-        slug: "repo-ops",
-        email: "repo-ops@chapter.local",
-        runtimes: ["claude-code", "codex"],
-        roles: ["@clawmasons/role-issue-manager"],
-        proxy: {
-          port: 9090,
-          type: "sse",
-        },
-      });
-      expect(result.success).toBe(true);
+describe("agentChapterFieldSchema", () => {
+  it("validates a valid agent", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Repo Ops",
+      slug: "repo-ops",
+      runtimes: ["claude-code", "codex"],
+      roles: ["@clawmasons/role-issue-manager"],
+      proxy: {
+        port: 9090,
+        type: "sse",
+      },
     });
-
-    it("validates agent member with resources", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Repo Ops",
-        slug: "repo-ops",
-        email: "repo-ops@chapter.local",
-        runtimes: ["claude-code"],
-        roles: ["@clawmasons/role-issue-manager"],
-        resources: [
-          {
-            type: "github-repo",
-            ref: "clawmasons/openclaw",
-            access: "read-write",
-          },
-        ],
-      });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.memberType).toBe("agent");
-        if (result.data.memberType === "agent") {
-          expect(result.data.resources).toHaveLength(1);
-          expect(result.data.resources[0].ref).toBe("clawmasons/openclaw");
-        }
-      }
-    });
-
-    it("validates agent member with authProviders", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Repo Ops",
-        slug: "repo-ops",
-        email: "repo-ops@chapter.local",
-        authProviders: ["github"],
-        runtimes: ["claude-code"],
-        roles: ["@clawmasons/role-issue-manager"],
-      });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.authProviders).toEqual(["github"]);
-      }
-    });
-
-    it("rejects agent member missing runtimes", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Repo Ops",
-        slug: "repo-ops",
-        email: "repo-ops@chapter.local",
-        roles: ["@clawmasons/role-issue-manager"],
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects agent member with empty runtimes array", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Repo Ops",
-        slug: "repo-ops",
-        email: "repo-ops@chapter.local",
-        runtimes: [],
-        roles: ["@clawmasons/role-issue-manager"],
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects agent member missing roles", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Repo Ops",
-        slug: "repo-ops",
-        email: "repo-ops@chapter.local",
-        runtimes: ["claude-code"],
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects agent member missing name", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        slug: "repo-ops",
-        email: "repo-ops@chapter.local",
-        runtimes: ["claude-code"],
-        roles: ["@clawmasons/role-issue-manager"],
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects agent member missing slug", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Repo Ops",
-        email: "repo-ops@chapter.local",
-        runtimes: ["claude-code"],
-        roles: ["@clawmasons/role-issue-manager"],
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects agent member missing email", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Repo Ops",
-        slug: "repo-ops",
-        runtimes: ["claude-code"],
-        roles: ["@clawmasons/role-issue-manager"],
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects agent member with invalid email", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Repo Ops",
-        slug: "repo-ops",
-        email: "not-an-email",
-        runtimes: ["claude-code"],
-        roles: ["@clawmasons/role-issue-manager"],
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("validates agent member with llm configuration", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Coder",
-        slug: "coder",
-        email: "coder@chapter.local",
-        runtimes: ["pi-coding-agent"],
-        roles: ["@acme/role-developer"],
-        llm: {
-          provider: "openrouter",
-          model: "anthropic/claude-sonnet-4",
-        },
-      });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.memberType).toBe("agent");
-        if (result.data.memberType === "agent") {
-          expect(result.data.llm).toEqual({
-            provider: "openrouter",
-            model: "anthropic/claude-sonnet-4",
-          });
-        }
-      }
-    });
-
-    it("validates agent member without llm (optional)", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Repo Ops",
-        slug: "repo-ops",
-        email: "repo-ops@chapter.local",
-        runtimes: ["claude-code"],
-        roles: ["@clawmasons/role-issue-manager"],
-      });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.memberType).toBe("agent");
-        if (result.data.memberType === "agent") {
-          expect(result.data.llm).toBeUndefined();
-        }
-      }
-    });
-
-    it("rejects agent member with llm missing model", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Coder",
-        slug: "coder",
-        email: "coder@chapter.local",
-        runtimes: ["pi-coding-agent"],
-        roles: ["@acme/role-developer"],
-        llm: {
-          provider: "openrouter",
-        },
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects agent member with llm missing provider", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Coder",
-        slug: "coder",
-        email: "coder@chapter.local",
-        runtimes: ["pi-coding-agent"],
-        roles: ["@acme/role-developer"],
-        llm: {
-          model: "anthropic/claude-sonnet-4",
-        },
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("validates PRD example: agent member", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "agent",
-        name: "Note Taker",
-        slug: "note-taker",
-        email: "note-taker@chapter.local",
-        authProviders: [],
-        description: "Note-taking agent that manages markdown files.",
-        runtimes: ["claude-code"],
-        roles: ["@clawmasons/role-writer"],
-        resources: [
-          {
-            type: "github-repo",
-            ref: "clawmasons/openclaw",
-            access: "read-write",
-          },
-        ],
-        proxy: {
-          port: 9090,
-          type: "sse",
-        },
-      });
-      expect(result.success).toBe(true);
-    });
+    expect(result.success).toBe(true);
   });
 
-  describe("human member", () => {
-    it("validates a valid human member", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "human",
-        name: "Alice Chen",
-        slug: "alice",
-        email: "alice@acme.com",
-        authProviders: ["github", "google"],
-        description: "Lead developer and project manager.",
-        roles: ["@acme/role-admin", "@acme/role-reviewer"],
-      });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.memberType).toBe("human");
-        expect(result.data.name).toBe("Alice Chen");
-        expect(result.data.slug).toBe("alice");
-        expect(result.data.email).toBe("alice@acme.com");
-      }
-    });
-
-    it("validates human member without authProviders", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "human",
-        name: "Bob",
-        slug: "bob",
-        email: "bob@acme.com",
-        roles: ["@acme/role-viewer"],
-      });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.authProviders).toEqual([]);
-      }
-    });
-
-    it("strips llm field from human member (not in human schema)", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "human",
-        name: "Alice Chen",
-        slug: "alice",
-        email: "alice@acme.com",
-        roles: ["@acme/role-admin"],
-        llm: {
-          provider: "openrouter",
-          model: "anthropic/claude-sonnet-4",
+  it("validates agent with resources", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Repo Ops",
+      slug: "repo-ops",
+      runtimes: ["claude-code"],
+      roles: ["@clawmasons/role-issue-manager"],
+      resources: [
+        {
+          type: "github-repo",
+          ref: "clawmasons/openclaw",
+          access: "read-write",
         },
-      });
-      // human schema doesn't have llm field — extra fields are stripped by default
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect("llm" in result.data).toBe(false);
-      }
+      ],
     });
-
-    it("rejects human member with runtimes", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "human",
-        name: "Alice Chen",
-        slug: "alice",
-        email: "alice@acme.com",
-        runtimes: ["claude-code"],
-        roles: ["@acme/role-admin"],
-      });
-      // human schema doesn't have runtimes field — extra fields are stripped by default
-      // but the schema should still accept the input (Zod strips unknown keys)
-      expect(result.success).toBe(true);
-      if (result.success) {
-        // runtimes should not be present on the parsed result
-        expect("runtimes" in result.data).toBe(false);
-      }
-    });
-
-    it("rejects human member missing name", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "human",
-        slug: "alice",
-        email: "alice@acme.com",
-        roles: ["@acme/role-admin"],
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects human member missing slug", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "human",
-        name: "Alice Chen",
-        email: "alice@acme.com",
-        roles: ["@acme/role-admin"],
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects human member missing email", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "human",
-        name: "Alice Chen",
-        slug: "alice",
-        roles: ["@acme/role-admin"],
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects human member missing roles", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "human",
-        name: "Alice Chen",
-        slug: "alice",
-        email: "alice@acme.com",
-      });
-      expect(result.success).toBe(false);
-    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.resources).toHaveLength(1);
+      expect(result.data.resources[0].ref).toBe("clawmasons/openclaw");
+    }
   });
 
-  describe("general", () => {
-    it("rejects member without memberType", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        name: "Alice",
-        slug: "alice",
-        email: "alice@acme.com",
-        roles: ["@acme/role-admin"],
-      });
-      expect(result.success).toBe(false);
+  it("rejects agent missing runtimes", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Repo Ops",
+      slug: "repo-ops",
+      roles: ["@clawmasons/role-issue-manager"],
     });
+    expect(result.success).toBe(false);
+  });
 
-    it("rejects member with invalid memberType", () => {
-      const result = memberChapterFieldSchema.safeParse({
-        type: "member",
-        memberType: "bot",
-        name: "Bot",
-        slug: "bot",
-        email: "bot@acme.com",
-        roles: ["@acme/role-admin"],
-      });
-      expect(result.success).toBe(false);
+  it("rejects agent with empty runtimes array", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Repo Ops",
+      slug: "repo-ops",
+      runtimes: [],
+      roles: ["@clawmasons/role-issue-manager"],
     });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects agent missing roles", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Repo Ops",
+      slug: "repo-ops",
+      runtimes: ["claude-code"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects agent missing name", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      slug: "repo-ops",
+      runtimes: ["claude-code"],
+      roles: ["@clawmasons/role-issue-manager"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects agent missing slug", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Repo Ops",
+      runtimes: ["claude-code"],
+      roles: ["@clawmasons/role-issue-manager"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("validates agent with llm configuration", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Coder",
+      slug: "coder",
+      runtimes: ["pi-coding-agent"],
+      roles: ["@acme/role-developer"],
+      llm: {
+        provider: "openrouter",
+        model: "anthropic/claude-sonnet-4",
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.llm).toEqual({
+        provider: "openrouter",
+        model: "anthropic/claude-sonnet-4",
+      });
+    }
+  });
+
+  it("validates agent without llm (optional)", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Repo Ops",
+      slug: "repo-ops",
+      runtimes: ["claude-code"],
+      roles: ["@clawmasons/role-issue-manager"],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.llm).toBeUndefined();
+    }
+  });
+
+  it("rejects agent with llm missing model", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Coder",
+      slug: "coder",
+      runtimes: ["pi-coding-agent"],
+      roles: ["@acme/role-developer"],
+      llm: {
+        provider: "openrouter",
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects agent with llm missing provider", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Coder",
+      slug: "coder",
+      runtimes: ["pi-coding-agent"],
+      roles: ["@acme/role-developer"],
+      llm: {
+        model: "anthropic/claude-sonnet-4",
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("validates PRD example: agent", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Note Taker",
+      slug: "note-taker",
+      description: "Note-taking agent that manages markdown files.",
+      runtimes: ["claude-code"],
+      roles: ["@clawmasons/role-writer"],
+      resources: [
+        {
+          type: "github-repo",
+          ref: "clawmasons/openclaw",
+          access: "read-write",
+        },
+      ],
+      proxy: {
+        port: 9090,
+        type: "sse",
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects packages with type 'member'", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "member",
+      memberType: "agent",
+      name: "Repo Ops",
+      slug: "repo-ops",
+      email: "repo-ops@chapter.local",
+      runtimes: ["claude-code"],
+      roles: ["@clawmasons/role-issue-manager"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects packages with email field", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Repo Ops",
+      slug: "repo-ops",
+      email: "repo-ops@chapter.local",
+      runtimes: ["claude-code"],
+      roles: ["@clawmasons/role-issue-manager"],
+    });
+    // Zod strips unknown fields by default, so extra fields are ignored
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect("email" in result.data).toBe(false);
+    }
+  });
+
+  it("rejects packages with memberType field", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      memberType: "agent",
+      name: "Repo Ops",
+      slug: "repo-ops",
+      runtimes: ["claude-code"],
+      roles: ["@clawmasons/role-issue-manager"],
+    });
+    // Zod strips unknown fields by default
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect("memberType" in result.data).toBe(false);
+    }
+  });
+
+  it("defaults resources to empty array when not provided", () => {
+    const result = agentChapterFieldSchema.safeParse({
+      type: "agent",
+      name: "Repo Ops",
+      slug: "repo-ops",
+      runtimes: ["claude-code"],
+      roles: ["@clawmasons/role-issue-manager"],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.resources).toEqual([]);
+    }
   });
 });

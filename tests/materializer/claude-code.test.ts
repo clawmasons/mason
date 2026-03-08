@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { claudeCodeMaterializer } from "../../src/materializer/claude-code.js";
-import type { ResolvedMember, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "../../src/resolver/types.js";
+import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "../../src/resolver/types.js";
 
 function makeGithubApp(): ResolvedApp {
   return {
@@ -66,7 +66,7 @@ function makeReviewTask(): ResolvedTask {
   };
 }
 
-function makeRepoOpsMember(): ResolvedMember {
+function makeRepoOpsMember(): ResolvedAgent {
   const githubApp = makeGithubApp();
   const slackApp = makeSlackApp();
   const labelingSkill = makeLabelingSkill();
@@ -110,13 +110,10 @@ function makeRepoOpsMember(): ResolvedMember {
   };
 
   return {
-    name: "@clawmasons/member-repo-ops",
+    name: "@clawmasons/agent-repo-ops",
     version: "1.0.0",
-    memberType: "agent",
-    memberName: "Repo Ops",
+    agentName: "Repo Ops",
     slug: "repo-ops",
-    email: "repo-ops@chapter.local",
-    authProviders: [],
     description: "Repository operations agent for GitHub.",
     runtimes: ["claude-code", "codex"],
     roles: [issueManager, prReviewer],

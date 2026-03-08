@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { discoverPackages } from "../../resolver/discover.js";
-import { resolveMember } from "../../resolver/resolve.js";
-import { validateMember } from "../../validator/validate.js";
+import { resolveAgent } from "../../resolver/resolve.js";
+import { validateAgent } from "../../validator/validate.js";
 import type { ValidationResult } from "../../validator/types.js";
 
 interface ValidateOptions {
@@ -31,33 +31,33 @@ function formatErrors(result: ValidationResult): string {
 export function registerValidateCommand(program: Command): void {
   program
     .command("validate")
-    .description("Validate a member's dependency graph and permissions")
-    .argument("<member>", "Member package name to validate")
+    .description("Validate an agent's dependency graph and permissions")
+    .argument("<agent>", "Agent package name to validate")
     .option("--json", "Output validation result as JSON")
-    .action(async (memberName: string, options: ValidateOptions) => {
-      await runValidate(process.cwd(), memberName, options);
+    .action(async (agentName: string, options: ValidateOptions) => {
+      await runValidate(process.cwd(), agentName, options);
     });
 }
 
 export async function runValidate(
   rootDir: string,
-  memberName: string,
+  agentName: string,
   options: ValidateOptions,
 ): Promise<void> {
   try {
     // Discover packages
     const packages = discoverPackages(rootDir);
 
-    // Resolve member graph
-    const member = resolveMember(memberName, packages);
+    // Resolve agent graph
+    const agent = resolveAgent(agentName, packages);
 
     // Validate
-    const result = validateMember(member);
+    const result = validateAgent(agent);
 
     if (options.json) {
       console.log(JSON.stringify(result, null, 2));
     } else if (result.valid) {
-      console.log(`\n✔ Member "${memberName}" is valid.\n`);
+      console.log(`\n✔ Agent "${agentName}" is valid.\n`);
       if (result.warnings.length > 0) {
         for (const w of result.warnings) {
           console.warn(`  ⚠ [${w.category}] ${w.message}`);
@@ -66,7 +66,7 @@ export async function runValidate(
       }
     } else {
       console.error(
-        `\n✘ Member "${memberName}" has ${result.errors.length} validation error(s):${formatErrors(result)}\n`,
+        `\n✘ Agent "${agentName}" has ${result.errors.length} validation error(s):${formatErrors(result)}\n`,
       );
     }
 

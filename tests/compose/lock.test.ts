@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateLockFile } from "../../src/compose/lock.js";
-import type { ResolvedMember, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "../../src/resolver/types.js";
+import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "../../src/resolver/types.js";
 
 function makeGithubApp(): ResolvedApp {
   return {
@@ -35,7 +35,7 @@ function makeTriageTask(): ResolvedTask {
   };
 }
 
-function makeRepoOpsMember(): ResolvedMember {
+function makeRepoOpsMember(): ResolvedAgent {
   const issueManager: ResolvedRole = {
     name: "@clawmasons/role-issue-manager",
     version: "2.0.0",
@@ -51,13 +51,10 @@ function makeRepoOpsMember(): ResolvedMember {
   };
 
   return {
-    name: "@clawmasons/member-repo-ops",
+    name: "@clawmasons/agent-repo-ops",
     version: "1.0.0",
-    memberType: "agent",
-    memberName: "Repo Ops",
+    agentName: "Repo Ops",
     slug: "repo-ops",
-    email: "repo-ops@chapter.local",
-    authProviders: [],
     runtimes: ["claude-code", "codex"],
     roles: [issueManager],
   };
@@ -76,25 +73,19 @@ describe("generateLockFile", () => {
     it("captures member name", () => {
       const member = makeRepoOpsMember();
       const lock = generateLockFile(member, []);
-      expect(lock.member.name).toBe("@clawmasons/member-repo-ops");
+      expect(lock.agent.name).toBe("@clawmasons/agent-repo-ops");
     });
 
     it("captures member version", () => {
       const member = makeRepoOpsMember();
       const lock = generateLockFile(member, []);
-      expect(lock.member.version).toBe("1.0.0");
-    });
-
-    it("captures memberType", () => {
-      const member = makeRepoOpsMember();
-      const lock = generateLockFile(member, []);
-      expect(lock.member.memberType).toBe("agent");
+      expect(lock.agent.version).toBe("1.0.0");
     });
 
     it("captures runtimes", () => {
       const member = makeRepoOpsMember();
       const lock = generateLockFile(member, []);
-      expect(lock.member.runtimes).toEqual(["claude-code", "codex"]);
+      expect(lock.agent.runtimes).toEqual(["claude-code", "codex"]);
     });
   });
 
@@ -170,7 +161,7 @@ describe("generateLockFile", () => {
       const parsed = JSON.parse(json);
 
       expect(parsed.lockVersion).toBe(1);
-      expect(parsed.member).toBeDefined();
+      expect(parsed.agent).toBeDefined();
       expect(parsed.roles).toBeDefined();
       expect(parsed.generatedFiles).toBeDefined();
     });

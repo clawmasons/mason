@@ -1,12 +1,12 @@
-import type { ResolvedMember, ResolvedApp } from "../resolver/types.js";
+import type { ResolvedAgent, ResolvedApp } from "../resolver/types.js";
 import type { ComposeServiceDef } from "../materializer/types.js";
 
 /**
  * Collect all unique apps from a resolved agent's roles.
  */
-function collectAllApps(member: ResolvedMember): Map<string, ResolvedApp> {
+function collectAllApps(agent: ResolvedAgent): Map<string, ResolvedApp> {
   const apps = new Map<string, ResolvedApp>();
-  for (const role of member.roles) {
+  for (const role of agent.roles) {
     for (const app of role.apps) {
       if (!apps.has(app.name)) {
         apps.set(app.name, app);
@@ -20,9 +20,9 @@ function collectAllApps(member: ResolvedMember): Map<string, ResolvedApp> {
  * Extract environment variable names referenced via ${VAR} interpolation
  * from all app env fields. Returns deduplicated sorted list.
  */
-function collectProxyEnvVars(member: ResolvedMember): string[] {
+function collectProxyEnvVars(agent: ResolvedAgent): string[] {
   const varNames = new Set<string>();
-  const allApps = collectAllApps(member);
+  const allApps = collectAllApps(agent);
 
   for (const [, app] of allApps) {
     if (app.env) {
@@ -96,11 +96,11 @@ function renderComposeService(service: ComposeServiceDef): string {
  * are rendered from their ComposeServiceDef definitions.
  */
 export function generateDockerCompose(
-  member: ResolvedMember,
+  agent: ResolvedAgent,
   runtimeServices: Map<string, ComposeServiceDef>,
 ): string {
-  const port = member.proxy?.port ?? 9090;
-  const envVars = collectProxyEnvVars(member);
+  const port = agent.proxy?.port ?? 9090;
+  const envVars = collectProxyEnvVars(agent);
 
   const lines: string[] = [];
 

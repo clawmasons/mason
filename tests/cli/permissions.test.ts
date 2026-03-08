@@ -20,7 +20,7 @@ describe("CLI permissions command", () => {
     if (permsCmd) {
       const args = permsCmd.registeredArguments;
       expect(args).toHaveLength(1);
-      expect(args[0].name()).toBe("member");
+      expect(args[0].name()).toBe("agent");
       expect(args[0].required).toBe(true);
     }
   });
@@ -144,16 +144,12 @@ describe("runPermissions", () => {
       },
     });
 
-    writePackage(path.join(tmpDir, "members", "ops"), {
-      name: "@test/member-ops",
+    writePackage(path.join(tmpDir, "agents", "ops"), {
+      name: "@test/agent-ops",
       version: "1.0.0",
       chapter: {
-        type: "member",
-        memberType: "agent",
-        name: "Ops",
-        slug: "ops",
-        email: "ops@chapter.local",
-        runtimes: ["claude-code"],
+        type: "agent",        name: "Ops",
+        slug: "ops",        runtimes: ["claude-code"],
         roles: ["@test/role-issue-manager", "@test/role-pr-reviewer"],
       },
     });
@@ -161,7 +157,7 @@ describe("runPermissions", () => {
 
   it("displays per-role permission breakdown", async () => {
     setupTwoRoleMember();
-    await runPermissions(tmpDir, "@test/member-ops", {});
+    await runPermissions(tmpDir, "@test/agent-ops", {});
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
@@ -176,7 +172,7 @@ describe("runPermissions", () => {
 
   it("displays deny list when present", async () => {
     setupTwoRoleMember();
-    await runPermissions(tmpDir, "@test/member-ops", {});
+    await runPermissions(tmpDir, "@test/agent-ops", {});
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("deny:");
@@ -185,7 +181,7 @@ describe("runPermissions", () => {
 
   it("displays proxy-level toolFilter union", async () => {
     setupTwoRoleMember();
-    await runPermissions(tmpDir, "@test/member-ops", {});
+    await runPermissions(tmpDir, "@test/agent-ops", {});
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("Proxy toolFilter");
@@ -200,7 +196,7 @@ describe("runPermissions", () => {
 
   it("outputs JSON with --json flag", async () => {
     setupTwoRoleMember();
-    await runPermissions(tmpDir, "@test/member-ops", { json: true });
+    await runPermissions(tmpDir, "@test/agent-ops", { json: true });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 

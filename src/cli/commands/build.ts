@@ -2,8 +2,8 @@ import type { Command } from "commander";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { discoverPackages } from "../../resolver/discover.js";
-import { resolveMember } from "../../resolver/resolve.js";
-import { validateMember } from "../../validator/validate.js";
+import { resolveAgent } from "../../resolver/resolve.js";
+import { validateAgent } from "../../validator/validate.js";
 import { generateLockFile } from "../../compose/lock.js";
 
 interface BuildOptions {
@@ -14,33 +14,33 @@ interface BuildOptions {
 export function registerBuildCommand(program: Command): void {
   program
     .command("build")
-    .description("Resolve member graph and generate chapter.lock.json")
-    .argument("<member>", "Member package name to build")
+    .description("Resolve agent graph and generate chapter.lock.json")
+    .argument("<agent>", "Agent package name to build")
     .option("--output <path>", "Output path for lock file")
     .option("--json", "Print lock file to stdout as JSON instead of writing to file")
-    .action(async (memberName: string, options: BuildOptions) => {
-      await runBuild(process.cwd(), memberName, options);
+    .action(async (agentName: string, options: BuildOptions) => {
+      await runBuild(process.cwd(), agentName, options);
     });
 }
 
 export async function runBuild(
   rootDir: string,
-  memberName: string,
+  agentName: string,
   options: BuildOptions,
 ): Promise<void> {
   try {
     // 1. Discover packages
     const packages = discoverPackages(rootDir);
 
-    // 2. Resolve member graph
-    const member = resolveMember(memberName, packages);
+    // 2. Resolve agent graph
+    const agent = resolveAgent(agentName, packages);
 
     // 3. Validate
-    const validation = validateMember(member);
+    const validation = validateAgent(agent);
     if (!validation.valid) {
       const errorLines = validation.errors.map((e) => `  - [${e.category}] ${e.message}`);
       console.error(
-        `\n✘ Member "${memberName}" failed validation with ${validation.errors.length} error(s):\n${errorLines.join("\n")}\n`,
+        `\n✘ Agent "${agentName}" failed validation with ${validation.errors.length} error(s):\n${errorLines.join("\n")}\n`,
       );
       process.exit(1);
       return;
@@ -52,7 +52,7 @@ export async function runBuild(
     }
 
     // 4. Generate lock file (empty generated files — build doesn't scaffold)
-    const lockFile = generateLockFile(member, []);
+    const lockFile = generateLockFile(agent, []);
 
     if (options.json) {
       console.log(JSON.stringify(lockFile, null, 2));

@@ -4,19 +4,19 @@ import { execSync, spawn } from "node:child_process";
 import { getAppShortName } from "../../generator/toolfilter.js";
 
 /**
- * Resolve the scaffolded member directory.
- * Uses `.chapter/members/<short-name>/` by default, or a custom outputDir if provided.
+ * Resolve the scaffolded agent directory.
+ * Uses `.chapter/agents/<short-name>/` by default, or a custom outputDir if provided.
  */
-export function resolveMemberDir(
+export function resolveAgentDir(
   rootDir: string,
-  memberName: string,
+  agentName: string,
   outputDir?: string,
 ): string {
   if (outputDir) {
     return path.resolve(rootDir, outputDir);
   }
-  const shortName = getAppShortName(memberName);
-  return path.join(rootDir, ".chapter", "members", shortName);
+  const shortName = getAppShortName(agentName);
+  return path.join(rootDir, ".chapter", "agents", shortName);
 }
 
 /**

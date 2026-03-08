@@ -4,8 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { program } from "../../src/cli/index.js";
 import { runEnable } from "../../src/cli/commands/enable.js";
-import { addMember, readMembersRegistry } from "../../src/registry/members.js";
-import type { MemberEntry } from "../../src/registry/types.js";
+import { addAgent, readAgentsRegistry } from "../../src/registry/members.js";
+import type { AgentEntry } from "../../src/registry/types.js";
 
 describe("CLI enable command", () => {
   it("has the enable command registered", () => {
@@ -22,7 +22,7 @@ describe("CLI enable command", () => {
     if (enableCmd) {
       const args = enableCmd.registeredArguments;
       expect(args).toHaveLength(1);
-      expect(args[0].name()).toBe("member");
+      expect(args[0].name()).toBe("agent");
       expect(args[0].required).toBe(true);
     }
   });
@@ -35,10 +35,9 @@ describe("runEnable", () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
-  const agentEntry: MemberEntry = {
-    package: "@test/member-ops",
-    memberType: "agent",
-    status: "enabled",
+  const agentEntry: AgentEntry = {
+    package: "@test/agent-ops",
+        status: "enabled",
     installedAt: "2026-03-06T10:30:00.000Z",
   };
 
@@ -56,45 +55,45 @@ describe("runEnable", () => {
   });
 
   it("enables a disabled member", () => {
-    addMember(chapterDir, "ops", { ...agentEntry, status: "disabled" });
+    addAgent(chapterDir, "ops", { ...agentEntry, status: "disabled" });
 
     runEnable(tmpDir, "@ops");
 
-    const registry = readMembersRegistry(chapterDir);
-    expect(registry.members.ops.status).toBe("enabled");
+    const registry = readAgentsRegistry(chapterDir);
+    expect(registry.agents.ops.status).toBe("enabled");
     expect(exitSpy).not.toHaveBeenCalled();
   });
 
   it("keeps an already enabled member as enabled", () => {
-    addMember(chapterDir, "ops", agentEntry);
+    addAgent(chapterDir, "ops", agentEntry);
 
     runEnable(tmpDir, "@ops");
 
-    const registry = readMembersRegistry(chapterDir);
-    expect(registry.members.ops.status).toBe("enabled");
+    const registry = readAgentsRegistry(chapterDir);
+    expect(registry.agents.ops.status).toBe("enabled");
     expect(exitSpy).not.toHaveBeenCalled();
   });
 
   it("strips @ prefix from member argument", () => {
-    addMember(chapterDir, "note-taker", { ...agentEntry, package: "@test/member-note-taker", status: "disabled" });
+    addAgent(chapterDir, "note-taker", { ...agentEntry, package: "@test/agent-note-taker", status: "disabled" });
 
     runEnable(tmpDir, "@note-taker");
 
-    const registry = readMembersRegistry(chapterDir);
-    expect(registry.members["note-taker"].status).toBe("enabled");
+    const registry = readAgentsRegistry(chapterDir);
+    expect(registry.agents["note-taker"].status).toBe("enabled");
   });
 
   it("works without @ prefix", () => {
-    addMember(chapterDir, "ops", { ...agentEntry, status: "disabled" });
+    addAgent(chapterDir, "ops", { ...agentEntry, status: "disabled" });
 
     runEnable(tmpDir, "ops");
 
-    const registry = readMembersRegistry(chapterDir);
-    expect(registry.members.ops.status).toBe("enabled");
+    const registry = readAgentsRegistry(chapterDir);
+    expect(registry.agents.ops.status).toBe("enabled");
   });
 
   it("prints success message with member slug", () => {
-    addMember(chapterDir, "ops", { ...agentEntry, status: "disabled" });
+    addAgent(chapterDir, "ops", { ...agentEntry, status: "disabled" });
 
     runEnable(tmpDir, "@ops");
 
@@ -113,13 +112,13 @@ describe("runEnable", () => {
   });
 
   it("preserves other member fields when enabling", () => {
-    addMember(chapterDir, "ops", { ...agentEntry, status: "disabled" });
+    addAgent(chapterDir, "ops", { ...agentEntry, status: "disabled" });
 
     runEnable(tmpDir, "@ops");
 
-    const registry = readMembersRegistry(chapterDir);
-    expect(registry.members.ops.package).toBe(agentEntry.package);
-    expect(registry.members.ops.memberType).toBe(agentEntry.memberType);
-    expect(registry.members.ops.installedAt).toBe(agentEntry.installedAt);
+    const registry = readAgentsRegistry(chapterDir);
+    expect(registry.agents.ops.package).toBe(agentEntry.package);
+    
+    expect(registry.agents.ops.installedAt).toBe(agentEntry.installedAt);
   });
 });
