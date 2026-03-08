@@ -1,0 +1,336 @@
+import { describe, expect, it } from "vitest";
+import { generateAgentDockerfile } from "../../src/generator/agent-dockerfile.js";
+import { generateProxyDockerfile } from "../../src/generator/proxy-dockerfile.js";
+import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
+
+// ── Test Helpers ───────────────────────────────────────────────────────
+
+function makeGithubApp(): ResolvedApp {
+  return {
+    name: "@acme.platform/app-github",
+    version: "1.0.0",
+    transport: "stdio",
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-github"],
+    env: { GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}" },
+    tools: ["create_issue", "list_repos", "create_pr"],
+    capabilities: ["tools"],
+  };
+}
+
+function makeFilesystemApp(): ResolvedApp {
+  return {
+    name: "@acme.platform/app-filesystem",
+    version: "1.0.0",
+    transport: "stdio",
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-filesystem"],
+    tools: ["read_file", "write_file", "list_directory"],
+    capabilities: ["tools"],
+  };
+}
+
+function makeLabelingSkill(): ResolvedSkill {
+  return {
+    name: "@acme.platform/skill-labeling",
+    version: "1.0.0",
+    artifacts: ["./SKILL.md"],
+    description: "Issue labeling heuristics",
+  };
+}
+
+function makeTriageTask(): ResolvedTask {
+  return {
+    name: "@acme.platform/task-triage-issue",
+    version: "1.0.0",
+    taskType: "subagent",
+    prompt: "./prompts/triage.md",
+    requiredApps: ["@acme.platform/app-github"],
+    apps: [makeGithubApp()],
+    skills: [makeLabelingSkill()],
+    subTasks: [],
+  };
+}
+
+function makeWriteTask(): ResolvedTask {
+  return {
+    name: "@acme.platform/task-write-notes",
+    version: "1.0.0",
+    taskType: "subagent",
+    prompt: "./prompts/write.md",
+    requiredApps: ["@acme.platform/app-filesystem"],
+    apps: [makeFilesystemApp()],
+    skills: [],
+    subTasks: [],
+  };
+}
+
+function makeWriterRole(): ResolvedRole {
+  return {
+    name: "@acme.platform/role-writer",
+    version: "1.0.0",
+    description: "Writes and manages markdown notes.",
+    permissions: {
+      "@acme.platform/app-filesystem": {
+        allow: ["read_file", "write_file", "list_directory"],
+        deny: [],
+      },
+    },
+    tasks: [makeWriteTask()],
+    apps: [makeFilesystemApp()],
+    skills: [],
+  };
+}
+
+function makeReviewerRole(): ResolvedRole {
+  return {
+    name: "@acme.platform/role-reviewer",
+    version: "1.0.0",
+    description: "Reviews issues and PRs.",
+    permissions: {
+      "@acme.platform/app-github": {
+        allow: ["create_issue", "list_repos"],
+        deny: [],
+      },
+    },
+    tasks: [makeTriageTask()],
+    apps: [makeGithubApp()],
+    skills: [makeLabelingSkill()],
+  };
+}
+
+function makeNoteTakerAgent(): ResolvedAgent {
+  return {
+    name: "@acme.platform/agent-note-taker",
+    version: "1.0.0",
+    agentName: "Note Taker",
+    slug: "note-taker",
+    description: "Note-taking agent",
+    runtimes: ["claude-code"],
+    roles: [makeWriterRole(), makeReviewerRole()],
+    proxy: { port: 9090, type: "sse" },
+    llm: { provider: "anthropic", model: "claude-sonnet-4-6" },
+  };
+}
+
+// ── Agent Dockerfile Tests ─────────────────────────────────────────────
+
+describe("generateAgentDockerfile", () => {
+  it("returns a non-empty Dockerfile string", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toBeTypeOf("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("uses node:22-slim as base image", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("FROM node:22-slim");
+  });
+
+  it("sets USER mason", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("USER mason");
+  });
+
+  it("creates mason user with home directory", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("groupadd -r mason");
+    expect(result).toContain("useradd -r -g mason -m mason");
+  });
+
+  it("sets up workspace/project directory structure", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("/home/mason/workspace/project");
+    expect(result).toContain("WORKDIR /home/mason/workspace/project");
+  });
+
+  it("includes header comment with agent and role names", () => {
+    const agent = makeNoteTakerAgent();
+    const writerRole = agent.roles[0];
+    const result = generateAgentDockerfile(agent, writerRole);
+
+    expect(result).toContain("note-taker");
+    expect(result).toContain("writer");
+  });
+
+  it("copies materialized workspace files", () => {
+    const agent = makeNoteTakerAgent();
+    const writerRole = agent.roles[0];
+    const result = generateAgentDockerfile(agent, writerRole);
+
+    expect(result).toContain("COPY agent/note-taker/writer/workspace/");
+    expect(result).toContain("/home/mason/workspace/");
+  });
+
+  it("installs claude-code runtime for claude-code agents", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("claude-code");
+    expect(result).toContain('ENTRYPOINT ["claude"]');
+  });
+
+  it("installs pi-coding-agent runtime for pi agents", () => {
+    const agent = makeNoteTakerAgent();
+    agent.runtimes = ["pi-coding-agent"];
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("pi-coding-agent");
+    expect(result).toContain('ENTRYPOINT ["pi"]');
+  });
+
+  it("handles unknown runtime gracefully", () => {
+    const agent = makeNoteTakerAgent();
+    agent.runtimes = ["custom-runtime"];
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("custom-runtime");
+    expect(result).toContain('ENTRYPOINT ["npx", "custom-runtime"]');
+  });
+
+  it("includes LLM provider env var for anthropic", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("ANTHROPIC_API_KEY");
+  });
+
+  it("includes correct env var for openrouter provider", () => {
+    const agent = makeNoteTakerAgent();
+    agent.llm = { provider: "openrouter", model: "anthropic/claude-sonnet-4" };
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("OPENROUTER_API_KEY");
+  });
+
+  it("omits LLM env section when no llm configured", () => {
+    const agent = makeNoteTakerAgent();
+    delete agent.llm;
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).not.toContain("LLM provider environment");
+  });
+
+  it("copies node_modules from local build context", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("COPY node_modules/ /app/node_modules/");
+  });
+
+  it("does not reference any registry pull", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).not.toContain("docker.io");
+    expect(result).not.toContain("ghcr.io");
+    expect(result).not.toContain("registry");
+  });
+
+  it("generates different Dockerfiles per role", () => {
+    const agent = makeNoteTakerAgent();
+    const writerResult = generateAgentDockerfile(agent, agent.roles[0]);
+    const reviewerResult = generateAgentDockerfile(agent, agent.roles[1]);
+
+    // They should differ in workspace COPY paths
+    expect(writerResult).toContain("agent/note-taker/writer/workspace/");
+    expect(reviewerResult).toContain("agent/note-taker/reviewer/workspace/");
+  });
+});
+
+// ── Proxy Dockerfile Tests ─────────────────────────────────────────────
+
+describe("generateProxyDockerfile", () => {
+  it("returns a non-empty Dockerfile string", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+
+    expect(result).toBeTypeOf("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("uses node:22-slim as base image", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+
+    expect(result).toContain("FROM node:22-slim");
+  });
+
+  it("sets USER mason", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+
+    expect(result).toContain("USER mason");
+  });
+
+  it("creates mason user", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+
+    expect(result).toContain("groupadd -r mason");
+    expect(result).toContain("useradd -r -g mason -m mason");
+  });
+
+  it("installs build tools for native addons", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+
+    expect(result).toContain("python3 make g++");
+  });
+
+  it("uses chapter proxy as entrypoint with agent name", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+
+    expect(result).toContain('ENTRYPOINT ["npx", "chapter"]');
+    expect(result).toContain('CMD ["proxy", "--agent", "@acme.platform/agent-note-taker"]');
+  });
+
+  it("includes role name in header comment", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+
+    expect(result).toContain("writer");
+  });
+
+  it("copies node_modules from local build context", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+
+    expect(result).toContain("COPY node_modules/ ./node_modules/");
+  });
+
+  it("does not reference any registry pull", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+
+    expect(result).not.toContain("docker.io");
+    expect(result).not.toContain("ghcr.io");
+  });
+
+  it("embeds the correct agent name in CMD", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+
+    expect(result).toContain("@acme.platform/agent-note-taker");
+  });
+
+  it("generates different header comments per role", () => {
+    const agent = makeNoteTakerAgent();
+    const writerResult = generateProxyDockerfile(agent.roles[0], agent.name);
+    const reviewerResult = generateProxyDockerfile(agent.roles[1], agent.name);
+
+    expect(writerResult).toContain("role: writer");
+    expect(reviewerResult).toContain("role: reviewer");
+  });
+});
