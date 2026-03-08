@@ -2,6 +2,15 @@ import type { Command } from "commander";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { getAppShortName } from "@clawmasons/shared";
+import type { ResolvedAgent, ResolvedRole } from "@clawmasons/shared";
+import { discoverPackages } from "../../resolver/discover.js";
+import { resolveAgent } from "../../resolver/resolve.js";
+import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
+import { generateAgentDockerfile } from "../../generator/agent-dockerfile.js";
+import { claudeCodeMaterializer } from "../../materializer/claude-code.js";
+import { piCodingAgentMaterializer } from "../../materializer/pi-coding-agent.js";
+import type { RuntimeMaterializer } from "../../materializer/types.js";
 
 /**
  * Shape of the `.clawmasons/chapter.json` config file.
@@ -137,6 +146,8 @@ export function runInstallLocal(rootDir: string): void {
 export interface DockerInitDeps {
   /** Skip running npm install (for testing). */
   skipInstall?: boolean;
+  /** Skip Dockerfile generation (for testing install-only). */
+  skipDockerfiles?: boolean;
 }
 
 export function registerDockerInitCommand(program: Command): void {
@@ -173,10 +184,130 @@ export async function runDockerInit(
       console.log("\n  docker/node_modules/ populated");
     }
 
+    // 5. Generate Dockerfiles for proxy and agent images
+    if (!deps?.skipDockerfiles) {
+      const dockerDir = path.join(rootDir, "docker");
+      generateDockerfiles(dockerDir);
+    }
+
     console.log("\n✔ docker-init complete\n");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\n✘ docker-init failed: ${message}\n`);
     process.exit(1);
+  }
+}
+
+// ── Dockerfile Generation ──────────────────────────────────────────────
+
+/**
+ * Get the runtime materializer for a given runtime name.
+ */
+function getMaterializer(runtime: string): RuntimeMaterializer | undefined {
+  switch (runtime) {
+    case "claude-code":
+      return claudeCodeMaterializer;
+    case "pi-coding-agent":
+      return piCodingAgentMaterializer;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Scan docker/node_modules/ for chapter packages, resolve agents,
+ * and generate proxy and agent Dockerfiles.
+ */
+export function generateDockerfiles(dockerDir: string): void {
+  // Discover all chapter packages from docker/node_modules/
+  const packages = discoverPackages(dockerDir);
+
+  if (packages.size === 0) {
+    console.log("\n  No chapter packages found in docker/node_modules/ — skipping Dockerfile generation");
+    return;
+  }
+
+  // Find all agent and role packages
+  const agents: ResolvedAgent[] = [];
+  const allRoles = new Map<string, ResolvedRole>();
+
+  for (const [name, pkg] of packages) {
+    if (pkg.chapterField.type === "agent") {
+      const resolved = resolveAgent(name, packages);
+      agents.push(resolved);
+
+      // Collect roles from resolved agent
+      for (const role of resolved.roles) {
+        if (!allRoles.has(role.name)) {
+          allRoles.set(role.name, role);
+        }
+      }
+    }
+  }
+
+  if (agents.length === 0) {
+    console.log("\n  No agent packages found — skipping Dockerfile generation");
+    return;
+  }
+
+  console.log(`\n  Generating Dockerfiles for ${agents.length} agent(s) and ${allRoles.size} role(s)...`);
+
+  // Generate proxy Dockerfiles — one per unique role
+  for (const [, role] of allRoles) {
+    const roleShortName = getAppShortName(role.name);
+    // Use the first agent that has this role (proxy serves any agent with the role)
+    const ownerAgent = agents.find((a) =>
+      a.roles.some((r) => r.name === role.name),
+    );
+    if (!ownerAgent) continue;
+
+    const dockerfile = generateProxyDockerfile(role, ownerAgent.name);
+    const dockerfilePath = path.join(dockerDir, "proxy", roleShortName, "Dockerfile");
+
+    fs.mkdirSync(path.dirname(dockerfilePath), { recursive: true });
+    fs.writeFileSync(dockerfilePath, dockerfile);
+    console.log(`  Created proxy/${roleShortName}/Dockerfile`);
+  }
+
+  // Generate agent Dockerfiles — one per agent × role
+  for (const agent of agents) {
+    const agentShortName = getAppShortName(agent.name);
+
+    for (const role of agent.roles) {
+      const roleShortName = getAppShortName(role.name);
+
+      // Generate the Dockerfile
+      const dockerfile = generateAgentDockerfile(agent, role);
+      const dockerfilePath = path.join(
+        dockerDir, "agent", agentShortName, roleShortName, "Dockerfile",
+      );
+
+      fs.mkdirSync(path.dirname(dockerfilePath), { recursive: true });
+      fs.writeFileSync(dockerfilePath, dockerfile);
+      console.log(`  Created agent/${agentShortName}/${roleShortName}/Dockerfile`);
+
+      // Materialize workspace files for the agent × role
+      const materializer = getMaterializer(agent.runtimes[0] ?? "claude-code");
+      if (materializer) {
+        const proxyEndpoint = `http://proxy-${roleShortName}:9090`;
+        // Create a single-role agent view for workspace materialization
+        const singleRoleAgent: ResolvedAgent = {
+          ...agent,
+          roles: [role],
+        };
+        const workspace = materializer.materializeWorkspace(singleRoleAgent, proxyEndpoint);
+
+        const workspaceDir = path.join(
+          dockerDir, "agent", agentShortName, roleShortName, "workspace",
+        );
+
+        for (const [filePath, content] of workspace) {
+          const fullPath = path.join(workspaceDir, filePath);
+          fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+          fs.writeFileSync(fullPath, content);
+        }
+        console.log(`  Created agent/${agentShortName}/${roleShortName}/workspace/`);
+      }
+    }
   }
 }

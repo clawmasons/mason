@@ -8,6 +8,7 @@ import {
   createDockerPackageJson,
   addInstallLocalScript,
   runDockerInit,
+  generateDockerfiles,
 } from "../../src/cli/commands/docker-init.js";
 
 describe("CLI docker-init command", () => {
@@ -321,5 +322,320 @@ describe("runDockerInit", () => {
     expect(updatedPkg.scripts["install-local"]).toBe(
       "cd docker && npm install ../dist/*.tgz",
     );
+  });
+});
+
+// ── Dockerfile Generation Integration Tests ────────────────────────────
+
+describe("generateDockerfiles", () => {
+  let tmpDir: string;
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-docker-gen-test-"));
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  /**
+   * Create a mock chapter package in node_modules.
+   */
+  function createPackage(
+    scope: string,
+    name: string,
+    chapter: Record<string, unknown>,
+    version = "1.0.0",
+  ): void {
+    const pkgDir = path.join(tmpDir, "node_modules", scope, name);
+    fs.mkdirSync(pkgDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(pkgDir, "package.json"),
+      JSON.stringify({
+        name: `${scope}/${name}`,
+        version,
+        chapter,
+      }),
+    );
+  }
+
+  function setupMockNodeModules(): void {
+    // Create package.json in dockerDir root
+    fs.writeFileSync(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify({ name: "@test/docker", version: "0.0.0", private: true }),
+    );
+
+    // App: filesystem
+    createPackage("@acme.platform", "app-filesystem", {
+      type: "app",
+      transport: "stdio",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem"],
+      tools: ["read_file", "write_file"],
+      capabilities: ["tools"],
+    });
+
+    // App: github
+    createPackage("@acme.platform", "app-github", {
+      type: "app",
+      transport: "stdio",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-github"],
+      tools: ["create_issue", "list_repos"],
+      capabilities: ["tools"],
+    });
+
+    // Task: write-notes (depends on app-filesystem)
+    createPackage("@acme.platform", "task-write-notes", {
+      type: "task",
+      taskType: "subagent",
+      prompt: "./prompts/write.md",
+      requires: {
+        apps: ["@acme.platform/app-filesystem"],
+      },
+    });
+
+    // Task: triage-issue (depends on app-github)
+    createPackage("@acme.platform", "task-triage-issue", {
+      type: "task",
+      taskType: "subagent",
+      prompt: "./prompts/triage.md",
+      requires: {
+        apps: ["@acme.platform/app-github"],
+      },
+    });
+
+    // Role: writer (has task-write-notes, app-filesystem in permissions)
+    createPackage("@acme.platform", "role-writer", {
+      type: "role",
+      description: "Writes notes",
+      tasks: ["@acme.platform/task-write-notes"],
+      permissions: {
+        "@acme.platform/app-filesystem": {
+          allow: ["read_file", "write_file"],
+          deny: [],
+        },
+      },
+    });
+
+    // Role: reviewer (has task-triage-issue, app-github in permissions)
+    createPackage("@acme.platform", "role-reviewer", {
+      type: "role",
+      description: "Reviews issues",
+      tasks: ["@acme.platform/task-triage-issue"],
+      permissions: {
+        "@acme.platform/app-github": {
+          allow: ["create_issue", "list_repos"],
+          deny: [],
+        },
+      },
+    });
+
+    // Agent: note-taker (has both roles)
+    createPackage("@acme.platform", "agent-note-taker", {
+      type: "agent",
+      name: "Note Taker",
+      slug: "note-taker",
+      description: "Note-taking agent",
+      runtimes: ["claude-code"],
+      roles: [
+        "@acme.platform/role-writer",
+        "@acme.platform/role-reviewer",
+      ],
+      proxy: { port: 9090, type: "sse" },
+    });
+  }
+
+  it("generates proxy Dockerfile for each role", () => {
+    setupMockNodeModules();
+
+    generateDockerfiles(tmpDir);
+
+    expect(fs.existsSync(path.join(tmpDir, "proxy", "writer", "Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "proxy", "reviewer", "Dockerfile"))).toBe(true);
+  });
+
+  it("generates agent Dockerfile for each agent x role", () => {
+    setupMockNodeModules();
+
+    generateDockerfiles(tmpDir);
+
+    expect(fs.existsSync(path.join(tmpDir, "agent", "note-taker", "writer", "Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "agent", "note-taker", "reviewer", "Dockerfile"))).toBe(true);
+  });
+
+  it("proxy Dockerfiles contain USER mason", () => {
+    setupMockNodeModules();
+
+    generateDockerfiles(tmpDir);
+
+    const writerDockerfile = fs.readFileSync(
+      path.join(tmpDir, "proxy", "writer", "Dockerfile"), "utf-8",
+    );
+    const reviewerDockerfile = fs.readFileSync(
+      path.join(tmpDir, "proxy", "reviewer", "Dockerfile"), "utf-8",
+    );
+
+    expect(writerDockerfile).toContain("USER mason");
+    expect(reviewerDockerfile).toContain("USER mason");
+  });
+
+  it("agent Dockerfiles contain USER mason", () => {
+    setupMockNodeModules();
+
+    generateDockerfiles(tmpDir);
+
+    const writerDockerfile = fs.readFileSync(
+      path.join(tmpDir, "agent", "note-taker", "writer", "Dockerfile"), "utf-8",
+    );
+    const reviewerDockerfile = fs.readFileSync(
+      path.join(tmpDir, "agent", "note-taker", "reviewer", "Dockerfile"), "utf-8",
+    );
+
+    expect(writerDockerfile).toContain("USER mason");
+    expect(reviewerDockerfile).toContain("USER mason");
+  });
+
+  it("proxy Dockerfiles reference local paths only (no registry)", () => {
+    setupMockNodeModules();
+
+    generateDockerfiles(tmpDir);
+
+    const dockerfile = fs.readFileSync(
+      path.join(tmpDir, "proxy", "writer", "Dockerfile"), "utf-8",
+    );
+
+    expect(dockerfile).not.toContain("docker.io");
+    expect(dockerfile).not.toContain("ghcr.io");
+    expect(dockerfile).toContain("COPY node_modules/");
+  });
+
+  it("agent Dockerfiles reference local paths only (no registry)", () => {
+    setupMockNodeModules();
+
+    generateDockerfiles(tmpDir);
+
+    const dockerfile = fs.readFileSync(
+      path.join(tmpDir, "agent", "note-taker", "writer", "Dockerfile"), "utf-8",
+    );
+
+    expect(dockerfile).not.toContain("docker.io");
+    expect(dockerfile).not.toContain("ghcr.io");
+    expect(dockerfile).toContain("COPY node_modules/");
+  });
+
+  it("generates materialized workspace for each agent x role", () => {
+    setupMockNodeModules();
+
+    generateDockerfiles(tmpDir);
+
+    // Claude-code workspace should have .mcp.json, AGENTS.md, etc.
+    const writerWorkspace = path.join(tmpDir, "agent", "note-taker", "writer", "workspace");
+    expect(fs.existsSync(path.join(writerWorkspace, ".mcp.json"))).toBe(true);
+    expect(fs.existsSync(path.join(writerWorkspace, "AGENTS.md"))).toBe(true);
+    expect(fs.existsSync(path.join(writerWorkspace, ".claude", "settings.json"))).toBe(true);
+
+    const reviewerWorkspace = path.join(tmpDir, "agent", "note-taker", "reviewer", "workspace");
+    expect(fs.existsSync(path.join(reviewerWorkspace, ".mcp.json"))).toBe(true);
+    expect(fs.existsSync(path.join(reviewerWorkspace, "AGENTS.md"))).toBe(true);
+  });
+
+  it("skips Dockerfile generation when no chapter packages found", () => {
+    // Empty node_modules
+    fs.mkdirSync(path.join(tmpDir, "node_modules"), { recursive: true });
+
+    generateDockerfiles(tmpDir);
+
+    expect(fs.existsSync(path.join(tmpDir, "proxy"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "agent"))).toBe(false);
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("No chapter packages found");
+  });
+
+  it("skips Dockerfile generation when no agent packages found", () => {
+    // Only create an app package (no agent)
+    createPackage("@acme.platform", "app-github", {
+      type: "app",
+      transport: "stdio",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-github"],
+      tools: ["create_issue"],
+      capabilities: ["tools"],
+    });
+
+    generateDockerfiles(tmpDir);
+
+    expect(fs.existsSync(path.join(tmpDir, "proxy"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "agent"))).toBe(false);
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("No agent packages found");
+  });
+
+  it("logs Dockerfile creation for each proxy and agent file", () => {
+    setupMockNodeModules();
+
+    generateDockerfiles(tmpDir);
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("proxy/writer/Dockerfile");
+    expect(logOutput).toContain("proxy/reviewer/Dockerfile");
+    expect(logOutput).toContain("agent/note-taker/writer/Dockerfile");
+    expect(logOutput).toContain("agent/note-taker/reviewer/Dockerfile");
+  });
+
+  it("proxy Dockerfile uses chapter proxy entrypoint", () => {
+    setupMockNodeModules();
+
+    generateDockerfiles(tmpDir);
+
+    const dockerfile = fs.readFileSync(
+      path.join(tmpDir, "proxy", "writer", "Dockerfile"), "utf-8",
+    );
+    expect(dockerfile).toContain("chapter");
+    expect(dockerfile).toContain("proxy");
+    expect(dockerfile).toContain("--agent");
+  });
+
+  it("agent Dockerfile uses runtime-specific entrypoint", () => {
+    setupMockNodeModules();
+
+    generateDockerfiles(tmpDir);
+
+    const dockerfile = fs.readFileSync(
+      path.join(tmpDir, "agent", "note-taker", "writer", "Dockerfile"), "utf-8",
+    );
+    // claude-code agent
+    expect(dockerfile).toContain('ENTRYPOINT ["claude"]');
+  });
+
+  it("handles multiple agents with overlapping roles", () => {
+    setupMockNodeModules();
+
+    // Add a second agent that also has the writer role
+    createPackage("@acme.platform", "agent-researcher", {
+      type: "agent",
+      name: "Researcher",
+      slug: "researcher",
+      description: "Research agent",
+      runtimes: ["claude-code"],
+      roles: ["@acme.platform/role-writer"],
+    });
+
+    generateDockerfiles(tmpDir);
+
+    // Should have proxy Dockerfiles for both roles
+    expect(fs.existsSync(path.join(tmpDir, "proxy", "writer", "Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "proxy", "reviewer", "Dockerfile"))).toBe(true);
+
+    // Should have agent Dockerfiles for both agents
+    expect(fs.existsSync(path.join(tmpDir, "agent", "note-taker", "writer", "Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "agent", "note-taker", "reviewer", "Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "agent", "researcher", "writer", "Dockerfile"))).toBe(true);
   });
 });
