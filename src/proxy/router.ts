@@ -1,6 +1,6 @@
 import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js";
-import type { ToolFilter } from "../generator/types.js";
-import { getAppShortName } from "../generator/toolfilter.js";
+import type { ToolFilter } from "@clawmasons/shared";
+import { getAppShortName } from "@clawmasons/shared";
 
 // ── Types ──────────────────────────────────────────────────────────────
 

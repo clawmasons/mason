@@ -1,8 +1,7 @@
 import type { Command } from "commander";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
-import { computeToolFilters } from "../../generator/toolfilter.js";
-import { getAppShortName } from "../../generator/toolfilter.js";
+import { computeToolFilters, getAppShortName } from "@clawmasons/shared";
 
 interface PermissionsOptions {
   json?: boolean;

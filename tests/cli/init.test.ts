@@ -7,7 +7,7 @@ import {
   listTemplates,
   copyTemplateFiles,
 } from "../../src/cli/commands/init.js";
-import { parseChapterField } from "../../src/schemas/chapter-field.js";
+import { parseChapterField } from "@clawmasons/shared";
 
 describe("chapter init", () => {
   let tmpDir: string;

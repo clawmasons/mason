@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agentChapterFieldSchema } from "../../src/schemas/agent.js";
+import { agentChapterFieldSchema } from "@clawmasons/shared";
 
 describe("agentChapterFieldSchema", () => {
   it("validates a valid agent", () => {

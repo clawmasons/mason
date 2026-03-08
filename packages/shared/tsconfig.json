@@ -5,7 +5,7 @@
     "moduleResolution": "Node16",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": ".",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -13,9 +13,7 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "paths": {
-      "@clawmasons/shared": ["./packages/shared/src/index.ts"]
-    }
+    "composite": true
   },
-  "include": ["src/**/*", "tests/**/*", "packages/shared/src/**/*"]
+  "include": ["src/**/*"]
 }

@@ -19,8 +19,7 @@ import { UpstreamManager } from "../../src/proxy/upstream.js";
 import { ToolRouter } from "../../src/proxy/router.js";
 import { openDatabase, queryAuditLog } from "../../src/proxy/db.js";
 import type Database from "better-sqlite3";
-import type { ResolvedApp } from "../../src/resolver/types.js";
-import type { ToolFilter } from "../../src/generator/types.js";
+import type { ResolvedApp, ToolFilter } from "@clawmasons/shared";
 
 // ── Constants ──────────────────────────────────────────────────────────
 

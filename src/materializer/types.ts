@@ -1,4 +1,4 @@
-import type { ResolvedAgent } from "../resolver/types.js";
+import type { ResolvedAgent } from "@clawmasons/shared";
 
 /**
  * A map of relative file paths to their string content.

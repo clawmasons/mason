@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { execFileSync } from "node:child_process";
 import { discoverPackages } from "../../resolver/discover.js";
-import type { DiscoveredPackage } from "../../resolver/types.js";
+import type { DiscoveredPackage } from "@clawmasons/shared";
 
 interface RemoveOptions {
   force: boolean;

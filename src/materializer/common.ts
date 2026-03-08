@@ -1,5 +1,5 @@
-import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from "../resolver/types.js";
-import { getAppShortName } from "../generator/toolfilter.js";
+import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from "@clawmasons/shared";
+import { getAppShortName } from "@clawmasons/shared";
 
 /**
  * Mapping from LLM provider identifiers to their environment variable names.

@@ -11,7 +11,7 @@ import {
   type ReadResourceResult,
   type GetPromptResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { ResolvedApp } from "../resolver/types.js";
+import type { ResolvedApp } from "@clawmasons/shared";
 
 // ── Types ──────────────────────────────────────────────────────────────
 

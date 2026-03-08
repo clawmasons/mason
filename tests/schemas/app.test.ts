@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appChapterFieldSchema } from "../../src/schemas/app.js";
+import { appChapterFieldSchema } from "@clawmasons/shared";
 
 describe("appChapterFieldSchema", () => {
   it("validates a valid stdio app", () => {

@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { validateAgent } from "../../validator/validate.js";
-import type { ResolvedAgent } from "../../resolver/types.js";
+import type { ResolvedAgent } from "@clawmasons/shared";
 
 interface BuildOptions {
   output?: string;

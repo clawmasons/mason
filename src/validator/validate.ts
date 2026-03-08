@@ -1,4 +1,4 @@
-import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedTask } from "../resolver/types.js";
+import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedTask } from "@clawmasons/shared";
 import type { ValidationError, ValidationWarning, ValidationResult } from "./types.js";
 
 /**

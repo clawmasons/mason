@@ -1,18 +1,21 @@
-import type { AppChapterField, RoleChapterField, SkillChapterField, TaskChapterField } from "../schemas/index.js";
-import type { AgentChapterField } from "../schemas/agent.js";
-import {
-  CircularDependencyError,
-  PackageNotFoundError,
-  TypeMismatchError,
-} from "./errors.js";
 import type {
+  AppChapterField,
+  RoleChapterField,
+  SkillChapterField,
+  TaskChapterField,
+  AgentChapterField,
   DiscoveredPackage,
   ResolvedAgent,
   ResolvedApp,
   ResolvedRole,
   ResolvedSkill,
   ResolvedTask,
-} from "./types.js";
+} from "@clawmasons/shared";
+import {
+  CircularDependencyError,
+  PackageNotFoundError,
+  TypeMismatchError,
+} from "./errors.js";
 
 /**
  * Look up a package in the discovery map, throwing if not found.

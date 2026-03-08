@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { skillChapterFieldSchema } from "../../src/schemas/skill.js";
+import { skillChapterFieldSchema } from "@clawmasons/shared";
 
 describe("skillChapterFieldSchema", () => {
   it("validates a valid skill", () => {

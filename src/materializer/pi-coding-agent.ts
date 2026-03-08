@@ -1,5 +1,5 @@
-import type { ResolvedAgent, ResolvedRole, ResolvedTask } from "../resolver/types.js";
-import { getAppShortName } from "../generator/toolfilter.js";
+import type { ResolvedAgent, ResolvedRole, ResolvedTask } from "@clawmasons/shared";
+import { getAppShortName } from "@clawmasons/shared";
 import type { RuntimeMaterializer, MaterializationResult } from "./types.js";
 import {
   formatPermittedTools,

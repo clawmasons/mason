@@ -5,7 +5,7 @@ export type {
   ResolvedRole,
   ResolvedSkill,
   ResolvedTask,
-} from "./types.js";
+} from "@clawmasons/shared";
 
 export {
   PackageNotFoundError,

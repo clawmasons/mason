@@ -1,8 +1,8 @@
 import type { Command } from "commander";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
-import type { ResolvedAgent, ResolvedRole } from "../../resolver/types.js";
-import { getAppShortName } from "../../generator/toolfilter.js";
+import type { ResolvedAgent, ResolvedRole } from "@clawmasons/shared";
+import { getAppShortName } from "@clawmasons/shared";
 
 interface ListOptions {
   json?: boolean;

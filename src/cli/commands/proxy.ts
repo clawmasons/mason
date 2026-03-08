@@ -2,8 +2,8 @@ import type { Command } from "commander";
 import { join } from "node:path";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
-import type { ResolvedAgent } from "../../resolver/types.js";
-import { computeToolFilters } from "../../generator/toolfilter.js";
+import type { ResolvedAgent } from "@clawmasons/shared";
+import { computeToolFilters } from "@clawmasons/shared";
 import { loadEnvFile, resolveEnvVars } from "../../proxy/credentials.js";
 import { openDatabase } from "../../proxy/db.js";
 import { UpstreamManager } from "../../proxy/upstream.js";
@@ -167,7 +167,7 @@ export async function startProxy(
  */
 function resolveAgentName(
   agentFlag: string | undefined,
-  packages: Map<string, import("../../resolver/types.js").DiscoveredPackage>,
+  packages: Map<string, import("@clawmasons/shared").DiscoveredPackage>,
 ): string {
   if (agentFlag) return agentFlag;
 

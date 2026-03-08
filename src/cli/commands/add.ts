@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { parseChapterField } from "../../schemas/index.js";
+import { parseChapterField } from "@clawmasons/shared";
 
 interface AddOptions {
   npmArgs: string[];

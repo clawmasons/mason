@@ -11,10 +11,14 @@ vi.mock("../../src/resolver/resolve.js", () => ({
   resolveAgent: vi.fn(),
 }));
 
-vi.mock("../../src/generator/toolfilter.js", () => ({
-  computeToolFilters: vi.fn(() => new Map()),
-  getAppShortName: vi.fn((name: string) => name.split("/").pop()?.replace("app-", "") ?? name),
-}));
+vi.mock("@clawmasons/shared", async () => {
+  const actual = await vi.importActual<typeof import("@clawmasons/shared")>("@clawmasons/shared");
+  return {
+    ...actual,
+    computeToolFilters: vi.fn(() => new Map()),
+    getAppShortName: vi.fn((name: string) => name.split("/").pop()?.replace("app-", "") ?? name),
+  };
+});
 
 vi.mock("../../src/proxy/credentials.js", () => ({
   loadEnvFile: vi.fn(() => ({})),
@@ -96,10 +100,10 @@ describe("chapter proxy command", () => {
 import { startProxy } from "../../src/cli/commands/proxy.js";
 import { discoverPackages } from "../../src/resolver/discover.js";
 import { resolveAgent } from "../../src/resolver/resolve.js";
-import { computeToolFilters } from "../../src/generator/toolfilter.js";
+import { computeToolFilters } from "@clawmasons/shared";
 import { UpstreamManager } from "../../src/proxy/upstream.js";
 import { ChapterProxyServer } from "../../src/proxy/server.js";
-import type { DiscoveredPackage, ResolvedAgent } from "../../src/resolver/types.js";
+import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
 
 function makeMember(name: string): ResolvedAgent {
   return {

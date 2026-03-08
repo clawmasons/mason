@@ -5,8 +5,7 @@ import {
   CircularDependencyError,
   TypeMismatchError,
 } from "../../src/resolver/errors.js";
-import type { DiscoveredPackage } from "../../src/resolver/types.js";
-import type { ChapterField } from "../../src/schemas/index.js";
+import type { DiscoveredPackage, ChapterField } from "@clawmasons/shared";
 
 /**
  * Helper to build a DiscoveredPackage from minimal inputs.
