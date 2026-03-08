@@ -97,19 +97,19 @@ The `@clawmasons/chapter` package SHALL contain a `templates/` directory with at
 
 #### Scenario: note-taker template exists
 - **WHEN** the `templates/` directory is inspected
-- **THEN** `note-taker/` exists containing `package.json`, `members/note-taker/package.json`, and `roles/writer/package.json`
+- **THEN** `note-taker/` exists containing `package.json`, `members/note-taker/package.json`, `roles/writer/package.json`, `apps/filesystem/package.json`, `tasks/take-notes/package.json`, `tasks/take-notes/prompts/take-notes.md`, `skills/markdown-conventions/package.json`, and `skills/markdown-conventions/SKILL.md`
 
-#### Scenario: Template root package.json depends on chapter-core
+#### Scenario: Template root package.json has no external dependencies
 - **WHEN** `templates/note-taker/package.json` is read
-- **THEN** it lists `@clawmasons/chapter-core` as a dependency with a version range
+- **THEN** it does NOT list `@clawmasons/chapter-core` as a dependency; `dependencies` is empty or absent
 
 #### Scenario: Template member references local role
 - **WHEN** `templates/note-taker/members/note-taker/package.json` is read
 - **THEN** the chapter field has `type: "member"`, `memberType: "agent"`, and `roles` contains `@{{projectScope}}/role-writer`
 
-#### Scenario: Template role references chapter-core components
+#### Scenario: Template role references local components
 - **WHEN** `templates/note-taker/roles/writer/package.json` is read
-- **THEN** the chapter field has `type: "role"`, tasks include `@clawmasons/task-take-notes`, skills include `@clawmasons/skill-markdown-conventions`, and permissions reference `@clawmasons/app-filesystem`
+- **THEN** the chapter field has `type: "role"`, tasks include `@{{projectScope}}/task-take-notes`, skills include `@{{projectScope}}/skill-markdown-conventions`, and permissions reference `@{{projectScope}}/app-filesystem`
 
 #### Scenario: Template member includes identity fields
 - **WHEN** `templates/note-taker/members/note-taker/package.json` is read

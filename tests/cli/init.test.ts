@@ -234,7 +234,7 @@ describe("chapter init", () => {
             version: "0.1.0",
             private: true,
             workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "members/*"],
-            dependencies: { "@clawmasons/chapter-core": "^0.1.0" },
+            dependencies: {},
           },
           null,
           2,
@@ -273,10 +273,10 @@ describe("chapter init", () => {
             version: "1.0.0",
             chapter: {
               type: "role",
-              tasks: ["@clawmasons/task-take-notes"],
-              skills: ["@clawmasons/skill-markdown-conventions"],
+              tasks: ["@{{projectScope}}/task-take-notes"],
+              skills: ["@{{projectScope}}/skill-markdown-conventions"],
               permissions: {
-                "@clawmasons/app-filesystem": {
+                "@{{projectScope}}/app-filesystem": {
                   allow: ["read_file", "write_file"],
                   deny: [],
                 },
@@ -361,8 +361,8 @@ describe("chapter init", () => {
           ),
         );
         expect(rolePkg.name).toBe("@test.unit/role-writer");
-        // chapter-core references should remain unchanged
-        expect(rolePkg.chapter.tasks).toEqual(["@clawmasons/task-take-notes"]);
+        // projectScope references should be substituted
+        expect(rolePkg.chapter.tasks).toEqual(["@test.unit/task-take-notes"]);
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }

@@ -4,6 +4,5 @@
   "private": true,
   "workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "members/*"],
   "dependencies": {
-    "@clawmasons/chapter-core": "^0.1.0"
   }
 }

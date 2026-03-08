@@ -32,14 +32,12 @@ import { runEnable } from "../../src/cli/commands/enable.js";
 // ── Constants ──────────────────────────────────────────────────────────
 
 const CHAPTER_ROOT = join(import.meta.dirname, "..", "..");
-const CHAPTER_CORE_DIR = join(CHAPTER_ROOT, "chapter-core");
 const TIMEOUT = 120_000;
 
 // ── Shared State ───────────────────────────────────────────────────────
 
 let tmpDir: string;
 let chapterTgzPath: string;
-let chapterCoreTgzPath: string;
 let projectScope: string;
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -77,19 +75,12 @@ beforeAll(() => {
   const chapterFilename = chapterPackResult[0]!.filename;
   chapterTgzPath = join(CHAPTER_ROOT, chapterFilename);
 
-  // 3. Pack @clawmasons/chapter-core
-  const corePackJson = run("npm", ["pack", "--json"], CHAPTER_CORE_DIR);
-  const corePackResult = JSON.parse(corePackJson) as Array<{ filename: string }>;
-  const coreFilename = corePackResult[0]!.filename;
-  chapterCoreTgzPath = join(CHAPTER_CORE_DIR, coreFilename);
-
-  // 4. Create temp directory
+  // 3. Create temp directory
   tmpDir = mkdtempSync(join(tmpdir(), "test-chapter-"));
-  projectScope = tmpDir.split("/").pop()!;
+  projectScope = "e2e.test";
 
-  // Verify tgz files exist
+  // Verify tgz file exists
   expect(existsSync(chapterTgzPath)).toBe(true);
-  expect(existsSync(chapterCoreTgzPath)).toBe(true);
 }, TIMEOUT);
 
 afterAll(() => {
@@ -105,11 +96,6 @@ afterAll(() => {
   // Clean up tgz files (they're gitignored but tidy up)
   try {
     if (chapterTgzPath && existsSync(chapterTgzPath)) rmSync(chapterTgzPath);
-  } catch {
-    /* ignore */
-  }
-  try {
-    if (chapterCoreTgzPath && existsSync(chapterCoreTgzPath)) rmSync(chapterCoreTgzPath);
   } catch {
     /* ignore */
   }
@@ -130,16 +116,14 @@ describe("E2E Install Flow (Local tgz)", () => {
     // Verify chapter CLI is available
     expect(existsSync(join(tmpDir, "node_modules", ".bin", "chapter"))).toBe(true);
 
-    // Run chapter init --template note-taker
-    // This will copy template files (including package.json with @clawmasons/chapter-core dep),
-    // create .chapter/ scaffold, and attempt npm install. The npm install inside init
-    // may warn about @clawmasons/chapter-core not being on the registry — that's expected
-    // for local tgz testing. The template files are still copied correctly.
-    chapterCli(["init", "--template", "note-taker"], tmpDir);
+    // Run chapter init --template note-taker --name e2e.test
+    // This will copy template files (all components are inline in the template),
+    // create .clawmasons/ scaffold, and run npm install.
+    chapterCli(["init", "--template", "note-taker", "--name", "e2e.test"], tmpDir);
 
     // Verify scaffold was created
-    expect(existsSync(join(tmpDir, ".chapter"))).toBe(true);
-    expect(existsSync(join(tmpDir, ".chapter", "config.json"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".clawmasons"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".clawmasons", "chapter.json"))).toBe(true);
 
     // Verify template files were copied (still uses members/ directory from template)
     expect(existsSync(join(tmpDir, "members", "note-taker", "package.json"))).toBe(true);
@@ -158,29 +142,24 @@ describe("E2E Install Flow (Local tgz)", () => {
     expect(rolePkg.name).toBe(`@${projectScope}/role-writer`);
   }, TIMEOUT);
 
-  it("step 2: installs both tgz packages for full dependency resolution", () => {
+  it("step 2: installs chapter tgz and verifies local template components", () => {
     // After chapter init, the template's package.json replaced the original.
-    // Install both chapter and chapter-core tgz files to populate node_modules
-    // with all required packages for discovery and CLI usage.
-    run("npm", ["install", chapterTgzPath, chapterCoreTgzPath], tmpDir);
+    // Install chapter tgz to populate node_modules with the CLI.
+    // All components (apps, tasks, skills) are now local workspace packages.
+    run("npm", ["install", chapterTgzPath], tmpDir);
 
-    // Verify both packages are installed
+    // Verify chapter is installed
     expect(existsSync(join(tmpDir, "node_modules", "@clawmasons", "chapter"))).toBe(true);
-    expect(existsSync(join(tmpDir, "node_modules", "@clawmasons", "chapter-core"))).toBe(true);
 
     // Verify chapter CLI binary is linked
     expect(existsSync(join(tmpDir, "node_modules", ".bin", "chapter"))).toBe(true);
 
-    // Verify chapter-core contains expected component structure
-    expect(
-      existsSync(join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "apps", "filesystem", "package.json")),
-    ).toBe(true);
-    expect(
-      existsSync(join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "tasks", "take-notes", "package.json")),
-    ).toBe(true);
-    expect(
-      existsSync(join(tmpDir, "node_modules", "@clawmasons", "chapter-core", "skills", "markdown-conventions", "package.json")),
-    ).toBe(true);
+    // Verify template components exist as local workspace packages
+    expect(existsSync(join(tmpDir, "apps", "filesystem", "package.json"))).toBe(true);
+    expect(existsSync(join(tmpDir, "tasks", "take-notes", "package.json"))).toBe(true);
+    expect(existsSync(join(tmpDir, "skills", "markdown-conventions", "package.json"))).toBe(true);
+    expect(existsSync(join(tmpDir, "tasks", "take-notes", "prompts", "take-notes.md"))).toBe(true);
+    expect(existsSync(join(tmpDir, "skills", "markdown-conventions", "SKILL.md"))).toBe(true);
   }, TIMEOUT);
 
   it("step 3: chapter validate confirms agent graph is valid", () => {
@@ -212,10 +191,10 @@ describe("E2E Install Flow (Local tgz)", () => {
     const role = agent!.roles.find((r) => r.name === `@${projectScope}/role-writer`);
     expect(role).toBeDefined();
 
-    // Role should reference chapter-core components
-    expect(role!.tasks.some((t) => t.name === "@clawmasons/task-take-notes")).toBe(true);
-    expect(role!.skills.some((s) => s.name === "@clawmasons/skill-markdown-conventions")).toBe(true);
-    expect(role!.apps.some((a) => a.name === "@clawmasons/app-filesystem")).toBe(true);
+    // Role should reference local project-scoped components
+    expect(role!.tasks.some((t) => t.name === `@${projectScope}/task-take-notes`)).toBe(true);
+    expect(role!.skills.some((s) => s.name === `@${projectScope}/skill-markdown-conventions`)).toBe(true);
+    expect(role!.apps.some((a) => a.name === `@${projectScope}/app-filesystem`)).toBe(true);
   }, TIMEOUT);
 
   it("step 5: chapter install generates single-stage Dockerfile", () => {
