@@ -7,6 +7,7 @@ import { registerListCommand } from "./list.js";
 import { registerPermissionsCommand } from "./permissions.js";
 import { registerProxyCommand } from "./proxy.js";
 import { registerRemoveCommand } from "./remove.js";
+import { registerRunAgentCommand } from "./run-agent.js";
 import { registerRunInitCommand } from "./run-init.js";
 import { registerValidateCommand } from "./validate.js";
 
@@ -19,6 +20,7 @@ export function registerCommands(program: Command): void {
   registerPermissionsCommand(program);
   registerProxyCommand(program);
   registerRemoveCommand(program);
+  registerRunAgentCommand(program);
   registerRunInitCommand(program);
   registerValidateCommand(program);
 }
