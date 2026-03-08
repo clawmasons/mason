@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { matchesApprovalPattern, requestApproval } from "../../../src/proxy/hooks/approval.js";
-import type { HookContext } from "../../../src/proxy/hooks/audit.js";
-import { openDatabase, updateApprovalStatus } from "../../../src/proxy/db.js";
+import { matchesApprovalPattern, requestApproval } from "../../src/hooks/approval.js";
+import type { HookContext } from "../../src/hooks/audit.js";
+import { openDatabase, updateApprovalStatus } from "../../src/db.js";
 import type Database from "better-sqlite3";
 
 // ── Fixtures ────────────────────────────────────────────────────────────

@@ -14,10 +14,10 @@ import { tmpdir } from "node:os";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import { ChapterProxyServer } from "../../src/proxy/server.js";
-import { UpstreamManager } from "../../src/proxy/upstream.js";
-import { ToolRouter } from "../../src/proxy/router.js";
-import { openDatabase, queryAuditLog } from "../../src/proxy/db.js";
+import { ChapterProxyServer } from "../src/server.js";
+import { UpstreamManager } from "../src/upstream.js";
+import { ToolRouter } from "../src/router.js";
+import { openDatabase, queryAuditLog } from "../src/db.js";
 import type Database from "better-sqlite3";
 import type { ResolvedApp, ToolFilter } from "@clawmasons/shared";
 

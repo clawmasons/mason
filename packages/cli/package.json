@@ -1,0 +1,35 @@
+{
+  "name": "@clawmasons/chapter",
+  "version": "0.1.0",
+  "description": "Clawmasons Chapter CLI — AI agent packaging, governance, and runtime orchestration",
+  "type": "module",
+  "bin": {
+    "chapter": "../../bin/chapter.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./cli": {
+      "import": "./dist/cli/index.js",
+      "types": "./dist/cli/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@clawmasons/shared": "*",
+    "@clawmasons/proxy": "*",
+    "commander": "^14.0.3"
+  }
+}

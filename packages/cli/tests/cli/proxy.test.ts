@@ -20,18 +20,12 @@ vi.mock("@clawmasons/shared", async () => {
   };
 });
 
-vi.mock("../../src/proxy/credentials.js", () => ({
+vi.mock("@clawmasons/proxy", () => ({
   loadEnvFile: vi.fn(() => ({})),
   resolveEnvVars: vi.fn((env: Record<string, string>) => env),
-}));
-
-vi.mock("../../src/proxy/db.js", () => ({
   openDatabase: vi.fn(() => ({
     close: vi.fn(),
   })),
-}));
-
-vi.mock("../../src/proxy/upstream.js", () => ({
   UpstreamManager: vi.fn().mockImplementation(() => ({
     initialize: vi.fn(),
     getTools: vi.fn(async () => []),
@@ -39,9 +33,6 @@ vi.mock("../../src/proxy/upstream.js", () => ({
     getPrompts: vi.fn(async () => []),
     shutdown: vi.fn(),
   })),
-}));
-
-vi.mock("../../src/proxy/router.js", () => ({
   ToolRouter: vi.fn().mockImplementation(() => ({
     listTools: vi.fn(() => []),
     resolve: vi.fn(() => null),
@@ -54,9 +45,6 @@ vi.mock("../../src/proxy/router.js", () => ({
     listPrompts: vi.fn(() => []),
     resolve: vi.fn(() => null),
   })),
-}));
-
-vi.mock("../../src/proxy/server.js", () => ({
   ChapterProxyServer: vi.fn().mockImplementation(() => ({
     start: vi.fn(),
     stop: vi.fn(),
@@ -101,8 +89,7 @@ import { startProxy } from "../../src/cli/commands/proxy.js";
 import { discoverPackages } from "../../src/resolver/discover.js";
 import { resolveAgent } from "../../src/resolver/resolve.js";
 import { computeToolFilters } from "@clawmasons/shared";
-import { UpstreamManager } from "../../src/proxy/upstream.js";
-import { ChapterProxyServer } from "../../src/proxy/server.js";
+import { UpstreamManager, ChapterProxyServer } from "@clawmasons/proxy";
 import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
 
 function makeMember(name: string): ResolvedAgent {

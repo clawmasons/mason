@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { auditPreHook, auditPostHook } from "../../../src/proxy/hooks/audit.js";
-import type { HookContext } from "../../../src/proxy/hooks/audit.js";
-import { openDatabase, queryAuditLog } from "../../../src/proxy/db.js";
+import { auditPreHook, auditPostHook } from "../../src/hooks/audit.js";
+import type { HookContext } from "../../src/hooks/audit.js";
+import { openDatabase, queryAuditLog } from "../../src/db.js";
 import type Database from "better-sqlite3";
 
 // ── Fixtures ────────────────────────────────────────────────────────────
