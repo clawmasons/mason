@@ -1,5 +1,5 @@
 /**
- * E2E Setup Script — Create a temporary chapter workspace using `chapter init --template`.
+ * E2E Setup Script — Create a temporary chapter workspace and build agents.
  *
  * Usage:
  *   npm run setup
@@ -9,9 +9,9 @@
  *   E2E_WORKSPACE_DIR — Override the temp directory path (default: e2e/tmp/chapter-e2e-<timestamp>)
  *
  * This script:
- * 1. Creates a temp workspace directory
- * 2. Runs `chapter init --template note-taker --name test.e2e` to scaffold the workspace
- * 3. Runs `chapter install @test.e2e/member-note-taker` to materialize the member
+ * 1. Creates a temp workspace directory from fixtures
+ * 2. Runs `chapter init --name test.chapter` if needed
+ * 3. Runs `chapter build @test/agent-test-note-taker`
  * 4. Saves the workspace path for teardown and tests
  */
 
@@ -25,9 +25,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const E2E_ROOT = path.resolve(__dirname, "..");
 const TMP_DIR = path.join(E2E_ROOT, "tmp");
 const LAST_WORKSPACE_FILE = path.join(TMP_DIR, ".last-workspace");
+const FIXTURES_DIR = path.join(E2E_ROOT, "fixtures", "test-chapter");
 
-const PROJECT_NAME = "test.e2e";
-const MEMBER_NAME = `@${PROJECT_NAME}/member-note-taker`;
+const AGENT_NAME = "@test/agent-test-note-taker";
+
+/**
+ * Recursively copy a directory tree, skipping node_modules and .git.
+ */
+function copyDirRecursive(src: string, dest: string): void {
+  if (!fs.existsSync(src)) return;
+  fs.mkdirSync(dest, { recursive: true });
+
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      if (entry.name === "node_modules" || entry.name === ".git") continue;
+      copyDirRecursive(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
 
 async function main(): Promise<void> {
   console.log("=== E2E Chapter Setup ===\n");
@@ -44,53 +64,54 @@ async function main(): Promise<void> {
     fs.rmSync(workspaceDir, { recursive: true, force: true });
   }
 
-  // 2. Create workspace directory
+  // 2. Create workspace from fixtures
   fs.mkdirSync(workspaceDir, { recursive: true });
   console.log(`Created workspace at ${workspaceDir}`);
 
-  // 3. Run chapter init --template note-taker --name e2e-test-chapter
-  console.log("\nInitializing chapter workspace from template...");
+  // Copy fixture tree
+  const dirs = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons"];
+  fs.copyFileSync(
+    path.join(FIXTURES_DIR, "package.json"),
+    path.join(workspaceDir, "package.json"),
+  );
+  for (const dir of dirs) {
+    copyDirRecursive(
+      path.join(FIXTURES_DIR, dir),
+      path.join(workspaceDir, dir),
+    );
+  }
+
+  // 3. Run chapter build
+  console.log(`\nBuilding agent: ${AGENT_NAME}...`);
   const chapterBin = path.resolve(E2E_ROOT, "..", "bin", "chapter.js");
   try {
     execFileSync(
       "node",
-      [chapterBin, "init", "--template", "note-taker", "--name", PROJECT_NAME],
+      [chapterBin, "build", AGENT_NAME],
       {
         cwd: workspaceDir,
         stdio: "inherit",
       },
     );
   } catch {
-    console.error("Error: chapter init --template note-taker failed.");
+    console.error(`Error: chapter build ${AGENT_NAME} failed.`);
     process.exit(1);
   }
 
-  // 4. Install the template member
-  console.log(`\nInstalling member: ${MEMBER_NAME}...`);
-  try {
-    execFileSync("node", [chapterBin, "install", MEMBER_NAME], {
-      cwd: workspaceDir,
-      stdio: "inherit",
-    });
-    console.log(`  Installed ${MEMBER_NAME}`);
-  } catch {
-    console.warn(`Warning: chapter install ${MEMBER_NAME} failed.`);
-  }
-
-  // 5. Note .env availability
+  // 4. Note .env availability
   const envFile = path.join(E2E_ROOT, ".env");
   if (fs.existsSync(envFile)) {
     console.log("\n.env file found — API keys available for live tests.");
   }
 
-  // 6. Save workspace path for teardown and tests
+  // 5. Save workspace path for teardown and tests
   fs.mkdirSync(TMP_DIR, { recursive: true });
   fs.writeFileSync(LAST_WORKSPACE_FILE, workspaceDir);
 
   // Success
   console.log("\n=== Setup Complete ===");
   console.log(`  Workspace: ${workspaceDir}`);
-  console.log(`  Member:    ${MEMBER_NAME}`);
+  console.log(`  Agent:     ${AGENT_NAME}`);
   console.log(`  Teardown:  npm run teardown\n`);
 }
 

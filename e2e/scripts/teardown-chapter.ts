@@ -10,7 +10,7 @@
  *
  * This script:
  * 1. Reads the workspace path from .last-workspace or E2E_WORKSPACE_DIR
- * 2. Stops any running Docker Compose stacks in member directories
+ * 2. Stops any running Docker Compose stacks in docker/ directories
  * 3. Removes the workspace directory
  * 4. Cleans up the .last-workspace tracking file
  */
@@ -27,24 +27,36 @@ const TMP_DIR = path.join(E2E_ROOT, "tmp");
 const LAST_WORKSPACE_FILE = path.join(TMP_DIR, ".last-workspace");
 
 /**
- * Find all docker-compose.yml files in member directories.
+ * Find docker-compose.yml files in the docker/ directory.
  */
 function findComposeFiles(workspaceDir: string): string[] {
-  const chapterDir = path.join(workspaceDir, ".chapter", "members");
-  if (!fs.existsSync(chapterDir)) return [];
+  const dockerDir = path.join(workspaceDir, "docker");
+  if (!fs.existsSync(dockerDir)) return [];
 
   const composeFiles: string[] = [];
-  try {
-    for (const entry of fs.readdirSync(chapterDir, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const composePath = path.join(chapterDir, entry.name, "docker-compose.yml");
-      if (fs.existsSync(composePath)) {
-        composeFiles.push(composePath);
-      }
-    }
-  } catch {
-    // Directory might not exist
+
+  // Check for compose file directly in docker/
+  const rootCompose = path.join(dockerDir, "docker-compose.yml");
+  if (fs.existsSync(rootCompose)) {
+    composeFiles.push(rootCompose);
   }
+
+  // Check in agent subdirectories
+  const agentDir = path.join(dockerDir, "agent");
+  if (fs.existsSync(agentDir)) {
+    try {
+      for (const entry of fs.readdirSync(agentDir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const composePath = path.join(agentDir, entry.name, "docker-compose.yml");
+        if (fs.existsSync(composePath)) {
+          composeFiles.push(composePath);
+        }
+      }
+    } catch {
+      // Directory might not exist
+    }
+  }
+
   return composeFiles;
 }
 
@@ -78,17 +90,17 @@ async function main(): Promise<void> {
   const composeFiles = findComposeFiles(workspaceDir);
   for (const composePath of composeFiles) {
     const composeDir = path.dirname(composePath);
-    const memberName = path.basename(composeDir);
-    console.log(`Stopping Docker stack for member: ${memberName}...`);
+    const name = path.basename(composeDir);
+    console.log(`Stopping Docker stack: ${name}...`);
     try {
       execFileSync("docker", ["compose", "-f", composePath, "down", "--remove-orphans"], {
         cwd: composeDir,
         stdio: "inherit",
         timeout: 30_000,
       });
-      console.log(`  Stopped ${memberName}`);
+      console.log(`  Stopped ${name}`);
     } catch {
-      console.warn(`  Warning: Failed to stop Docker stack for ${memberName} (may not be running)`);
+      console.warn(`  Warning: Failed to stop Docker stack for ${name} (may not be running)`);
     }
   }
 
