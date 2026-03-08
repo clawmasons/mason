@@ -234,11 +234,10 @@ export async function runInit(
     console.log("\nNext steps:");
     console.log(`  chapter list                                    List discovered packages`);
     console.log(`  chapter validate @${projectScope}/agent-note-taker   Validate the agent graph`);
-    console.log(`  chapter install @${projectScope}/agent-note-taker    Install and scaffold the agent\n`);
+    console.log(`  chapter build @${projectScope}/agent-note-taker      Build the agent lock file\n`);
   } else {
     console.log("\nNext steps:");
     console.log("  chapter add <package>    Add a chapter component");
-    console.log("  chapter build <agent>    Build and validate an agent");
-    console.log("  chapter install <agent>  Install and scaffold an agent\n");
+    console.log("  chapter build <agent>    Build and validate an agent\n");
   }
 }

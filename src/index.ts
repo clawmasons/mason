@@ -45,15 +45,8 @@ export {
 
 export {
   claudeCodeMaterializer,
+  piCodingAgentMaterializer,
+  PROVIDER_ENV_VARS,
   type RuntimeMaterializer,
   type MaterializationResult,
-  type ComposeServiceDef,
 } from "./materializer/index.js";
-
-export {
-  generateDockerCompose,
-  generateEnvTemplate,
-  generateLockFile,
-  type LockFile,
-  type LockFileRole,
-} from "./compose/index.js";

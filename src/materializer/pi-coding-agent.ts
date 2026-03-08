@@ -1,6 +1,6 @@
 import type { ResolvedAgent, ResolvedRole, ResolvedTask } from "../resolver/types.js";
 import { getAppShortName } from "../generator/toolfilter.js";
-import type { RuntimeMaterializer, MaterializationResult, ComposeServiceDef } from "./types.js";
+import type { RuntimeMaterializer, MaterializationResult } from "./types.js";
 import {
   formatPermittedTools,
   collectAllSkills,
@@ -8,27 +8,6 @@ import {
   generateAgentsMd,
   generateSkillReadme,
 } from "./common.js";
-
-/**
- * Mapping from LLM provider identifiers to their environment variable names.
- *
- * Used by the materializer to inject the correct API key into the
- * Docker Compose service, and by env template generation to include
- * the key in .env.example.
- *
- * @see PRD §3.3 — Supported Providers
- * @see PRD §7.2 — Provider → Environment Variable Mapping
- */
-export const PROVIDER_ENV_VARS: Record<string, string> = {
-  "openrouter": "OPENROUTER_API_KEY",
-  "anthropic": "ANTHROPIC_API_KEY",
-  "openai": "OPENAI_API_KEY",
-  "google": "GEMINI_API_KEY",
-  "mistral": "MISTRAL_API_KEY",
-  "groq": "GROQ_API_KEY",
-  "xai": "XAI_API_KEY",
-  "azure-openai": "AZURE_OPENAI_API_KEY",
-};
 
 /**
  * Generate the command prompt for a pi `registerCommand()` call.
@@ -234,57 +213,5 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
     }
 
     return result;
-  },
-
-  generateDockerfile(): string {
-    return [
-      "FROM node:22-slim",
-      "",
-      "RUN npm install -g @mariozechner/pi-coding-agent",
-      "",
-      "USER node",
-      "WORKDIR /home/node/workspace",
-      "COPY --chown=node:node workspace/ /home/node/workspace/",
-      "",
-      'CMD ["pi", "--no-session", "--mode", "print"]',
-    ].join("\n");
-  },
-
-  generateComposeService(agent: ResolvedAgent): ComposeServiceDef {
-    const roleNames = agent.roles
-      .map((r) => getAppShortName(r.name))
-      .join(",");
-
-    const port = agent.proxy?.port ?? 9090;
-    const environment: string[] = [
-      `CHAPTER_ROLES=${roleNames}`,
-    ];
-
-    // Add LLM provider API key env var (dynamic based on llm.provider)
-    if (agent.llm) {
-      const envVar = PROVIDER_ENV_VARS[agent.llm.provider];
-      if (envVar) {
-        environment.push(`${envVar}=\${${envVar}}`);
-      }
-    }
-
-    // Add proxy connection env vars
-    environment.push("CHAPTER_PROXY_TOKEN=${CHAPTER_PROXY_TOKEN}");
-    environment.push(`CHAPTER_PROXY_ENDPOINT=http://mcp-proxy:${port}`);
-
-    return {
-      build: "./pi-coding-agent",
-      restart: "no",
-      volumes: [
-        "./pi-coding-agent/workspace:/home/node/workspace",
-      ],
-      working_dir: "/home/node/workspace",
-      environment,
-      depends_on: ["mcp-proxy"],
-      stdin_open: true,
-      tty: true,
-      init: true,
-      networks: ["chapter-net"],
-    };
   },
 };

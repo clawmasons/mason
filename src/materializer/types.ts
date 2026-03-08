@@ -7,22 +7,6 @@ import type { ResolvedAgent } from "../resolver/types.js";
 export type MaterializationResult = Map<string, string>;
 
 /**
- * A docker-compose service definition for a runtime container.
- */
-export interface ComposeServiceDef {
-  build: string;
-  restart: string;
-  volumes: string[];
-  working_dir: string;
-  environment: string[];
-  depends_on: string[];
-  stdin_open: boolean;
-  tty: boolean;
-  init: boolean;
-  networks: string[];
-}
-
-/**
  * The contract all runtime materializers implement.
  *
  * A materializer translates the abstract chapter dependency graph into
@@ -34,7 +18,7 @@ export interface RuntimeMaterializer {
 
   /**
    * Generate workspace file content for this runtime.
-   * Returns a map of relative paths → file content strings.
+   * Returns a map of relative paths -> file content strings.
    * The caller handles writing files to disk.
    */
   materializeWorkspace(
@@ -42,13 +26,4 @@ export interface RuntimeMaterializer {
     proxyEndpoint: string,
     proxyToken?: string,
   ): MaterializationResult;
-
-  /** Generate a Dockerfile string for this runtime's container. */
-  generateDockerfile(agent: ResolvedAgent): string;
-
-  /** Generate a docker-compose service definition for this runtime. */
-  generateComposeService(agent: ResolvedAgent): ComposeServiceDef;
-
-  /** Generate runtime-specific config JSON (e.g., OOBE bypass for Claude Code). */
-  generateConfigJson?(): string;
 }

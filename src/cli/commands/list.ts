@@ -1,11 +1,8 @@
-import * as path from "node:path";
 import type { Command } from "commander";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import type { ResolvedAgent, ResolvedRole } from "../../resolver/types.js";
 import { getAppShortName } from "../../generator/toolfilter.js";
-import { readAgentsRegistry } from "../../registry/members.js";
-import type { AgentsRegistry } from "../../registry/types.js";
 
 interface ListOptions {
   json?: boolean;
@@ -14,7 +11,7 @@ interface ListOptions {
 export function registerListCommand(program: Command): void {
   program
     .command("list")
-    .description("List installed agents and their dependency trees")
+    .description("List agents and their dependency trees")
     .option("--json", "Output as JSON")
     .action(async (options: ListOptions) => {
       await runList(process.cwd(), options);
@@ -49,21 +46,16 @@ export async function runList(
       agents.push(resolveAgent(name, packages));
     }
 
-    // 4. Read the agents registry for status information
-    const chapterDir = path.join(rootDir, ".chapter");
-    const registry = readAgentsRegistry(chapterDir);
-
     if (options.json) {
       console.log(JSON.stringify(agents, null, 2));
       return;
     }
 
-    // 5. Print tree for each agent with status
+    // 4. Print tree for each agent
     for (let i = 0; i < agents.length; i++) {
       const agent = agents[i];
       if (i > 0) console.log("");
-      const statusSuffix = formatAgentStatus(agent, registry);
-      console.log(`${agent.name}@${agent.version}${statusSuffix}`);
+      console.log(`${agent.name}@${agent.version}`);
       printRoles(agent.roles);
     }
   } catch (error) {
@@ -71,19 +63,6 @@ export async function runList(
     console.error(`\n✘ List failed: ${message}\n`);
     process.exit(1);
   }
-}
-
-/**
- * Format the agent status suffix for display.
- * Shows "(status)" if the agent is in the registry,
- * or empty if the agent is not installed.
- */
-function formatAgentStatus(agent: ResolvedAgent, registry: AgentsRegistry): string {
-  const entry = registry.agents[agent.slug];
-  if (entry) {
-    return ` (${entry.status})`;
-  }
-  return "";
 }
 
 function printRoles(roles: ResolvedRole[]): void {

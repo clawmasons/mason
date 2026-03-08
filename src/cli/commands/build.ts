@@ -4,11 +4,55 @@ import * as path from "node:path";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { validateAgent } from "../../validator/validate.js";
-import { generateLockFile } from "../../compose/lock.js";
+import type { ResolvedAgent } from "../../resolver/types.js";
 
 interface BuildOptions {
   output?: string;
   json?: boolean;
+}
+
+/**
+ * Lock file structure for reproducible builds.
+ */
+interface LockFile {
+  lockVersion: number;
+  agent: { name: string; version: string; runtimes: string[] };
+  roles: Array<{
+    name: string;
+    version: string;
+    tasks: Array<{ name: string; version: string }>;
+    apps: Array<{ name: string; version: string }>;
+    skills: Array<{ name: string; version: string }>;
+  }>;
+  generatedFiles: string[];
+}
+
+/**
+ * Generate a chapter.lock.json object from a resolved agent and
+ * the list of generated file paths.
+ */
+function generateLockFile(
+  agent: ResolvedAgent,
+  generatedFiles: string[],
+): LockFile {
+  const roles = agent.roles.map((role) => ({
+    name: role.name,
+    version: role.version,
+    tasks: role.tasks.map((t) => ({ name: t.name, version: t.version })),
+    apps: role.apps.map((a) => ({ name: a.name, version: a.version })),
+    skills: role.skills.map((s) => ({ name: s.name, version: s.version })),
+  }));
+
+  return {
+    lockVersion: 1,
+    agent: {
+      name: agent.name,
+      version: agent.version,
+      runtimes: [...agent.runtimes],
+    },
+    roles,
+    generatedFiles: [...generatedFiles].sort(),
+  };
 }
 
 export function registerBuildCommand(program: Command): void {
