@@ -1,18 +1,18 @@
-import type { ResolvedMember } from "../resolver/types.js";
+import type { ResolvedAgent } from "../resolver/types.js";
 import type { LockFile, LockFileRole } from "./types.js";
 
 /**
- * Generate a chapter.lock.json object from a resolved member and
+ * Generate a chapter.lock.json object from a resolved agent and
  * the list of generated file paths.
  *
  * The lock file captures exact versions for reproducibility.
  * Output is deterministic — same input always produces the same result.
  */
 export function generateLockFile(
-  member: ResolvedMember,
+  agent: ResolvedAgent,
   generatedFiles: string[],
 ): LockFile {
-  const roles: LockFileRole[] = member.roles.map((role) => ({
+  const roles: LockFileRole[] = agent.roles.map((role) => ({
     name: role.name,
     version: role.version,
     tasks: role.tasks.map((t) => ({ name: t.name, version: t.version })),
@@ -22,11 +22,10 @@ export function generateLockFile(
 
   return {
     lockVersion: 1,
-    member: {
-      name: member.name,
-      version: member.version,
-      memberType: member.memberType,
-      runtimes: [...member.runtimes],
+    agent: {
+      name: agent.name,
+      version: agent.version,
+      runtimes: [...agent.runtimes],
     },
     roles,
     generatedFiles: [...generatedFiles].sort(),

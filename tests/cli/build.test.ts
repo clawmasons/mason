@@ -20,7 +20,7 @@ describe("CLI build command", () => {
     if (buildCmd) {
       const args = buildCmd.registeredArguments;
       expect(args).toHaveLength(1);
-      expect(args[0].name()).toBe("member");
+      expect(args[0].name()).toBe("agent");
       expect(args[0].required).toBe(true);
     }
   });
@@ -114,16 +114,12 @@ describe("runBuild", () => {
       },
     });
 
-    writePackage(path.join(tmpDir, "members", "ops"), {
-      name: "@test/member-ops",
+    writePackage(path.join(tmpDir, "agents", "ops"), {
+      name: "@test/agent-ops",
       version: "1.0.0",
       chapter: {
-        type: "member",
-        memberType: "agent",
-        name: "Ops",
-        slug: "ops",
-        email: "ops@chapter.local",
-        runtimes: ["claude-code"],
+        type: "agent",        name: "Ops",
+        slug: "ops",        runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
     });
@@ -131,7 +127,7 @@ describe("runBuild", () => {
 
   it("writes lock file to default path", async () => {
     setupValidMember();
-    await runBuild(tmpDir, "@test/member-ops", {});
+    await runBuild(tmpDir, "@test/agent-ops", {});
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
@@ -140,8 +136,8 @@ describe("runBuild", () => {
 
     const lock = JSON.parse(fs.readFileSync(lockPath, "utf-8"));
     expect(lock.lockVersion).toBe(1);
-    expect(lock.member.name).toBe("@test/member-ops");
-    expect(lock.member.runtimes).toContain("claude-code");
+    expect(lock.agent.name).toBe("@test/agent-ops");
+    expect(lock.agent.runtimes).toContain("claude-code");
     expect(lock.roles).toHaveLength(1);
     expect(lock.roles[0].name).toBe("@test/role-manager");
     expect(lock.generatedFiles).toEqual([]);
@@ -150,25 +146,25 @@ describe("runBuild", () => {
   it("writes lock file to custom output path", async () => {
     setupValidMember();
     const customPath = path.join(tmpDir, "custom", "lock.json");
-    await runBuild(tmpDir, "@test/member-ops", { output: customPath });
+    await runBuild(tmpDir, "@test/agent-ops", { output: customPath });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     expect(fs.existsSync(customPath)).toBe(true);
 
     const lock = JSON.parse(fs.readFileSync(customPath, "utf-8"));
-    expect(lock.member.name).toBe("@test/member-ops");
+    expect(lock.agent.name).toBe("@test/agent-ops");
   });
 
   it("prints JSON to stdout with --json flag", async () => {
     setupValidMember();
-    await runBuild(tmpDir, "@test/member-ops", { json: true });
+    await runBuild(tmpDir, "@test/agent-ops", { json: true });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     const parsed = JSON.parse(logOutput);
     expect(parsed.lockVersion).toBe(1);
-    expect(parsed.member.name).toBe("@test/member-ops");
+    expect(parsed.agent.name).toBe("@test/agent-ops");
 
     // Should NOT write a file
     expect(fs.existsSync(path.join(tmpDir, "chapter.lock.json"))).toBe(false);
@@ -227,21 +223,17 @@ describe("runBuild", () => {
       },
     });
 
-    writePackage(path.join(tmpDir, "members", "ops"), {
-      name: "@test/member-ops",
+    writePackage(path.join(tmpDir, "agents", "ops"), {
+      name: "@test/agent-ops",
       version: "1.0.0",
       chapter: {
-        type: "member",
-        memberType: "agent",
-        name: "Ops",
-        slug: "ops",
-        email: "ops@chapter.local",
-        runtimes: ["claude-code"],
+        type: "agent",        name: "Ops",
+        slug: "ops",        runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
     });
 
-    await runBuild(tmpDir, "@test/member-ops", {});
+    await runBuild(tmpDir, "@test/agent-ops", {});
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");

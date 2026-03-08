@@ -4,8 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { program } from "../../src/cli/index.js";
 import { runList } from "../../src/cli/commands/list.js";
-import { writeMembersRegistry } from "../../src/registry/members.js";
-import type { MembersRegistry } from "../../src/registry/types.js";
+import { writeAgentsRegistry } from "../../src/registry/members.js";
+import type { AgentsRegistry } from "../../src/registry/types.js";
 
 describe("CLI list command", () => {
   it("has the list command registered", () => {
@@ -103,16 +103,13 @@ describe("runList", () => {
       },
     });
 
-    writePackage(path.join(tmpDir, "members", "ops"), {
-      name: "@test/member-ops",
+    writePackage(path.join(tmpDir, "agents", "ops"), {
+      name: "@test/agent-ops",
       version: "1.0.0",
       chapter: {
-        type: "member",
-        memberType: "agent",
-        name: "Ops",
-        slug: "ops",
-        email: "ops@chapter.local",
-        runtimes: ["claude-code"],
+        type: "agent",
+                name: "Ops",
+        slug: "ops",        runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
     });
@@ -125,7 +122,7 @@ describe("runList", () => {
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("@test/member-ops@1.0.0");
+    expect(logOutput).toContain("@test/agent-ops@1.0.0");
     expect(logOutput).toContain("role: manager@1.0.0");
     expect(logOutput).toContain("task: triage@1.0.0");
     expect(logOutput).toContain("app: github@1.0.0");
@@ -136,16 +133,13 @@ describe("runList", () => {
     setupValidMember();
 
     // Add a second member
-    writePackage(path.join(tmpDir, "members", "ops2"), {
-      name: "@test/member-ops2",
+    writePackage(path.join(tmpDir, "agents", "ops2"), {
+      name: "@test/agent-ops2",
       version: "2.0.0",
       chapter: {
-        type: "member",
-        memberType: "agent",
-        name: "Ops2",
-        slug: "ops2",
-        email: "ops2@chapter.local",
-        runtimes: ["claude-code"],
+        type: "agent",
+                name: "Ops2",
+        slug: "ops2",        runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
     });
@@ -155,8 +149,8 @@ describe("runList", () => {
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("@test/member-ops@1.0.0");
-    expect(logOutput).toContain("@test/member-ops2@2.0.0");
+    expect(logOutput).toContain("@test/agent-ops@1.0.0");
+    expect(logOutput).toContain("@test/agent-ops2@2.0.0");
   });
 
   it("exits 1 when no members are found", async () => {
@@ -164,7 +158,7 @@ describe("runList", () => {
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("No members found");
+    expect(errorOutput).toContain("No agents found");
   });
 
   it("outputs JSON array with --json flag", async () => {
@@ -177,7 +171,7 @@ describe("runList", () => {
     const parsed = JSON.parse(logOutput);
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed).toHaveLength(1);
-    expect(parsed[0].name).toBe("@test/member-ops");
+    expect(parsed[0].name).toBe("@test/agent-ops");
     expect(parsed[0].roles).toHaveLength(1);
   });
 
@@ -185,57 +179,55 @@ describe("runList", () => {
     setupValidMember();
 
     const chapterDir = path.join(tmpDir, ".chapter");
-    const registry: MembersRegistry = {
-      members: {
+    const registry: AgentsRegistry = {
+      agents: {
         ops: {
-          package: "@test/member-ops",
-          memberType: "agent",
-          status: "enabled",
+          package: "@test/agent-ops",
+                    status: "enabled",
           installedAt: "2026-03-06T10:30:00.000Z",
         },
       },
     };
-    writeMembersRegistry(chapterDir, registry);
+    writeAgentsRegistry(chapterDir, registry);
 
     await runList(tmpDir, {});
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("(agent, enabled)");
+    expect(logOutput).toContain("(enabled)");
   });
 
-  it("shows member type without status when not in registry", async () => {
+  it("shows no status suffix when not in registry", async () => {
     setupValidMember();
-    // No registry file -- member is discovered but not installed
+    // No registry file -- agent is discovered but not installed
     await runList(tmpDir, {});
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("(agent)");
+    expect(logOutput).toContain("@test/agent-ops@1.0.0\n");
     expect(logOutput).not.toContain("enabled");
     expect(logOutput).not.toContain("disabled");
   });
 
-  it("shows disabled status for disabled members", async () => {
+  it("shows disabled status for disabled agents", async () => {
     setupValidMember();
 
     const chapterDir = path.join(tmpDir, ".chapter");
-    const registry: MembersRegistry = {
-      members: {
+    const registry: AgentsRegistry = {
+      agents: {
         ops: {
-          package: "@test/member-ops",
-          memberType: "agent",
-          status: "disabled",
+          package: "@test/agent-ops",
+                    status: "disabled",
           installedAt: "2026-03-06T10:30:00.000Z",
         },
       },
     };
-    writeMembersRegistry(chapterDir, registry);
+    writeAgentsRegistry(chapterDir, registry);
 
     await runList(tmpDir, {});
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("(agent, disabled)");
+    expect(logOutput).toContain("(disabled)");
   });
 });

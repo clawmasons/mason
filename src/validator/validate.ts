@@ -1,4 +1,4 @@
-import type { ResolvedMember, ResolvedApp, ResolvedRole, ResolvedTask } from "../resolver/types.js";
+import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedTask } from "../resolver/types.js";
 import type { ValidationError, ValidationWarning, ValidationResult } from "./types.js";
 
 /**
@@ -145,13 +145,13 @@ function checkAppLaunchConfig(
 }
 
 /**
- * Collect all unique apps from a resolved member's roles.
+ * Collect all unique apps from a resolved agent's roles.
  */
-function collectAllApps(member: ResolvedMember): ResolvedApp[] {
+function collectAllApps(agent: ResolvedAgent): ResolvedApp[] {
   const seen = new Set<string>();
   const apps: ResolvedApp[] = [];
 
-  for (const role of member.roles) {
+  for (const role of agent.roles) {
     for (const app of role.apps) {
       if (!seen.has(app.name)) {
         seen.add(app.name);
@@ -187,23 +187,20 @@ function collectAppsFromTask(
  * claude-code warns when `llm` is present (it only supports Anthropic).
  */
 function checkLlmConfig(
-  member: ResolvedMember,
+  agent: ResolvedAgent,
   errors: ValidationError[],
   warnings: ValidationWarning[],
 ): void {
-  // Only applies to agent members (humans don't have runtimes or llm)
-  if (member.memberType !== "agent") return;
-
-  const hasPi = member.runtimes.includes("pi-coding-agent");
-  const hasClaude = member.runtimes.includes("claude-code");
-  const hasLlm = member.llm !== undefined;
+  const hasPi = agent.runtimes.includes("pi-coding-agent");
+  const hasClaude = agent.runtimes.includes("claude-code");
+  const hasLlm = agent.llm !== undefined;
 
   // Pi requires LLM config — it has no default provider
   if (hasPi && !hasLlm) {
     errors.push({
       category: "llm-config",
-      message: `Member "${member.memberName}" uses runtime "pi-coding-agent" but has no "llm" configuration. Pi requires explicit provider and model.`,
-      context: { member: member.name, runtime: "pi-coding-agent" },
+      message: `Agent "${agent.agentName}" uses runtime "pi-coding-agent" but has no "llm" configuration. Pi requires explicit provider and model.`,
+      context: { agent: agent.name, runtime: "pi-coding-agent" },
     });
   }
 
@@ -211,35 +208,35 @@ function checkLlmConfig(
   if (hasClaude && hasLlm) {
     warnings.push({
       category: "llm-config",
-      message: `Member "${member.memberName}" uses runtime "claude-code" with an "llm" configuration. Claude Code only supports Anthropic — the "llm" field will be ignored.`,
-      context: { member: member.name, runtime: "claude-code" },
+      message: `Agent "${agent.agentName}" uses runtime "claude-code" with an "llm" configuration. Claude Code only supports Anthropic — the "llm" field will be ignored.`,
+      context: { agent: agent.name, runtime: "claude-code" },
     });
   }
 }
 
 /**
- * Validate a resolved member graph for semantic correctness.
+ * Validate a resolved agent graph for semantic correctness.
  * Runs all validation checks and collects errors and warnings.
  */
-export function validateMember(member: ResolvedMember): ValidationResult {
+export function validateAgent(agent: ResolvedAgent): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
   // Check each role
-  for (const role of member.roles) {
+  for (const role of agent.roles) {
     checkRequirementCoverage(role, errors);
     checkToolExistence(role, errors);
     checkSkillAvailability(role, errors);
   }
 
   // Check all unique apps for launch config
-  const allApps = collectAllApps(member);
+  const allApps = collectAllApps(agent);
   for (const app of allApps) {
     checkAppLaunchConfig(app, errors);
   }
 
   // Check LLM configuration
-  checkLlmConfig(member, errors, warnings);
+  checkLlmConfig(agent, errors, warnings);
 
   return {
     valid: errors.length === 0,

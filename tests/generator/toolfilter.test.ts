@@ -1,16 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { computeToolFilters, getAppShortName } from "../../src/generator/toolfilter.js";
-import type { ResolvedMember } from "../../src/resolver/types.js";
+import type { ResolvedAgent } from "../../src/resolver/types.js";
 
-function makeMember(overrides: Partial<ResolvedMember> = {}): ResolvedMember {
+function makeMember(overrides: Partial<ResolvedAgent> = {}): ResolvedAgent {
   return {
-    name: "@clawmasons/member-repo-ops",
+    name: "@clawmasons/agent-repo-ops",
     version: "1.0.0",
-    memberType: "agent",
-    memberName: "Repo Ops",
+    agentName: "Repo Ops",
     slug: "repo-ops",
-    email: "repo-ops@chapter.local",
-    authProviders: [],
     runtimes: ["claude-code"],
     roles: [],
     ...overrides,
@@ -35,7 +32,7 @@ describe("getAppShortName", () => {
   });
 
   it("strips member- prefix from scoped package", () => {
-    expect(getAppShortName("@clawmasons/member-note-taker")).toBe("note-taker");
+    expect(getAppShortName("@clawmasons/agent-note-taker")).toBe("note-taker");
   });
 
   it("strips agent- prefix from scoped package", () => {

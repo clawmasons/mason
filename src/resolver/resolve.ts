@@ -1,5 +1,5 @@
 import type { AppChapterField, RoleChapterField, SkillChapterField, TaskChapterField } from "../schemas/index.js";
-import type { MemberChapterField } from "../schemas/member.js";
+import type { AgentChapterField } from "../schemas/agent.js";
 import {
   CircularDependencyError,
   PackageNotFoundError,
@@ -7,7 +7,7 @@ import {
 } from "./errors.js";
 import type {
   DiscoveredPackage,
-  ResolvedMember,
+  ResolvedAgent,
   ResolvedApp,
   ResolvedRole,
   ResolvedSkill,
@@ -211,54 +211,33 @@ function resolveRole(
 }
 
 /**
- * Resolve a member package into a fully-resolved dependency graph.
- * Handles both human and agent member types.
+ * Resolve an agent package into a fully-resolved dependency graph.
  */
-export function resolveMember(
-  memberName: string,
+export function resolveAgent(
+  agentName: string,
   packages: Map<string, DiscoveredPackage>,
-): ResolvedMember {
-  const pkg = getPackage(memberName, packages);
-  assertType(pkg, "member", undefined);
-  const chapter = pkg.chapterField as MemberChapterField;
-  const memberContext = `member "${memberName}"`;
+): ResolvedAgent {
+  const pkg = getPackage(agentName, packages);
+  assertType(pkg, "agent", undefined);
+  const chapter = pkg.chapterField as AgentChapterField;
+  const agentContext = `agent "${agentName}"`;
 
   // Resolve all roles
   const roles: ResolvedRole[] = [];
   for (const roleName of chapter.roles) {
-    roles.push(resolveRole(roleName, packages, memberContext));
+    roles.push(resolveRole(roleName, packages, agentContext));
   }
 
-  // Build the resolved member based on memberType
-  if (chapter.memberType === "agent") {
-    return {
-      name: pkg.name,
-      version: pkg.version,
-      memberType: "agent",
-      memberName: chapter.name,
-      slug: chapter.slug,
-      email: chapter.email,
-      authProviders: chapter.authProviders,
-      description: chapter.description,
-      runtimes: chapter.runtimes,
-      roles,
-      resources: chapter.resources.length > 0 ? chapter.resources : undefined,
-      proxy: chapter.proxy,
-      llm: chapter.llm,
-    };
-  }
-
-  // Human member
   return {
     name: pkg.name,
     version: pkg.version,
-    memberType: "human",
-    memberName: chapter.name,
+    agentName: chapter.name,
     slug: chapter.slug,
-    email: chapter.email,
-    authProviders: chapter.authProviders,
     description: chapter.description,
-    runtimes: [],
+    runtimes: chapter.runtimes,
     roles,
+    resources: chapter.resources.length > 0 ? chapter.resources : undefined,
+    proxy: chapter.proxy,
+    llm: chapter.llm,
   };
 }

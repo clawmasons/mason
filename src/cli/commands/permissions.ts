@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { discoverPackages } from "../../resolver/discover.js";
-import { resolveMember } from "../../resolver/resolve.js";
+import { resolveAgent } from "../../resolver/resolve.js";
 import { computeToolFilters } from "../../generator/toolfilter.js";
 import { getAppShortName } from "../../generator/toolfilter.js";
 
@@ -16,26 +16,26 @@ interface PermissionsOutput {
 export function registerPermissionsCommand(program: Command): void {
   program
     .command("permissions")
-    .description("Display the resolved permission matrix and toolFilter for a member")
-    .argument("<member>", "Member package name")
+    .description("Display the resolved permission matrix and toolFilter for an agent")
+    .argument("<agent>", "Agent package name")
     .option("--json", "Output as JSON")
-    .action(async (memberName: string, options: PermissionsOptions) => {
-      await runPermissions(process.cwd(), memberName, options);
+    .action(async (agentName: string, options: PermissionsOptions) => {
+      await runPermissions(process.cwd(), agentName, options);
     });
 }
 
 export async function runPermissions(
   rootDir: string,
-  memberName: string,
+  agentName: string,
   options: PermissionsOptions,
 ): Promise<void> {
   try {
     // 1. Discover and resolve
     const packages = discoverPackages(rootDir);
-    const member = resolveMember(memberName, packages);
+    const agent = resolveAgent(agentName, packages);
 
     // 2. Compute toolFilters
-    const toolFilters = computeToolFilters(member);
+    const toolFilters = computeToolFilters(agent);
 
     if (options.json) {
       const output: PermissionsOutput = {
@@ -43,7 +43,7 @@ export async function runPermissions(
         toolFilters: {},
       };
 
-      for (const role of member.roles) {
+      for (const role of agent.roles) {
         output.roles[role.name] = role.permissions;
       }
 
@@ -56,9 +56,9 @@ export async function runPermissions(
     }
 
     // 3. Print per-role breakdown
-    console.log(`\nPermissions for member: ${memberName}\n`);
+    console.log(`\nPermissions for agent: ${agentName}\n`);
 
-    for (const role of member.roles) {
+    for (const role of agent.roles) {
       console.log(`  Role: ${getAppShortName(role.name)}`);
 
       for (const [appName, perms] of Object.entries(role.permissions)) {

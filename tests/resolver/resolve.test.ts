@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveMember } from "../../src/resolver/resolve.js";
+import { resolveAgent } from "../../src/resolver/resolve.js";
 import {
   PackageNotFoundError,
   CircularDependencyError,
@@ -114,14 +114,11 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
     },
   }));
 
-  // Member (agent type)
-  packages.set("@clawmasons/member-repo-ops", makePkg("@clawmasons/member-repo-ops", "1.0.0", {
-    type: "member",
-    memberType: "agent",
+  // Agent
+  packages.set("@clawmasons/agent-repo-ops", makePkg("@clawmasons/agent-repo-ops", "1.0.0", {
+    type: "agent",
     name: "Repo Ops",
     slug: "repo-ops",
-    email: "repo-ops@chapter.local",
-    authProviders: [],
     description: "Repository operations agent for GitHub.",
     runtimes: ["claude-code", "codex"],
     roles: ["@clawmasons/role-issue-manager", "@clawmasons/role-pr-reviewer"],
@@ -132,18 +129,16 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
   return packages;
 }
 
-describe("resolveMember", () => {
-  describe("PRD repo-ops member example", () => {
-    it("resolves the full member with 2 roles", () => {
+describe("resolveAgent", () => {
+  describe("PRD repo-ops agent example", () => {
+    it("resolves the full agent with 2 roles", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveMember("@clawmasons/member-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      expect(resolved.name).toBe("@clawmasons/member-repo-ops");
+      expect(resolved.name).toBe("@clawmasons/agent-repo-ops");
       expect(resolved.version).toBe("1.0.0");
-      expect(resolved.memberType).toBe("agent");
-      expect(resolved.memberName).toBe("Repo Ops");
+      expect(resolved.agentName).toBe("Repo Ops");
       expect(resolved.slug).toBe("repo-ops");
-      expect(resolved.email).toBe("repo-ops@chapter.local");
       expect(resolved.description).toBe("Repository operations agent for GitHub.");
       expect(resolved.runtimes).toEqual(["claude-code", "codex"]);
       expect(resolved.roles).toHaveLength(2);
@@ -151,9 +146,9 @@ describe("resolveMember", () => {
 
     it("resolves issue-manager role with tasks, apps, skills", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveMember("@clawmasons/member-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      const issueManager = resolved.roles.find(r => r.name === "@clawmasons/role-issue-manager");
+      const issueManager = resolved.roles.find((r: { name: string }) => r.name === "@clawmasons/role-issue-manager");
       expect(issueManager).toBeDefined();
       expect(issueManager?.description).toBe("Manages GitHub issues: triage, label, assign.");
       expect(issueManager?.tasks).toHaveLength(2);
@@ -165,9 +160,9 @@ describe("resolveMember", () => {
 
     it("resolves pr-reviewer role", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveMember("@clawmasons/member-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      const prReviewer = resolved.roles.find(r => r.name === "@clawmasons/role-pr-reviewer");
+      const prReviewer = resolved.roles.find((r: { name: string }) => r.name === "@clawmasons/role-pr-reviewer");
       expect(prReviewer).toBeDefined();
       expect(prReviewer?.tasks).toHaveLength(1);
       expect(prReviewer?.apps).toHaveLength(1); // github from permissions
@@ -176,11 +171,11 @@ describe("resolveMember", () => {
 
     it("resolves task with required apps and skills", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveMember("@clawmasons/member-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      const issueManager = resolved.roles.find(r => r.name === "@clawmasons/role-issue-manager");
+      const issueManager = resolved.roles.find((r: { name: string }) => r.name === "@clawmasons/role-issue-manager");
       expect(issueManager).toBeDefined();
-      const triageTask = issueManager?.tasks.find(t => t.name === "@clawmasons/task-triage-issue");
+      const triageTask = issueManager?.tasks.find((t: { name: string }) => t.name === "@clawmasons/task-triage-issue");
       expect(triageTask).toBeDefined();
 
       expect(triageTask?.taskType).toBe("subagent");
@@ -195,11 +190,11 @@ describe("resolveMember", () => {
 
     it("resolves app with full details", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveMember("@clawmasons/member-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      const issueManager = resolved.roles.find(r => r.name === "@clawmasons/role-issue-manager");
+      const issueManager = resolved.roles.find((r: { name: string }) => r.name === "@clawmasons/role-issue-manager");
       expect(issueManager).toBeDefined();
-      const github = issueManager?.apps.find(a => a.name === "@clawmasons/app-github");
+      const github = issueManager?.apps.find((a: { name: string }) => a.name === "@clawmasons/app-github");
       expect(github).toBeDefined();
 
       expect(github?.transport).toBe("stdio");
@@ -211,9 +206,9 @@ describe("resolveMember", () => {
 
     it("resolves skill with full details", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveMember("@clawmasons/member-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
-      const issueManager = resolved.roles.find(r => r.name === "@clawmasons/role-issue-manager");
+      const issueManager = resolved.roles.find((r: { name: string }) => r.name === "@clawmasons/role-issue-manager");
       expect(issueManager).toBeDefined();
       const skill = issueManager?.skills[0];
       expect(skill).toBeDefined();
@@ -225,7 +220,7 @@ describe("resolveMember", () => {
 
     it("includes resources and proxy config", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveMember("@clawmasons/member-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
       expect(resolved.resources).toHaveLength(1);
       expect(resolved.resources?.[0]).toEqual({
@@ -241,57 +236,26 @@ describe("resolveMember", () => {
 
     it("produces serializable output", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveMember("@clawmasons/member-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
       const json = JSON.stringify(resolved);
       const parsed = JSON.parse(json);
-      expect(parsed.name).toBe("@clawmasons/member-repo-ops");
+      expect(parsed.name).toBe("@clawmasons/agent-repo-ops");
       expect(parsed.roles).toHaveLength(2);
-    });
-  });
-
-  describe("human member", () => {
-    it("resolves a human member with roles", () => {
-      const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@acme/member-alice", makePkg("@acme/member-alice", "1.0.0", {
-        type: "member",
-        memberType: "human",
-        name: "Alice Chen",
-        slug: "alice",
-        email: "alice@acme.com",
-        authProviders: ["github", "google"],
-        description: "Lead developer.",
-        roles: ["@acme/role-admin"],
-      }));
-      packages.set("@acme/role-admin", makePkg("@acme/role-admin", "1.0.0", {
-        type: "role",
-        permissions: {},
-      }));
-
-      const resolved = resolveMember("@acme/member-alice", packages);
-      expect(resolved.memberType).toBe("human");
-      expect(resolved.memberName).toBe("Alice Chen");
-      expect(resolved.slug).toBe("alice");
-      expect(resolved.email).toBe("alice@acme.com");
-      expect(resolved.authProviders).toEqual(["github", "google"]);
-      expect(resolved.runtimes).toEqual([]);
-      expect(resolved.proxy).toBeUndefined();
-      expect(resolved.resources).toBeUndefined();
-      expect(resolved.roles).toHaveLength(1);
     });
   });
 
   describe("diamond dependencies", () => {
     it("same app referenced by multiple roles resolves correctly", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveMember("@clawmasons/member-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
 
       // Both roles reference @clawmasons/app-github
-      const issueManager = resolved.roles.find(r => r.name === "@clawmasons/role-issue-manager");
-      const prReviewer = resolved.roles.find(r => r.name === "@clawmasons/role-pr-reviewer");
+      const issueManager = resolved.roles.find((r: { name: string }) => r.name === "@clawmasons/role-issue-manager");
+      const prReviewer = resolved.roles.find((r: { name: string }) => r.name === "@clawmasons/role-pr-reviewer");
 
-      const imGithub = issueManager?.apps.find(a => a.name === "@clawmasons/app-github");
-      const prGithub = prReviewer?.apps.find(a => a.name === "@clawmasons/app-github");
+      const imGithub = issueManager?.apps.find((a: { name: string }) => a.name === "@clawmasons/app-github");
+      const prGithub = prReviewer?.apps.find((a: { name: string }) => a.name === "@clawmasons/app-github");
 
       expect(imGithub).toBeDefined();
       expect(prGithub).toBeDefined();
@@ -300,24 +264,21 @@ describe("resolveMember", () => {
   });
 
   describe("error cases", () => {
-    it("throws PackageNotFoundError when member is not found", () => {
+    it("throws PackageNotFoundError when agent is not found", () => {
       const packages = new Map<string, DiscoveredPackage>();
 
-      expect(() => resolveMember("@clawmasons/nonexistent", packages))
+      expect(() => resolveAgent("@clawmasons/nonexistent", packages))
         .toThrow(PackageNotFoundError);
-      expect(() => resolveMember("@clawmasons/nonexistent", packages))
+      expect(() => resolveAgent("@clawmasons/nonexistent", packages))
         .toThrow('Package "@clawmasons/nonexistent" not found');
     });
 
-    it("throws TypeMismatchError when member references non-role package", () => {
+    it("throws TypeMismatchError when agent references non-role package", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@clawmasons/member-bad", makePkg("@clawmasons/member-bad", "1.0.0", {
-        type: "member",
-        memberType: "agent",
+      packages.set("@clawmasons/agent-bad", makePkg("@clawmasons/agent-bad", "1.0.0", {
+        type: "agent",
         name: "Bad",
         slug: "bad",
-        email: "bad@chapter.local",
-        authProviders: [],
         runtimes: ["claude-code"],
         roles: ["@clawmasons/app-github"],
         resources: [],
@@ -331,21 +292,18 @@ describe("resolveMember", () => {
         capabilities: ["tools"],
       }));
 
-      expect(() => resolveMember("@clawmasons/member-bad", packages))
+      expect(() => resolveAgent("@clawmasons/agent-bad", packages))
         .toThrow(TypeMismatchError);
-      expect(() => resolveMember("@clawmasons/member-bad", packages))
+      expect(() => resolveAgent("@clawmasons/agent-bad", packages))
         .toThrow('type "app" but expected "role"');
     });
 
     it("throws TypeMismatchError when role references non-task package", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
-        type: "member",
-        memberType: "agent",
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
         name: "Test",
         slug: "test",
-        email: "test@chapter.local",
-        authProviders: [],
         runtimes: ["claude-code"],
         roles: ["@test/role"],
         resources: [],
@@ -361,21 +319,18 @@ describe("resolveMember", () => {
         description: "Not a task",
       }));
 
-      expect(() => resolveMember("@test/member", packages))
+      expect(() => resolveAgent("@test/agent", packages))
         .toThrow(TypeMismatchError);
-      expect(() => resolveMember("@test/member", packages))
+      expect(() => resolveAgent("@test/agent", packages))
         .toThrow('type "skill" but expected "task"');
     });
 
     it("throws PackageNotFoundError with context when task requires missing app", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
-        type: "member",
-        memberType: "agent",
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
         name: "Test",
         slug: "test",
-        email: "test@chapter.local",
-        authProviders: [],
         runtimes: ["claude-code"],
         roles: ["@test/role"],
         resources: [],
@@ -391,21 +346,18 @@ describe("resolveMember", () => {
         requires: { apps: ["@test/missing-app"] },
       }));
 
-      expect(() => resolveMember("@test/member", packages))
+      expect(() => resolveAgent("@test/agent", packages))
         .toThrow(PackageNotFoundError);
-      expect(() => resolveMember("@test/member", packages))
+      expect(() => resolveAgent("@test/agent", packages))
         .toThrow("@test/missing-app");
     });
 
     it("throws PackageNotFoundError when role references missing task", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
-        type: "member",
-        memberType: "agent",
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
         name: "Test",
         slug: "test",
-        email: "test@chapter.local",
-        authProviders: [],
         runtimes: ["claude-code"],
         roles: ["@test/role"],
         resources: [],
@@ -416,21 +368,18 @@ describe("resolveMember", () => {
         permissions: {},
       }));
 
-      expect(() => resolveMember("@test/member", packages))
+      expect(() => resolveAgent("@test/agent", packages))
         .toThrow(PackageNotFoundError);
-      expect(() => resolveMember("@test/member", packages))
+      expect(() => resolveAgent("@test/agent", packages))
         .toThrow("@test/missing-task");
     });
 
     it("throws PackageNotFoundError when role permissions reference missing app", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
-        type: "member",
-        memberType: "agent",
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
         name: "Test",
         slug: "test",
-        email: "test@chapter.local",
-        authProviders: [],
         runtimes: ["claude-code"],
         roles: ["@test/role"],
         resources: [],
@@ -442,36 +391,33 @@ describe("resolveMember", () => {
         },
       }));
 
-      expect(() => resolveMember("@test/member", packages))
+      expect(() => resolveAgent("@test/agent", packages))
         .toThrow(PackageNotFoundError);
-      expect(() => resolveMember("@test/member", packages))
+      expect(() => resolveAgent("@test/agent", packages))
         .toThrow("@test/missing-app");
     });
 
-    it("throws TypeMismatchError when resolving non-member as member", () => {
+    it("throws TypeMismatchError when resolving non-agent as agent", () => {
       const packages = new Map<string, DiscoveredPackage>();
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
         permissions: {},
       }));
 
-      expect(() => resolveMember("@test/role", packages))
+      expect(() => resolveAgent("@test/role", packages))
         .toThrow(TypeMismatchError);
-      expect(() => resolveMember("@test/role", packages))
-        .toThrow('type "role" but expected "member"');
+      expect(() => resolveAgent("@test/role", packages))
+        .toThrow('type "role" but expected "agent"');
     });
   });
 
   describe("composite tasks", () => {
     it("resolves composite task with sub-tasks", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
-        type: "member",
-        memberType: "agent",
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
         name: "Test",
         slug: "test",
-        email: "test@chapter.local",
-        authProviders: [],
         runtimes: ["claude-code"],
         roles: ["@test/role"],
         resources: [],
@@ -495,7 +441,7 @@ describe("resolveMember", () => {
         taskType: "script",
       }));
 
-      const resolved = resolveMember("@test/member", packages);
+      const resolved = resolveAgent("@test/agent", packages);
       const composite = resolved.roles[0].tasks[0];
       expect(composite.taskType).toBe("composite");
       expect(composite.subTasks).toHaveLength(2);
@@ -507,13 +453,10 @@ describe("resolveMember", () => {
   describe("circular dependencies", () => {
     it("detects direct circular dependency between tasks", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
-        type: "member",
-        memberType: "agent",
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
         name: "Test",
         slug: "test",
-        email: "test@chapter.local",
-        authProviders: [],
         runtimes: ["claude-code"],
         roles: ["@test/role"],
         resources: [],
@@ -534,21 +477,18 @@ describe("resolveMember", () => {
         tasks: ["@test/task-a"],
       }));
 
-      expect(() => resolveMember("@test/member", packages))
+      expect(() => resolveAgent("@test/agent", packages))
         .toThrow(CircularDependencyError);
-      expect(() => resolveMember("@test/member", packages))
+      expect(() => resolveAgent("@test/agent", packages))
         .toThrow("@test/task-a");
     });
 
     it("detects transitive circular dependency", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
-        type: "member",
-        memberType: "agent",
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
         name: "Test",
         slug: "test",
-        email: "test@chapter.local",
-        authProviders: [],
         runtimes: ["claude-code"],
         roles: ["@test/role"],
         resources: [],
@@ -574,21 +514,18 @@ describe("resolveMember", () => {
         tasks: ["@test/task-a"],
       }));
 
-      expect(() => resolveMember("@test/member", packages))
+      expect(() => resolveAgent("@test/agent", packages))
         .toThrow(CircularDependencyError);
     });
   });
 
   describe("llm configuration", () => {
-    it("resolves agent member with llm field populated", () => {
+    it("resolves agent with llm field populated", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
-        type: "member",
-        memberType: "agent",
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
         name: "Coder",
         slug: "coder",
-        email: "coder@chapter.local",
-        authProviders: [],
         runtimes: ["pi-coding-agent"],
         roles: ["@test/role"],
         resources: [],
@@ -602,22 +539,19 @@ describe("resolveMember", () => {
         permissions: {},
       }));
 
-      const resolved = resolveMember("@test/member", packages);
+      const resolved = resolveAgent("@test/agent", packages);
       expect(resolved.llm).toEqual({
         provider: "openrouter",
         model: "anthropic/claude-sonnet-4",
       });
     });
 
-    it("resolves agent member without llm field as undefined", () => {
+    it("resolves agent without llm field as undefined", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
-        type: "member",
-        memberType: "agent",
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
         name: "Test",
         slug: "test",
-        email: "test@chapter.local",
-        authProviders: [],
         runtimes: ["claude-code"],
         roles: ["@test/role"],
         resources: [],
@@ -627,47 +561,24 @@ describe("resolveMember", () => {
         permissions: {},
       }));
 
-      const resolved = resolveMember("@test/member", packages);
-      expect(resolved.llm).toBeUndefined();
-    });
-
-    it("resolves human member without llm field", () => {
-      const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@acme/member-alice", makePkg("@acme/member-alice", "1.0.0", {
-        type: "member",
-        memberType: "human",
-        name: "Alice Chen",
-        slug: "alice",
-        email: "alice@acme.com",
-        authProviders: [],
-        roles: ["@acme/role-admin"],
-      }));
-      packages.set("@acme/role-admin", makePkg("@acme/role-admin", "1.0.0", {
-        type: "role",
-        permissions: {},
-      }));
-
-      const resolved = resolveMember("@acme/member-alice", packages);
+      const resolved = resolveAgent("@test/agent", packages);
       expect(resolved.llm).toBeUndefined();
     });
 
     it("existing repo-ops fixture has no llm (backward compatible)", () => {
       const packages = buildRepoOpsFixture();
-      const resolved = resolveMember("@clawmasons/member-repo-ops", packages);
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
       expect(resolved.llm).toBeUndefined();
     });
   });
 
-  describe("minimal members", () => {
-    it("resolves member with role that has no tasks or skills", () => {
+  describe("minimal agents", () => {
+    it("resolves agent with role that has no tasks or skills", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
-        type: "member",
-        memberType: "agent",
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
         name: "Test",
         slug: "test",
-        email: "test@chapter.local",
-        authProviders: [],
         runtimes: ["claude-code"],
         roles: ["@test/role"],
         resources: [],
@@ -677,22 +588,19 @@ describe("resolveMember", () => {
         permissions: {},
       }));
 
-      const resolved = resolveMember("@test/member", packages);
+      const resolved = resolveAgent("@test/agent", packages);
       expect(resolved.roles).toHaveLength(1);
       expect(resolved.roles[0].tasks).toHaveLength(0);
       expect(resolved.roles[0].skills).toHaveLength(0);
       expect(resolved.roles[0].apps).toHaveLength(0);
     });
 
-    it("resolves member without optional fields", () => {
+    it("resolves agent without optional fields", () => {
       const packages = new Map<string, DiscoveredPackage>();
-      packages.set("@test/member", makePkg("@test/member", "1.0.0", {
-        type: "member",
-        memberType: "agent",
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
         name: "Test",
         slug: "test",
-        email: "test@chapter.local",
-        authProviders: [],
         runtimes: ["claude-code"],
         roles: ["@test/role"],
         resources: [],
@@ -702,7 +610,7 @@ describe("resolveMember", () => {
         permissions: {},
       }));
 
-      const resolved = resolveMember("@test/member", packages);
+      const resolved = resolveAgent("@test/agent", packages);
       expect(resolved.description).toBeUndefined();
       expect(resolved.resources).toBeUndefined();
       expect(resolved.proxy).toBeUndefined();

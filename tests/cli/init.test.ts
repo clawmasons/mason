@@ -27,7 +27,7 @@ describe("chapter init", () => {
     it("creates all workspace directories", async () => {
       await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
-      const expectedDirs = ["apps", "tasks", "skills", "roles", "members", ".clawmasons"];
+      const expectedDirs = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons"];
       for (const dir of expectedDirs) {
         const stat = fs.statSync(path.join(tmpDir, dir));
         expect(stat.isDirectory()).toBe(true);
@@ -47,7 +47,7 @@ describe("chapter init", () => {
         "tasks/*",
         "skills/*",
         "roles/*",
-        "members/*",
+        "agents/*",
       ]);
     });
 
@@ -218,7 +218,7 @@ describe("chapter init", () => {
       // Create a test templates directory with a "test-template" template
       templatesDir = path.join(tmpDir, "__templates__");
       const templateDir = path.join(templatesDir, "test-template");
-      fs.mkdirSync(path.join(templateDir, "members", "note-taker"), {
+      fs.mkdirSync(path.join(templateDir, "agents", "note-taker"), {
         recursive: true,
       });
       fs.mkdirSync(path.join(templateDir, "roles", "writer"), {
@@ -233,7 +233,7 @@ describe("chapter init", () => {
             name: "{{projectName}}",
             version: "0.1.0",
             private: true,
-            workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "members/*"],
+            workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"],
             dependencies: {},
           },
           null,
@@ -243,19 +243,16 @@ describe("chapter init", () => {
 
       // Template member package.json
       fs.writeFileSync(
-        path.join(templateDir, "members", "note-taker", "package.json"),
+        path.join(templateDir, "agents", "note-taker", "package.json"),
         JSON.stringify(
           {
-            name: "@{{projectScope}}/member-note-taker",
+            name: "@{{projectScope}}/agent-note-taker",
             version: "1.0.0",
             chapter: {
-              type: "member",
-              memberType: "agent",
+              type: "agent",
+
               name: "Note Taker",
-              slug: "note-taker",
-              email: "note-taker@chapter.local",
-              authProviders: [],
-              roles: ["@{{projectScope}}/role-writer"],
+              slug: "note-taker",              roles: ["@{{projectScope}}/role-writer"],
               runtimes: ["claude-code"],
             },
           },
@@ -301,7 +298,7 @@ describe("chapter init", () => {
         expect(fs.existsSync(path.join(targetDir, "package.json"))).toBe(true);
         expect(
           fs.existsSync(
-            path.join(targetDir, "members", "note-taker", "package.json"),
+            path.join(targetDir, "agents", "note-taker", "package.json"),
           ),
         ).toBe(true);
         expect(
@@ -347,11 +344,11 @@ describe("chapter init", () => {
 
         const memberPkg = JSON.parse(
           fs.readFileSync(
-            path.join(targetDir, "members", "note-taker", "package.json"),
+            path.join(targetDir, "agents", "note-taker", "package.json"),
             "utf-8",
           ),
         );
-        expect(memberPkg.name).toBe("@test.unit/member-note-taker");
+        expect(memberPkg.name).toBe("@test.unit/agent-note-taker");
         expect(memberPkg.chapter.roles).toEqual(["@test.unit/role-writer"]);
 
         const rolePkg = JSON.parse(
@@ -384,11 +381,11 @@ describe("chapter init", () => {
 
         const memberPkg = JSON.parse(
           fs.readFileSync(
-            path.join(targetDir, "members", "note-taker", "package.json"),
+            path.join(targetDir, "agents", "note-taker", "package.json"),
             "utf-8",
           ),
         );
-        expect(memberPkg.name).toBe("@acme.agent/member-note-taker");
+        expect(memberPkg.name).toBe("@acme.agent/agent-note-taker");
         expect(memberPkg.chapter.roles).toEqual(["@acme.agent/role-writer"]);
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
@@ -449,7 +446,7 @@ describe("chapter init", () => {
 
         const memberPkg = JSON.parse(
           fs.readFileSync(
-            path.join(targetDir, "members", "note-taker", "package.json"),
+            path.join(targetDir, "agents", "note-taker", "package.json"),
             "utf-8",
           ),
         );
@@ -458,9 +455,10 @@ describe("chapter init", () => {
         const result = parseChapterField(memberPkg.chapter);
         expect(result.success).toBe(true);
         if (result.success) {
-          expect(result.data.type).toBe("member");
-          if (result.data.type === "member") {
-            expect(result.data.memberType).toBe("agent");
+          expect(result.data.type).toBe("agent");
+          if (result.data.type === "agent") {
+            expect(result.data.slug).toBe("note-taker");
+            expect(result.data.runtimes).toContain("claude-code");
           }
         }
       } finally {
@@ -481,7 +479,7 @@ describe("chapter init", () => {
 
         const logCalls = vi.mocked(console.log).mock.calls.flat().join("\n");
         expect(logCalls).toContain("Template: test-template");
-        expect(logCalls).toContain("chapter validate @test.unit/member-note-taker");
+        expect(logCalls).toContain("chapter validate @test.unit/agent-note-taker");
         expect(logCalls).toContain("chapter list");
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
@@ -609,21 +607,21 @@ describe("copyTemplateFiles", () => {
   });
 
   it("substitutes {{projectScope}} in nested package.json files", () => {
-    fs.mkdirSync(path.join(srcDir, "members", "test"), { recursive: true });
+    fs.mkdirSync(path.join(srcDir, "agents", "test"), { recursive: true });
     fs.writeFileSync(
-      path.join(srcDir, "members", "test", "package.json"),
-      JSON.stringify({ name: "@{{projectScope}}/member-test" }),
+      path.join(srcDir, "agents", "test", "package.json"),
+      JSON.stringify({ name: "@{{projectScope}}/agent-test" }),
     );
 
     copyTemplateFiles(srcDir, destDir, "@acme/my-agent", "acme");
 
     const pkg = JSON.parse(
       fs.readFileSync(
-        path.join(destDir, "members", "test", "package.json"),
+        path.join(destDir, "agents", "test", "package.json"),
         "utf-8",
       ),
     );
-    expect(pkg.name).toBe("@acme/member-test");
+    expect(pkg.name).toBe("@acme/agent-test");
   });
 
   it("does not substitute placeholders in non-package.json files", () => {

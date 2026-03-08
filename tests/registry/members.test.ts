@@ -3,13 +3,13 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
-  readMembersRegistry,
-  writeMembersRegistry,
-  addMember,
-  updateMemberStatus,
-  getMember,
+  readAgentsRegistry,
+  writeAgentsRegistry,
+  addAgent,
+  updateAgentStatus,
+  getAgent,
 } from "../../src/registry/members.js";
-import type { MemberEntry, MembersRegistry } from "../../src/registry/types.js";
+import type { AgentEntry, AgentsRegistry } from "../../src/registry/types.js";
 
 describe("members registry", () => {
   let tmpDir: string;
@@ -24,63 +24,61 @@ describe("members registry", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  const agentEntry: MemberEntry = {
+  const agentEntry: AgentEntry = {
     package: "@test/member-ops",
-    memberType: "agent",
-    status: "enabled",
+        status: "enabled",
     installedAt: "2026-03-06T10:30:00.000Z",
   };
 
-  const humanEntry: MemberEntry = {
+  const humanEntry: AgentEntry = {
     package: "@test/member-alice",
-    memberType: "human",
-    status: "enabled",
+        status: "enabled",
     installedAt: "2026-03-06T11:00:00.000Z",
   };
 
-  describe("readMembersRegistry", () => {
+  describe("readAgentsRegistry", () => {
     it("returns empty registry when file does not exist", () => {
-      const registry = readMembersRegistry(chapterDir);
-      expect(registry).toEqual({ members: {} });
+      const registry = readAgentsRegistry(chapterDir);
+      expect(registry).toEqual({ agents: {} });
     });
 
     it("returns empty registry when directory does not exist", () => {
       const nonExistent = path.join(tmpDir, "does-not-exist");
-      const registry = readMembersRegistry(nonExistent);
-      expect(registry).toEqual({ members: {} });
+      const registry = readAgentsRegistry(nonExistent);
+      expect(registry).toEqual({ agents: {} });
     });
 
     it("parses valid registry file", () => {
-      const expected: MembersRegistry = {
-        members: {
+      const expected: AgentsRegistry = {
+        agents: {
           ops: agentEntry,
           alice: humanEntry,
         },
       };
       fs.mkdirSync(chapterDir, { recursive: true });
       fs.writeFileSync(
-        path.join(chapterDir, "members.json"),
+        path.join(chapterDir, "agents.json"),
         JSON.stringify(expected, null, 2),
       );
 
-      const registry = readMembersRegistry(chapterDir);
+      const registry = readAgentsRegistry(chapterDir);
       expect(registry).toEqual(expected);
     });
 
     it("throws on malformed JSON", () => {
       fs.mkdirSync(chapterDir, { recursive: true });
-      fs.writeFileSync(path.join(chapterDir, "members.json"), "not json");
+      fs.writeFileSync(path.join(chapterDir, "agents.json"), "not json");
 
-      expect(() => readMembersRegistry(chapterDir)).toThrow();
+      expect(() => readAgentsRegistry(chapterDir)).toThrow();
     });
   });
 
-  describe("writeMembersRegistry", () => {
+  describe("writeAgentsRegistry", () => {
     it("creates file with proper JSON format", () => {
-      const registry: MembersRegistry = { members: { ops: agentEntry } };
-      writeMembersRegistry(chapterDir, registry);
+      const registry: AgentsRegistry = { agents: { ops: agentEntry } };
+      writeAgentsRegistry(chapterDir, registry);
 
-      const filePath = path.join(chapterDir, "members.json");
+      const filePath = path.join(chapterDir, "agents.json");
       expect(fs.existsSync(filePath)).toBe(true);
 
       const content = fs.readFileSync(filePath, "utf-8");
@@ -93,107 +91,107 @@ describe("members registry", () => {
 
     it("creates directory if it does not exist", () => {
       const deepDir = path.join(tmpDir, "deep", "nested", ".chapter");
-      const registry: MembersRegistry = { members: { ops: agentEntry } };
-      writeMembersRegistry(deepDir, registry);
+      const registry: AgentsRegistry = { agents: { ops: agentEntry } };
+      writeAgentsRegistry(deepDir, registry);
 
-      expect(fs.existsSync(path.join(deepDir, "members.json"))).toBe(true);
+      expect(fs.existsSync(path.join(deepDir, "agents.json"))).toBe(true);
     });
 
     it("overwrites existing file", () => {
-      const registry1: MembersRegistry = { members: { ops: agentEntry } };
-      writeMembersRegistry(chapterDir, registry1);
+      const registry1: AgentsRegistry = { agents: { ops: agentEntry } };
+      writeAgentsRegistry(chapterDir, registry1);
 
-      const registry2: MembersRegistry = { members: { alice: humanEntry } };
-      writeMembersRegistry(chapterDir, registry2);
+      const registry2: AgentsRegistry = { agents: { alice: humanEntry } };
+      writeAgentsRegistry(chapterDir, registry2);
 
-      const content = fs.readFileSync(path.join(chapterDir, "members.json"), "utf-8");
+      const content = fs.readFileSync(path.join(chapterDir, "agents.json"), "utf-8");
       const parsed = JSON.parse(content);
       expect(parsed).toEqual(registry2);
     });
   });
 
-  describe("addMember", () => {
+  describe("addAgent", () => {
     it("adds a new member entry", () => {
-      addMember(chapterDir, "ops", agentEntry);
+      addAgent(chapterDir, "ops", agentEntry);
 
-      const registry = readMembersRegistry(chapterDir);
-      expect(registry.members.ops).toEqual(agentEntry);
+      const registry = readAgentsRegistry(chapterDir);
+      expect(registry.agents.ops).toEqual(agentEntry);
     });
 
     it("adds multiple members", () => {
-      addMember(chapterDir, "ops", agentEntry);
-      addMember(chapterDir, "alice", humanEntry);
+      addAgent(chapterDir, "ops", agentEntry);
+      addAgent(chapterDir, "alice", humanEntry);
 
-      const registry = readMembersRegistry(chapterDir);
-      expect(Object.keys(registry.members)).toHaveLength(2);
-      expect(registry.members.ops).toEqual(agentEntry);
-      expect(registry.members.alice).toEqual(humanEntry);
+      const registry = readAgentsRegistry(chapterDir);
+      expect(Object.keys(registry.agents)).toHaveLength(2);
+      expect(registry.agents.ops).toEqual(agentEntry);
+      expect(registry.agents.alice).toEqual(humanEntry);
     });
 
     it("overwrites existing member entry", () => {
-      addMember(chapterDir, "ops", agentEntry);
+      addAgent(chapterDir, "ops", agentEntry);
 
-      const updatedEntry: MemberEntry = {
+      const updatedEntry: AgentEntry = {
         ...agentEntry,
         installedAt: "2026-03-06T12:00:00.000Z",
       };
-      addMember(chapterDir, "ops", updatedEntry);
+      addAgent(chapterDir, "ops", updatedEntry);
 
-      const registry = readMembersRegistry(chapterDir);
-      expect(Object.keys(registry.members)).toHaveLength(1);
-      expect(registry.members.ops.installedAt).toBe("2026-03-06T12:00:00.000Z");
+      const registry = readAgentsRegistry(chapterDir);
+      expect(Object.keys(registry.agents)).toHaveLength(1);
+      expect(registry.agents.ops.installedAt).toBe("2026-03-06T12:00:00.000Z");
     });
   });
 
-  describe("updateMemberStatus", () => {
+  describe("updateAgentStatus", () => {
     it("changes status from enabled to disabled", () => {
-      addMember(chapterDir, "ops", agentEntry);
-      updateMemberStatus(chapterDir, "ops", "disabled");
+      addAgent(chapterDir, "ops", agentEntry);
+      updateAgentStatus(chapterDir, "ops", "disabled");
 
-      const registry = readMembersRegistry(chapterDir);
-      expect(registry.members.ops.status).toBe("disabled");
+      const registry = readAgentsRegistry(chapterDir);
+      expect(registry.agents.ops.status).toBe("disabled");
     });
 
     it("changes status from disabled to enabled", () => {
-      addMember(chapterDir, "ops", { ...agentEntry, status: "disabled" });
-      updateMemberStatus(chapterDir, "ops", "enabled");
+      addAgent(chapterDir, "ops", { ...agentEntry, status: "disabled" });
+      updateAgentStatus(chapterDir, "ops", "enabled");
 
-      const registry = readMembersRegistry(chapterDir);
-      expect(registry.members.ops.status).toBe("enabled");
+      const registry = readAgentsRegistry(chapterDir);
+      expect(registry.agents.ops.status).toBe("enabled");
     });
 
     it("throws when slug is not found", () => {
-      expect(() => updateMemberStatus(chapterDir, "nonexistent", "disabled")).toThrow(
-        'Member "nonexistent" not found in registry',
+      expect(() => updateAgentStatus(chapterDir, "nonexistent", "disabled")).toThrow(
+        'Agent "nonexistent" not found in registry',
       );
     });
 
     it("preserves other member fields when updating status", () => {
-      addMember(chapterDir, "ops", agentEntry);
-      updateMemberStatus(chapterDir, "ops", "disabled");
+      addAgent(chapterDir, "ops", agentEntry);
+      updateAgentStatus(chapterDir, "ops", "disabled");
 
-      const registry = readMembersRegistry(chapterDir);
-      expect(registry.members.ops.package).toBe(agentEntry.package);
-      expect(registry.members.ops.memberType).toBe(agentEntry.memberType);
-      expect(registry.members.ops.installedAt).toBe(agentEntry.installedAt);
+      const registry = readAgentsRegistry(chapterDir);
+      expect(registry.agents.ops.package).toBe(agentEntry.package);
+      
+      expect(registry.agents.ops.installedAt).toBe(agentEntry.installedAt);
     });
   });
 
-  describe("getMember", () => {
+  describe("getAgent", () => {
     it("returns entry for existing member", () => {
-      addMember(chapterDir, "ops", agentEntry);
+      addAgent(chapterDir, "ops", agentEntry);
 
-      const entry = getMember(chapterDir, "ops");
+      const entry = getAgent(chapterDir, "ops");
       expect(entry).toEqual(agentEntry);
     });
 
     it("returns undefined for non-existent member", () => {
-      const entry = getMember(chapterDir, "nonexistent");
+      const entry = getAgent(chapterDir, "nonexistent");
       expect(entry).toBeUndefined();
     });
 
     it("returns undefined when registry file does not exist", () => {
-      const entry = getMember(chapterDir, "ops");
+      const entry = getAgent(chapterDir, "ops");
       expect(entry).toBeUndefined();
     });
   });

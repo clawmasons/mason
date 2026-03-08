@@ -58,17 +58,13 @@ describe("parseChapterField", () => {
 
   it("parses a member by type discrimination", () => {
     const result = parseChapterField({
-      type: "member",
-      memberType: "agent",
-      name: "Note Taker",
-      slug: "note-taker",
-      email: "note-taker@chapter.local",
-      runtimes: ["claude-code"],
+      type: "agent",      name: "Note Taker",
+      slug: "note-taker",      runtimes: ["claude-code"],
       roles: ["@clawmasons/role-issue-manager"],
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.type).toBe("member");
+      expect(result.data.type).toBe("agent");
     }
   });
 

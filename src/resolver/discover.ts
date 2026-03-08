@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { parseChapterField } from "../schemas/index.js";
 import type { DiscoveredPackage } from "./types.js";
 
-const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "members"];
+const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents"];
 
 /**
  * Try to read and parse a chapter package from a directory.

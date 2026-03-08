@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
-  resolveMemberDir,
+  resolveAgentDir,
   checkDockerCompose,
   execDockerCompose,
 } from "./docker-utils.js";
@@ -14,30 +14,30 @@ interface StopOptions {
 export function registerStopCommand(program: Command): void {
   program
     .command("stop")
-    .description("Stop the Docker Compose stack for a member")
-    .argument("<member>", "Member package name to stop")
-    .option("--output-dir <dir>", "Custom member directory")
-    .action(async (memberName: string, options: StopOptions) => {
-      await stopAgent(process.cwd(), memberName, options);
+    .description("Stop the Docker Compose stack for an agent")
+    .argument("<agent>", "Agent package name to stop")
+    .option("--output-dir <dir>", "Custom agent directory")
+    .action(async (agentName: string, options: StopOptions) => {
+      await stopAgent(process.cwd(), agentName, options);
     });
 }
 
 export async function stopAgent(
   rootDir: string,
-  memberName: string,
+  agentName: string,
   options: StopOptions,
 ): Promise<void> {
   try {
     // 1. Check docker compose availability
     checkDockerCompose();
 
-    // 2. Resolve member directory
-    const memberDir = resolveMemberDir(rootDir, memberName, options.outputDir);
-    const composePath = path.join(memberDir, "docker-compose.yml");
+    // 2. Resolve agent directory
+    const agentDir = resolveAgentDir(rootDir, agentName, options.outputDir);
+    const composePath = path.join(agentDir, "docker-compose.yml");
 
-    if (!fs.existsSync(memberDir)) {
+    if (!fs.existsSync(agentDir)) {
       console.error(
-        `\n✘ Member directory not found: ${memberDir}\n  Run "chapter install ${memberName}" first.\n`,
+        `\n✘ Agent directory not found: ${agentDir}\n  Run "chapter install ${agentName}" first.\n`,
       );
       process.exit(1);
       return;
@@ -45,14 +45,14 @@ export async function stopAgent(
 
     if (!fs.existsSync(composePath)) {
       console.error(
-        `\n✘ docker-compose.yml not found in ${memberDir}\n  The member may need to be reinstalled with "chapter install ${memberName}".\n`,
+        `\n✘ docker-compose.yml not found in ${agentDir}\n  The agent may need to be reinstalled with "chapter install ${agentName}".\n`,
       );
       process.exit(1);
       return;
     }
 
     // 3. Execute docker compose down
-    console.log(`Stopping member "${memberName}"...`);
+    console.log(`Stopping agent "${agentName}"...`);
     const exitCode = await execDockerCompose([
       "compose",
       "-f",
@@ -65,7 +65,7 @@ export async function stopAgent(
       return;
     }
 
-    console.log(`\n✔ Member "${memberName}" stopped.\n`);
+    console.log(`\n✔ Agent "${agentName}" stopped.\n`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\n✘ Stop failed: ${message}\n`);

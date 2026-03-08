@@ -21,7 +21,7 @@ export interface ValidationError {
     tool?: string;
     skill?: string;
     field?: string;
-    member?: string;
+    agent?: string;
     runtime?: string;
   };
 }
@@ -39,7 +39,7 @@ export interface ValidationWarning {
   category: ValidationWarningCategory;
   message: string;
   context: {
-    member?: string;
+    agent?: string;
     runtime?: string;
   };
 }

@@ -25,7 +25,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { readMembersRegistry, getMember } from "../../src/registry/members.js";
+import { readAgentsRegistry, getAgent } from "../../src/registry/members.js";
 import { runDisable } from "../../src/cli/commands/disable.js";
 import { runEnable } from "../../src/cli/commands/enable.js";
 
@@ -126,14 +126,14 @@ describe("E2E Install Flow (Local tgz)", () => {
     expect(existsSync(join(tmpDir, ".clawmasons", "chapter.json"))).toBe(true);
 
     // Verify template files were copied (still uses members/ directory from template)
-    expect(existsSync(join(tmpDir, "members", "note-taker", "package.json"))).toBe(true);
+    expect(existsSync(join(tmpDir, "agents", "note-taker", "package.json"))).toBe(true);
     expect(existsSync(join(tmpDir, "roles", "writer", "package.json"))).toBe(true);
 
     // Verify member package.json has correct project scope
     const memberPkg = JSON.parse(
-      readFileSync(join(tmpDir, "members", "note-taker", "package.json"), "utf-8"),
+      readFileSync(join(tmpDir, "agents", "note-taker", "package.json"), "utf-8"),
     ) as { name: string };
-    expect(memberPkg.name).toBe(`@${projectScope}/member-note-taker`);
+    expect(memberPkg.name).toBe(`@${projectScope}/agent-note-taker`);
 
     // Verify role package.json has correct project scope
     const rolePkg = JSON.parse(
@@ -163,7 +163,7 @@ describe("E2E Install Flow (Local tgz)", () => {
   }, TIMEOUT);
 
   it("step 3: chapter validate confirms agent graph is valid", () => {
-    const agentName = `@${projectScope}/member-note-taker`;
+    const agentName = `@${projectScope}/agent-note-taker`;
     const output = chapterCli(["validate", agentName], tmpDir);
     expect(output).toContain("is valid");
   }, TIMEOUT);
@@ -184,7 +184,7 @@ describe("E2E Install Flow (Local tgz)", () => {
     expect(agents.length).toBeGreaterThanOrEqual(1);
 
     // Find our template agent (local scope takes precedence)
-    const agent = agents.find((a) => a.name === `@${projectScope}/member-note-taker`);
+    const agent = agents.find((a) => a.name === `@${projectScope}/agent-note-taker`);
     expect(agent).toBeDefined();
 
     // Agent should have the writer role
@@ -198,11 +198,11 @@ describe("E2E Install Flow (Local tgz)", () => {
   }, TIMEOUT);
 
   it("step 5: chapter install generates single-stage Dockerfile", () => {
-    const agentName = `@${projectScope}/member-note-taker`;
+    const agentName = `@${projectScope}/agent-note-taker`;
     chapterCli(["install", agentName], tmpDir);
 
     // Verify output directory was created
-    const installDir = join(tmpDir, ".chapter", "members", "note-taker");
+    const installDir = join(tmpDir, ".chapter", "agents", "note-taker");
     expect(existsSync(installDir)).toBe(true);
 
     // Verify Dockerfile exists and is single-stage
@@ -212,7 +212,7 @@ describe("E2E Install Flow (Local tgz)", () => {
     const dockerfile = readFileSync(dockerfilePath, "utf-8");
     expect(dockerfile).not.toContain("AS builder");
     expect(dockerfile).toContain("FROM node:22-slim");
-    expect(dockerfile).toContain(`CMD ["proxy", "--member", "${agentName}"]`);
+    expect(dockerfile).toContain(`CMD ["proxy", "--agent", "${agentName}"]`);
 
     // Verify docker-compose.yml exists
     expect(existsSync(join(installDir, "docker-compose.yml"))).toBe(true);
@@ -231,17 +231,17 @@ describe("E2E Install Flow (Local tgz)", () => {
   it("step 6: members registry is populated after install", () => {
     const chapterDir = join(tmpDir, ".chapter");
 
-    // Verify members.json exists
-    expect(existsSync(join(chapterDir, "members.json"))).toBe(true);
+    // Verify agents.json exists
+    expect(existsSync(join(chapterDir, "agents.json"))).toBe(true);
 
     // Read and validate registry
-    const registry = readMembersRegistry(chapterDir);
-    const entry = registry.members["note-taker"];
+    const registry = readAgentsRegistry(chapterDir);
+    const entry = registry.agents["note-taker"];
 
     expect(entry).toBeDefined();
     expect(entry!.status).toBe("enabled");
-    expect(entry!.memberType).toBe("agent");
-    expect(entry!.package).toBe(`@${projectScope}/member-note-taker`);
+    
+    expect(entry!.package).toBe(`@${projectScope}/agent-note-taker`);
 
     // Verify installedAt is a valid ISO 8601 timestamp
     expect(entry!.installedAt).toBeTruthy();
@@ -250,7 +250,7 @@ describe("E2E Install Flow (Local tgz)", () => {
   }, TIMEOUT);
 
   it("step 7: per-member directory structure is complete", () => {
-    const installDir = join(tmpDir, ".chapter", "members", "note-taker");
+    const installDir = join(tmpDir, ".chapter", "agents", "note-taker");
 
     // Activity log directory
     expect(existsSync(join(installDir, "log"))).toBe(true);
@@ -282,23 +282,23 @@ describe("E2E Install Flow (Local tgz)", () => {
 
     // Verify the registry was updated
     const chapterDir = join(tmpDir, ".chapter");
-    const registry = readMembersRegistry(chapterDir);
-    const entry = registry.members["note-taker"];
+    const registry = readAgentsRegistry(chapterDir);
+    const entry = registry.agents["note-taker"];
 
     expect(entry).toBeDefined();
     expect(entry!.status).toBe("disabled");
 
     // Other fields should be preserved
-    expect(entry!.memberType).toBe("agent");
-    expect(entry!.package).toBe(`@${projectScope}/member-note-taker`);
+    
+    expect(entry!.package).toBe(`@${projectScope}/agent-note-taker`);
     expect(entry!.installedAt).toBeTruthy();
   }, TIMEOUT);
 
   it("step 9: disabled member is blocked from running", () => {
     const chapterDir = join(tmpDir, ".chapter");
 
-    // Verify getMember confirms the disabled status
-    const entry = getMember(chapterDir, "note-taker");
+    // Verify getAgent confirms the disabled status
+    const entry = getAgent(chapterDir, "note-taker");
     expect(entry).toBeDefined();
     expect(entry!.status).toBe("disabled");
 
@@ -317,22 +317,22 @@ describe("E2E Install Flow (Local tgz)", () => {
 
     // Verify the registry was updated
     const chapterDir = join(tmpDir, ".chapter");
-    const registry = readMembersRegistry(chapterDir);
-    const entry = registry.members["note-taker"];
+    const registry = readAgentsRegistry(chapterDir);
+    const entry = registry.agents["note-taker"];
 
     expect(entry).toBeDefined();
     expect(entry!.status).toBe("enabled");
   }, TIMEOUT);
 
   it("step 11: no forge references in generated config files", () => {
-    const installDir = join(tmpDir, ".chapter", "members", "note-taker");
+    const installDir = join(tmpDir, ".chapter", "agents", "note-taker");
 
     // Check key generated files for "forge" references (case-insensitive)
     const filesToCheck: Array<[string, string]> = [
       ["docker-compose.yml", join(installDir, "docker-compose.yml")],
       [".env", join(installDir, ".env")],
       ["chapter.lock.json", join(installDir, "chapter.lock.json")],
-      ["members.json", join(tmpDir, ".chapter", "members.json")],
+      ["agents.json", join(tmpDir, ".chapter", "agents.json")],
     ];
 
     for (const [label, filePath] of filesToCheck) {

@@ -13,7 +13,7 @@
  * Node.js regardless of whether apps are stdio or remote.
  */
 export function generateProxyDockerfile(
-  memberName: string,
+  agentName: string,
 ): string {
   return `FROM node:22-slim
 WORKDIR /app/chapter
@@ -28,6 +28,6 @@ RUN mkdir -p /home/node/data /logs && chown -R node:node /app /home/node/data /l
 USER node
 WORKDIR /app/workspace
 ENTRYPOINT ["node", "/app/chapter/bin/chapter.js"]
-CMD ["proxy", "--member", "${memberName}"]
+CMD ["proxy", "--agent", "${agentName}"]
 `;
 }

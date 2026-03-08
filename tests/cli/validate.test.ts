@@ -20,7 +20,7 @@ describe("CLI validate command", () => {
     if (validateCmd) {
       const args = validateCmd.registeredArguments;
       expect(args).toHaveLength(1);
-      expect(args[0].name()).toBe("member");
+      expect(args[0].name()).toBe("agent");
       expect(args[0].required).toBe(true);
     }
   });
@@ -117,16 +117,12 @@ describe("runValidate", () => {
     });
 
     // Member
-    writePackage(path.join(tmpDir, "members", "ops"), {
-      name: "@test/member-ops",
+    writePackage(path.join(tmpDir, "agents", "ops"), {
+      name: "@test/agent-ops",
       version: "1.0.0",
       chapter: {
-        type: "member",
-        memberType: "agent",
-        name: "Ops",
-        slug: "ops",
-        email: "ops@chapter.local",
-        runtimes: ["claude-code"],
+        type: "agent",        name: "Ops",
+        slug: "ops",        runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
     });
@@ -190,16 +186,12 @@ describe("runValidate", () => {
     });
 
     // Member
-    writePackage(path.join(tmpDir, "members", "ops"), {
-      name: "@test/member-ops",
+    writePackage(path.join(tmpDir, "agents", "ops"), {
+      name: "@test/agent-ops",
       version: "1.0.0",
       chapter: {
-        type: "member",
-        memberType: "agent",
-        name: "Ops",
-        slug: "ops",
-        email: "ops@chapter.local",
-        runtimes: ["claude-code"],
+        type: "agent",        name: "Ops",
+        slug: "ops",        runtimes: ["claude-code"],
         roles: ["@test/role-manager"],
       },
     });
@@ -207,7 +199,7 @@ describe("runValidate", () => {
 
   it("exits 0 and prints success for valid member", async () => {
     setupValidMember();
-    await runValidate(tmpDir, "@test/member-ops", {});
+    await runValidate(tmpDir, "@test/agent-ops", {});
 
     expect(exitSpy).toHaveBeenCalledWith(0);
     const logOutput = logSpy.mock.calls.flat().join("\n");
@@ -216,7 +208,7 @@ describe("runValidate", () => {
 
   it("exits 1 and prints errors for invalid member", async () => {
     setupInvalidMember();
-    await runValidate(tmpDir, "@test/member-ops", {});
+    await runValidate(tmpDir, "@test/agent-ops", {});
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -226,7 +218,7 @@ describe("runValidate", () => {
 
   it("outputs JSON when --json flag is set for valid member", async () => {
     setupValidMember();
-    await runValidate(tmpDir, "@test/member-ops", { json: true });
+    await runValidate(tmpDir, "@test/agent-ops", { json: true });
 
     expect(exitSpy).toHaveBeenCalledWith(0);
     const logOutput = logSpy.mock.calls.flat().join("\n");
@@ -237,7 +229,7 @@ describe("runValidate", () => {
 
   it("outputs JSON when --json flag is set for invalid member", async () => {
     setupInvalidMember();
-    await runValidate(tmpDir, "@test/member-ops", { json: true });
+    await runValidate(tmpDir, "@test/agent-ops", { json: true });
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const logOutput = logSpy.mock.calls.flat().join("\n");

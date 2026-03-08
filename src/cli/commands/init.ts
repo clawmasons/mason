@@ -9,7 +9,7 @@ export interface InitOptions {
   template?: string;
 }
 
-const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "members", ".clawmasons"];
+const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons"];
 
 const GITIGNORE = `node_modules/
 dist/
@@ -174,7 +174,7 @@ export async function runInit(
   if (fs.existsSync(packageJsonPath)) {
     if (!usedTemplate) {
       console.log(
-        '⚠ package.json already exists. Skipping generation. Please add "workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "members/*"] manually.',
+        '⚠ package.json already exists. Skipping generation. Please add "workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"] manually.',
       );
     }
   } else {
@@ -182,7 +182,7 @@ export async function runInit(
       name: projectName,
       version: "0.1.0",
       private: true,
-      workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "members/*"],
+      workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"],
     };
     fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
     created.push("package.json");
@@ -233,12 +233,12 @@ export async function runInit(
     console.log(`\nTemplate: ${options.template}`);
     console.log("\nNext steps:");
     console.log(`  chapter list                                    List discovered packages`);
-    console.log(`  chapter validate @${projectScope}/member-note-taker   Validate the member graph`);
-    console.log(`  chapter install @${projectScope}/member-note-taker    Install and scaffold the member\n`);
+    console.log(`  chapter validate @${projectScope}/agent-note-taker   Validate the agent graph`);
+    console.log(`  chapter install @${projectScope}/agent-note-taker    Install and scaffold the agent\n`);
   } else {
     console.log("\nNext steps:");
     console.log("  chapter add <package>    Add a chapter component");
-    console.log("  chapter build <member>   Build and validate a member");
-    console.log("  chapter install <member> Install and scaffold a member\n");
+    console.log("  chapter build <agent>    Build and validate an agent");
+    console.log("  chapter install <agent>  Install and scaffold an agent\n");
   }
 }
