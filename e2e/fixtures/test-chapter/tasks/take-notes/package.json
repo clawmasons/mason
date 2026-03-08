@@ -1,14 +1,13 @@
 {
-  "name": "@clawmasons/task-take-notes",
+  "name": "@test/task-take-notes",
   "version": "1.0.0",
-  "description": "Subagent task — create and organize markdown notes on the filesystem",
   "chapter": {
     "type": "task",
     "taskType": "subagent",
     "prompt": "./prompts/take-notes.md",
     "requires": {
-      "apps": ["@clawmasons/app-filesystem"],
-      "skills": ["@clawmasons/skill-markdown-conventions"]
+      "apps": ["@test/app-filesystem"],
+      "skills": ["@test/skill-markdown-conventions"]
     }
   }
 }

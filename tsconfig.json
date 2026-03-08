@@ -4,15 +4,24 @@
     "module": "Node16",
     "moduleResolution": "Node16",
     "lib": ["ES2022"],
-    "outDir": "./dist",
-    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "noEmit": true,
+    "paths": {
+      "@clawmasons/shared": ["./packages/shared/src/index.ts"],
+      "@clawmasons/proxy": ["./packages/proxy/src/index.ts"]
+    }
   },
-  "include": ["src/**/*", "tests/**/*"]
+  "include": [
+    "packages/shared/src/**/*",
+    "packages/proxy/src/**/*",
+    "packages/cli/src/**/*",
+    "packages/proxy/tests/**/*",
+    "packages/cli/tests/**/*"
+  ]
 }

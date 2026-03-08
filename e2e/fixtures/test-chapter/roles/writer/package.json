@@ -1,14 +1,13 @@
 {
-  "name": "@clawmasons/role-writer",
+  "name": "@test/role-writer",
   "version": "1.0.0",
-  "description": "Writer role — permission boundary for filesystem note operations",
   "chapter": {
     "type": "role",
     "description": "Manages notes on the filesystem: read, write, list, and create directories.",
-    "tasks": ["@clawmasons/task-take-notes"],
-    "skills": ["@clawmasons/skill-markdown-conventions"],
+    "tasks": ["@test/task-take-notes"],
+    "skills": ["@test/skill-markdown-conventions"],
     "permissions": {
-      "@clawmasons/app-filesystem": {
+      "@test/app-filesystem": {
         "allow": ["read_file", "write_file", "list_directory", "create_directory"],
         "deny": []
       }

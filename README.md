@@ -5,81 +5,124 @@ Clawmasons Chapter — npm-native packaging, governance, and runtime portability
 ## Installation
 
 ```bash
-npm install @clawmasons/chapter
-```
-
-Or install globally to use the `chapter` CLI anywhere:
-
-```bash
 npm install -g @clawmasons/chapter
 ```
 
+This installs the `chapter` CLI globally. The monorepo contains three packages:
+
+- **`@clawmasons/chapter`** — CLI and library (the main install)
+- **`@clawmasons/shared`** — schemas, types, and utilities (internal dependency)
+- **`@clawmasons/proxy`** — MCP proxy server (internal dependency)
+
 ## CLI Usage
+
+### Chapter Development
 
 ```bash
 # Initialize a new chapter workspace
-chapter init
+chapter init --name acme.platform
 
-# Discover and list all packages in the workspace
+# Add a chapter package dependency
+chapter add @clawmasons/app-github
+
+# Remove a chapter package dependency
+chapter remove @clawmasons/app-github
+
+# List agents and their dependency trees
 chapter list
 
-# Validate an agent's dependency graph
-chapter validate @clawmasons/member-note-taker
+# Validate an agent's dependency graph and permissions
+chapter validate @acme.platform/agent-note-taker
 
-# Install and generate deployment artifacts
-chapter install @clawmasons/member-note-taker
+# Resolve agent graph and generate chapter.lock.json
+chapter build @acme.platform/agent-note-taker
 
-# Run an installed agent
-chapter run @clawmasons/member-note-taker
+# Display the resolved permission matrix for an agent
+chapter permissions @acme.platform/agent-note-taker
 
-# Stop a running agent
-chapter stop @clawmasons/member-note-taker
+# Start the MCP proxy server for an agent
+chapter proxy --agent @acme.platform/agent-note-taker
+
+# Scaffold Docker build system (Dockerfiles for proxy + agent containers)
+chapter docker-init
 ```
 
-## Using a Local Build
+### Running Agents
 
-If you're developing chapter itself and want to test your local changes in another project:
-
-### 1. Build from source
+In a project directory where you want to run an agent:
 
 ```bash
-# In the chapter repo
-npm install
-npm run build
+# Initialize the project directory for running chapter agents
+chapter run-init
+
+# Run an agent interactively against this project
+chapter run-agent note-taker writer
 ```
 
-### 2. Link locally
+## Getting Started
+
+### 1. Create a chapter workspace
 
 ```bash
-# In the chapter repo — register the local package globally
-npm link
-
-# In your consuming project — use the linked version
-npm link @clawmasons/chapter
+chapter init --name acme.platform
+cd acme.platform
 ```
 
-Now `chapter` commands and library imports will resolve to your local build. Any changes you make to chapter just need an `npm run build` to take effect.
+This creates the workspace with directories for `apps/`, `tasks/`, `skills/`, `roles/`, and `agents/`.
 
-### 3. Alternative: file dependency
+### 2. Develop your agent
 
-Instead of `npm link`, you can point directly to the local path in your consuming project's `package.json`:
-
-```json
-{
-  "dependencies": {
-    "@clawmasons/chapter": "file:../path/to/chapter"
-  }
-}
-```
-
-Then run `npm install`. This creates a symlink in `node_modules` to your local chapter directory.
-
-### 4. Using the CLI directly without installing
-
-You can also run the CLI directly from the chapter repo without installing or linking:
+Add chapter packages, then list and validate:
 
 ```bash
-node /path/to/chapter/bin/chapter.js <command>
+chapter add @clawmasons/app-github
+chapter list
+chapter validate @acme.platform/agent-note-taker
+```
+
+### 3. Build and containerize
+
+```bash
+chapter build @acme.platform/agent-note-taker
+chapter docker-init
+```
+
+`docker-init` generates Dockerfiles under `docker/` for both the MCP proxy and agent containers.
+
+### 4. Run in a project
+
+In the target project directory:
+
+```bash
+chapter run-init
+chapter run-agent note-taker writer
+```
+
+This spins up the proxy and agent containers via Docker Compose, running the agent interactively against your project.
+
+## Project Structure
+
+```
+chapter/
+  packages/
+    cli/       # @clawmasons/chapter — CLI commands and library
+    shared/    # @clawmasons/shared — schemas, types, utilities
+    proxy/     # @clawmasons/proxy — MCP proxy server
+  e2e/         # end-to-end tests
+```
+
+A chapter workspace (created by `chapter init`) has this layout:
+
+```
+<workspace>/
+  apps/            # MCP server packages (type: "app")
+  tasks/           # Task packages (type: "task")
+  skills/          # Skill packages (type: "skill")
+  roles/           # Role packages (type: "role")
+  agents/          # Agent packages (type: "agent")
+  .clawmasons/     # Chapter metadata
+    chapter.json   # Workspace config
+  package.json     # npm workspaces root
 ```
 
 ## Programmatic API
@@ -93,20 +136,15 @@ import {
   validateAgent,
   claudeCodeMaterializer,
 } from "@clawmasons/chapter";
+
+// Schemas and types are also available directly
+import {
+  parseChapterField,
+  computeToolFilters,
+  type ResolvedAgent,
+  type ChapterField,
+} from "@clawmasons/shared";
 ```
-
-## Getting Started
-
-Bootstrap a new agent project with a template:
-
-```bash
-chapter init --template note-taker
-chapter list
-chapter validate @my-project/member-note-taker
-chapter install @my-project/member-note-taker
-```
-
-The `note-taker` template creates a working agent project that uses pre-built components from [`@clawmasons/chapter-core`](./chapter-core/) (apps, tasks, skills, roles) as building blocks.
 
 ## Development
 
@@ -116,6 +154,17 @@ npm run build        # compile TypeScript
 npm run typecheck    # type-check without emitting
 npm run lint         # run ESLint
 npm test             # run tests
+```
+
+### Using a Local Build
+
+```bash
+# Build from source
+npm install && npm run build
+
+# Link globally, then use in a consuming project
+cd packages/cli && npm link
+cd /path/to/project && npm link @clawmasons/chapter
 ```
 
 ## License

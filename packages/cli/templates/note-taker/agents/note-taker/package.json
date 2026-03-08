@@ -1,0 +1,13 @@
+{
+  "name": "@{{projectScope}}/agent-note-taker",
+  "version": "1.0.0",
+  "description": "Note-taker agent — creates and organizes markdown notes via filesystem MCP server",
+  "chapter": {
+    "type": "agent",
+    "name": "Note Taker",
+    "slug": "note-taker",
+    "description": "A note-taking agent that reads, writes, and organizes markdown files.",
+    "runtimes": ["claude-code"],
+    "roles": ["@{{projectScope}}/role-writer"]
+  }
+}

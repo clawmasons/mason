@@ -1,0 +1,243 @@
+import type { Command } from "commander";
+import { execFileSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
+
+export interface InitOptions {
+  name: string;
+  template?: string;
+}
+
+const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons"];
+
+const GITIGNORE = `node_modules/
+dist/
+.env
+.chapter/.env
+`;
+
+/**
+ * Resolve the chapter project root directory (where package.json, src/, bin/ live).
+ * The templates/ directory lives at the project root.
+ */
+function getChapterProjectRoot(): string {
+  // This file is at src/cli/commands/init.ts (or dist/cli/commands/init.js)
+  // The project root is 3 levels up from the file's directory.
+  const thisFile = fileURLToPath(import.meta.url);
+  return path.resolve(path.dirname(thisFile), "..", "..", "..");
+}
+
+/**
+ * Get the path to the templates directory inside the chapter package.
+ */
+export function getTemplatesDir(): string {
+  return path.join(getChapterProjectRoot(), "templates");
+}
+
+/**
+ * List available template names by reading subdirectories of the templates/ directory.
+ */
+export function listTemplates(templatesDir?: string): string[] {
+  const dir = templatesDir ?? getTemplatesDir();
+  if (!fs.existsSync(dir)) return [];
+
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+}
+
+
+/**
+ * Recursively copy template files from srcDir to destDir.
+ * Performs {{projectName}} and {{projectScope}} placeholder substitution
+ * in package.json files.
+ */
+export function copyTemplateFiles(
+  srcDir: string,
+  destDir: string,
+  projectName: string,
+  projectScope: string,
+): void {
+  const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(srcDir, entry.name);
+    const destPath = path.join(destDir, entry.name);
+
+    if (entry.isDirectory()) {
+      fs.mkdirSync(destPath, { recursive: true });
+      copyTemplateFiles(srcPath, destPath, projectName, projectScope);
+    } else {
+      let content = fs.readFileSync(srcPath, "utf-8");
+
+      // Perform placeholder substitution in package.json files
+      if (entry.name === "package.json") {
+        content = content.replace(/\{\{projectName\}\}/g, projectName);
+        content = content.replace(/\{\{projectScope\}\}/g, projectScope);
+      }
+
+      fs.writeFileSync(destPath, content);
+    }
+  }
+}
+
+export function registerInitCommand(program: Command): void {
+  program
+    .command("init")
+    .description("Initialize a new chapter workspace")
+    .requiredOption("--name <name>", "Set the workspace name in <lodge>.<chapter> format (e.g., acme.platform)")
+    .option("--template <template>", "Use a project template")
+    .action(async (options: InitOptions) => {
+      await runInit(process.cwd(), options);
+    });
+}
+
+export async function runInit(
+  targetDir: string,
+  options: InitOptions,
+  deps?: { templatesDir?: string; skipNpmInstall?: boolean },
+): Promise<void> {
+  const clawmasonsDir = path.join(targetDir, ".clawmasons");
+
+  // Idempotency check
+  if (fs.existsSync(clawmasonsDir)) {
+    console.log(
+      "⚠ Workspace already initialized (.clawmasons/ directory exists). Nothing to do.",
+    );
+    return;
+  }
+
+  // Validate name format: must be <lodge>.<chapter>
+  const name = options.name;
+  if (!name || !name.includes(".") || name.startsWith(".") || name.endsWith(".")) {
+    console.error('✘ --name must be in <lodge>.<chapter> format (e.g., "acme.platform")');
+    process.exit(1);
+    return;
+  }
+
+  // Derive scope and package name from validated name
+  const projectScope = name;
+  const projectName = `@${projectScope}/chapter`;
+
+  // Resolve templates directory
+  const templatesDir = deps?.templatesDir ?? getTemplatesDir();
+
+  // If no template specified, list available templates
+  if (!options.template) {
+    const templates = listTemplates(templatesDir);
+    if (templates.length > 0) {
+      console.log("\nAvailable templates:");
+      for (const t of templates) {
+        console.log(`  ${t}`);
+      }
+      console.log(
+        "\nUse --template <name> to initialize from a template.",
+      );
+      console.log("Proceeding with empty workspace scaffold...\n");
+    }
+  }
+
+  // If template specified, validate and copy template files
+  let usedTemplate = false;
+  if (options.template) {
+    const templateDir = path.join(templatesDir, options.template);
+    if (!fs.existsSync(templateDir)) {
+      const available = listTemplates(templatesDir);
+      const listStr =
+        available.length > 0
+          ? `Available templates: ${available.join(", ")}`
+          : "No templates available.";
+      console.error(
+        `✘ Unknown template "${options.template}". ${listStr}`,
+      );
+      process.exit(1);
+      return;
+    }
+
+    // Copy template files to target directory
+    copyTemplateFiles(templateDir, targetDir, projectName, projectScope);
+    usedTemplate = true;
+  }
+
+  const created: string[] = [];
+
+  // Create workspace directories (may already exist from template)
+  for (const dir of WORKSPACE_DIRS) {
+    const dirPath = path.join(targetDir, dir);
+    fs.mkdirSync(dirPath, { recursive: true });
+    created.push(`${dir}/`);
+  }
+
+  // Generate package.json (only if it doesn't exist -- template may have provided one)
+  const packageJsonPath = path.join(targetDir, "package.json");
+  if (fs.existsSync(packageJsonPath)) {
+    if (!usedTemplate) {
+      console.log(
+        '⚠ package.json already exists. Skipping generation. Please add "workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"] manually.',
+      );
+    }
+  } else {
+    const packageJson = {
+      name: projectName,
+      version: "0.1.0",
+      private: true,
+      workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"],
+    };
+    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
+    created.push("package.json");
+  }
+
+  // Generate .clawmasons/chapter.json
+  const configPath = path.join(targetDir, "/.clawmasons/", "chapter.json");
+  const managingChapter = { 
+    chapter: "grand.chapter-builder",
+    version: "0.1.0" 
+  };
+  fs.writeFileSync(configPath, JSON.stringify(managingChapter, null, 2) + "\n");
+  created.push(".clawmasons/chapter.json");
+
+
+  // Generate .gitignore (only if it doesn't exist)
+  const gitignorePath = path.join(targetDir, ".gitignore");
+  if (fs.existsSync(gitignorePath)) {
+    console.log("⚠ .gitignore already exists. Skipping generation.");
+  } else {
+    fs.writeFileSync(gitignorePath, GITIGNORE);
+    created.push(".gitignore");
+  }
+
+  // Run npm install after template scaffolding
+  if (usedTemplate && !deps?.skipNpmInstall) {
+    console.log("\nInstalling dependencies...");
+    try {
+      execFileSync("npm", ["install"], {
+        cwd: targetDir,
+        stdio: "inherit",
+      });
+    } catch {
+      console.log(
+        "⚠ npm install failed. You can run it manually later.",
+      );
+    }
+  }
+
+  // Success output
+  console.log("\n✔ chapter workspace initialized!\n");
+  console.log("Created:");
+  for (const item of created) {
+    console.log(`  ${item}`);
+  }
+
+  if (usedTemplate) {
+    console.log(`\nTemplate: ${options.template}`);
+    console.log("\nNext steps:");
+    console.log(`  chapter list                                    List discovered packages`);
+    console.log(`  chapter validate @${projectScope}/agent-note-taker   Validate the agent graph`);
+    console.log(`  chapter build @${projectScope}/agent-note-taker      Build the agent lock file\n`);
+  } else {
+    console.log("\nNext steps:");
+    console.log("  chapter add <package>    Add a chapter component");
+    console.log("  chapter build <agent>    Build and validate an agent\n");
+  }
+}
