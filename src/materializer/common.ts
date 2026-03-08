@@ -2,6 +2,27 @@ import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from ".
 import { getAppShortName } from "../generator/toolfilter.js";
 
 /**
+ * Mapping from LLM provider identifiers to their environment variable names.
+ *
+ * Used by Dockerfile generators to inject the correct API key into
+ * Docker Compose services, and by env template generation to include
+ * the key in .env.example.
+ *
+ * @see PRD §3.3 — Supported Providers
+ * @see PRD §7.2 — Provider → Environment Variable Mapping
+ */
+export const PROVIDER_ENV_VARS: Record<string, string> = {
+  "openrouter": "OPENROUTER_API_KEY",
+  "anthropic": "ANTHROPIC_API_KEY",
+  "openai": "OPENAI_API_KEY",
+  "google": "GEMINI_API_KEY",
+  "mistral": "MISTRAL_API_KEY",
+  "groq": "GROQ_API_KEY",
+  "xai": "XAI_API_KEY",
+  "azure-openai": "AZURE_OPENAI_API_KEY",
+};
+
+/**
  * Format a role's permitted tools as a readable list.
  * Each line: "  - {appShortName}: tool1, tool2, tool3"
  */

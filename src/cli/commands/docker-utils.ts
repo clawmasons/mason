@@ -1,23 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execSync, spawn } from "node:child_process";
-import { getAppShortName } from "../../generator/toolfilter.js";
-
-/**
- * Resolve the scaffolded agent directory.
- * Uses `.chapter/agents/<short-name>/` by default, or a custom outputDir if provided.
- */
-export function resolveAgentDir(
-  rootDir: string,
-  agentName: string,
-  outputDir?: string,
-): string {
-  if (outputDir) {
-    return path.resolve(rootDir, outputDir);
-  }
-  const shortName = getAppShortName(agentName);
-  return path.join(rootDir, ".chapter", "agents", shortName);
-}
 
 /**
  * Check that `docker compose` (v2) is available on the system.
@@ -42,7 +25,7 @@ export function validateEnvFile(agentDir: string): string[] {
 
   if (!fs.existsSync(envPath)) {
     throw new Error(
-      `No .env file found at ${envPath}. Run chapter install first to generate credentials template.`,
+      `No .env file found at ${envPath}. Create a .env file with the required credentials.`,
     );
   }
 

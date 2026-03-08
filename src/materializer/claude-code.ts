@@ -1,6 +1,6 @@
 import type { ResolvedAgent, ResolvedRole, ResolvedTask } from "../resolver/types.js";
 import { getAppShortName } from "../generator/toolfilter.js";
-import type { RuntimeMaterializer, MaterializationResult, ComposeServiceDef } from "./types.js";
+import type { RuntimeMaterializer, MaterializationResult } from "./types.js";
 import {
   formatPermittedTools,
   collectAllSkills,
@@ -155,61 +155,5 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     }
 
     return result;
-  },
-
-  generateDockerfile(): string {
-    return [
-      "FROM node:22-slim",
-      "",
-      "RUN npm install -g @anthropic-ai/claude-code",
-      "",
-      "ENV DISABLE_AUTOUPDATER=1",
-      "",
-      "USER node",
-      "WORKDIR /home/node/workspace",
-      "COPY --chown=node:node workspace/ /home/node/workspace/",
-      "",
-      'CMD ["claude", "--dangerously-skip-permissions"]',
-    ].join("\n");
-  },
-
-  generateComposeService(agent: ResolvedAgent): ComposeServiceDef {
-    const roleNames = agent.roles
-      .map((r) => getAppShortName(r.name))
-      .join(",");
-
-    return {
-      build: "./claude-code",
-      restart: "no",
-      volumes: [
-        "./claude-code/workspace:/home/node/workspace",
-        "./claude-code/.claude:/home/node/.claude",
-        "./claude-code/.claude.json:/home/node/.claude.json",
-      ],
-      working_dir: "/home/node/workspace",
-      environment: [
-        `CHAPTER_ROLES=${roleNames}`,
-      ],
-      depends_on: ["mcp-proxy"],
-      stdin_open: true,
-      tty: true,
-      init: true,
-      networks: ["chapter-net"],
-    };
-  },
-
-  generateConfigJson(): string {
-    return JSON.stringify(
-      {
-        hasCompletedOnboarding: true,
-        projects: {
-          "/home/node/workspace": {
-            hasTrustDialogAccepted: true,
-          },
-        },
-      },
-      null,
-      2,
-    );
   },
 };
