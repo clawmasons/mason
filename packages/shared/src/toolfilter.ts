@@ -1,5 +1,12 @@
-import type { ResolvedAgent } from "../resolver/types.js";
-import type { ToolFilter } from "./types.js";
+import type { ResolvedAgent } from "./types.js";
+
+/**
+ * A toolFilter entry for a single app in the proxy config.
+ */
+export interface ToolFilter {
+  mode: "allow";
+  list: string[];
+}
 
 /** Known chapter package type prefixes. */
 const TYPE_PREFIXES = ["app-", "member-", "agent-", "role-", "task-", "skill-"];

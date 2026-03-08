@@ -1,4 +1,4 @@
-import type { ChapterField } from "../schemas/index.js";
+import type { ChapterField } from "./schemas/index.js";
 
 /**
  * A chapter package discovered on the filesystem.

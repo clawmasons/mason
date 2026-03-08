@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { roleChapterFieldSchema } from "../../src/schemas/role.js";
+import { roleChapterFieldSchema } from "@clawmasons/shared";
 
 describe("roleChapterFieldSchema", () => {
   it("validates a valid role with permissions", () => {

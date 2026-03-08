@@ -1,7 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { parseChapterField } from "../schemas/index.js";
-import type { DiscoveredPackage } from "./types.js";
+import { parseChapterField, type DiscoveredPackage } from "@clawmasons/shared";
 
 const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents"];
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseChapterField } from "../../src/schemas/chapter-field.js";
+import { parseChapterField } from "@clawmasons/shared";
 
 describe("parseChapterField", () => {
   it("parses an app by type discrimination", () => {

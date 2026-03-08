@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { UpstreamManager, createTransport } from "../../src/proxy/upstream.js";
 import type { UpstreamAppConfig } from "../../src/proxy/upstream.js";
-import type { ResolvedApp } from "../../src/resolver/types.js";
+import type { ResolvedApp } from "@clawmasons/shared";
 
 // ── Mock MCP SDK ────────────────────────────────────────────────────────
 

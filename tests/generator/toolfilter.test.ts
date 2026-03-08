@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeToolFilters, getAppShortName } from "../../src/generator/toolfilter.js";
-import type { ResolvedAgent } from "../../src/resolver/types.js";
+import { computeToolFilters, getAppShortName, type ResolvedAgent } from "@clawmasons/shared";
 
 function makeMember(overrides: Partial<ResolvedAgent> = {}): ResolvedAgent {
   return {

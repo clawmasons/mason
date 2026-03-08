@@ -11,15 +11,18 @@ export {
   type AgentChapterField,
   parseChapterField,
   type ChapterField,
-} from "./schemas/index.js";
-
-export {
   type DiscoveredPackage,
   type ResolvedAgent,
   type ResolvedApp,
   type ResolvedRole,
   type ResolvedSkill,
   type ResolvedTask,
+  computeToolFilters,
+  getAppShortName,
+  type ToolFilter,
+} from "@clawmasons/shared";
+
+export {
   PackageNotFoundError,
   InvalidChapterFieldError,
   CircularDependencyError,
@@ -36,12 +39,6 @@ export {
   type ValidationWarning,
   type ValidationWarningCategory,
 } from "./validator/index.js";
-
-export {
-  computeToolFilters,
-  getAppShortName,
-  type ToolFilter,
-} from "./generator/index.js";
 
 export {
   claudeCodeMaterializer,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateAgent } from "../../src/validator/validate.js";
-import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "../../src/resolver/types.js";
+import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
 
 // --- Test helpers ---
 

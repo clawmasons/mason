@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { piCodingAgentMaterializer } from "../../src/materializer/pi-coding-agent.js";
 import { PROVIDER_ENV_VARS } from "../../src/materializer/common.js";
-import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "../../src/resolver/types.js";
+import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
 
 function makeGithubApp(): ResolvedApp {
   return {

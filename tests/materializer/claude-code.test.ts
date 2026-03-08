@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { claudeCodeMaterializer } from "../../src/materializer/claude-code.js";
-import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "../../src/resolver/types.js";
+import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
 
 function makeGithubApp(): ResolvedApp {
   return {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { taskChapterFieldSchema } from "../../src/schemas/task.js";
+import { taskChapterFieldSchema } from "@clawmasons/shared";
 
 describe("taskChapterFieldSchema", () => {
   it("validates a valid subagent task", () => {
