@@ -46,8 +46,22 @@ describe("runPack", () => {
     expect(errorOutput).toContain("No package.json found");
   });
 
+  it("exits with error when no workspaces defined", async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify({ name: "test" }),
+    );
+
+    await runPack(tmpDir);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const errorOutput = errorSpy.mock.calls.flat().join("\n");
+    expect(errorOutput).toContain("Pack failed");
+    expect(errorOutput).toContain("No workspaces defined");
+  });
+
   it("exits with error when no workspace packages found", async () => {
-    // Create root package.json but no packages/ directory
+    // Workspaces defined but directories are empty
     fs.writeFileSync(
       path.join(tmpDir, "package.json"),
       JSON.stringify({ name: "test", workspaces: ["packages/*"] }),
@@ -130,5 +144,60 @@ describe("runPack", () => {
     expect(logOutput).toContain("@test/shared");
     expect(logOutput).toContain("@test/cli");
     expect(logOutput).toContain("@test/proxy");
+  });
+
+  it("discovers packages from chapter-style workspaces (apps/*, roles/*, etc.)", async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify({
+        name: "@test.chapter/chapter",
+        workspaces: ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"],
+      }),
+    );
+
+    // Create chapter-style workspace packages
+    const dirs = [
+      { dir: "apps/filesystem", name: "@test/app-filesystem" },
+      { dir: "roles/writer", name: "@test/role-writer" },
+      { dir: "agents/note-taker", name: "@test/agent-note-taker" },
+    ];
+
+    for (const { dir, name } of dirs) {
+      const pkgDir = path.join(tmpDir, dir);
+      fs.mkdirSync(pkgDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(pkgDir, "package.json"),
+        JSON.stringify({ name, version: "1.0.0" }),
+      );
+    }
+
+    await runPack(tmpDir);
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("3 workspace package(s)");
+    expect(logOutput).toContain("@test/app-filesystem");
+    expect(logOutput).toContain("@test/role-writer");
+    expect(logOutput).toContain("@test/agent-note-taker");
+  });
+
+  it("skips build when no build script exists", async () => {
+    // No scripts.build — should skip straight to packing
+    fs.writeFileSync(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify({ name: "test", workspaces: ["apps/*"] }),
+    );
+
+    const pkgDir = path.join(tmpDir, "apps", "test-app");
+    fs.mkdirSync(pkgDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(pkgDir, "package.json"),
+      JSON.stringify({ name: "@test/app-test", version: "1.0.0" }),
+    );
+
+    await runPack(tmpDir);
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).not.toContain("Building...");
+    // It will fail at npm pack (no real npm workspace), but it shouldn't have tried to build
   });
 });

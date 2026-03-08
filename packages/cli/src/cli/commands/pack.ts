@@ -3,26 +3,34 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-/**
- * Discover workspace package names by reading each packages sub-directory.
- */
-function discoverWorkspacePackages(rootDir: string): string[] {
-  const packagesDir = path.join(rootDir, "packages");
-  if (!fs.existsSync(packagesDir)) {
-    return [];
-  }
+interface RootPackageJson {
+  name?: string;
+  workspaces?: string[];
+  scripts?: Record<string, string>;
+}
 
-  const entries = fs.readdirSync(packagesDir, { withFileTypes: true });
+/**
+ * Discover workspace package names by resolving workspace globs from package.json.
+ */
+function discoverWorkspacePackages(rootDir: string, workspaces: string[]): string[] {
   const names: string[] = [];
 
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const pkgJsonPath = path.join(packagesDir, entry.name, "package.json");
-    if (!fs.existsSync(pkgJsonPath)) continue;
+  for (const pattern of workspaces) {
+    // Each workspace pattern is like "apps/*", "packages/*", etc.
+    // Resolve the parent directory and scan for package.json in each subdirectory.
+    const parentDir = path.join(rootDir, pattern.replace(/\/?\*$/, ""));
+    if (!fs.existsSync(parentDir)) continue;
 
-    const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8")) as { name?: string };
-    if (pkg.name) {
-      names.push(pkg.name);
+    const entries = fs.readdirSync(parentDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const pkgJsonPath = path.join(parentDir, entry.name, "package.json");
+      if (!fs.existsSync(pkgJsonPath)) continue;
+
+      const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8")) as { name?: string };
+      if (pkg.name) {
+        names.push(pkg.name);
+      }
     }
   }
 
@@ -59,10 +67,16 @@ export async function runPack(rootDir: string): Promise<void> {
       throw new Error("No package.json found at project root.");
     }
 
+    const rootPkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8")) as RootPackageJson;
+
+    if (!rootPkg.workspaces || rootPkg.workspaces.length === 0) {
+      throw new Error("No workspaces defined in package.json.");
+    }
+
     // 1. Discover workspace packages
-    const packages = discoverWorkspacePackages(rootDir);
+    const packages = discoverWorkspacePackages(rootDir, rootPkg.workspaces);
     if (packages.length === 0) {
-      throw new Error("No workspace packages found in packages/.");
+      throw new Error("No workspace packages found.");
     }
 
     console.log(`\n  Found ${packages.length} workspace package(s):`);
@@ -74,15 +88,17 @@ export async function runPack(rootDir: string): Promise<void> {
     console.log("\n  Cleaning dist/*.tgz...");
     cleanDist(rootDir);
 
-    // 3. Build
-    console.log("  Building...\n");
-    try {
-      execFileSync("npm", ["run", "build"], {
-        cwd: rootDir,
-        stdio: "inherit",
-      });
-    } catch {
-      throw new Error("Build failed. Fix build errors before packing.");
+    // 3. Build (only if a build script exists)
+    if (rootPkg.scripts?.build) {
+      console.log("  Building...\n");
+      try {
+        execFileSync("npm", ["run", "build"], {
+          cwd: rootDir,
+          stdio: "inherit",
+        });
+      } catch {
+        throw new Error("Build failed. Fix build errors before packing.");
+      }
     }
 
     // 4. Pack each workspace package
