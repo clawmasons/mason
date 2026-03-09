@@ -54,7 +54,7 @@ Create the credential resolution engine that resolves credential values from mul
 
 **Testable output:** Unit tests with mocked env/dotenv: resolve from env returns `source: "env"`. Resolve from dotenv (not in env) returns `source: "dotenv"`. Env takes priority over dotenv. Missing key returns error with `sourcesAttempted`. Keychain is skipped on non-macOS (mocked platform check). `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — [spec](../../specs/credential-resolver/spec.md)
 
 ---
 
