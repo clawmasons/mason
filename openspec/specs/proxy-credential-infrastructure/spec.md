@@ -42,6 +42,35 @@ The `SessionStore` class SHALL store active sessions in memory with O(1) lookup 
 - **WHEN** `store.getByToken("nonexistent")` is called
 - **THEN** `undefined` is returned
 
+### Requirement: Risk-based connection limits enforce session locking for HIGH/MEDIUM risk roles
+
+The `SessionStore` SHALL accept a `riskLevel` parameter at construction (defaulting to `"LOW"`). When the risk level is `HIGH` or `MEDIUM`, the store locks after the first agent connection — `isLocked()` returns true and subsequent `handleConnectAgent` calls are rejected with 403.
+
+#### Scenario: HIGH risk — first connection succeeds
+- **GIVEN** a `SessionStore` with `riskLevel: "HIGH"`
+- **WHEN** the first `POST /connect-agent` request arrives with valid auth
+- **THEN** the proxy returns 200 with `{ sessionToken, sessionId }`
+
+#### Scenario: HIGH risk — second connection rejected
+- **GIVEN** a `SessionStore` with `riskLevel: "HIGH"` and one existing connection
+- **WHEN** a second `POST /connect-agent` request arrives with valid auth
+- **THEN** the proxy returns 403 with `{ error: "Session locked — HIGH risk role does not allow additional agent connections" }`
+
+#### Scenario: MEDIUM risk — second connection rejected
+- **GIVEN** a `SessionStore` with `riskLevel: "MEDIUM"` and one existing connection
+- **WHEN** a second `POST /connect-agent` request arrives with valid auth
+- **THEN** the proxy returns 403 with `{ error: "Session locked — MEDIUM risk role does not allow additional agent connections" }`
+
+#### Scenario: LOW risk — unlimited connections allowed
+- **GIVEN** a `SessionStore` with `riskLevel: "LOW"` and one existing connection
+- **WHEN** a second `POST /connect-agent` request arrives with valid auth
+- **THEN** the proxy returns 200 with `{ sessionToken, sessionId }`
+
+#### Scenario: Default risk level behaves as LOW
+- **GIVEN** a `SessionStore` created with no risk level argument
+- **WHEN** multiple `POST /connect-agent` requests arrive with valid auth
+- **THEN** all connections succeed (unlimited)
+
 ### Requirement: GET /ws/credentials accepts credential service WebSocket connections
 
 The proxy SHALL accept WebSocket upgrade requests at `GET /ws/credentials`, authenticated with `CREDENTIAL_PROXY_TOKEN` (Bearer auth). Only one credential service connection is allowed per proxy instance. A new connection replaces any existing one.
