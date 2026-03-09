@@ -10,6 +10,7 @@ import {
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import type Database from "better-sqlite3";
 import type { ToolRouter, ResourceRouter, PromptRouter } from "./router.js";
 import type { UpstreamManager } from "./upstream.js";
@@ -17,6 +18,8 @@ import { auditPreHook, auditPostHook } from "./hooks/audit.js";
 import type { HookContext } from "./hooks/audit.js";
 import { matchesApprovalPattern, requestApproval } from "./hooks/approval.js";
 import type { ApprovalOptions } from "./hooks/approval.js";
+import { SessionStore, handleConnectAgent } from "./handlers/connect-agent.js";
+import { CredentialRelay } from "./handlers/credential-relay.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -32,7 +35,36 @@ export interface ChapterProxyServerConfig {
   approvalOptions?: ApprovalOptions;
   resourceRouter?: ResourceRouter;
   promptRouter?: PromptRouter;
+  /** Token for authenticating credential service WebSocket connections. */
+  credentialProxyToken?: string;
+  /** Timeout for credential requests in milliseconds. Default: 30000. */
+  credentialRequestTimeoutMs?: number;
+  /** Agent's declared credential keys (for credential_request tool). */
+  declaredCredentials?: string[];
+  /** Role name for the agent session. */
+  roleName?: string;
 }
+
+// ── credential_request Tool Definition ──────────────────────────────────
+
+const CREDENTIAL_REQUEST_TOOL: Tool = {
+  name: "credential_request",
+  description: "Request a credential value from the credential service. Returns the resolved credential or an error.",
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      key: {
+        type: "string",
+        description: "The credential key to request (e.g., OPENAI_API_KEY)",
+      },
+      session_token: {
+        type: "string",
+        description: "The agent session token received from connect-agent",
+      },
+    },
+    required: ["key", "session_token"],
+  },
+};
 
 // ── ChapterProxyServer ──────────────────────────────────────────────────
 
@@ -42,9 +74,29 @@ export class ChapterProxyServer {
   private config: Required<Pick<ChapterProxyServerConfig, "port" | "transport">> & ChapterProxyServerConfig;
   private httpServer: HttpServer | null = null;
   private activeTransports: Set<SSEServerTransport | StreamableHTTPServerTransport> = new Set();
+  private sessionStore: SessionStore;
+  private credentialRelay: CredentialRelay | null = null;
 
   constructor(config: ChapterProxyServerConfig) {
     this.config = { ...config, port: config.port ?? DEFAULT_PORT };
+    this.sessionStore = new SessionStore();
+
+    if (config.credentialProxyToken) {
+      this.credentialRelay = new CredentialRelay({
+        credentialProxyToken: config.credentialProxyToken,
+        requestTimeoutMs: config.credentialRequestTimeoutMs,
+      });
+    }
+  }
+
+  /** Expose the session store for external access (e.g., risk-based limits in CHANGE 5). */
+  getSessionStore(): SessionStore {
+    return this.sessionStore;
+  }
+
+  /** Expose the credential relay for external access. */
+  getCredentialRelay(): CredentialRelay | null {
+    return this.credentialRelay;
   }
 
   async start(): Promise<void> {
@@ -57,6 +109,24 @@ export class ChapterProxyServer {
       if (req.method === "GET" && url.pathname === "/health") {
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("ok");
+        return;
+      }
+
+      // Connect-agent endpoint — uses its own auth (MCP_PROXY_TOKEN)
+      if (url.pathname === "/connect-agent") {
+        if (this.config.authToken) {
+          handleConnectAgent(
+            req,
+            res,
+            this.config.authToken,
+            this.sessionStore,
+            this.config.agentName,
+            this.config.roleName,
+          );
+        } else {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Proxy not configured with auth token" }));
+        }
         return;
       }
 
@@ -74,6 +144,19 @@ export class ChapterProxyServer {
       }
     });
 
+    // WebSocket upgrade handler for credential service
+    if (this.credentialRelay) {
+      const relay = this.credentialRelay;
+      this.httpServer.on("upgrade", (req, socket, head) => {
+        const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+        if (url.pathname === "/ws/credentials") {
+          relay.handleUpgrade(req, socket, head as Buffer);
+        } else {
+          socket.destroy();
+        }
+      });
+    }
+
     const server = this.httpServer;
     return new Promise<void>((resolve, reject) => {
       server.on("error", reject);
@@ -85,6 +168,11 @@ export class ChapterProxyServer {
   }
 
   async stop(): Promise<void> {
+    // Close credential relay first
+    if (this.credentialRelay) {
+      this.credentialRelay.close();
+    }
+
     const closePromises = Array.from(this.activeTransports).map(async (t) => {
       try {
         await t.close();
@@ -215,12 +303,48 @@ export class ChapterProxyServer {
       { capabilities },
     );
 
-    server.setRequestHandler(ListToolsRequestSchema, () => ({
-      tools: router.listTools(),
-    }));
+    server.setRequestHandler(ListToolsRequestSchema, () => {
+      const tools = router.listTools();
+      // Include credential_request tool when credential relay is configured
+      if (this.credentialRelay) {
+        tools.push(CREDENTIAL_REQUEST_TOOL);
+      }
+      return { tools };
+    });
 
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
+
+      // Handle internal credential_request tool
+      if (name === "credential_request" && this.credentialRelay) {
+        const key = (args as Record<string, unknown> | undefined)?.key as string | undefined;
+        const sessionToken = (args as Record<string, unknown> | undefined)?.session_token as string | undefined;
+
+        if (!key || !sessionToken) {
+          return {
+            content: [{ type: "text" as const, text: "Missing required arguments: key, session_token" }],
+            isError: true,
+          };
+        }
+
+        const result = await this.credentialRelay.handleCredentialRequest(
+          this.sessionStore,
+          key,
+          sessionToken,
+          this.config.declaredCredentials,
+        );
+
+        if (result.error) {
+          return {
+            content: [{ type: "text" as const, text: `Credential error: ${result.error}` }],
+            isError: true,
+          };
+        }
+
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify({ key: result.key, value: result.value }) }],
+        };
+      }
 
       const route = router.resolve(name);
       if (!route) {
