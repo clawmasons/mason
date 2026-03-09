@@ -32,12 +32,12 @@ WORKDIR /app
 # Install build tools for native addons (e.g., better-sqlite3)
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
-# Copy package manifest and install production dependencies
+# Copy pre-populated node_modules (all deps resolved by docker-init)
 COPY package.json ./
-RUN npm install --omit=dev
-
-# Copy all chapter packages from local build context
 COPY node_modules/ ./node_modules/
+
+# Rebuild native addons for the container platform
+RUN npm rebuild better-sqlite3
 
 # Create mason user and set up directories
 RUN groupadd -r mason && useradd -r -g mason -m mason \\
@@ -46,7 +46,7 @@ RUN groupadd -r mason && useradd -r -g mason -m mason \\
 
 USER mason
 
-ENTRYPOINT ["npx", "chapter"]
+ENTRYPOINT ["node", "node_modules/.bin/chapter"]
 CMD ["proxy", "--agent", "${agentName}"]
 `;
 }

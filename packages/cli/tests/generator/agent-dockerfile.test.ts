@@ -198,26 +198,12 @@ describe("generateAgentDockerfile", () => {
     expect(result).toContain('ENTRYPOINT ["npx", "custom-runtime"]');
   });
 
-  it("includes LLM provider env var for anthropic", () => {
+  it("does not include LLM provider env vars (passed via compose)", () => {
     const agent = makeNoteTakerAgent();
     const result = generateAgentDockerfile(agent, agent.roles[0]);
 
-    expect(result).toContain("ANTHROPIC_API_KEY");
-  });
-
-  it("includes correct env var for openrouter provider", () => {
-    const agent = makeNoteTakerAgent();
-    agent.llm = { provider: "openrouter", model: "anthropic/claude-sonnet-4" };
-    const result = generateAgentDockerfile(agent, agent.roles[0]);
-
-    expect(result).toContain("OPENROUTER_API_KEY");
-  });
-
-  it("omits LLM env section when no llm configured", () => {
-    const agent = makeNoteTakerAgent();
-    delete agent.llm;
-    const result = generateAgentDockerfile(agent, agent.roles[0]);
-
+    expect(result).not.toContain("ANTHROPIC_API_KEY");
+    expect(result).not.toContain("OPENROUTER_API_KEY");
     expect(result).not.toContain("LLM provider environment");
   });
 
@@ -292,7 +278,7 @@ describe("generateProxyDockerfile", () => {
     const agent = makeNoteTakerAgent();
     const result = generateProxyDockerfile(agent.roles[0], agent.name);
 
-    expect(result).toContain('ENTRYPOINT ["npx", "chapter"]');
+    expect(result).toContain('ENTRYPOINT ["node", "node_modules/.bin/chapter"]');
     expect(result).toContain('CMD ["proxy", "--agent", "@acme.platform/agent-note-taker"]');
   });
 

@@ -66,8 +66,8 @@ export function readChapterConfig(rootDir: string): ChapterConfig {
 }
 
 /**
- * Create the `docker/package.json` file listing all chapter packages
- * from `dist/*.tgz` as file dependencies.
+ * Create the `docker/package.json` — a minimal manifest for the Docker build context.
+ * No dependencies are listed; all packages are copied directly by docker-init.
  */
 export function createDockerPackageJson(
   rootDir: string,
@@ -90,34 +90,40 @@ export function createDockerPackageJson(
 }
 
 /**
- * Add the `install-local` script to the root `package.json`.
- * If the script already exists, it is overwritten.
+ * The framework packages that must be copied into docker/node_modules/.
+ * These are the @clawmasons packages needed by the proxy at runtime.
  */
-export function addInstallLocalScript(rootDir: string): void {
-  const pkgJsonPath = path.join(rootDir, "package.json");
+const FRAMEWORK_PACKAGES = [
+  "@clawmasons/chapter",
+  "@clawmasons/proxy",
+  "@clawmasons/shared",
+];
 
-  if (!fs.existsSync(pkgJsonPath)) {
-    throw new Error(
-      `No package.json found at project root. Run "npm init" or "chapter init" first.`,
-    );
+/**
+ * Resolve a package directory by walking up from startDir, like Node's module resolution.
+ * Checks startDir/node_modules/<pkg>, then parent/node_modules/<pkg>, etc.
+ */
+function resolvePackageDir(pkgName: string, startDir: string): string | null {
+  let dir = startDir;
+  while (true) {
+    const candidate = path.join(dir, "node_modules", ...pkgName.split("/"));
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
   }
-
-  const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
-  if (!pkgJson.scripts) {
-    pkgJson.scripts = {};
-  }
-
-  pkgJson.scripts["install-local"] = "cd docker && npm install ../dist/*.tgz";
-
-  fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2) + "\n");
 }
 
 /**
- * Run the `install-local` script to populate `docker/node_modules/`.
+ * Copy framework packages and their transitive dependencies from the project's
+ * node_modules/ into docker/node_modules/, then extract chapter packages
+ * from dist/*.tgz.
  */
-export function runInstallLocal(rootDir: string): void {
+export function populateDockerNodeModules(rootDir: string): void {
+  const dockerDir = path.join(rootDir, "docker");
   const distDir = path.join(rootDir, "dist");
 
+  // Validate dist/ has .tgz files
   if (!fs.existsSync(distDir)) {
     throw new Error(
       `No dist/ directory found. Run "chapter pack" first to build and pack all workspace packages.`,
@@ -131,15 +137,112 @@ export function runInstallLocal(rootDir: string): void {
     );
   }
 
+  // 1. Copy framework packages and transitive deps from node_modules/
+  copyFrameworkPackages(rootDir, dockerDir);
+
+  // 2. Extract chapter packages from dist/*.tgz into docker/node_modules/
+  for (const tgzFile of tgzFiles) {
+    const tgzPath = path.join(distDir, tgzFile);
+    extractTgzToNodeModules(tgzPath, dockerDir);
+  }
+}
+
+/**
+ * Copy @clawmasons framework packages and all their transitive production
+ * dependencies into docker/node_modules/.
+ * Uses Node-style resolution (walks up directories) to find packages.
+ * Resolves symlinks (handles monorepo workspace links).
+ */
+function copyFrameworkPackages(rootDir: string, dockerDir: string): void {
+  const destNodeModules = path.join(dockerDir, "node_modules");
+  fs.mkdirSync(destNodeModules, { recursive: true });
+
+  // BFS to collect all packages that need copying: Map<pkgName, resolvedRealPath>
+  const toCopy = new Map<string, string>();
+  const queue = [...FRAMEWORK_PACKAGES];
+
+  while (queue.length > 0) {
+    const pkgName = queue.shift()!;
+    if (toCopy.has(pkgName)) continue;
+
+    const srcDir = resolvePackageDir(pkgName, rootDir);
+    if (!srcDir) {
+      throw new Error(
+        `Framework package "${pkgName}" not found in node_modules/. Run "npm install" first.`,
+      );
+    }
+
+    const realSrcDir = fs.realpathSync(srcDir);
+    toCopy.set(pkgName, realSrcDir);
+
+    // Read package.json to find production dependencies
+    const pkgJsonPath = path.join(realSrcDir, "package.json");
+    if (fs.existsSync(pkgJsonPath)) {
+      const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8")) as {
+        dependencies?: Record<string, string>;
+      };
+      if (pkg.dependencies) {
+        for (const dep of Object.keys(pkg.dependencies)) {
+          if (!toCopy.has(dep)) {
+            queue.push(dep);
+          }
+        }
+      }
+    }
+  }
+
+  // Copy each package into docker/node_modules/
+  for (const [pkgName, realSrcDir] of toCopy) {
+    const destDir = path.join(destNodeModules, ...pkgName.split("/"));
+
+    if (fs.existsSync(destDir)) {
+      fs.rmSync(destDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(path.dirname(destDir), { recursive: true });
+    fs.cpSync(realSrcDir, destDir, { recursive: true, dereference: true });
+  }
+
+  // Create .bin/chapter symlink
+  const binDir = path.join(destNodeModules, ".bin");
+  fs.mkdirSync(binDir, { recursive: true });
+  const chapterBin = path.join(binDir, "chapter");
+  if (fs.existsSync(chapterBin)) fs.unlinkSync(chapterBin);
+  fs.symlinkSync("../@clawmasons/chapter/dist/cli/bin.js", chapterBin);
+  fs.chmodSync(chapterBin, 0o755);
+}
+
+/**
+ * Extract a .tgz package into docker/node_modules/<scope>/<name>.
+ * npm pack outputs tarballs with contents under a `package/` directory.
+ */
+function extractTgzToNodeModules(tgzPath: string, dockerDir: string): void {
+  const tmpDir = fs.mkdtempSync(path.join(dockerDir, ".tmp-extract-"));
+
   try {
-    execFileSync("npm", ["run", "install-local"], {
-      cwd: rootDir,
-      stdio: "inherit",
-    });
-  } catch {
-    throw new Error(
-      `install-local script failed. Check that dist/*.tgz files are valid npm packages.`,
-    );
+    // Extract the tarball
+    execFileSync("tar", ["-xzf", tgzPath, "-C", tmpDir], { stdio: "pipe" });
+
+    // Read the package name from the extracted package.json
+    const extractedPkgJson = path.join(tmpDir, "package", "package.json");
+    if (!fs.existsSync(extractedPkgJson)) {
+      throw new Error(`No package.json found in ${path.basename(tgzPath)}`);
+    }
+
+    const pkg = JSON.parse(fs.readFileSync(extractedPkgJson, "utf-8")) as { name: string };
+    const pkgName = pkg.name;
+
+    // Determine target directory in node_modules
+    const targetDir = path.join(dockerDir, "node_modules", ...pkgName.split("/"));
+
+    // Remove existing directory if present, then move extracted contents
+    if (fs.existsSync(targetDir)) {
+      fs.rmSync(targetDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+    fs.renameSync(path.join(tmpDir, "package"), targetDir);
+  } finally {
+    // Clean up temp directory
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
@@ -169,22 +272,18 @@ export async function runDockerInit(
     const chapterName = config.chapter;
     console.log(`\n  Chapter: ${chapterName}\n`);
 
-    // 2. Create docker/ directory with package.json
+    // 2. Create docker/ directory with package.json (includes @clawmasons/chapter dep)
     createDockerPackageJson(rootDir, chapterName);
     console.log("  Created docker/package.json");
 
-    // 3. Add install-local script to root package.json
-    addInstallLocalScript(rootDir);
-    console.log('  Added "install-local" script to package.json');
-
-    // 4. Run install-local to populate docker/node_modules/
+    // 3. Populate docker/node_modules/ with framework deps + chapter packages
     if (!deps?.skipInstall) {
-      console.log("\n  Running install-local...\n");
-      runInstallLocal(rootDir);
+      console.log("\n  Installing dependencies into docker/node_modules/...\n");
+      populateDockerNodeModules(rootDir);
       console.log("\n  docker/node_modules/ populated");
     }
 
-    // 5. Generate Dockerfiles for proxy and agent images
+    // 4. Generate Dockerfiles for proxy and agent images
     if (!deps?.skipDockerfiles) {
       const dockerDir = path.join(rootDir, "docker");
       generateDockerfiles(dockerDir);

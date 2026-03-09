@@ -1,6 +1,5 @@
 import type { ResolvedAgent, ResolvedRole } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
-import { PROVIDER_ENV_VARS } from "../materializer/common.js";
 
 /**
  * Generate a Dockerfile for an agent container scoped to a single role.
@@ -14,6 +13,9 @@ import { PROVIDER_ENV_VARS } from "../materializer/common.js";
  * The generated Dockerfile uses `docker/` as its build context
  * (the Dockerfile lives at `docker/agent/<agent-name>/<role-name>/Dockerfile`).
  *
+ * LLM provider API keys are NOT baked into the image — they are passed
+ * at runtime via docker-compose environment variables.
+ *
  * @param agent  The fully resolved agent.
  * @param role   The specific role for this agent image.
  */
@@ -24,24 +26,11 @@ export function generateAgentDockerfile(
   const agentShortName = getAppShortName(agent.name);
   const roleShortName = getAppShortName(role.name);
 
-  // Determine environment variables for the LLM provider
-  const envLines: string[] = [];
-  if (agent.llm?.provider) {
-    const envVar = PROVIDER_ENV_VARS[agent.llm.provider];
-    if (envVar) {
-      envLines.push(`ENV ${envVar}=\${${envVar}}`);
-    }
-  }
-
   // Determine the runtime — first runtime is the primary one
   const primaryRuntime = agent.runtimes[0] ?? "claude-code";
 
   // Build runtime-specific install and entrypoint
   const { runtimeInstall, runtimeEntrypoint } = getRuntimeConfig(primaryRuntime);
-
-  const envSection = envLines.length > 0
-    ? "\n# LLM provider environment\n" + envLines.join("\n") + "\n"
-    : "";
 
   // Workspace files are COPY'd from a pre-generated directory
   // The workspace dir is created by docker-init at:
@@ -54,11 +43,7 @@ FROM node:22-slim
 
 WORKDIR /home/mason
 ${runtimeInstall}
-# Copy package manifest and install production dependencies
-COPY package.json /app/package.json
-RUN cd /app && npm install --omit=dev
-
-# Copy all chapter packages from local build context
+# Copy pre-populated node_modules (all deps resolved by docker-init)
 COPY node_modules/ /app/node_modules/
 
 # Create mason user and set up directories
@@ -69,7 +54,7 @@ RUN groupadd -r mason && useradd -r -g mason -m mason \\
 # Copy materialized workspace files
 ${workspaceCopyLine}
 RUN chown -R mason:mason /home/mason/workspace
-${envSection}
+
 USER mason
 
 WORKDIR /home/mason/workspace/project
@@ -99,7 +84,7 @@ RUN npm install -g @anthropic-ai/claude-code
       return {
         runtimeInstall: `
 # Install pi-coding-agent runtime
-RUN npm install -g @anthropic-ai/pi-coding-agent
+RUN npm install -g @mariozechner/pi-coding-agent
 `,
         runtimeEntrypoint: `ENTRYPOINT ["pi"]`,
       };

@@ -167,6 +167,9 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
       expect(dockerfile).toContain("USER mason");
       expect(dockerfile).toContain("chapter");
       expect(dockerfile).toContain("proxy");
+      expect(dockerfile).toContain("COPY node_modules/");
+      expect(dockerfile).not.toContain("npm install");
+      expect(dockerfile).toContain("npm rebuild better-sqlite3");
     });
   });
 
@@ -189,8 +192,10 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
         "utf-8",
       );
       expect(dockerfile).toContain(
-        "npm install -g @anthropic-ai/pi-coding-agent",
+        "npm install -g @mariozechner/pi-coding-agent",
       );
+      expect(dockerfile).toContain("COPY node_modules/");
+      expect(dockerfile).not.toContain("npm install --omit=dev");
     });
   });
 

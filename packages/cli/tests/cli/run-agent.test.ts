@@ -179,6 +179,12 @@ describe("generateComposeYml", () => {
     // Agent is interactive
     expect(yml).toContain("stdin_open: true");
     expect(yml).toContain("tty: true");
+    expect(yml).toContain("init: true");
+
+    // LLM provider API keys passed from host
+    expect(yml).toContain("environment:");
+    expect(yml).toContain("OPENROUTER_API_KEY");
+    expect(yml).toContain("ANTHROPIC_API_KEY");
   });
 
   it("uses correct Dockerfile paths for different agent/role combos", () => {
