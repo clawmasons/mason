@@ -141,7 +141,7 @@ Enforce connection limits on the proxy based on the role's `risk` level.
 
 **Testable output:** HIGH risk role: first connect → 200, second connect → 403 with "session locked" message. MEDIUM risk: same behavior. LOW risk: first connect → 200, second connect → 200. Audit log records the rejection. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-09-risk-based-connection-limits/proposal.md) | [design](../../changes/archive/2026-03-09-risk-based-connection-limits/design.md) | [tasks](../../changes/archive/2026-03-09-risk-based-connection-limits/tasks.md) | [spec delta](../../changes/archive/2026-03-09-risk-based-connection-limits/specs/proxy-credential-infrastructure/delta.md)
 
 ---
 

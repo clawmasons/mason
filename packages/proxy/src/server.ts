@@ -18,7 +18,7 @@ import { auditPreHook, auditPostHook } from "./hooks/audit.js";
 import type { HookContext } from "./hooks/audit.js";
 import { matchesApprovalPattern, requestApproval } from "./hooks/approval.js";
 import type { ApprovalOptions } from "./hooks/approval.js";
-import { SessionStore, handleConnectAgent } from "./handlers/connect-agent.js";
+import { SessionStore, handleConnectAgent, type RiskLevel } from "./handlers/connect-agent.js";
 import { CredentialRelay } from "./handlers/credential-relay.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -43,6 +43,8 @@ export interface ChapterProxyServerConfig {
   declaredCredentials?: string[];
   /** Role name for the agent session. */
   roleName?: string;
+  /** Risk level for the agent's role. Controls connection limits. */
+  riskLevel?: RiskLevel;
 }
 
 // ── credential_request Tool Definition ──────────────────────────────────
@@ -79,7 +81,7 @@ export class ChapterProxyServer {
 
   constructor(config: ChapterProxyServerConfig) {
     this.config = { ...config, port: config.port ?? DEFAULT_PORT };
-    this.sessionStore = new SessionStore();
+    this.sessionStore = new SessionStore(config.riskLevel);
 
     if (config.credentialProxyToken) {
       this.credentialRelay = new CredentialRelay({
