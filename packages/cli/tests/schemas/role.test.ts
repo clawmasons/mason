@@ -69,6 +69,40 @@ describe("roleChapterFieldSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("validates risk enum values", () => {
+    for (const risk of ["HIGH", "MEDIUM", "LOW"]) {
+      const result = roleChapterFieldSchema.safeParse({
+        type: "role",
+        risk,
+        permissions: {},
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.risk).toBe(risk);
+      }
+    }
+  });
+
+  it("rejects invalid risk value", () => {
+    const result = roleChapterFieldSchema.safeParse({
+      type: "role",
+      risk: "INVALID",
+      permissions: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("defaults risk to LOW when omitted", () => {
+    const result = roleChapterFieldSchema.safeParse({
+      type: "role",
+      permissions: {},
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.risk).toBe("LOW");
+    }
+  });
+
   it("validates PRD example: @clawmasons/role-issue-manager", () => {
     const result = roleChapterFieldSchema.safeParse({
       type: "role",

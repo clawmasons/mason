@@ -72,6 +72,7 @@ function resolveApp(
     env: chapter.env,
     tools: chapter.tools,
     capabilities: chapter.capabilities,
+    credentials: chapter.credentials,
     description: chapter.description,
   };
 }
@@ -205,6 +206,7 @@ function resolveRole(
     name: pkg.name,
     version: pkg.version,
     description: chapter.description,
+    risk: chapter.risk,
     permissions: chapter.permissions,
     constraints: chapter.constraints,
     tasks,
@@ -238,6 +240,7 @@ export function resolveAgent(
     slug: chapter.slug,
     description: chapter.description,
     runtimes: chapter.runtimes,
+    credentials: chapter.credentials,
     roles,
     resources: chapter.resources.length > 0 ? chapter.resources : undefined,
     proxy: chapter.proxy,

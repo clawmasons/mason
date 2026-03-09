@@ -8,6 +8,7 @@ const permissionEntrySchema = z.object({
 export const roleChapterFieldSchema = z.object({
   type: z.literal("role"),
   description: z.string().optional(),
+  risk: z.enum(["HIGH", "MEDIUM", "LOW"]).optional().default("LOW"),
   tasks: z.array(z.string()).optional(),
   skills: z.array(z.string()).optional(),
   permissions: z.record(z.string(), permissionEntrySchema),

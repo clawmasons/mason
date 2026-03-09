@@ -99,10 +99,12 @@ function makeMember(name: string): ResolvedAgent {
         agentName: name.split("/").pop()?.replace("member-", "") ?? name,
     slug: name.split("/").pop()?.replace("member-", "") ?? name,
     runtimes: ["claude-code"],
+    credentials: [],
     roles: [
       {
         name: "@test/role-dev",
         version: "1.0.0",
+        risk: "LOW" as const,
         permissions: {
           "@test/app-github": { allow: ["create_pr"], deny: [] },
         },
@@ -117,6 +119,7 @@ function makeMember(name: string): ResolvedAgent {
             env: { GITHUB_TOKEN: "${GITHUB_TOKEN}" },
             tools: ["create_pr"],
             capabilities: ["github"],
+            credentials: [],
           },
         ],
         skills: [],
@@ -138,6 +141,7 @@ function makePackages(agentName: string): Map<string, DiscoveredPackage> {
       slug: "test",
       runtimes: ["claude-code"],
       roles: ["@test/role-dev"],
+      credentials: [],
       resources: [],
     },
   });
@@ -171,13 +175,13 @@ describe("startProxy", () => {
       name: "@test/agent-a",
       version: "1.0.0",
       packagePath: "/fake/a",
-      chapterField: { type: "agent", name: "A", slug: "a", runtimes: ["claude-code"], roles: ["@test/role"], resources: [] },
+      chapterField: { type: "agent", name: "A", slug: "a", runtimes: ["claude-code"], roles: ["@test/role"], credentials: [], resources: [] },
     });
     packages.set("@test/agent-b", {
       name: "@test/agent-b",
       version: "1.0.0",
       packagePath: "/fake/b",
-      chapterField: { type: "agent", name: "B", slug: "b", runtimes: ["claude-code"], roles: ["@test/role"], resources: [] },
+      chapterField: { type: "agent", name: "B", slug: "b", runtimes: ["claude-code"], roles: ["@test/role"], credentials: [], resources: [] },
     });
     vi.mocked(discoverPackages).mockReturnValue(packages);
 

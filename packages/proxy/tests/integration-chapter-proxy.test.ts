@@ -61,6 +61,7 @@ beforeAll(async () => {
     args: ["-y", "@modelcontextprotocol/server-filesystem", tmpDir],
     tools: ["read_file", "write_file", "list_directory", "create_directory"],
     capabilities: [],
+    credentials: [],
   };
 
   upstream = new UpstreamManager([{ name: APP_NAME, app: filesystemApp }]);
