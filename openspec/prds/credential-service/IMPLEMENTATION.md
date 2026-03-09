@@ -118,7 +118,7 @@ Add three new capabilities to the MCP proxy: (1) a `connect-agent` HTTP endpoint
 
 **Testable output:** POST `/connect-agent` with valid token → 200 with `{ sessionToken, sessionId }`. POST with invalid token → 401. WebSocket connects with valid `CREDENTIAL_PROXY_TOKEN` → accepted. WebSocket with invalid token → rejected. Agent calls `credential_request` tool → proxy relays to credential service WS → agent receives response. Calling `credential_request` with invalid session token → error. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — [spec](../../specs/proxy-credential-infrastructure/spec.md) | [proposal](../../changes/archive/2026-03-09-proxy-credential-infrastructure/proposal.md) | [design](../../changes/archive/2026-03-09-proxy-credential-infrastructure/design.md) | [tasks](../../changes/archive/2026-03-09-proxy-credential-infrastructure/tasks.md)
 
 ---
 
