@@ -157,6 +157,7 @@ describe("generateComposeYml", () => {
       agent: "note-taker",
       role: "writer",
       logsDir: "/projects/my-project/.clawmasons/logs",
+      proxyToken: "test-token-abc",
     });
 
     // Service names
@@ -179,6 +180,15 @@ describe("generateComposeYml", () => {
     // Agent is interactive
     expect(yml).toContain("stdin_open: true");
     expect(yml).toContain("tty: true");
+    expect(yml).toContain("init: true");
+
+    // LLM provider API keys passed from host
+    expect(yml).toContain("environment:");
+    expect(yml).toContain("OPENROUTER_API_KEY");
+    expect(yml).toContain("ANTHROPIC_API_KEY");
+
+    // CHAPTER_PROXY_TOKEN in both services
+    expect(yml).toContain("CHAPTER_PROXY_TOKEN=test-token-abc");
   });
 
   it("uses correct Dockerfile paths for different agent/role combos", () => {
@@ -188,12 +198,30 @@ describe("generateComposeYml", () => {
       agent: "coder",
       role: "reviewer",
       logsDir: "/proj/.clawmasons/logs",
+      proxyToken: "token-123",
     });
 
     expect(yml).toContain("proxy-reviewer:");
     expect(yml).toContain("agent-coder-reviewer:");
     expect(yml).toContain('dockerfile: "proxy/reviewer/Dockerfile"');
     expect(yml).toContain('dockerfile: "agent/coder/reviewer/Dockerfile"');
+  });
+
+  it("includes CHAPTER_PROXY_TOKEN in both proxy and agent environments", () => {
+    const yml = generateComposeYml({
+      dockerBuildPath: "/docker",
+      projectDir: "/proj",
+      agent: "note-taker",
+      role: "writer",
+      logsDir: "/proj/.clawmasons/logs",
+      proxyToken: "my-secret-token",
+    });
+
+    // Token should appear in proxy and agent service environments
+    const proxySection = yml.split("agent-note-taker-writer:")[0]!;
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    expect(proxySection).toContain("CHAPTER_PROXY_TOKEN=my-secret-token");
+    expect(agentSection).toContain("CHAPTER_PROXY_TOKEN=my-secret-token");
   });
 });
 

@@ -6,7 +6,6 @@ import { program } from "../../src/cli/index.js";
 import {
   readChapterConfig,
   createDockerPackageJson,
-  addInstallLocalScript,
   runDockerInit,
   generateDockerfiles,
 } from "../../src/cli/commands/docker-init.js";
@@ -124,6 +123,7 @@ describe("createDockerPackageJson", () => {
     expect(pkg.name).toBe("@acme.platform/docker");
     expect(pkg.private).toBe(true);
     expect(pkg.description).toContain("acme.platform");
+    expect(pkg.dependencies).toBeUndefined();
   });
 
   it("overwrites existing docker/package.json", () => {
@@ -142,65 +142,6 @@ describe("createDockerPackageJson", () => {
   });
 });
 
-describe("addInstallLocalScript", () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-docker-init-test-"));
-  });
-
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it("adds install-local script to package.json", () => {
-    fs.writeFileSync(
-      path.join(tmpDir, "package.json"),
-      JSON.stringify({ name: "test", scripts: { build: "tsc" } }),
-    );
-
-    addInstallLocalScript(tmpDir);
-
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(tmpDir, "package.json"), "utf-8"),
-    );
-    expect(pkg.scripts["install-local"]).toBe("cd docker && npm install ../dist/*.tgz");
-    // Existing scripts preserved
-    expect(pkg.scripts.build).toBe("tsc");
-  });
-
-  it("creates scripts object if missing", () => {
-    fs.writeFileSync(
-      path.join(tmpDir, "package.json"),
-      JSON.stringify({ name: "test" }),
-    );
-
-    addInstallLocalScript(tmpDir);
-
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(tmpDir, "package.json"), "utf-8"),
-    );
-    expect(pkg.scripts["install-local"]).toBe("cd docker && npm install ../dist/*.tgz");
-  });
-
-  it("throws when package.json is missing", () => {
-    expect(() => addInstallLocalScript(tmpDir)).toThrow("No package.json found");
-  });
-
-  it("overwrites existing install-local script", () => {
-    fs.writeFileSync(
-      path.join(tmpDir, "package.json"),
-      JSON.stringify({ name: "test", scripts: { "install-local": "old" } }),
-    );
-
-    addInstallLocalScript(tmpDir);
-
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(tmpDir, "package.json"), "utf-8"),
-    );
-    expect(pkg.scripts["install-local"]).toBe("cd docker && npm install ../dist/*.tgz");
-  });
-});
 
 describe("runDockerInit", () => {
   let tmpDir: string;
@@ -254,19 +195,17 @@ describe("runDockerInit", () => {
     expect(dockerPkg.private).toBe(true);
   });
 
-  it("adds install-local script to root package.json", async () => {
+  it("docker/package.json has no dependencies (packages copied directly)", async () => {
     setupChapterProject("acme.platform");
 
     await runDockerInit(tmpDir, { skipInstall: true });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
-    const rootPkg = JSON.parse(
-      fs.readFileSync(path.join(tmpDir, "package.json"), "utf-8"),
+    const dockerPkg = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, "docker", "package.json"), "utf-8"),
     );
-    expect(rootPkg.scripts["install-local"]).toBe(
-      "cd docker && npm install ../dist/*.tgz",
-    );
+    expect(dockerPkg.dependencies).toBeUndefined();
   });
 
   it("prints chapter name during init", async () => {
@@ -289,39 +228,14 @@ describe("runDockerInit", () => {
     expect(errorOutput).toContain(".clawmasons/chapter.json");
   });
 
-  it("exits 1 when root package.json is missing", async () => {
-    // Create chapter.json but no package.json
-    fs.mkdirSync(path.join(tmpDir, ".clawmasons"), { recursive: true });
-    fs.writeFileSync(
-      path.join(tmpDir, ".clawmasons", "chapter.json"),
-      JSON.stringify({ chapter: "acme.platform" }),
-    );
-
-    await runDockerInit(tmpDir, { skipInstall: true });
-
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("docker-init failed");
-    expect(errorOutput).toContain("No package.json found");
-  });
-
-  it("preserves existing root package.json fields", async () => {
+  it("does not modify root package.json", async () => {
     setupChapterProject("acme.platform");
-    // Add an extra field
     const pkgPath = path.join(tmpDir, "package.json");
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-    pkg.description = "My chapter project";
-    pkg.scripts = { build: "tsc" };
-    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+    const originalContent = fs.readFileSync(pkgPath, "utf-8");
 
     await runDockerInit(tmpDir, { skipInstall: true });
 
-    const updatedPkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-    expect(updatedPkg.description).toBe("My chapter project");
-    expect(updatedPkg.scripts.build).toBe("tsc");
-    expect(updatedPkg.scripts["install-local"]).toBe(
-      "cd docker && npm install ../dist/*.tgz",
-    );
+    expect(fs.readFileSync(pkgPath, "utf-8")).toBe(originalContent);
   });
 });
 
@@ -500,7 +414,7 @@ describe("generateDockerfiles", () => {
     expect(reviewerDockerfile).toContain("USER mason");
   });
 
-  it("proxy Dockerfiles reference local paths only (no registry)", () => {
+  it("proxy Dockerfiles use pre-populated node_modules (no npm install)", () => {
     setupMockNodeModules();
 
     generateDockerfiles(tmpDir);
@@ -512,9 +426,11 @@ describe("generateDockerfiles", () => {
     expect(dockerfile).not.toContain("docker.io");
     expect(dockerfile).not.toContain("ghcr.io");
     expect(dockerfile).toContain("COPY node_modules/");
+    expect(dockerfile).not.toContain("npm install");
+    expect(dockerfile).toContain("npm rebuild better-sqlite3");
   });
 
-  it("agent Dockerfiles reference local paths only (no registry)", () => {
+  it("agent Dockerfiles use pre-populated node_modules (no npm install --omit=dev)", () => {
     setupMockNodeModules();
 
     generateDockerfiles(tmpDir);
@@ -526,6 +442,7 @@ describe("generateDockerfiles", () => {
     expect(dockerfile).not.toContain("docker.io");
     expect(dockerfile).not.toContain("ghcr.io");
     expect(dockerfile).toContain("COPY node_modules/");
+    expect(dockerfile).not.toContain("npm install --omit=dev");
   });
 
   it("generates materialized workspace for each agent x role", () => {

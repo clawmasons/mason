@@ -373,6 +373,130 @@ describe("ChapterProxyServer (streamable-http)", () => {
   });
 });
 
+// ── Auth + Health Endpoint Tests ─────────────────────────────────────
+
+describe("ChapterProxyServer (auth)", () => {
+  let server: ChapterProxyServer;
+  let client: Client;
+
+  afterEach(async () => {
+    try { await client?.close(); } catch { /* ignore */ }
+    try { await server?.stop(); } catch { /* ignore */ }
+  });
+
+  it("/health responds 200 without auth", async () => {
+    const port = getPort();
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ChapterProxyServer({
+      port, transport: "streamable-http", router, upstream, authToken: "secret",
+    });
+    await server.start();
+
+    const resp = await fetch(`http://localhost:${port}/health`);
+    expect(resp.status).toBe(200);
+    expect(await resp.text()).toBe("ok");
+  });
+
+  it("rejects MCP requests when authToken is set and no Authorization header", async () => {
+    const port = getPort();
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ChapterProxyServer({
+      port, transport: "streamable-http", router, upstream, authToken: "secret",
+    });
+    await server.start();
+
+    const resp = await fetch(`http://localhost:${port}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "initialize", id: 1, params: {} }),
+    });
+    expect(resp.status).toBe(401);
+  });
+
+  it("rejects MCP requests with wrong token", async () => {
+    const port = getPort();
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ChapterProxyServer({
+      port, transport: "streamable-http", router, upstream, authToken: "secret",
+    });
+    await server.start();
+
+    const resp = await fetch(`http://localhost:${port}/mcp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer wrong-token",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "initialize", id: 1, params: {} }),
+    });
+    expect(resp.status).toBe(401);
+  });
+
+  it("allows MCP requests with correct token", async () => {
+    const port = getPort();
+    const tools = [makeTool("test_tool")];
+    const router = createMockRouter(tools, new Map());
+    const upstream = createMockUpstream();
+
+    server = new ChapterProxyServer({
+      port, transport: "streamable-http", router, upstream, authToken: "my-secret",
+    });
+    await server.start();
+
+    client = new Client({ name: "auth-test", version: "0.1.0" });
+    const transport = new StreamableHTTPClientTransport(
+      new URL(`http://localhost:${port}/mcp`),
+      {
+        requestInit: {
+          headers: { Authorization: "Bearer my-secret" },
+        },
+      },
+    );
+    await client.connect(transport);
+
+    const result = await client.listTools();
+    expect(result.tools).toHaveLength(1);
+    expect(result.tools[0]!.name).toBe("test_tool");
+  });
+
+  it("allows all MCP requests when no authToken configured", async () => {
+    const port = getPort();
+    const tools = [makeTool("open_tool")];
+    const router = createMockRouter(tools, new Map());
+    const upstream = createMockUpstream();
+
+    server = new ChapterProxyServer({
+      port, transport: "streamable-http", router, upstream,
+    });
+    await server.start();
+
+    client = await connectClient(port, "streamable-http");
+    const result = await client.listTools();
+    expect(result.tools).toHaveLength(1);
+  });
+
+  it("auth works with SSE transport", async () => {
+    const port = getPort();
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ChapterProxyServer({
+      port, transport: "sse", router, upstream, authToken: "sse-secret",
+    });
+    await server.start();
+
+    // Without token — should get 401
+    const resp = await fetch(`http://localhost:${port}/sse`);
+    expect(resp.status).toBe(401);
+  });
+});
+
 // ── Audit Logging Integration Tests ──────────────────────────────────
 
 describe("ChapterProxyServer (audit logging)", () => {
