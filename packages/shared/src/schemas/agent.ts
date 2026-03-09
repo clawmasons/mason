@@ -23,6 +23,7 @@ export const agentChapterFieldSchema = z.object({
   description: z.string().optional(),
   runtimes: z.array(z.string()).min(1),
   roles: z.array(z.string()).min(1),
+  credentials: z.array(z.string()).optional().default([]),
   resources: z.array(resourceSchema).optional().default([]),
   proxy: proxySchema.optional(),
   llm: llmSchema.optional(),

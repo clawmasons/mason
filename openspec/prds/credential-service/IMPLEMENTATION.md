@@ -28,7 +28,7 @@ Add `credentials` field to agent and app Zod schemas, add `risk` field to role Z
 
 **Testable output:** Schema validates `{ "type": "agent", ..., "credentials": ["KEY_A"] }`. Schema rejects `{ "credentials": [123] }`. Schema validates `{ "type": "role", ..., "risk": "HIGH" }`. Schema rejects `{ "risk": "INVALID" }`. Omitting `credentials` defaults to `[]`. Omitting `risk` defaults to `"LOW"`. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — [spec](../../specs/schema-credentials-risk/spec.md)
 
 ---
 

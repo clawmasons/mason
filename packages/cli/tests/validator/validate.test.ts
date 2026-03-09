@@ -13,6 +13,7 @@ function makeApp(overrides: Partial<ResolvedApp> = {}): ResolvedApp {
     args: ["-y", "@modelcontextprotocol/server-github"],
     tools: ["create_issue", "list_repos", "add_label", "get_pr", "create_review", "delete_repo", "transfer_repo"],
     capabilities: ["tools"],
+    credentials: [],
     ...overrides,
   };
 }
@@ -46,6 +47,7 @@ function makeRole(overrides: Partial<ResolvedRole> = {}): ResolvedRole {
   return {
     name: "@clawmasons/role-issue-manager",
     version: "1.0.0",
+    risk: "LOW",
     description: "Manages GitHub issues",
     permissions: {
       "@clawmasons/app-github": {
@@ -68,6 +70,7 @@ function makeMember(overrides: Partial<ResolvedAgent> = {}): ResolvedAgent {
     slug: "repo-ops",
     description: "Repository operations member",
     runtimes: ["claude-code"],
+    credentials: [],
     roles: [makeRole()],
     ...overrides,
   };

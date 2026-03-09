@@ -23,6 +23,7 @@ export interface ResolvedApp {
   env?: Record<string, string>;
   tools: string[];
   capabilities: string[];
+  credentials: string[];
   description?: string;
 }
 
@@ -60,6 +61,7 @@ export interface ResolvedRole {
   name: string;
   version: string;
   description?: string;
+  risk: "HIGH" | "MEDIUM" | "LOW";
   permissions: Record<string, { allow: string[]; deny: string[] }>;
   constraints?: {
     maxConcurrentTasks?: number;
@@ -80,6 +82,7 @@ export interface ResolvedAgent {
   slug: string;
   description?: string;
   runtimes: string[];
+  credentials: string[];
   roles: ResolvedRole[];
   resources?: Array<{ type: string; ref: string; access: string }>;
   proxy?: {

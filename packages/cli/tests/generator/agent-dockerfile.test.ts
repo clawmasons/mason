@@ -15,6 +15,7 @@ function makeGithubApp(): ResolvedApp {
     env: { GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}" },
     tools: ["create_issue", "list_repos", "create_pr"],
     capabilities: ["tools"],
+    credentials: [],
   };
 }
 
@@ -27,6 +28,7 @@ function makeFilesystemApp(): ResolvedApp {
     args: ["-y", "@modelcontextprotocol/server-filesystem"],
     tools: ["read_file", "write_file", "list_directory"],
     capabilities: ["tools"],
+    credentials: [],
   };
 }
 
@@ -70,6 +72,7 @@ function makeWriterRole(): ResolvedRole {
     name: "@acme.platform/role-writer",
     version: "1.0.0",
     description: "Writes and manages markdown notes.",
+    risk: "LOW",
     permissions: {
       "@acme.platform/app-filesystem": {
         allow: ["read_file", "write_file", "list_directory"],
@@ -87,6 +90,7 @@ function makeReviewerRole(): ResolvedRole {
     name: "@acme.platform/role-reviewer",
     version: "1.0.0",
     description: "Reviews issues and PRs.",
+    risk: "LOW",
     permissions: {
       "@acme.platform/app-github": {
         allow: ["create_issue", "list_repos"],
@@ -107,6 +111,7 @@ function makeNoteTakerAgent(): ResolvedAgent {
     slug: "note-taker",
     description: "Note-taking agent",
     runtimes: ["claude-code"],
+    credentials: [],
     roles: [makeWriterRole(), makeReviewerRole()],
     proxy: { port: 9090, type: "sse" },
     llm: { provider: "anthropic", model: "claude-sonnet-4-6" },

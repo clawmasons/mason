@@ -8,6 +8,7 @@ function makeMember(overrides: Partial<ResolvedAgent> = {}): ResolvedAgent {
     agentName: "Repo Ops",
     slug: "repo-ops",
     runtimes: ["claude-code"],
+    credentials: [],
     roles: [],
     ...overrides,
   };
@@ -65,6 +66,7 @@ describe("computeToolFilters", () => {
           tasks: [],
           apps: [],
           skills: [],
+          risk: "LOW",
         },
       ],
     });
@@ -93,6 +95,7 @@ describe("computeToolFilters", () => {
           tasks: [],
           apps: [],
           skills: [],
+          risk: "LOW",
         },
         {
           name: "@clawmasons/role-pr-reviewer",
@@ -106,6 +109,7 @@ describe("computeToolFilters", () => {
           tasks: [],
           apps: [],
           skills: [],
+          risk: "LOW",
         },
       ],
     });
@@ -139,6 +143,7 @@ describe("computeToolFilters", () => {
           tasks: [],
           apps: [],
           skills: [],
+          risk: "LOW",
         },
         {
           name: "@clawmasons/role-pr-reviewer",
@@ -152,6 +157,7 @@ describe("computeToolFilters", () => {
           tasks: [],
           apps: [],
           skills: [],
+          risk: "LOW",
         },
       ],
     });
@@ -185,6 +191,7 @@ describe("computeToolFilters", () => {
           tasks: [],
           apps: [],
           skills: [],
+          risk: "LOW",
         },
       ],
     });
@@ -209,6 +216,7 @@ describe("computeToolFilters", () => {
           tasks: [],
           apps: [],
           skills: [],
+          risk: "LOW",
         },
         {
           name: "role-b",
@@ -219,6 +227,7 @@ describe("computeToolFilters", () => {
           tasks: [],
           apps: [],
           skills: [],
+          risk: "LOW",
         },
       ],
     });
@@ -243,6 +252,7 @@ describe("computeToolFilters", () => {
           tasks: [],
           apps: [],
           skills: [],
+          risk: "LOW",
         },
       ],
     });
