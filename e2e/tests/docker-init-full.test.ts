@@ -13,8 +13,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { execFileSync } from "node:child_process";
+import * as crypto from "node:crypto";
+import { execFileSync, execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { runRunInit } from "../../packages/cli/src/cli/commands/run-init.js";
 import { readRunConfig, validateDockerfiles } from "../../packages/cli/src/cli/commands/run-agent.js";
 
@@ -268,5 +271,140 @@ describe("full docker-init → run-init → run-agent flow", () => {
       expect(result.proxyDockerfile).toContain("proxy/writer/Dockerfile");
       expect(result.agentDockerfile).toContain("agent/test-note-taker/writer/Dockerfile");
     });
+  });
+
+  // ── Proxy Boot + MCP Connectivity ──────────────────────────────────
+
+  describe("proxy boot + MCP connectivity", () => {
+    const TEST_PORT = 19400;
+    const PROXY_TOKEN = crypto.randomBytes(32).toString("hex");
+    const COMPOSE_PROJECT = `chapter-e2e-${Date.now()}`;
+    let composeFile: string;
+
+    beforeAll(() => {
+      // Generate a test-specific compose file with port mapping
+      const composeContent = `# Generated for e2e proxy boot test
+services:
+  proxy-writer:
+    build:
+      context: "${dockerDir}"
+      dockerfile: "proxy/writer/Dockerfile"
+    ports:
+      - "${TEST_PORT}:9090"
+    volumes:
+      - "${workspaceDir}:/workspace"
+    environment:
+      - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
+    command: ["proxy", "--agent", "test-note-taker", "--transport", "streamable-http"]
+    restart: "no"
+`;
+      const composeDir = path.join(workspaceDir, "e2e-compose");
+      fs.mkdirSync(composeDir, { recursive: true });
+      composeFile = path.join(composeDir, "docker-compose.yml");
+      fs.writeFileSync(composeFile, composeContent);
+    });
+
+    afterAll(() => {
+      // Tear down containers and images
+      try {
+        execSync(
+          `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" down --rmi local --volumes`,
+          { stdio: "pipe", timeout: 60_000 },
+        );
+      } catch { /* best-effort cleanup */ }
+    });
+
+    it("builds proxy Docker image", () => {
+      execSync(
+        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" build proxy-writer`,
+        { cwd: dockerDir, stdio: "pipe", timeout: 120_000 },
+      );
+    }, 130_000);
+
+    it("starts proxy container", () => {
+      execSync(
+        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d proxy-writer`,
+        { stdio: "pipe", timeout: 60_000 },
+      );
+
+      // Verify container is running
+      const ps = execSync(
+        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" ps --format json`,
+        { stdio: "pipe", timeout: 10_000 },
+      ).toString();
+      expect(ps).toContain("proxy-writer");
+    }, 65_000);
+
+    it("proxy health endpoint responds", async () => {
+      const maxWait = 30_000;
+      const start = Date.now();
+      let ready = false;
+
+      while (Date.now() - start < maxWait) {
+        try {
+          const resp = await fetch(`http://localhost:${TEST_PORT}/health`);
+          if (resp.ok) {
+            ready = true;
+            break;
+          }
+        } catch {
+          // Not ready yet
+        }
+        await new Promise((r) => setTimeout(r, 1_000));
+      }
+
+      if (!ready) {
+        const logs = execSync(
+          `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" logs proxy-writer`,
+          { stdio: "pipe" },
+        ).toString();
+        throw new Error(`Proxy failed to become ready. Logs:\n${logs}`);
+      }
+
+      expect(ready).toBe(true);
+    }, 35_000);
+
+    it("MCP client connects with valid token and lists tools", async () => {
+      const client = new Client({ name: "e2e-proxy-test", version: "0.1.0" });
+      const transport = new StreamableHTTPClientTransport(
+        new URL(`http://localhost:${TEST_PORT}/mcp`),
+        {
+          requestInit: {
+            headers: {
+              Authorization: `Bearer ${PROXY_TOKEN}`,
+            },
+          },
+        },
+      );
+      await client.connect(transport);
+
+      const result = await client.listTools();
+      // The proxy should respond — tools may or may not be populated
+      // depending on upstream app availability, but the call should succeed
+      expect(result).toHaveProperty("tools");
+
+      await client.close();
+    }, 30_000);
+
+    it("rejects requests without auth token", async () => {
+      const resp = await fetch(`http://localhost:${TEST_PORT}/mcp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "initialize", id: 1, params: {} }),
+      });
+      expect(resp.status).toBe(401);
+    }, 10_000);
+
+    it("rejects requests with wrong auth token", async () => {
+      const resp = await fetch(`http://localhost:${TEST_PORT}/mcp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer wrong-token",
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "initialize", id: 1, params: {} }),
+      });
+      expect(resp.status).toBe(401);
+    }, 10_000);
   });
 });

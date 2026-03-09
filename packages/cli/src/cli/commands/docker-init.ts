@@ -202,6 +202,14 @@ function copyFrameworkPackages(rootDir: string, dockerDir: string): void {
     fs.cpSync(realSrcDir, destDir, { recursive: true, dereference: true });
   }
 
+  // Packages copied via cpSync may contain nested node_modules/ with
+  // version-conflicted dependencies (e.g. @modelcontextprotocol/sdk ships
+  // its own ajv@8 while the root has ajv@6).  Those nested packages rely on
+  // Node's upward resolution to find *their* transitive deps (e.g. fast-uri)
+  // at the docker root level.  Walk every nested node_modules inside the
+  // copied tree and ensure those transitive deps are also present.
+  copyNestedDependencies(destNodeModules, rootDir);
+
   // Create .bin/chapter symlink
   const binDir = path.join(destNodeModules, ".bin");
   fs.mkdirSync(binDir, { recursive: true });
@@ -209,6 +217,129 @@ function copyFrameworkPackages(rootDir: string, dockerDir: string): void {
   if (fs.existsSync(chapterBin)) fs.unlinkSync(chapterBin);
   fs.symlinkSync("../@clawmasons/chapter/dist/cli/bin.js", chapterBin);
   fs.chmodSync(chapterBin, 0o755);
+}
+
+/**
+ * Walk the docker node_modules tree for nested node_modules directories.
+ * For each nested package, ensure its production dependencies are present
+ * at the top level of destNodeModules — if missing, resolve from rootDir
+ * and copy them (repeating until no new deps are discovered).
+ */
+function copyNestedDependencies(destNodeModules: string, rootDir: string): void {
+  const copied = new Set<string>();
+
+  // Collect top-level package names already present
+  for (const name of listPackageNames(destNodeModules)) {
+    copied.add(name);
+  }
+
+  let foundNew = true;
+  while (foundNew) {
+    foundNew = false;
+
+    for (const nestedPkgDir of findNestedNodeModulesPackages(destNodeModules)) {
+      const pkgJsonPath = path.join(nestedPkgDir, "package.json");
+      if (!fs.existsSync(pkgJsonPath)) continue;
+
+      const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8")) as {
+        dependencies?: Record<string, string>;
+      };
+      if (!pkg.dependencies) continue;
+
+      for (const dep of Object.keys(pkg.dependencies)) {
+        if (copied.has(dep)) continue;
+
+        const srcDir = resolvePackageDir(dep, rootDir);
+        if (!srcDir) continue; // optional peer or already nested
+
+        const realSrcDir = fs.realpathSync(srcDir);
+        const destDir = path.join(destNodeModules, ...dep.split("/"));
+
+        fs.mkdirSync(path.dirname(destDir), { recursive: true });
+        fs.cpSync(realSrcDir, destDir, { recursive: true, dereference: true });
+
+        copied.add(dep);
+        foundNew = true;
+      }
+    }
+  }
+}
+
+/**
+ * List top-level package names in a node_modules directory.
+ * Handles both plain packages ("commander") and scoped ("@scope/pkg").
+ */
+function listPackageNames(nodeModulesDir: string): string[] {
+  const names: string[] = [];
+  if (!fs.existsSync(nodeModulesDir)) return names;
+
+  for (const entry of fs.readdirSync(nodeModulesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name === ".bin") continue;
+
+    if (entry.name.startsWith("@")) {
+      // Scoped package — list children
+      const scopeDir = path.join(nodeModulesDir, entry.name);
+      for (const child of fs.readdirSync(scopeDir, { withFileTypes: true })) {
+        if (child.isDirectory()) {
+          names.push(`${entry.name}/${child.name}`);
+        }
+      }
+    } else {
+      names.push(entry.name);
+    }
+  }
+  return names;
+}
+
+/**
+ * Recursively find all packages inside nested node_modules directories
+ * within the given top-level node_modules. Returns absolute paths to
+ * each nested package directory.
+ */
+function findNestedNodeModulesPackages(topNodeModules: string): string[] {
+  const results: string[] = [];
+
+  function walkPackage(pkgDir: string): void {
+    const nestedNm = path.join(pkgDir, "node_modules");
+    if (!fs.existsSync(nestedNm)) return;
+
+    for (const entry of fs.readdirSync(nestedNm, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name === ".bin") continue;
+
+      if (entry.name.startsWith("@")) {
+        const scopeDir = path.join(nestedNm, entry.name);
+        for (const child of fs.readdirSync(scopeDir, { withFileTypes: true })) {
+          if (child.isDirectory()) {
+            const childDir = path.join(scopeDir, child.name);
+            results.push(childDir);
+            walkPackage(childDir);
+          }
+        }
+      } else {
+        const childDir = path.join(nestedNm, entry.name);
+        results.push(childDir);
+        walkPackage(childDir);
+      }
+    }
+  }
+
+  // Walk each top-level package
+  for (const entry of fs.readdirSync(topNodeModules, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name === ".bin") continue;
+
+    if (entry.name.startsWith("@")) {
+      const scopeDir = path.join(topNodeModules, entry.name);
+      for (const child of fs.readdirSync(scopeDir, { withFileTypes: true })) {
+        if (child.isDirectory()) {
+          walkPackage(path.join(scopeDir, child.name));
+        }
+      }
+    } else {
+      walkPackage(path.join(topNodeModules, entry.name));
+    }
+  }
+
+  return results;
 }
 
 /**

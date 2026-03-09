@@ -27,6 +27,7 @@ export interface ChapterProxyServerConfig {
   upstream: UpstreamManager;
   db?: Database.Database;
   agentName?: string;
+  authToken?: string;
   approvalPatterns?: string[];
   approvalOptions?: ApprovalOptions;
   resourceRouter?: ResourceRouter;
@@ -50,6 +51,22 @@ export class ChapterProxyServer {
     const { port, transport } = this.config;
 
     this.httpServer = createServer((req, res) => {
+      const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+
+      // Health endpoint — no auth required
+      if (req.method === "GET" && url.pathname === "/health") {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("ok");
+        return;
+      }
+
+      // Auth check — before any MCP handling
+      if (this.config.authToken && !this.checkAuth(req)) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Unauthorized" }));
+        return;
+      }
+
       if (transport === "sse") {
         this.handleSseRequest(req, res);
       } else {
@@ -85,6 +102,15 @@ export class ChapterProxyServer {
       });
       this.httpServer = null;
     }
+  }
+
+  // ── Auth ─────────────────────────────────────────────────────────
+
+  private checkAuth(req: IncomingMessage): boolean {
+    const auth = req.headers.authorization;
+    if (!auth) return false;
+    const [scheme, token] = auth.split(" ", 2);
+    return scheme === "Bearer" && token === this.config.authToken;
   }
 
   // ── SSE Transport ──────────────────────────────────────────────────

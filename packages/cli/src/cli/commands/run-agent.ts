@@ -92,8 +92,9 @@ export function generateComposeYml(opts: {
   agent: string;
   role: string;
   logsDir: string;
+  proxyToken: string;
 }): string {
-  const { dockerBuildPath, projectDir, agent, role, logsDir } = opts;
+  const { dockerBuildPath, projectDir, agent, role, logsDir, proxyToken } = opts;
 
   const proxyContext = path.join(dockerBuildPath);
   const proxyDockerfile = path.join("proxy", role, "Dockerfile");
@@ -119,6 +120,8 @@ services:
     volumes:
       - "${projectDir}:/workspace"
       - "${logsDir}:/logs"
+    environment:
+      - CHAPTER_PROXY_TOKEN=${proxyToken}
     restart: "no"
 
   ${agentServiceName}:
@@ -130,6 +133,7 @@ services:
     depends_on:
       - ${proxyServiceName}
     environment:
+      - CHAPTER_PROXY_TOKEN=${proxyToken}
 ${envLines}
     stdin_open: true
     tty: true
@@ -220,12 +224,14 @@ export async function runAgent(
     console.log(`  Session: ${sessionId}`);
 
     // 5. Generate docker-compose.yml
+    const proxyToken = crypto.randomBytes(32).toString("hex");
     const composeContent = generateComposeYml({
       dockerBuildPath,
       projectDir,
       agent,
       role,
       logsDir,
+      proxyToken,
     });
 
     const composeFile = path.join(sessionDir, "docker-compose.yml");

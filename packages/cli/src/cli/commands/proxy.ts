@@ -23,6 +23,7 @@ interface ProxyOptions {
   port?: string;
   startupTimeout?: string;
   agent?: string;
+  transport?: string;
 }
 
 // ── Command Registration ──────────────────────────────────────────────
@@ -34,6 +35,7 @@ export function registerProxyCommand(program: Command): void {
     .option("--port <number>", "Port to listen on (default: from agent config or 9090)")
     .option("--startup-timeout <seconds>", "Upstream server startup timeout in seconds (default: 60)")
     .option("--agent <name>", "Agent package name (auto-detected if only one agent)")
+    .option("--transport <type>", "Transport type: sse or streamable-http (default: from agent config or sse)")
     .action(async (options: ProxyOptions) => {
       await startProxy(process.cwd(), options);
     });
@@ -125,7 +127,10 @@ export async function startProxy(
     const port = options.port
       ? parseInt(options.port, 10)
       : agent.proxy?.port ?? 9090;
-    const transport = agent.proxy?.type ?? "sse";
+    const transport = (options.transport as "sse" | "streamable-http" | undefined)
+      ?? agent.proxy?.type
+      ?? "sse";
+    const authToken = process.env.CHAPTER_PROXY_TOKEN || undefined;
 
     server = new ChapterProxyServer({
       port,
@@ -134,6 +139,7 @@ export async function startProxy(
       upstream,
       db,
       agentName: agent.name,
+      authToken,
       approvalPatterns: approvalPatterns.length > 0 ? approvalPatterns : undefined,
       resourceRouter,
       promptRouter,
