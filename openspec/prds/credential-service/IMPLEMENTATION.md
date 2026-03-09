@@ -89,7 +89,7 @@ Build the credential service core: WebSocket connection to proxy, access validat
 
 **Testable output:** SDK mode: instantiate `CredentialService` → `handleRequest({ key: "API_KEY", agentId: "test", ... })` returns resolved value when agent declares the credential, returns `ACCESS_DENIED` when not declared. Audit table: after request, query returns entry with correct fields. WebSocket client: unit test with mock WebSocket server verifies connect/auth/request/response cycle. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — [spec](../../specs/credential-service-package/spec.md) | [proposal](../../changes/archive/2026-03-09-credential-service-package/proposal.md) | [design](../../changes/archive/2026-03-09-credential-service-package/design.md) | [tasks](../../changes/archive/2026-03-09-credential-service-package/tasks.md)
 
 ---
 
