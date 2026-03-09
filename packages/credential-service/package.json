@@ -11,12 +11,17 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "bin": {
+    "credential-service": "./dist/cli.js"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
   "license": "MIT",
   "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "ws": "^8.19.0",
     "zod": "^3.24.0"
   }
 }
