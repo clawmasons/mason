@@ -3,6 +3,7 @@ import { Command } from "commander";
 import {
   runAcpAgent,
   resolveAgentName,
+  collectEnvCredentials,
   registerRunAcpAgentCommand,
   bootstrapChapter,
   RUN_ACP_AGENT_HELP_EPILOG,
@@ -1048,5 +1049,213 @@ describe("runAcpAgent with --chapter", () => {
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("Chapter:    initiate");
+  });
+});
+
+// ── collectEnvCredentials ──────────────────────────────────────────────
+
+describe("collectEnvCredentials", () => {
+  it("collects agent-level credentials from env", () => {
+    const agent = makeResolvedAgent();
+    agent.credentials = ["MY_API_KEY", "OTHER_KEY"];
+
+    const env = { MY_API_KEY: "secret123", OTHER_KEY: "other456", UNRELATED: "nope" };
+    const result = collectEnvCredentials(agent, env);
+
+    expect(result).toEqual({ MY_API_KEY: "secret123", OTHER_KEY: "other456" });
+  });
+
+  it("collects app-level credentials from env", () => {
+    const agent = makeResolvedAgent(); // has GITHUB_TOKEN in app credentials
+    agent.credentials = [];
+
+    const env = { GITHUB_TOKEN: "gh-token-value", UNRELATED: "nope" };
+    const result = collectEnvCredentials(agent, env);
+
+    expect(result).toEqual({ GITHUB_TOKEN: "gh-token-value" });
+  });
+
+  it("collects both agent-level and app-level credentials", () => {
+    const agent = makeResolvedAgent();
+    agent.credentials = ["OPENROUTER_API_KEY"];
+
+    const env = {
+      OPENROUTER_API_KEY: "or-key",
+      GITHUB_TOKEN: "gh-token",
+      UNRELATED: "nope",
+    };
+    const result = collectEnvCredentials(agent, env);
+
+    expect(result).toEqual({
+      OPENROUTER_API_KEY: "or-key",
+      GITHUB_TOKEN: "gh-token",
+    });
+  });
+
+  it("excludes env vars that do not match declared credentials", () => {
+    const agent = makeResolvedAgent();
+    agent.credentials = [];
+    // Agent has GITHUB_TOKEN from app, but nothing else
+
+    const env = { RANDOM_VAR: "should-not-appear", PATH: "/usr/bin" };
+    const result = collectEnvCredentials(agent, env);
+
+    expect(result).toEqual({});
+  });
+
+  it("excludes undefined env values", () => {
+    const agent = makeResolvedAgent();
+    agent.credentials = ["MISSING_KEY"];
+
+    const env: Record<string, string | undefined> = { MISSING_KEY: undefined };
+    const result = collectEnvCredentials(agent, env);
+
+    expect(result).toEqual({});
+  });
+
+  it("excludes empty string env values", () => {
+    const agent = makeResolvedAgent();
+    agent.credentials = ["EMPTY_KEY"];
+
+    const env = { EMPTY_KEY: "" };
+    const result = collectEnvCredentials(agent, env);
+
+    expect(result).toEqual({});
+  });
+
+  it("deduplicates credential keys across agent and apps", () => {
+    const agent = makeResolvedAgent();
+    // GITHUB_TOKEN is declared both at agent level and in the app
+    agent.credentials = ["GITHUB_TOKEN"];
+
+    const env = { GITHUB_TOKEN: "gh-token" };
+    const result = collectEnvCredentials(agent, env);
+
+    // Should only appear once
+    expect(result).toEqual({ GITHUB_TOKEN: "gh-token" });
+    expect(Object.keys(result)).toHaveLength(1);
+  });
+
+  it("returns empty record when no credentials are declared", () => {
+    const agent = makeResolvedAgent();
+    agent.credentials = [];
+    agent.roles = [{ ...agent.roles[0]!, apps: [] }];
+
+    const env = { SOME_VAR: "value" };
+    const result = collectEnvCredentials(agent, env);
+
+    expect(result).toEqual({});
+  });
+
+  it("collects credentials across multiple roles and apps", () => {
+    const agent = makeResolvedAgent();
+    agent.credentials = [];
+    agent.roles = [
+      {
+        ...agent.roles[0]!,
+        apps: [
+          { ...agent.roles[0]!.apps[0]!, credentials: ["KEY_A"] },
+        ],
+      },
+      {
+        ...agent.roles[0]!,
+        name: "other-role",
+        apps: [
+          { ...agent.roles[0]!.apps[0]!, name: "other-app", credentials: ["KEY_B"] },
+        ],
+      },
+    ];
+
+    const env = { KEY_A: "val-a", KEY_B: "val-b" };
+    const result = collectEnvCredentials(agent, env);
+
+    expect(result).toEqual({ KEY_A: "val-a", KEY_B: "val-b" });
+  });
+});
+
+// ── runAcpAgent env credential integration ────────────────────────────
+
+describe("runAcpAgent env credential flow", () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.spyOn(process, "exit").mockImplementation((() => { /* noop */ }) as never);
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("passes env credentials to session config when present", async () => {
+    let sessionConfig: AcpSessionConfig | undefined;
+
+    const agent = makeResolvedAgent();
+    agent.credentials = ["MY_SECRET"];
+
+    // Temporarily set process.env
+    const originalEnv = process.env.MY_SECRET;
+    process.env.MY_SECRET = "from-env";
+
+    try {
+      const deps: RunAcpAgentDeps = {
+        ...makeDeps({ agent }),
+        createSessionFn: (config: AcpSessionConfig) => {
+          sessionConfig = config;
+          return makeMockSession().session as unknown as AcpSession;
+        },
+      };
+
+      await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+
+      expect(sessionConfig?.credentials).toEqual({ MY_SECRET: "from-env" });
+    } finally {
+      if (originalEnv === undefined) {
+        delete process.env.MY_SECRET;
+      } else {
+        process.env.MY_SECRET = originalEnv;
+      }
+    }
+  });
+
+  it("does not set credentials on session config when no env vars match", async () => {
+    let sessionConfig: AcpSessionConfig | undefined;
+
+    const agent = makeResolvedAgent();
+    agent.credentials = ["NONEXISTENT_VAR_XYZ_12345"];
+
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps({ agent }),
+      createSessionFn: (config: AcpSessionConfig) => {
+        sessionConfig = config;
+        return makeMockSession().session as unknown as AcpSession;
+      },
+    };
+
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+
+    expect(sessionConfig?.credentials).toBeUndefined();
+  });
+
+  it("logs env credential count when credentials found", async () => {
+    const agent = makeResolvedAgent();
+    agent.credentials = ["MY_CRED_LOG_TEST"];
+
+    const originalEnv = process.env.MY_CRED_LOG_TEST;
+    process.env.MY_CRED_LOG_TEST = "test-value";
+
+    try {
+      const deps = makeDeps({ agent });
+      await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+
+      const logOutput = logSpy.mock.calls.flat().join("\n");
+      expect(logOutput).toContain("Env credentials: 1 key(s) from process.env");
+    } finally {
+      if (originalEnv === undefined) {
+        delete process.env.MY_CRED_LOG_TEST;
+      } else {
+        process.env.MY_CRED_LOG_TEST = originalEnv;
+      }
+    }
   });
 });
