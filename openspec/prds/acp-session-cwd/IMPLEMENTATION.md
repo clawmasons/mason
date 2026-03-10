@@ -63,7 +63,7 @@ function hasGitignoreEntry(gitignorePath: string, pattern: string): boolean;
 
 **Testable output:** Unit tests: (a) appends pattern when `.gitignore` exists but doesn't contain it, (b) no-op when pattern already present, (c) no-op when `.gitignore` doesn't exist, (d) handles `.gitignore` with trailing newline and without.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived change](../../changes/archive/2026-03-10-gitignore-auto-management/) ([proposal](../../changes/archive/2026-03-10-gitignore-auto-management/proposal.md), [design](../../changes/archive/2026-03-10-gitignore-auto-management/design.md), [tasks](../../changes/archive/2026-03-10-gitignore-auto-management/tasks.md)). Source: `packages/cli/src/runtime/gitignore.ts`. Tests: `packages/cli/tests/runtime/gitignore.test.ts` (11 tests).
 
 ---
 
