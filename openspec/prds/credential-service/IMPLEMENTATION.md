@@ -264,4 +264,4 @@ Extend the `chapter validate` command to check that agents declare all credentia
 
 **Testable output:** Agent declaring all app credentials → no warnings. Agent missing an app credential → warning emitted naming the agent, missing key, and declaring app. Agent with no credentials and apps with no credentials → no warnings. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-09-validate-credential-coverage/proposal.md) | [design](../../changes/archive/2026-03-09-validate-credential-coverage/design.md) | [tasks](../../changes/archive/2026-03-09-validate-credential-coverage/tasks.md) | [spec delta](../../specs/graph-validation/spec.md)
