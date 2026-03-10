@@ -87,7 +87,15 @@ Create `packages/cli/src/acp/rewriter.ts` and `packages/cli/src/acp/warnings.ts`
 
 **Testable output:** Unit tests: (a) rewritten config has single `chapter` entry with correct URL and auth header, (b) credentials extracted from matched servers' env fields, (c) no warnings when all servers match, (d) warning format matches PRD spec (`[chapter acp-proxy] WARNING: Dropping unmatched MCP server "..."`), (e) empty matched list still produces valid (empty tools) proxy config.
 
-**Not Implemented Yet**
+**Implemented**
+
+- Archived change: [2026-03-10-mcp-server-rewriter](../../changes/archive/2026-03-10-mcp-server-rewriter/)
+  - [Proposal](../../changes/archive/2026-03-10-mcp-server-rewriter/proposal.md)
+  - [Design](../../changes/archive/2026-03-10-mcp-server-rewriter/design.md)
+  - [Tasks](../../changes/archive/2026-03-10-mcp-server-rewriter/tasks.md)
+- Spec: [mcp-server-rewriter](../../specs/mcp-server-rewriter/spec.md)
+- Source: `packages/cli/src/acp/rewriter.ts`, `packages/cli/src/acp/warnings.ts`
+- Tests: `packages/cli/tests/acp/rewriter.test.ts`, `packages/cli/tests/acp/warnings.test.ts`
 
 ---
 
