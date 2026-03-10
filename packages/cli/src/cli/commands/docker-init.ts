@@ -31,7 +31,7 @@ export function readChapterConfig(rootDir: string): ChapterConfig {
 
   if (!fs.existsSync(configPath)) {
     throw new Error(
-      `No .clawmasons/chapter.json found. Run "chapter init" first to initialize the workspace.`,
+      `No .clawmasons/chapter.json found. Run "clawmasons init" first to initialize the workspace.`,
     );
   }
 
@@ -129,14 +129,14 @@ export function populateDockerNodeModules(rootDir: string): void {
   // Validate dist/ has .tgz files
   if (!fs.existsSync(distDir)) {
     throw new Error(
-      `No dist/ directory found. Run "chapter pack" first to build and pack all workspace packages.`,
+      `No dist/ directory found. Run "clawmasons pack" first to build and pack all workspace packages.`,
     );
   }
 
   const tgzFiles = fs.readdirSync(distDir).filter((f) => f.endsWith(".tgz"));
   if (tgzFiles.length === 0) {
     throw new Error(
-      `No .tgz files found in dist/. Run "chapter pack" first.`,
+      `No .tgz files found in dist/. Run "clawmasons pack" first.`,
     );
   }
 

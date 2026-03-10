@@ -15,7 +15,7 @@ describe("formatWarning", () => {
     const server = makeUnmatched({ name: "personal-notes" });
     const warning = formatWarning(server);
 
-    expect(warning).toContain('[chapter run-acp-agent] WARNING: Dropping unmatched MCP server "personal-notes"');
+    expect(warning).toContain('[clawmasons run-acp-agent] WARNING: Dropping unmatched MCP server "personal-notes"');
     expect(warning).toContain("Agent will not have access to tools from this server");
     expect(warning).toContain("To govern this server, create a chapter App package for it");
   });
@@ -77,7 +77,7 @@ describe("generateWarnings", () => {
 
     expect(warnings).toHaveLength(1);
     const warning = warnings[0]!;
-    expect(warning).toContain("[chapter run-acp-agent] WARNING:");
+    expect(warning).toContain("[clawmasons run-acp-agent] WARNING:");
     expect(warning).toContain("Agent will not have access to tools from this server");
     expect(warning).toContain("To govern this server, create a chapter App package for it");
   });

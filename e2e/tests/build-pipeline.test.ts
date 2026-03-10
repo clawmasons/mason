@@ -94,9 +94,9 @@ describe("full chapter build → run-agent validation flow", () => {
       ).toBe(true);
     });
 
-    it("has .bin/chapter symlink", () => {
-      const chapterBin = path.join(dockerDir, "node_modules", ".bin", "chapter");
-      expect(fs.existsSync(chapterBin)).toBe(true);
+    it("has .bin/clawmasons symlink", () => {
+      const clawmasonsBin = path.join(dockerDir, "node_modules", ".bin", "clawmasons");
+      expect(fs.existsSync(clawmasonsBin)).toBe(true);
     });
 
     it("has transitive dependencies (e.g., commander, zod)", () => {

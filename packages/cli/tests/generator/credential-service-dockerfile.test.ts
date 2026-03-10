@@ -70,6 +70,6 @@ describe("generateCredentialServiceDockerfile", () => {
     const result = generateCredentialServiceDockerfile();
 
     expect(result).toContain("Credential Service Dockerfile");
-    expect(result).toContain("chapter docker-init");
+    expect(result).toContain("clawmasons docker-init");
   });
 });

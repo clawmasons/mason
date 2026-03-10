@@ -344,11 +344,11 @@ describe("generateProxyDockerfile", () => {
     expect(result).toContain("python3 make g++");
   });
 
-  it("uses chapter proxy as entrypoint with agent name", () => {
+  it("uses clawmasons proxy as entrypoint with agent name", () => {
     const agent = makeNoteTakerAgent();
     const result = generateProxyDockerfile(agent.roles[0], agent.name);
 
-    expect(result).toContain('ENTRYPOINT ["node", "node_modules/.bin/chapter"]');
+    expect(result).toContain('ENTRYPOINT ["node", "node_modules/.bin/clawmasons"]');
     expect(result).toContain('CMD ["proxy", "--agent", "@acme.platform/agent-note-taker"]');
   });
 

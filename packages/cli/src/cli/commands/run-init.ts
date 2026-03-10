@@ -63,7 +63,7 @@ export function validateDockerBuildPath(dockerBuildPath: string): string {
   const dockerPkgPath = path.join(dockerBuildPath, "package.json");
   if (!fs.existsSync(dockerPkgPath)) {
     throw new Error(
-      `No package.json found in docker build directory. Run "chapter docker-init" in the chapter project first.`,
+      `No package.json found in docker build directory. Run "clawmasons docker-init" in the chapter project first.`,
     );
   }
 

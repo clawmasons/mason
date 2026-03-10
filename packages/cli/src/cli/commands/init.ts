@@ -232,12 +232,12 @@ export async function runInit(
   if (usedTemplate) {
     console.log(`\nTemplate: ${options.template}`);
     console.log("\nNext steps:");
-    console.log(`  chapter list                                    List discovered packages`);
-    console.log(`  chapter validate @${projectScope}/agent-note-taker   Validate the agent graph`);
-    console.log(`  chapter build @${projectScope}/agent-note-taker      Build the agent lock file\n`);
+    console.log(`  clawmasons list                                    List discovered packages`);
+    console.log(`  clawmasons validate @${projectScope}/agent-note-taker   Validate the agent graph`);
+    console.log(`  clawmasons build @${projectScope}/agent-note-taker      Build the agent lock file\n`);
   } else {
     console.log("\nNext steps:");
-    console.log("  chapter add <package>    Add a chapter component");
-    console.log("  chapter build <agent>    Build and validate an agent\n");
+    console.log("  clawmasons add <package>    Add a chapter component");
+    console.log("  clawmasons build <agent>    Build and validate an agent\n");
   }
 }

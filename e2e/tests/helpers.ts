@@ -15,7 +15,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const E2E_ROOT = path.resolve(__dirname, "..");
 export const PROJECT_ROOT = path.resolve(E2E_ROOT, "..");
 export const FIXTURES_DIR = path.join(E2E_ROOT, "fixtures", "test-chapter");
-export const CHAPTER_BIN = path.join(PROJECT_ROOT, "bin", "chapter.js");
+export const CLAWMASONS_BIN = path.join(PROJECT_ROOT, "bin", "clawmasons.js");
+/** @deprecated Use CLAWMASONS_BIN instead */
+export const CHAPTER_BIN = CLAWMASONS_BIN;
 
 /** Workspace directories to copy from fixtures. */
 const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons"];
