@@ -228,7 +228,7 @@ Create minimal placeholder packages for npm namespace protection.
 
 **Testable output:** Each placeholder directory has valid `package.json` and `README.md`. `npm pack` succeeds in each directory. Publish script iterates all directories.
 
-**Not Implemented Yet**
+**Implemented:** [spec](../../changes/archive/2026-03-10-npm-placeholder-packages/spec.md)
 
 ---
 
