@@ -321,7 +321,7 @@ e2e/
 │       ├── skills/
 │       └── roles/
 └── tests/
-    └── note-taker-pi.test.ts          # E2E test: note-taker on pi w/ OpenRouter
+    └── build-pi-runtime.test.ts       # E2E test: note-taker on pi w/ OpenRouter
 ```
 
 ### 5.3 `package.json`
@@ -416,7 +416,7 @@ This reuses the existing `@clawmasons/role-writer` from chapter-core, giving the
 
 ### 5.7 E2E Test: Note-Taker on Pi with OpenRouter
 
-`tests/note-taker-pi.test.ts`:
+`tests/build-pi-runtime.test.ts` (formerly `note-taker-pi.test.ts`):
 
 ```typescript
 describe("note-taker on pi-coding-agent with OpenRouter", () => {
@@ -629,13 +629,11 @@ chapter install @<member>
 ```
 e2e/
   tests/
-    note-taker-pi.test.ts
+    build-pi-runtime.test.ts
         │
         ├── beforeAll:
-        │     ├── Create temp workspace
-        │     ├── Copy fixtures
-        │     ├── chapter init (programmatic)
-        │     └── chapter install @test-note-taker
+        │     ├── copyFixtureWorkspace() (shared helper)
+        │     └── chapter build @test/agent-test-note-taker (CLI only)
         │
         ├── test: workspace materialization
         │     └── Assert file existence + content

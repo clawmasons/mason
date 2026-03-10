@@ -383,19 +383,20 @@ Comprehensive integration test exercising the full ACP proxy lifecycle using the
 **User Story:** As a developer working on the ACP proxy, I run the integration test and get confidence that the entire ACP flow works: editor → ACP proxy → matcher → Docker session → bridge → container agent → proxy → upstream MCP → audit log. If any component breaks, this test catches it.
 
 **Scope:**
-- New file: `e2e/tests/acp-proxy.test.ts`
-- Uses: `e2e/fixtures/test-chapter/` workspace (with mcp-agent + filesystem app)
-- Test scenarios:
-  1. `chapter acp-proxy` starts and ACP endpoint accepts connections
-  2. ACP client sends mcpServers → matched servers produce governed tools, unmatched produce warnings
-  3. Tool call through ACP → bridge → agent → proxy → upstream → result back to ACP client
-  4. Audit log contains ACP session entries with `session_type: "acp"`
-  5. Dropped servers logged with `status: "dropped"`
-  6. ACP client disconnect triggers Docker session teardown
-  7. Graceful shutdown on SIGTERM
-- Cleanup: remove temp DB, stop containers
+- File: `e2e/tests/docker-proxy.test.ts` (formerly `acp-proxy.test.ts`, CLI-only — no internal imports)
+- Uses: `e2e/fixtures/test-chapter/` workspace (with note-taker agent + filesystem app)
+- Test scenarios (Docker e2e only):
+  1. `chapter build` produces Docker artifacts
+  2. Proxy Docker image builds with ACP config
+  3. Proxy container starts with ACP session env vars
+  4. Proxy health endpoint responds
+  5. MCP client connects and lists governed tools (filesystem tools visible)
+  6. Auth rejection (no token, wrong token)
+  7. Tool call through governed proxy succeeds
+- ACP unit tests (matcher, rewriter, warnings, audit) are covered by unit tests in `packages/cli/tests/acp/` and `packages/proxy/tests/hooks/`
+- Cleanup: docker compose down, remove temp dirs
 
-**Testable output:** `npx vitest run e2e/tests/acp-proxy.test.ts` passes. 16 tests covering all key scenarios.
+**Testable output:** `npx vitest run e2e/tests/docker-proxy.test.ts` passes. 7 Docker e2e tests.
 
 **Implemented**
 
@@ -403,7 +404,5 @@ Comprehensive integration test exercising the full ACP proxy lifecycle using the
   - [Proposal](../../changes/archive/2026-03-10-e2e-acp-integration-test/proposal.md)
   - [Design](../../changes/archive/2026-03-10-e2e-acp-integration-test/design.md)
   - [Tasks](../../changes/archive/2026-03-10-e2e-acp-integration-test/tasks.md)
-- Tests: `e2e/tests/acp-proxy.test.ts` (16 tests)
-  - ACP module integration: matcher + rewriter + warnings pipeline (6 tests)
-  - Dropped server audit logging (3 tests)
-  - Docker proxy E2E with ACP session metadata (7 tests)
+- Tests: `e2e/tests/docker-proxy.test.ts` (7 Docker e2e tests)
+- Unit tests (not in e2e): `packages/cli/tests/acp/matcher.test.ts` (15), `packages/cli/tests/acp/rewriter.test.ts` (10), `packages/cli/tests/acp/warnings.test.ts` (7), `packages/proxy/tests/hooks/audit.test.ts`

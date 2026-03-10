@@ -212,18 +212,20 @@ Write the E2E test that validates the note-taker member materialized for pi-codi
 
 **PRD refs:** REQ-005 (E2E Test — Note-Taker on Pi with OpenRouter), PRD §5.7
 
-**Summary:** Create `e2e/tests/note-taker-pi.test.ts`. Use setup/teardown to create a temp chapter from fixtures. Tests validate: (1) materialized workspace has all expected pi files (`AGENTS.md`, `.pi/settings.json`, `.pi/extensions/chapter-mcp/index.ts`, `skills/`), (2) `.pi/settings.json` contains correct OpenRouter model ID, (3) extension code registers MCP server and take-notes command, (4) Docker Compose includes pi-coding-agent service with `OPENROUTER_API_KEY` env var, (5) `.env.example` includes `OPENROUTER_API_KEY=`. Tests that require Docker or API keys are gated behind environment checks and skip gracefully.
+**Summary:** Create `e2e/tests/build-pi-runtime.test.ts` (formerly `note-taker-pi.test.ts`). Uses shared `copyFixtureWorkspace()` helper and `chapter build` CLI command exclusively — no internal API imports. Tests validate: (1) materialized workspace has all expected pi files (`AGENTS.md`, `.pi/settings.json`, `.pi/extensions/chapter-mcp/index.ts`, `skills/`), (2) `.pi/settings.json` contains correct OpenRouter model ID, (3) extension code registers MCP server and take-notes command, (4) `chapter validate` and `chapter list --json` produce correct output. Tests that require Docker or API keys are gated behind environment checks and skip gracefully.
 
 **User Story:** As a CI system or developer, I run `cd e2e && npm test` and get immediate feedback on whether the pi materializer produces correct output for the note-taker use case. Tests that need live infra skip cleanly when keys/Docker are unavailable.
 
 **Scope:**
-- New file: `e2e/tests/note-taker-pi.test.ts` — E2E test suite
+- File: `e2e/tests/build-pi-runtime.test.ts` — E2E test suite (CLI-only, no internal imports)
+- Shared helpers: `e2e/tests/helpers.ts` — `copyFixtureWorkspace`, `chapterExec`, `chapterExecJson`
 - Tests: workspace materialization assertions (always run)
-- Tests: Docker Compose generation assertions (always run)
+- Tests: Dockerfile generation assertions (always run)
+- Tests: validate and list CLI commands (always run)
 - Tests: proxy connectivity (skip if no Docker)
 - Tests: task execution (skip if no OPENROUTER_API_KEY)
 
-**Testable output:** `cd e2e && npm test` passes. Materialization tests verify all expected files exist with correct content. Docker Compose tests verify service definition and env vars. Tests skip gracefully when infrastructure is unavailable. `npx vitest run` in the e2e directory passes (20 passed, 2 skipped).
+**Testable output:** `cd e2e && npm test` passes. Materialization tests verify all expected files exist with correct content. Dockerfile tests verify structure. CLI command tests verify exit codes and JSON output. Tests skip gracefully when infrastructure is unavailable. `npx vitest run` in the e2e directory passes (16 passed, 2 skipped).
 
 **Implemented** -- 2026-03-06
 

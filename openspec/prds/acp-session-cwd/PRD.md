@@ -335,7 +335,7 @@ E2E tests are updated to use `chapter build` instead of the separate `pack` -> `
 
 Acceptance criteria:
 - Given the E2E test suite, when `chapter build` is used instead of separate commands, then all existing test assertions continue to pass.
-- Given the `docker-init-full.test.ts` test, it is updated to use `chapter build` as the setup step.
+- Given the `build-pipeline.test.ts` test (formerly `docker-init-full.test.ts`), it uses `chapter build` as the sole setup step with no internal API imports.
 
 ---
 

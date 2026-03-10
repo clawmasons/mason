@@ -82,27 +82,27 @@ Tests that require Docker or API keys skip gracefully when unavailable.
 
 #### Running specific test suites
 
-Run only the note-taker agent tests (build, Docker, materialization, validation):
+Run only the pi-runtime build tests (build, Docker, materialization, validation):
 
 ```bash
-npx vitest run tests/note-taker-pi.test.ts
+npx vitest run tests/build-pi-runtime.test.ts
 ```
 
-Run only the MCP/ACP proxy tests (server matching, tool governance, connectivity):
+Run only the full build pipeline tests (node_modules, Dockerfiles, MCP connectivity):
 
 ```bash
-npx vitest run tests/acp-proxy.test.ts
+npx vitest run tests/build-pipeline.test.ts
 ```
 
-Run the full docker-init build pipeline tests:
+Run only the Docker proxy tests with ACP session metadata:
 
 ```bash
-npx vitest run tests/docker-init-full.test.ts
+npx vitest run tests/docker-proxy.test.ts
 ```
 
 Run tests matching a name pattern:
 
 ```bash
-npx vitest run -t "mcp-test"
 npx vitest run -t "note-taker"
+npx vitest run -t "ACP"
 ```
