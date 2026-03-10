@@ -221,7 +221,7 @@ Update `run-agent` to display required credentials, generate the credential prox
 
 **Testable output:** Running `run-agent` displays credential keys, declaring packages, and risk level. Generated `docker-compose.yml` has `credential-service` service with `CREDENTIAL_PROXY_TOKEN` and `depends_on: proxy`. Agent service has `depends_on: credential-service`. Agent service environment contains only `MCP_PROXY_TOKEN` (no API keys). Both tokens are unique random hex strings. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-09-run-agent-credential-integration/proposal.md) | [design](../../changes/archive/2026-03-09-run-agent-credential-integration/design.md) | [tasks](../../changes/archive/2026-03-09-run-agent-credential-integration/tasks.md)
 
 ---
 
