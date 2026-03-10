@@ -152,7 +152,15 @@ Extend the credential-service to accept session-scoped credential overrides from
 
 **Testable output:** Unit tests: (a) session override returns override value instead of env var, (b) non-overridden credentials still resolve from env/keychain, (c) session overrides don't persist across sessions, (d) empty overrides behave identically to current behavior.
 
-**Not Implemented Yet**
+**Implemented**
+
+- Archived change: [2026-03-10-credential-session-overrides](../../changes/archive/2026-03-10-credential-session-overrides/)
+  - [Proposal](../../changes/archive/2026-03-10-credential-session-overrides/proposal.md)
+  - [Design](../../changes/archive/2026-03-10-credential-session-overrides/design.md)
+  - [Tasks](../../changes/archive/2026-03-10-credential-session-overrides/tasks.md)
+- Spec: [credential-session-overrides](../../specs/credential-session-overrides/spec.md)
+- Source: `packages/credential-service/src/resolver.ts`, `packages/credential-service/src/service.ts`, `packages/credential-service/src/cli.ts`
+- Tests: `packages/credential-service/tests/session-overrides.test.ts`
 
 ---
 
