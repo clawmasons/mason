@@ -170,7 +170,7 @@ Create `packages/agent-entry` — a standalone esbuild-bundled binary that boots
 
 **Testable output:** `npm run build` in agent-entry produces a single bundled `.js` file. The bundle runs with Node.js and no `node_modules`. Unit test: mock proxy `/connect-agent` → returns session token. Mock `credential_request` tool → returns credentials. Child process launched with credentials in env. Container process env does NOT contain credentials. Stdio forwarding works (child stdout → process stdout). Child exit code propagates. Error cases: proxy unreachable → retries 3x then exits 1. Invalid token → exits 1. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — [spec](../../specs/agent-entry-package/spec.md) | [proposal](../../changes/archive/2026-03-09-agent-entry-package/proposal.md) | [design](../../changes/archive/2026-03-09-agent-entry-package/design.md) | [tasks](../../changes/archive/2026-03-09-agent-entry-package/tasks.md)
 
 ---
 

@@ -1,0 +1,28 @@
+{
+  "name": "@clawmasons/agent-entry",
+  "version": "0.1.0",
+  "description": "Standalone entrypoint binary for bootstrapping agent containers",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "bin": {
+    "agent-entry": "./dist/agent-entry.js"
+  },
+  "scripts": {
+    "build": "tsx esbuild.config.ts",
+    "build:types": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.0"
+  }
+}
