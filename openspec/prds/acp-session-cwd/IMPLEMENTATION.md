@@ -179,4 +179,4 @@ Add detailed help text to `run-acp-agent` explaining CWD behavior, `.clawmasons`
 
 **Testable output:** (a) `chapter run-acp-agent --help` displays CWD behavior explanation, (b) help includes `.gitignore` notice, (c) help includes `CLAWMASONS_HOME` documentation, (d) help includes ACP client config example.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived change](../../changes/archive/2026-03-10-run-acp-agent-help/) ([proposal](../../changes/archive/2026-03-10-run-acp-agent-help/proposal.md), [design](../../changes/archive/2026-03-10-run-acp-agent-help/design.md), [tasks](../../changes/archive/2026-03-10-run-acp-agent-help/tasks.md)). Source: `packages/cli/src/cli/commands/run-acp-agent.ts`. Tests: `packages/cli/tests/cli/run-acp-agent.test.ts` (36 tests). 1034 total tests passing.

@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { Command } from "commander";
 import {
   runAcpAgent,
   resolveAgentName,
+  registerRunAcpAgentCommand,
+  RUN_ACP_AGENT_HELP_EPILOG,
   type RunAcpAgentDeps,
 } from "../../src/cli/commands/run-acp-agent.js";
 import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
@@ -637,5 +640,58 @@ describe("runAcpAgent", () => {
     expect(mockSession.stopAgentCalled).toBe(true);
     expect(mockSession.stopCalled).toBe(false); // Infrastructure stays up
     expect(mockBridge.resetCalled).toBe(true);
+  });
+});
+
+// ── Help Text ─────────────────────────────────────────────────────────────
+
+describe("run-acp-agent help text", () => {
+  function getHelpOutput(): string {
+    const program = new Command();
+    registerRunAcpAgentCommand(program);
+    const cmd = program.commands.find((c) => c.name() === "run-acp-agent");
+    expect(cmd).toBeDefined();
+    let output = "";
+    cmd!.configureOutput({ writeOut: (str: string) => { output += str; } });
+    cmd!.outputHelp();
+    return output;
+  }
+
+  it("contains session/new CWD behavior explanation", () => {
+    const help = getHelpOutput();
+    expect(help).toContain("session/new");
+    expect(help).toContain("cwd");
+    expect(help).toContain("/workspace");
+  });
+
+  it("contains .clawmasons/ creation notice", () => {
+    const help = getHelpOutput();
+    expect(help).toContain(".clawmasons/");
+    expect(help).toContain("session logs");
+  });
+
+  it("contains .gitignore management notice", () => {
+    const help = getHelpOutput();
+    expect(help).toContain(".gitignore");
+  });
+
+  it("contains CLAWMASONS_HOME documentation", () => {
+    const help = getHelpOutput();
+    expect(help).toContain("CLAWMASONS_HOME");
+    expect(help).toContain("~/.clawmasons");
+  });
+
+  it("contains ACP client configuration example", () => {
+    const help = getHelpOutput();
+    expect(help).toContain("mcpServers");
+    expect(help).toContain("run-acp-agent");
+    expect(help).toContain("--role");
+  });
+
+  it("exports the help epilog as a constant", () => {
+    expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("Session Behavior");
+    expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("Side Effects");
+    expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("Environment");
+    expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("ACP Client Configuration Example");
   });
 });
