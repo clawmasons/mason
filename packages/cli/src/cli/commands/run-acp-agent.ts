@@ -55,6 +55,39 @@ export interface RunAcpAgentDeps {
   mkdirSyncFn?: (dirPath: string, options?: { recursive?: boolean }) => void;
 }
 
+// ── Help Text ─────────────────────────────────────────────────────────
+
+export const RUN_ACP_AGENT_HELP_EPILOG = `
+Session Behavior:
+  When an ACP client sends session/new with a "cwd" field, the agent
+  container mounts that directory as /workspace. Each session/new starts
+  a fresh agent container; the proxy and credential-service stay running.
+
+  If no "cwd" is provided in session/new, the current working directory
+  of this process is used as the default.
+
+Side Effects:
+  - Creates .clawmasons/ in the session's CWD for session logs
+  - Appends ".clawmasons" to the project's .gitignore if present
+
+Environment:
+  CLAWMASONS_HOME    Base directory for chapter runtime state.
+                     Default: ~/.clawmasons
+
+ACP Client Configuration Example (Zed / JetBrains):
+  {
+    "mcpServers": {
+      "chapter": {
+        "command": "chapter",
+        "args": ["run-acp-agent", "--role", "<role-name>"],
+        "env": {
+          "CLAWMASONS_HOME": "~/.clawmasons"
+        }
+      }
+    }
+  }
+`;
+
 // ── Command Registration ──────────────────────────────────────────────
 
 export function registerRunAcpAgentCommand(program: Command): void {
@@ -65,6 +98,7 @@ export function registerRunAcpAgentCommand(program: Command): void {
     .option("--agent <name>", "Agent package name (auto-detected if only one)")
     .option("--port <number>", "ACP endpoint port (default: 3001)", "3001")
     .option("--proxy-port <number>", "Internal chapter proxy port (default: 3000)", "3000")
+    .addHelpText("after", RUN_ACP_AGENT_HELP_EPILOG)
     .action(async (options: { agent?: string; role: string; port: string; proxyPort: string }) => {
       await runAcpAgent(process.cwd(), {
         agent: options.agent,
