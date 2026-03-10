@@ -524,6 +524,162 @@ describe("validateAgent", () => {
     });
   });
 
+  describe("credential coverage", () => {
+    it("no warnings when agent declares all app credentials", () => {
+      const app = makeApp({
+        name: "@clawmasons/app-web-search",
+        credentials: ["SERP_API_KEY"],
+      });
+      const role = makeRole({
+        apps: [app],
+        tasks: [],
+        skills: [],
+        permissions: {
+          "@clawmasons/app-web-search": { allow: [], deny: [] },
+        },
+      });
+      const agent = makeMember({
+        credentials: ["SERP_API_KEY"],
+        roles: [role],
+      });
+
+      const result = validateAgent(agent);
+      const credWarnings = result.warnings.filter((w) => w.category === "credential-coverage");
+      expect(credWarnings).toHaveLength(0);
+    });
+
+    it("warns when agent is missing an app credential", () => {
+      const app = makeApp({
+        name: "@clawmasons/app-web-search",
+        credentials: ["SERP_API_KEY"],
+      });
+      const role = makeRole({
+        apps: [app],
+        tasks: [],
+        skills: [],
+        permissions: {
+          "@clawmasons/app-web-search": { allow: [], deny: [] },
+        },
+      });
+      const agent = makeMember({
+        credentials: [],
+        roles: [role],
+      });
+
+      const result = validateAgent(agent);
+      expect(result.valid).toBe(true); // warnings don't affect validity
+      const credWarnings = result.warnings.filter((w) => w.category === "credential-coverage");
+      expect(credWarnings).toHaveLength(1);
+      expect(credWarnings[0].message).toContain("SERP_API_KEY");
+      expect(credWarnings[0].message).toContain("@clawmasons/app-web-search");
+      expect(credWarnings[0].message).toContain("Repo Ops");
+      expect(credWarnings[0].context.agent).toBe("@clawmasons/agent-repo-ops");
+      expect(credWarnings[0].context.credential).toBe("SERP_API_KEY");
+      expect(credWarnings[0].context.app).toBe("@clawmasons/app-web-search");
+    });
+
+    it("no warnings when both agent and apps have no credentials", () => {
+      const app = makeApp({ credentials: [] });
+      const role = makeRole({ apps: [app] });
+      const agent = makeMember({ credentials: [], roles: [role] });
+
+      const result = validateAgent(agent);
+      const credWarnings = result.warnings.filter((w) => w.category === "credential-coverage");
+      expect(credWarnings).toHaveLength(0);
+    });
+
+    it("warns per app-credential pair for multiple apps", () => {
+      const app1 = makeApp({
+        name: "@clawmasons/app-web-search",
+        credentials: ["SERP_API_KEY"],
+      });
+      const app2 = makeApp({
+        name: "@clawmasons/app-openai",
+        credentials: ["OPENAI_API_KEY", "SERP_API_KEY"],
+      });
+      const role = makeRole({
+        apps: [app1, app2],
+        tasks: [],
+        skills: [],
+        permissions: {
+          "@clawmasons/app-web-search": { allow: [], deny: [] },
+          "@clawmasons/app-openai": { allow: [], deny: [] },
+        },
+      });
+      const agent = makeMember({
+        credentials: [],
+        roles: [role],
+      });
+
+      const result = validateAgent(agent);
+      const credWarnings = result.warnings.filter((w) => w.category === "credential-coverage");
+      // app1 needs SERP_API_KEY, app2 needs OPENAI_API_KEY and SERP_API_KEY = 3 warnings
+      expect(credWarnings).toHaveLength(3);
+    });
+
+    it("no warnings when agent has extra credentials beyond app needs", () => {
+      const app = makeApp({
+        name: "@clawmasons/app-web-search",
+        credentials: ["SERP_API_KEY"],
+      });
+      const role = makeRole({
+        apps: [app],
+        tasks: [],
+        skills: [],
+        permissions: {
+          "@clawmasons/app-web-search": { allow: [], deny: [] },
+        },
+      });
+      const agent = makeMember({
+        credentials: ["SERP_API_KEY", "EXTRA_KEY"],
+        roles: [role],
+      });
+
+      const result = validateAgent(agent);
+      const credWarnings = result.warnings.filter((w) => w.category === "credential-coverage");
+      expect(credWarnings).toHaveLength(0);
+    });
+
+    it("checks credentials across multiple roles", () => {
+      const app1 = makeApp({
+        name: "@clawmasons/app-web-search",
+        credentials: ["SERP_API_KEY"],
+      });
+      const app2 = makeApp({
+        name: "@clawmasons/app-slack",
+        credentials: ["SLACK_TOKEN"],
+      });
+      const role1 = makeRole({
+        name: "@clawmasons/role-researcher",
+        apps: [app1],
+        tasks: [],
+        skills: [],
+        permissions: {
+          "@clawmasons/app-web-search": { allow: [], deny: [] },
+        },
+      });
+      const role2 = makeRole({
+        name: "@clawmasons/role-communicator",
+        apps: [app2],
+        tasks: [],
+        skills: [],
+        permissions: {
+          "@clawmasons/app-slack": { allow: [], deny: [] },
+        },
+      });
+      const agent = makeMember({
+        credentials: ["SERP_API_KEY"], // missing SLACK_TOKEN
+        roles: [role1, role2],
+      });
+
+      const result = validateAgent(agent);
+      const credWarnings = result.warnings.filter((w) => w.category === "credential-coverage");
+      expect(credWarnings).toHaveLength(1);
+      expect(credWarnings[0].context.credential).toBe("SLACK_TOKEN");
+      expect(credWarnings[0].context.app).toBe("@clawmasons/app-slack");
+    });
+  });
+
   describe("collect all errors", () => {
     it("collects errors from multiple categories", () => {
       const badApp = makeApp({

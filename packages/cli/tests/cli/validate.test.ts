@@ -239,6 +239,68 @@ describe("runValidate", () => {
     expect(parsed.errors[0].category).toBe("tool-existence");
   });
 
+  it("shows credential coverage warnings for valid member with missing app credentials", async () => {
+    // App with credentials
+    writePackage(path.join(tmpDir, "apps", "web-search"), {
+      name: "@test/app-web-search",
+      version: "1.0.0",
+      chapter: {
+        type: "app",
+        transport: "stdio",
+        command: "npx",
+        args: ["-y", "web-search-server"],
+        tools: ["search"],
+        capabilities: ["tools"],
+        credentials: ["SERP_API_KEY"],
+      },
+    });
+
+    // Role using the app
+    writePackage(path.join(tmpDir, "roles", "researcher"), {
+      name: "@test/role-researcher",
+      version: "1.0.0",
+      chapter: {
+        type: "role",
+        permissions: {
+          "@test/app-web-search": {
+            allow: ["search"],
+            deny: [],
+          },
+        },
+      },
+    });
+
+    // Agent that does NOT declare SERP_API_KEY
+    writePackage(path.join(tmpDir, "agents", "researcher"), {
+      name: "@test/agent-researcher",
+      version: "1.0.0",
+      chapter: {
+        type: "agent",
+        name: "Researcher",
+        slug: "researcher",
+        runtimes: ["claude-code"],
+        roles: ["@test/role-researcher"],
+        credentials: [],
+      },
+    });
+
+    await runValidate(tmpDir, "@test/agent-researcher", {});
+
+    // Should still be valid (warnings don't affect validity)
+    expect(exitSpy).toHaveBeenCalledWith(0);
+    // Re-run to capture warn output
+    vi.restoreAllMocks();
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const warnMock = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await runValidate(tmpDir, "@test/agent-researcher", {});
+    expect(exitSpy).toHaveBeenCalledWith(0);
+    const warnOutput = warnMock.mock.calls.flat().join("\n");
+    expect(warnOutput).toContain("credential-coverage");
+    expect(warnOutput).toContain("SERP_API_KEY");
+  });
+
   it("exits 1 when member is not found", async () => {
     // Empty workspace -- no packages
     await runValidate(tmpDir, "@test/nonexistent", {});
