@@ -103,6 +103,153 @@ describe("roleChapterFieldSchema", () => {
     }
   });
 
+  describe("mounts field", () => {
+    it("validates role with valid mounts", () => {
+      const result = roleChapterFieldSchema.safeParse({
+        type: "role",
+        permissions: {},
+        mounts: [
+          { source: "${LODGE_HOME}", target: "/home/mason/${LODGE}" },
+        ],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.mounts).toHaveLength(1);
+        expect(result.data.mounts![0].source).toBe("${LODGE_HOME}");
+        expect(result.data.mounts![0].target).toBe("/home/mason/${LODGE}");
+        expect(result.data.mounts![0].readonly).toBe(false);
+      }
+    });
+
+    it("validates mount with explicit readonly flag", () => {
+      const result = roleChapterFieldSchema.safeParse({
+        type: "role",
+        permissions: {},
+        mounts: [
+          { source: "/data", target: "/mnt/data", readonly: true },
+        ],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.mounts![0].readonly).toBe(true);
+      }
+    });
+
+    it("rejects mount missing target", () => {
+      const result = roleChapterFieldSchema.safeParse({
+        type: "role",
+        permissions: {},
+        mounts: [{ source: "/data" }],
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects mount missing source", () => {
+      const result = roleChapterFieldSchema.safeParse({
+        type: "role",
+        permissions: {},
+        mounts: [{ target: "/mnt/data" }],
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("validates empty mounts array", () => {
+      const result = roleChapterFieldSchema.safeParse({
+        type: "role",
+        permissions: {},
+        mounts: [],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.mounts).toEqual([]);
+      }
+    });
+
+    it("validates multiple mounts", () => {
+      const result = roleChapterFieldSchema.safeParse({
+        type: "role",
+        permissions: {},
+        mounts: [
+          { source: "${LODGE_HOME}", target: "/home/mason/${LODGE}" },
+          { source: "/tmp/cache", target: "/cache", readonly: true },
+        ],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.mounts).toHaveLength(2);
+      }
+    });
+  });
+
+  describe("baseImage field", () => {
+    it("validates role with baseImage", () => {
+      const result = roleChapterFieldSchema.safeParse({
+        type: "role",
+        permissions: {},
+        baseImage: "node:22-bookworm",
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.baseImage).toBe("node:22-bookworm");
+      }
+    });
+
+    it("rejects non-string baseImage", () => {
+      const result = roleChapterFieldSchema.safeParse({
+        type: "role",
+        permissions: {},
+        baseImage: 123,
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("aptPackages field", () => {
+    it("validates role with aptPackages", () => {
+      const result = roleChapterFieldSchema.safeParse({
+        type: "role",
+        permissions: {},
+        aptPackages: ["git", "curl", "jq"],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.aptPackages).toEqual(["git", "curl", "jq"]);
+      }
+    });
+
+    it("validates empty aptPackages array", () => {
+      const result = roleChapterFieldSchema.safeParse({
+        type: "role",
+        permissions: {},
+        aptPackages: [],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.aptPackages).toEqual([]);
+      }
+    });
+  });
+
+  describe("backwards compatibility", () => {
+    it("validates role without new fields", () => {
+      const result = roleChapterFieldSchema.safeParse({
+        type: "role",
+        permissions: {
+          "@clawmasons/app-github": {
+            allow: ["create_issue"],
+            deny: [],
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.mounts).toBeUndefined();
+        expect(result.data.baseImage).toBeUndefined();
+        expect(result.data.aptPackages).toBeUndefined();
+      }
+    });
+  });
+
   it("validates PRD example: @clawmasons/role-issue-manager", () => {
     const result = roleChapterFieldSchema.safeParse({
       type: "role",

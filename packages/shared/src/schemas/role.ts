@@ -5,6 +5,12 @@ const permissionEntrySchema = z.object({
   deny: z.array(z.string()),
 });
 
+const mountSchema = z.object({
+  source: z.string(),
+  target: z.string(),
+  readonly: z.boolean().optional().default(false),
+});
+
 export const roleChapterFieldSchema = z.object({
   type: z.literal("role"),
   description: z.string().optional(),
@@ -19,6 +25,9 @@ export const roleChapterFieldSchema = z.object({
     })
     .passthrough()
     .optional(),
+  mounts: z.array(mountSchema).optional(),
+  baseImage: z.string().optional(),
+  aptPackages: z.array(z.string()).optional(),
 });
 
 export type RoleChapterField = z.infer<typeof roleChapterFieldSchema>;

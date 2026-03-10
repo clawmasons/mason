@@ -71,7 +71,7 @@ Extend the role schema and resolver to support `mounts`, `baseImage`, and `aptPa
 
 **Testable output:** Unit tests verify: (a) role with mounts/baseImage/aptPackages passes validation, (b) role without these fields still passes (backwards compatible), (c) invalid mount shapes are rejected, (d) ResolvedRole carries the new fields.
 
-**Not Implemented Yet**
+**Implemented:** [spec](../../changes/archive/2026-03-10-role-schema-extensions/spec.md)
 
 ---
 
