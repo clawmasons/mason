@@ -668,8 +668,10 @@ describe("runAgent", () => {
     expect(calls[1]!.args).toContain("-d");
     expect(calls[1]!.args).toContain("credential-service");
 
-    // Third call: agent up (interactive)
-    expect(calls[2]!.args).toContain("up");
+    // Third call: agent run (interactive)
+    expect(calls[2]!.args).toContain("run");
+    expect(calls[2]!.args).toContain("--rm");
+    expect(calls[2]!.args).toContain("--service-ports");
     expect(calls[2]!.args).toContain("agent-note-taker-writer");
     expect(calls[2]!.opts?.interactive).toBe(true);
   });

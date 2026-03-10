@@ -189,8 +189,12 @@ describe("mcpAgentMaterializer", () => {
       expect(ACP_RUNTIME_COMMANDS["node"]).toBe("node src/index.js --acp");
     });
 
-    it("contains exactly 3 runtime mappings", () => {
-      expect(Object.keys(ACP_RUNTIME_COMMANDS)).toHaveLength(3);
+    it("maps mcp-agent to mcp-agent --acp", () => {
+      expect(ACP_RUNTIME_COMMANDS["mcp-agent"]).toBe("mcp-agent --acp");
+    });
+
+    it("contains exactly 4 runtime mappings", () => {
+      expect(Object.keys(ACP_RUNTIME_COMMANDS)).toHaveLength(4);
     });
   });
 });

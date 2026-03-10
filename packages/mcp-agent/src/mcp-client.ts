@@ -14,9 +14,46 @@ export interface McpClientConfig {
   proxyToken: string;
 }
 
-// ── Implementation ────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────
 
 let requestIdCounter = 1;
+
+const MCP_HEADERS = {
+  "Content-Type": "application/json",
+  Accept: "application/json, text/event-stream",
+};
+
+/**
+ * Parse an MCP response which may be JSON or SSE (text/event-stream).
+ * SSE responses contain JSON-RPC messages in `data:` lines.
+ */
+async function parseMcpResponse(response: Response): Promise<unknown> {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (contentType.includes("text/event-stream")) {
+    // Parse SSE to extract JSON-RPC response
+    const text = await response.text();
+    const lines = text.split("\n");
+    let lastData = "";
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        lastData = line.slice(6);
+      }
+    }
+
+    if (!lastData) {
+      throw new Error("SSE response contained no data events");
+    }
+
+    return JSON.parse(lastData);
+  }
+
+  // Standard JSON response
+  return response.json();
+}
+
+// ── Implementation ────────────────────────────────────────────────────
 
 async function initializeMcpSession(
   proxyUrl: string,
@@ -25,7 +62,7 @@ async function initializeMcpSession(
   const initResponse = await fetch(`${proxyUrl}/mcp`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      ...MCP_HEADERS,
       Authorization: `Bearer ${proxyToken}`,
     },
     body: JSON.stringify({
@@ -44,6 +81,9 @@ async function initializeMcpSession(
     throw new Error(`MCP initialize failed: ${initResponse.status} ${initResponse.statusText}`);
   }
 
+  // Consume the response body (may be JSON or SSE)
+  await parseMcpResponse(initResponse);
+
   const mcpSessionId = initResponse.headers.get("mcp-session-id");
   if (!mcpSessionId) {
     throw new Error("MCP initialize response missing mcp-session-id header");
@@ -53,7 +93,7 @@ async function initializeMcpSession(
   await fetch(`${proxyUrl}/mcp`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      ...MCP_HEADERS,
       Authorization: `Bearer ${proxyToken}`,
       "mcp-session-id": mcpSessionId,
     },
@@ -76,7 +116,7 @@ async function mcpListTools(
   const response = await fetch(`${proxyUrl}/mcp`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      ...MCP_HEADERS,
       Authorization: `Bearer ${proxyToken}`,
       "mcp-session-id": mcpSessionId,
     },
@@ -92,7 +132,7 @@ async function mcpListTools(
     throw new Error(`MCP tools/list failed: ${response.status} ${response.statusText}`);
   }
 
-  const body = (await response.json()) as {
+  const body = (await parseMcpResponse(response)) as {
     result?: { tools: ToolDefinition[] };
     error?: { message: string };
   };
@@ -116,7 +156,7 @@ async function mcpCallTool(
   const response = await fetch(`${proxyUrl}/mcp`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      ...MCP_HEADERS,
       Authorization: `Bearer ${proxyToken}`,
       "mcp-session-id": mcpSessionId,
     },
@@ -132,7 +172,7 @@ async function mcpCallTool(
     throw new Error(`MCP tool call failed: ${response.status} ${response.statusText}`);
   }
 
-  const body = (await response.json()) as {
+  const body = (await parseMcpResponse(response)) as {
     result?: ToolCallResult;
     error?: { message: string };
   };

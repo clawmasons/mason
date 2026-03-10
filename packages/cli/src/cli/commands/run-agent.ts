@@ -389,7 +389,7 @@ export async function runAgent(
 
     const agentCode = await execCompose(
       composeFile,
-      ["up", agentServiceName],
+      ["run", "--rm", "--service-ports", agentServiceName],
       { interactive: true },
     );
 

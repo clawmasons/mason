@@ -11,6 +11,7 @@ import { generateAgentDockerfile } from "../../generator/agent-dockerfile.js";
 import { generateCredentialServiceDockerfile } from "../../generator/credential-service-dockerfile.js";
 import { claudeCodeMaterializer } from "../../materializer/claude-code.js";
 import { piCodingAgentMaterializer } from "../../materializer/pi-coding-agent.js";
+import { mcpAgentMaterializer } from "../../materializer/mcp-agent.js";
 import type { RuntimeMaterializer } from "../../materializer/types.js";
 
 /**
@@ -98,6 +99,7 @@ const FRAMEWORK_PACKAGES = [
   "@clawmasons/chapter",
   "@clawmasons/proxy",
   "@clawmasons/shared",
+  "@clawmasons/mcp-agent",
 ];
 
 /**
@@ -211,13 +213,32 @@ function copyFrameworkPackages(rootDir: string, dockerDir: string): void {
   // copied tree and ensure those transitive deps are also present.
   copyNestedDependencies(destNodeModules, rootDir);
 
-  // Create .bin/chapter symlink
+  // Create .bin/ symlinks for all framework packages with bin entries
   const binDir = path.join(destNodeModules, ".bin");
   fs.mkdirSync(binDir, { recursive: true });
-  const chapterBin = path.join(binDir, "chapter");
-  if (fs.existsSync(chapterBin)) fs.unlinkSync(chapterBin);
-  fs.symlinkSync("../@clawmasons/chapter/dist/cli/bin.js", chapterBin);
-  fs.chmodSync(chapterBin, 0o755);
+
+  for (const [pkgName, realSrcDir] of toCopy) {
+    const pkgJsonPath = path.join(realSrcDir, "package.json");
+    if (!fs.existsSync(pkgJsonPath)) continue;
+
+    const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8")) as {
+      bin?: string | Record<string, string>;
+    };
+    if (!pkg.bin) continue;
+
+    const binEntries: Record<string, string> =
+      typeof pkg.bin === "string"
+        ? { [pkgName.split("/").pop()!]: pkg.bin }
+        : pkg.bin;
+
+    for (const [binName, binPath] of Object.entries(binEntries)) {
+      const linkPath = path.join(binDir, binName);
+      const target = path.join("..", ...pkgName.split("/"), binPath);
+      if (fs.existsSync(linkPath)) fs.unlinkSync(linkPath);
+      fs.symlinkSync(target, linkPath);
+      fs.chmodSync(linkPath, 0o755);
+    }
+  }
 }
 
 /**
@@ -440,6 +461,8 @@ function getMaterializer(runtime: string): RuntimeMaterializer | undefined {
       return claudeCodeMaterializer;
     case "pi-coding-agent":
       return piCodingAgentMaterializer;
+    case "mcp-agent":
+      return mcpAgentMaterializer;
     default:
       return undefined;
   }
