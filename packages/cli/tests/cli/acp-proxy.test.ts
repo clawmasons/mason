@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { program } from "../../src/cli/index.js";
 import {
   acpProxy,
   resolveAgentName,
@@ -133,47 +132,8 @@ function makeDeps(overrides?: {
 }
 
 // ── Command Registration ────────────────────────────────────────────────
-
-describe("CLI acp-proxy command", () => {
-  it("has the acp-proxy command registered", () => {
-    const cmd = program.commands.find((c) => c.name() === "acp-proxy");
-    expect(cmd).toBeDefined();
-    if (cmd) {
-      expect(cmd.description()).toContain("ACP");
-    }
-  });
-
-  it("has --agent option", () => {
-    const cmd = program.commands.find((c) => c.name() === "acp-proxy");
-    expect(cmd).toBeDefined();
-    const agentOpt = cmd?.options.find((o) => o.long === "--agent");
-    expect(agentOpt).toBeDefined();
-  });
-
-  it("has --role required option", () => {
-    const cmd = program.commands.find((c) => c.name() === "acp-proxy");
-    expect(cmd).toBeDefined();
-    const roleOpt = cmd?.options.find((o) => o.long === "--role");
-    expect(roleOpt).toBeDefined();
-    expect(roleOpt?.required).toBe(true);
-  });
-
-  it("has --port option with default 3001", () => {
-    const cmd = program.commands.find((c) => c.name() === "acp-proxy");
-    expect(cmd).toBeDefined();
-    const portOpt = cmd?.options.find((o) => o.long === "--port");
-    expect(portOpt).toBeDefined();
-    expect(portOpt?.defaultValue).toBe("3001");
-  });
-
-  it("has --proxy-port option with default 3000", () => {
-    const cmd = program.commands.find((c) => c.name() === "acp-proxy");
-    expect(cmd).toBeDefined();
-    const portOpt = cmd?.options.find((o) => o.long === "--proxy-port");
-    expect(portOpt).toBeDefined();
-    expect(portOpt?.defaultValue).toBe("3000");
-  });
-});
+// acp-proxy has been removed as a CLI entry point (REQ-007).
+// Command registration tests are in build.test.ts (verifying removal).
 
 // ── resolveAgentName ────────────────────────────────────────────────────
 

@@ -2,21 +2,13 @@ import { type MockInstance, describe, it, expect, beforeEach, afterEach, vi } fr
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { program } from "../../src/cli/index.js";
 import {
   runRunInit,
   validateDockerBuildPath,
 } from "../../src/cli/commands/run-init.js";
 
-describe("CLI run-init command", () => {
-  it("has the run-init command registered", () => {
-    const cmd = program.commands.find((c) => c.name() === "run-init");
-    expect(cmd).toBeDefined();
-    if (cmd) {
-      expect(cmd.description()).toContain("Initialize");
-    }
-  });
-});
+// run-init has been removed as a CLI entry point (REQ-007).
+// Command registration removal is verified in build.test.ts.
 
 describe("validateDockerBuildPath", () => {
   let tmpDir: string;
