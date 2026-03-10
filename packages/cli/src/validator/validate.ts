@@ -47,6 +47,9 @@ function checkToolExistence(
   errors: ValidationError[],
 ): void {
   for (const [appName, perms] of Object.entries(role.permissions)) {
+    // Wildcard "*" app or wildcard allow — skip tool existence checks
+    if (appName === "*" || perms.allow.includes("*")) continue;
+
     const resolvedApp = role.apps.find((a) => a.name === appName);
     if (!resolvedApp) {
       // App not resolved — this would have been caught by the resolver.

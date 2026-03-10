@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { createServer, type Server } from "node:http";
-import { AcpBridge } from "../../src/acp/bridge.js";
+import { AcpBridge, extractCwdFromBody } from "../../src/acp/bridge.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -450,5 +450,277 @@ describe("AcpBridge", () => {
       await bridge.stop();
       await expect(bridge.stop()).resolves.toBeUndefined();
     });
+  });
+
+  describe("onSessionNew (deferred agent start)", () => {
+    it("calls onSessionNew with cwd from POST body when agent not connected", async () => {
+      const hostPort = nextPort();
+      const containerPort = nextPort();
+
+      const agent = await createMockAgent(containerPort);
+      cleanups.push(() => closeServer(agent));
+
+      const bridge = new AcpBridge({
+        hostPort,
+        containerHost: "localhost",
+        containerPort,
+        connectRetries: 0,
+      });
+
+      let receivedCwd: string | undefined;
+      bridge.onSessionNew = async (cwd: string) => {
+        receivedCwd = cwd;
+        // Simulate starting agent and connecting
+        await bridge.connectToAgent();
+      };
+
+      await bridge.start();
+      cleanups.push(() => bridge.stop());
+
+      // Send POST — agent not connected yet, so onSessionNew should be called
+      const res = await httpPost(hostPort, "/", JSON.stringify({ params: { cwd: "/projects/myapp" } }));
+
+      expect(res.status).toBe(200);
+      expect(receivedCwd).toBe("/projects/myapp");
+    });
+
+    it("falls back to process.cwd() when no cwd in body", async () => {
+      const hostPort = nextPort();
+      const containerPort = nextPort();
+
+      const agent = await createMockAgent(containerPort);
+      cleanups.push(() => closeServer(agent));
+
+      const bridge = new AcpBridge({
+        hostPort,
+        containerHost: "localhost",
+        containerPort,
+        connectRetries: 0,
+      });
+
+      let receivedCwd: string | undefined;
+      bridge.onSessionNew = async (cwd: string) => {
+        receivedCwd = cwd;
+        await bridge.connectToAgent();
+      };
+
+      await bridge.start();
+      cleanups.push(() => bridge.stop());
+
+      await httpPost(hostPort, "/", JSON.stringify({ method: "initialize" }));
+
+      expect(receivedCwd).toBe(process.cwd());
+    });
+
+    it("relays buffered request to agent after onSessionNew resolves", async () => {
+      const hostPort = nextPort();
+      const containerPort = nextPort();
+
+      const agent = await createMockAgent(containerPort);
+      cleanups.push(() => closeServer(agent));
+
+      const bridge = new AcpBridge({
+        hostPort,
+        containerHost: "localhost",
+        containerPort,
+        connectRetries: 0,
+      });
+
+      bridge.onSessionNew = async () => {
+        await bridge.connectToAgent();
+      };
+
+      await bridge.start();
+      cleanups.push(() => bridge.stop());
+
+      const body = JSON.stringify({ method: "initialize", params: { cwd: "/test" } });
+      const res = await httpPost(hostPort, "/", body);
+
+      expect(res.status).toBe(200);
+      // The mock agent echoes the body back
+      const parsed = JSON.parse(res.body);
+      expect(parsed.echo).toBe(body);
+    });
+
+    it("returns 500 when onSessionNew callback fails", async () => {
+      const hostPort = nextPort();
+      const containerPort = nextPort();
+
+      const bridge = new AcpBridge({
+        hostPort,
+        containerHost: "localhost",
+        containerPort,
+      });
+
+      bridge.onSessionNew = async () => {
+        throw new Error("Agent container failed to start");
+      };
+
+      await bridge.start();
+      cleanups.push(() => bridge.stop());
+
+      const res = await httpPost(hostPort, "/", JSON.stringify({ params: { cwd: "/test" } }));
+
+      expect(res.status).toBe(500);
+      const parsed = JSON.parse(res.body);
+      expect(parsed.error).toContain("Session startup failed");
+    });
+
+    it("returns 503 when no onSessionNew and agent not connected", async () => {
+      const hostPort = nextPort();
+      const containerPort = nextPort();
+
+      const bridge = new AcpBridge({
+        hostPort,
+        containerHost: "localhost",
+        containerPort,
+      });
+
+      // No onSessionNew set — old behavior
+      await bridge.start();
+      cleanups.push(() => bridge.stop());
+
+      const res = await httpPost(hostPort, "/", '{"command":"list"}');
+      expect(res.status).toBe(503);
+      expect(JSON.parse(res.body)).toEqual({ error: "Agent not connected" });
+    });
+
+    it("returns 503 when concurrent session starts are attempted", async () => {
+      const hostPort = nextPort();
+      const containerPort = nextPort();
+
+      const agent = await createMockAgent(containerPort);
+      cleanups.push(() => closeServer(agent));
+
+      const bridge = new AcpBridge({
+        hostPort,
+        containerHost: "localhost",
+        containerPort,
+        connectRetries: 0,
+      });
+
+      // Slow onSessionNew to create a window for concurrent requests
+      bridge.onSessionNew = async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await bridge.connectToAgent();
+      };
+
+      await bridge.start();
+      cleanups.push(() => bridge.stop());
+
+      // Send two concurrent requests
+      const [res1, res2] = await Promise.all([
+        httpPost(hostPort, "/", JSON.stringify({ params: { cwd: "/test1" } })),
+        httpPost(hostPort, "/", JSON.stringify({ params: { cwd: "/test2" } })),
+      ]);
+
+      // One should succeed (200) and the other should get 503
+      const statuses = [res1.status, res2.status].sort();
+      expect(statuses).toEqual([200, 503]);
+    });
+  });
+
+  describe("resetForNewSession()", () => {
+    it("allows new onSessionNew after reset", async () => {
+      const hostPort = nextPort();
+      const containerPort = nextPort();
+
+      const agent = await createMockAgent(containerPort);
+      cleanups.push(() => closeServer(agent));
+
+      const bridge = new AcpBridge({
+        hostPort,
+        containerHost: "localhost",
+        containerPort,
+        connectRetries: 0,
+      });
+
+      let sessionNewCallCount = 0;
+      bridge.onSessionNew = async () => {
+        sessionNewCallCount++;
+        await bridge.connectToAgent();
+      };
+
+      await bridge.start();
+      cleanups.push(() => bridge.stop());
+
+      // First session
+      await httpPost(hostPort, "/", JSON.stringify({ params: { cwd: "/test1" } }));
+      expect(sessionNewCallCount).toBe(1);
+
+      // Second request should relay directly (agent already connected)
+      await httpPost(hostPort, "/", JSON.stringify({ data: "more" }));
+      expect(sessionNewCallCount).toBe(1); // Not called again
+
+      // Reset for new session
+      bridge.resetForNewSession();
+
+      // Third request triggers onSessionNew again
+      await httpPost(hostPort, "/", JSON.stringify({ params: { cwd: "/test2" } }));
+      expect(sessionNewCallCount).toBe(2);
+    });
+
+    it("server remains running after reset", async () => {
+      const hostPort = nextPort();
+      const containerPort = nextPort();
+
+      const bridge = new AcpBridge({
+        hostPort,
+        containerHost: "localhost",
+        containerPort,
+      });
+      await bridge.start();
+      cleanups.push(() => bridge.stop());
+
+      bridge.resetForNewSession();
+
+      // Health endpoint should still work
+      const res = await httpGet(hostPort, "/health");
+      expect(res.status).toBe(200);
+    });
+  });
+});
+
+// ── extractCwdFromBody ──────────────────────────────────────────────────
+
+describe("extractCwdFromBody", () => {
+  it("extracts cwd from params.cwd (JSON-RPC style)", () => {
+    const body = Buffer.from(JSON.stringify({ method: "initialize", params: { cwd: "/projects/app" } }));
+    expect(extractCwdFromBody(body)).toBe("/projects/app");
+  });
+
+  it("extracts cwd from top-level cwd field", () => {
+    const body = Buffer.from(JSON.stringify({ cwd: "/projects/app" }));
+    expect(extractCwdFromBody(body)).toBe("/projects/app");
+  });
+
+  it("prefers params.cwd over top-level cwd", () => {
+    const body = Buffer.from(JSON.stringify({ cwd: "/top-level", params: { cwd: "/params-level" } }));
+    expect(extractCwdFromBody(body)).toBe("/params-level");
+  });
+
+  it("returns process.cwd() for empty cwd string", () => {
+    const body = Buffer.from(JSON.stringify({ params: { cwd: "" } }));
+    expect(extractCwdFromBody(body)).toBe(process.cwd());
+  });
+
+  it("returns process.cwd() for non-string cwd", () => {
+    const body = Buffer.from(JSON.stringify({ params: { cwd: 42 } }));
+    expect(extractCwdFromBody(body)).toBe(process.cwd());
+  });
+
+  it("returns process.cwd() for invalid JSON", () => {
+    const body = Buffer.from("not json at all");
+    expect(extractCwdFromBody(body)).toBe(process.cwd());
+  });
+
+  it("returns process.cwd() when no cwd field present", () => {
+    const body = Buffer.from(JSON.stringify({ method: "initialize", params: {} }));
+    expect(extractCwdFromBody(body)).toBe(process.cwd());
+  });
+
+  it("returns process.cwd() for empty body", () => {
+    const body = Buffer.from("");
+    expect(extractCwdFromBody(body)).toBe(process.cwd());
   });
 });

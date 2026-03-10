@@ -5,6 +5,13 @@ import * as path from "node:path";
 import { spawn } from "node:child_process";
 import type { RunConfig } from "./run-init.js";
 import { checkDockerCompose } from "./docker-utils.js";
+import {
+  getClawmasonsHome,
+  findRoleEntryByRole,
+  type ChapterEntry,
+} from "../../runtime/home.js";
+import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
+import { initRole, type InitRoleOptions, type InitRoleDeps } from "./init-role.js";
 
 /**
  * Generate a short unique session ID (8 hex characters).
@@ -16,6 +23,9 @@ export function generateSessionId(): string {
 /**
  * Read and validate the run-init `.clawmasons/chapter.json` config
  * from the given project directory.
+ *
+ * @deprecated Kept for backward compatibility. `runAgent` now reads from
+ * CLAWMASONS_HOME/chapters.json instead.
  */
 export function readRunConfig(projectDir: string): RunConfig {
   const configPath = path.join(projectDir, ".clawmasons", "chapter.json");
@@ -64,19 +74,19 @@ export function validateDockerfiles(
 
   if (!fs.existsSync(proxyDockerfile)) {
     throw new Error(
-      `Proxy Dockerfile not found: ${proxyDockerfile}\nRun "chapter docker-init" in the chapter project to generate Dockerfiles.`,
+      `Proxy Dockerfile not found: ${proxyDockerfile}\nRun "chapter build" in the chapter project to generate Dockerfiles.`,
     );
   }
 
   if (!fs.existsSync(agentDockerfile)) {
     throw new Error(
-      `Agent Dockerfile not found: ${agentDockerfile}\nRun "chapter docker-init" in the chapter project to generate Dockerfiles.`,
+      `Agent Dockerfile not found: ${agentDockerfile}\nRun "chapter build" in the chapter project to generate Dockerfiles.`,
     );
   }
 
   if (!fs.existsSync(credentialServiceDockerfile)) {
     throw new Error(
-      `Credential service Dockerfile not found: ${credentialServiceDockerfile}\nRun "chapter docker-init" in the chapter project to generate Dockerfiles.`,
+      `Credential service Dockerfile not found: ${credentialServiceDockerfile}\nRun "chapter build" in the chapter project to generate Dockerfiles.`,
     );
   }
 
@@ -242,6 +252,21 @@ export interface RunAgentDeps {
   generateSessionIdFn?: () => string;
   /** Override docker compose check (for testing). */
   checkDockerComposeFn?: () => void;
+  /** Override CLAWMASONS_HOME resolution (for testing). */
+  getClawmasonsHomeFn?: () => string;
+  /** Override chapters.json role lookup (for testing). */
+  findRoleEntryByRoleFn?: (
+    home: string,
+    role: string,
+  ) => ChapterEntry | undefined;
+  /** Override init-role invocation for auto-init (for testing). */
+  initRoleFn?: (
+    rootDir: string,
+    options: InitRoleOptions,
+    deps?: InitRoleDeps,
+  ) => Promise<void>;
+  /** Override .gitignore entry management (for testing). */
+  ensureGitignoreEntryFn?: (dir: string, pattern: string) => boolean;
 }
 
 export function registerRunAgentCommand(program: Command): void {
@@ -264,23 +289,48 @@ export async function runAgent(
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const genSessionId = deps?.generateSessionIdFn ?? generateSessionId;
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
+  const getHome = deps?.getClawmasonsHomeFn ?? getClawmasonsHome;
+  const findRole = deps?.findRoleEntryByRoleFn ?? findRoleEntryByRole;
+  const autoInitRole = deps?.initRoleFn ?? initRole;
+  const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
 
   try {
     // 1. Pre-flight: check docker compose is available
     checkDocker();
 
-    // 2. Read project config
-    const config = readRunConfig(projectDir);
-    const dockerBuildPath = config["docker-build"];
+    // 2. Resolve role from CLAWMASONS_HOME/chapters.json
+    const home = getHome();
+    let entry = findRole(home, role);
 
-    console.log(`\n  Chapter: ${config.chapter}`);
+    // 3. Auto-init if role not found
+    if (!entry) {
+      console.log(`\n  Role "${role}" not found in chapters.json. Auto-initializing...`);
+      await autoInitRole(projectDir, { role });
+
+      // Re-read after init
+      entry = findRole(home, role);
+
+      if (!entry) {
+        throw new Error(
+          `Role "${role}" not initialized and auto-init failed. Run "chapter init-role --role ${role}" from your chapter workspace.`,
+        );
+      }
+    }
+
+    const dockerBuildPath = entry.dockerBuild;
+    const chapterName = `${entry.lodge}.${entry.chapter}`;
+
+    console.log(`\n  Chapter: ${chapterName}`);
     console.log(`  Agent: ${agent}`);
     console.log(`  Role: ${role}`);
 
-    // 3. Validate Dockerfiles exist
+    // 4. Validate Dockerfiles exist
     validateDockerfiles(dockerBuildPath, agent, role);
 
-    // 4. Generate session ID and create session directory
+    // 5. Ensure .clawmasons is in project's .gitignore
+    ensureGitignore(projectDir, ".clawmasons");
+
+    // 6. Generate session ID and create session directory
     const sessionId = genSessionId();
     const sessionDir = path.join(projectDir, ".clawmasons", "sessions", sessionId, "docker");
     fs.mkdirSync(sessionDir, { recursive: true });
@@ -290,7 +340,7 @@ export async function runAgent(
 
     console.log(`  Session: ${sessionId}`);
 
-    // 5. Generate tokens and docker-compose.yml
+    // 7. Generate tokens and docker-compose.yml
     const proxyToken = crypto.randomBytes(32).toString("hex");
     const credentialProxyToken = crypto.randomBytes(32).toString("hex");
 
@@ -308,7 +358,7 @@ export async function runAgent(
     fs.writeFileSync(composeFile, composeContent);
     console.log(`  Compose: .clawmasons/sessions/${sessionId}/docker/docker-compose.yml`);
 
-    // 6. Start proxy detached
+    // 8. Start proxy detached
     const proxyServiceName = `proxy-${role}`;
     console.log(`\n  Starting proxy (${proxyServiceName})...`);
 
@@ -321,7 +371,7 @@ export async function runAgent(
     }
     console.log(`  Proxy started in background.`);
 
-    // 7. Start credential service detached
+    // 9. Start credential service detached
     console.log(`  Starting credential service...`);
 
     const credServiceCode = await execCompose(
@@ -333,7 +383,7 @@ export async function runAgent(
     }
     console.log(`  Credential service started in background.`);
 
-    // 8. Start agent interactively
+    // 10. Start agent interactively
     const agentServiceName = `agent-${agent}-${role}`;
     console.log(`  Starting agent (${agentServiceName})...\n`);
 
@@ -343,7 +393,7 @@ export async function runAgent(
       { interactive: true },
     );
 
-    // 9. Tear down all containers on agent exit
+    // 11. Tear down all containers on agent exit
     console.log(`\n  Agent exited (code ${agentCode}). Tearing down services...`);
 
     await execCompose(composeFile, ["down"]);

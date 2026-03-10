@@ -4,109 +4,34 @@
  * Validates that the chapter CLI can build, validate, list, and generate
  * Docker artifacts for a pi-coding-agent agent with OpenRouter LLM config.
  *
- * The test creates a temporary workspace from fixtures, runs chapter build,
- * sets up a docker/ directory with symlinked packages, and calls
- * generateDockerfiles() programmatically to verify the full output.
+ * All setup and generation is done exclusively via `chapter build`.
+ * Tests verify CLI output: exit codes, generated files, and command output.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { generateDockerfiles } from "../../packages/cli/src/cli/commands/docker-init.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const E2E_ROOT = path.resolve(__dirname, "..");
-const PROJECT_ROOT = path.resolve(E2E_ROOT, "..");
-const FIXTURES_DIR = path.join(E2E_ROOT, "fixtures", "test-chapter");
-const CHAPTER_BIN = path.join(PROJECT_ROOT, "bin", "chapter.js");
-
-/** Workspace directories to copy from fixtures. */
-const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons"];
-
-/**
- * Recursively copy a directory tree, skipping node_modules and .git.
- */
-function copyDirRecursive(src: string, dest: string): void {
-  if (!fs.existsSync(src)) return;
-  fs.mkdirSync(dest, { recursive: true });
-
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-
-    if (entry.isDirectory()) {
-      if (entry.name === "node_modules" || entry.name === ".git") continue;
-      copyDirRecursive(srcPath, destPath);
-    } else {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
-}
+import {
+  E2E_ROOT,
+  copyFixtureWorkspace,
+  chapterExec,
+  chapterExecJson,
+} from "./helpers.js";
 
 describe("note-taker on pi-coding-agent with OpenRouter", () => {
   let workspaceDir: string;
   let dockerDir: string;
 
   beforeAll(() => {
-    // 1. Create temp workspace and copy fixture tree
-    const timestamp = Date.now();
-    workspaceDir = path.join(E2E_ROOT, "tmp", `chapter-e2e-${timestamp}`);
-    fs.mkdirSync(workspaceDir, { recursive: true });
+    // 1. Create temp workspace from fixtures
+    workspaceDir = copyFixtureWorkspace("build-pi-runtime");
 
-    // Copy root package.json
-    fs.copyFileSync(
-      path.join(FIXTURES_DIR, "package.json"),
-      path.join(workspaceDir, "package.json"),
-    );
+    // 2. Run chapter build (resolve + pack + docker-init)
+    chapterExec(["build", "@test/agent-test-note-taker"], workspaceDir, {
+      timeout: 120_000,
+    });
 
-    // Copy workspace directories (including .clawmasons)
-    for (const wsDir of WORKSPACE_DIRS) {
-      const fixtureSrc = path.join(FIXTURES_DIR, wsDir);
-      const workspaceDest = path.join(workspaceDir, wsDir);
-      if (fs.existsSync(fixtureSrc)) {
-        copyDirRecursive(fixtureSrc, workspaceDest);
-      } else {
-        fs.mkdirSync(workspaceDest, { recursive: true });
-      }
-    }
-
-    // 2. Run chapter build @test/agent-test-note-taker
-    execFileSync(
-      "node",
-      [CHAPTER_BIN, "build", "@test/agent-test-note-taker"],
-      {
-        cwd: workspaceDir,
-        stdio: "pipe",
-        timeout: 30_000,
-      },
-    );
-
-    // 3. Set up docker/ with mock node_modules containing fixture packages
     dockerDir = path.join(workspaceDir, "docker");
-    fs.mkdirSync(dockerDir, { recursive: true });
-
-    const nmScopeDir = path.join(dockerDir, "node_modules", "@test");
-    fs.mkdirSync(nmScopeDir, { recursive: true });
-
-    const packageMappings: [string, string][] = [
-      ["apps/filesystem", "app-filesystem"],
-      ["tasks/take-notes", "task-take-notes"],
-      ["skills/markdown-conventions", "skill-markdown-conventions"],
-      ["roles/writer", "role-writer"],
-      ["agents/test-note-taker", "agent-test-note-taker"],
-    ];
-
-    for (const [srcRel, pkgName] of packageMappings) {
-      fs.symlinkSync(
-        path.join(workspaceDir, srcRel),
-        path.join(nmScopeDir, pkgName),
-      );
-    }
-
-    // 4. Generate Dockerfiles
-    generateDockerfiles(dockerDir);
   }, 120_000);
 
   afterAll(() => {
@@ -274,29 +199,12 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
 
   describe("validate and list", () => {
     it("chapter validate exits 0", () => {
-      execFileSync(
-        "node",
-        [CHAPTER_BIN, "validate", "@test/agent-test-note-taker"],
-        {
-          cwd: workspaceDir,
-          stdio: "pipe",
-          timeout: 30_000,
-        },
-      );
+      chapterExec(["validate", "@test/agent-test-note-taker"], workspaceDir);
     });
 
     it("chapter list --json includes the agent", () => {
-      const output = execFileSync(
-        "node",
-        [CHAPTER_BIN, "list", "--json"],
-        {
-          cwd: workspaceDir,
-          stdio: "pipe",
-          timeout: 30_000,
-        },
-      ).toString();
+      const agents = chapterExecJson<unknown[]>(["list", "--json"], workspaceDir);
 
-      const agents = JSON.parse(output);
       expect(agents).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "@test/agent-test-note-taker" }),

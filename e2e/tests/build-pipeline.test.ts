@@ -1,130 +1,58 @@
 /**
- * E2E Test: Full docker-init → run-init → run-agent validation flow
+ * E2E Test: Full chapter build → run-agent validation flow
  *
  * Exercises the real pipeline:
  *   1. Copy fixture workspace to temp dir
- *   2. Run `chapter pack` to create dist/*.tgz
- *   3. Run `chapter docker-init` (copies framework packages + extracts tgz + generates Dockerfiles)
- *   4. Create a separate "runner" project directory
- *   5. Run `run-init` programmatically (inject promptFn)
- *   6. Validate that `run-agent` prerequisites are satisfied
+ *   2. Run `chapter build` (resolve + pack + docker-init in one step)
+ *   3. Validate Docker artifacts, Dockerfiles, and workspace materialization
+ *   4. Validate that run-agent prerequisites (Dockerfiles) exist
+ *   5. Build and start proxy container, verify MCP connectivity
+ *
+ * All setup is done exclusively via `chapter build`.
+ * Tests verify CLI output: exit codes, generated files, and running containers.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
-import { execFileSync, execSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { execSync } from "node:child_process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { runRunInit } from "../../packages/cli/src/cli/commands/run-init.js";
-import { readRunConfig, validateDockerfiles } from "../../packages/cli/src/cli/commands/run-agent.js";
+import {
+  copyFixtureWorkspace,
+  chapterExec,
+  waitForHealth,
+} from "./helpers.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const E2E_ROOT = path.resolve(__dirname, "..");
-const PROJECT_ROOT = path.resolve(E2E_ROOT, "..");
-const FIXTURES_DIR = path.join(E2E_ROOT, "fixtures", "test-chapter");
-const CHAPTER_BIN = path.join(PROJECT_ROOT, "bin", "chapter.js");
-
-/** Workspace directories to copy from fixtures. */
-const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons"];
-
-/**
- * Recursively copy a directory tree, skipping node_modules and .git.
- */
-function copyDirRecursive(src: string, dest: string): void {
-  if (!fs.existsSync(src)) return;
-  fs.mkdirSync(dest, { recursive: true });
-
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-
-    if (entry.isDirectory()) {
-      if (entry.name === "node_modules" || entry.name === ".git") continue;
-      copyDirRecursive(srcPath, destPath);
-    } else {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
-}
-
-describe("full docker-init → run-init → run-agent flow", () => {
+describe("full chapter build → run-agent validation flow", () => {
   let workspaceDir: string;
   let dockerDir: string;
-  let runnerDir: string;
 
   beforeAll(async () => {
-    const timestamp = Date.now();
+    // 1. Create temp workspace from fixtures
+    workspaceDir = copyFixtureWorkspace("build-pipeline");
 
-    // 1. Create temp workspace and copy fixture tree
-    workspaceDir = path.join(E2E_ROOT, "tmp", `docker-init-full-${timestamp}`);
-    fs.mkdirSync(workspaceDir, { recursive: true });
-
-    // Copy root package.json
-    fs.copyFileSync(
-      path.join(FIXTURES_DIR, "package.json"),
-      path.join(workspaceDir, "package.json"),
-    );
-
-    // Copy workspace directories
-    for (const wsDir of WORKSPACE_DIRS) {
-      const fixtureSrc = path.join(FIXTURES_DIR, wsDir);
-      const workspaceDest = path.join(workspaceDir, wsDir);
-      if (fs.existsSync(fixtureSrc)) {
-        copyDirRecursive(fixtureSrc, workspaceDest);
-      } else {
-        fs.mkdirSync(workspaceDest, { recursive: true });
-      }
-    }
-
-    // 2. Run chapter pack (creates dist/*.tgz)
-    execFileSync(
-      "node",
-      [CHAPTER_BIN, "pack"],
-      {
-        cwd: workspaceDir,
-        stdio: "pipe",
-        timeout: 60_000,
-      },
-    );
-
-    // 3. Run chapter docker-init (copies framework packages, extracts tgz, generates Dockerfiles)
-    execFileSync(
-      "node",
-      [CHAPTER_BIN, "docker-init"],
-      {
-        cwd: workspaceDir,
-        stdio: "pipe",
-        timeout: 60_000,
-      },
-    );
+    // 2. Run chapter build (resolve + pack + docker-init in one step)
+    chapterExec(["build"], workspaceDir, { timeout: 120_000 });
 
     dockerDir = path.join(workspaceDir, "docker");
-
-    // 4. Create a runner project directory
-    runnerDir = path.join(E2E_ROOT, "tmp", `runner-${timestamp}`);
-    fs.mkdirSync(runnerDir, { recursive: true });
-
-    // 5. Run run-init with injected promptFn
-    await runRunInit(runnerDir, {
-      promptFn: async () => dockerDir,
-    });
   }, 120_000);
 
   afterAll(() => {
     if (workspaceDir && fs.existsSync(workspaceDir)) {
       fs.rmSync(workspaceDir, { recursive: true, force: true });
     }
-    if (runnerDir && fs.existsSync(runnerDir)) {
-      fs.rmSync(runnerDir, { recursive: true, force: true });
-    }
   });
 
-  // ── Pack Output ───────────────────────────────────────────────────────
+  // ── Build Output ────────────────────────────────────────────────────
 
-  describe("pack output", () => {
+  describe("build output", () => {
+    it("creates chapter.lock.json", () => {
+      const lockPath = path.join(workspaceDir, "chapter.lock.json");
+      expect(fs.existsSync(lockPath)).toBe(true);
+    });
+
     it("creates dist/ with .tgz files", () => {
       const distDir = path.join(workspaceDir, "dist");
       expect(fs.existsSync(distDir)).toBe(true);
@@ -236,40 +164,21 @@ describe("full docker-init → run-init → run-agent flow", () => {
     });
   });
 
-  // ── Run Init ──────────────────────────────────────────────────────────
-
-  describe("run-init output", () => {
-    it("creates .clawmasons/chapter.json in runner project", () => {
-      const configPath = path.join(runnerDir, ".clawmasons", "chapter.json");
-      expect(fs.existsSync(configPath)).toBe(true);
-    });
-
-    it("runner config has correct docker-build path", () => {
-      const config = readRunConfig(runnerDir);
-      expect(config["docker-build"]).toBe(dockerDir);
-      expect(config.chapter).toBe("test.chapter");
-    });
-
-    it("creates .clawmasons/logs/ directory", () => {
-      expect(
-        fs.existsSync(path.join(runnerDir, ".clawmasons", "logs")),
-      ).toBe(true);
-    });
-
-    it("creates .clawmasons/workspace/ directory", () => {
-      expect(
-        fs.existsSync(path.join(runnerDir, ".clawmasons", "workspace")),
-      ).toBe(true);
-    });
-  });
-
-  // ── Run Agent Validation ──────────────────────────────────────────────
+  // ── Run Agent Prerequisites ──────────────────────────────────────────
 
   describe("run-agent prerequisites", () => {
-    it("validateDockerfiles succeeds for test-note-taker/writer", () => {
-      const result = validateDockerfiles(dockerDir, "test-note-taker", "writer");
-      expect(result.proxyDockerfile).toContain("proxy/writer/Dockerfile");
-      expect(result.agentDockerfile).toContain("agent/test-note-taker/writer/Dockerfile");
+    it("proxy Dockerfile exists for test-note-taker/writer", () => {
+      expect(
+        fs.existsSync(path.join(dockerDir, "proxy", "writer", "Dockerfile")),
+      ).toBe(true);
+    });
+
+    it("agent Dockerfile exists for test-note-taker/writer", () => {
+      expect(
+        fs.existsSync(
+          path.join(dockerDir, "agent", "test-note-taker", "writer", "Dockerfile"),
+        ),
+      ).toBe(true);
     });
   });
 
@@ -282,6 +191,10 @@ describe("full docker-init → run-init → run-agent flow", () => {
     let composeFile: string;
 
     beforeAll(() => {
+      // Create notes directory required by the filesystem MCP server
+      const notesDir = path.join(workspaceDir, "notes");
+      fs.mkdirSync(notesDir, { recursive: true });
+
       // Generate a test-specific compose file with port mapping
       const composeContent = `# Generated for e2e proxy boot test
 services:
@@ -293,9 +206,10 @@ services:
       - "${TEST_PORT}:9090"
     volumes:
       - "${workspaceDir}:/workspace"
+      - "${path.join(workspaceDir, "notes")}:/app/notes"
     environment:
       - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
-    command: ["proxy", "--agent", "test-note-taker", "--transport", "streamable-http"]
+    command: ["proxy", "--agent", "@test/agent-test-note-taker", "--transport", "streamable-http"]
     restart: "no"
 `;
       const composeDir = path.join(workspaceDir, "e2e-compose");
@@ -336,32 +250,11 @@ services:
     }, 65_000);
 
     it("proxy health endpoint responds", async () => {
-      const maxWait = 30_000;
-      const start = Date.now();
-      let ready = false;
-
-      while (Date.now() - start < maxWait) {
-        try {
-          const resp = await fetch(`http://localhost:${TEST_PORT}/health`);
-          if (resp.ok) {
-            ready = true;
-            break;
-          }
-        } catch {
-          // Not ready yet
-        }
-        await new Promise((r) => setTimeout(r, 1_000));
-      }
-
-      if (!ready) {
-        const logs = execSync(
-          `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" logs proxy-writer`,
-          { stdio: "pipe" },
-        ).toString();
-        throw new Error(`Proxy failed to become ready. Logs:\n${logs}`);
-      }
-
-      expect(ready).toBe(true);
+      await waitForHealth(`http://localhost:${TEST_PORT}/health`, 30_000, {
+        composeProject: COMPOSE_PROJECT,
+        composeFile,
+        service: "proxy-writer",
+      });
     }, 35_000);
 
     it("MCP client connects with valid token and lists tools", async () => {
