@@ -4,6 +4,7 @@ import { registerBuildCommand } from "./build.js";
 import { registerInitCommand } from "./init.js";
 import { registerInitRoleCommand } from "./init-role.js";
 import { registerListCommand } from "./list.js";
+import { registerLodgeInitCommand } from "./lodge-init.js";
 import { registerPackCommand } from "./pack.js";
 import { registerPermissionsCommand } from "./permissions.js";
 import { registerProxyCommand } from "./proxy.js";
@@ -19,17 +20,8 @@ import { registerValidateCommand } from "./validate.js";
 export function registerCommands(program: Command): void {
   // ── Top-level commands ──────────────────────────────────────────────
 
-  // Placeholder `init` — lodge initialization (implemented in a future change)
-  program
-    .command("init")
-    .description("Initialize a new lodge (coming soon)")
-    .action(() => {
-      console.log(
-        "\n  Lodge initialization is not yet implemented.\n" +
-        "  This command will be available in a future release.\n" +
-        "\n  To initialize a chapter workspace, use: clawmasons chapter init --name <lodge>.<chapter>\n",
-      );
-    });
+  // `init` — lodge initialization
+  registerLodgeInitCommand(program);
 
   // `agent` — renamed from `run-agent`
   registerRunAgentCommand(program);
