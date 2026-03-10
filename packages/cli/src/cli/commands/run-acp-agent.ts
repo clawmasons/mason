@@ -141,6 +141,45 @@ export function registerRunAcpAgentCommand(program: Command): void {
     });
 }
 
+// ── Environment Variable Credential Collection ───────────────────────
+
+/**
+ * Collect environment variables from process.env that match the agent's
+ * declared credentials (agent-level + app-level across all roles).
+ *
+ * This enables the ACP client's `env` block to flow credentials through
+ * to the credential-service container as session overrides.
+ *
+ * @param agent - The resolved agent with credential declarations
+ * @param env - The environment to read from (defaults to process.env)
+ * @returns A record of credential key -> value for all matched env vars
+ */
+export function collectEnvCredentials(
+  agent: ResolvedAgent,
+  env: Record<string, string | undefined> = process.env,
+): Record<string, string> {
+  // Build the set of all declared credential keys
+  const declaredKeys = new Set<string>(agent.credentials);
+  for (const role of agent.roles) {
+    for (const app of role.apps) {
+      for (const key of app.credentials) {
+        declaredKeys.add(key);
+      }
+    }
+  }
+
+  // Collect matching env vars
+  const collected: Record<string, string> = {};
+  for (const key of declaredKeys) {
+    const value = env[key];
+    if (value !== undefined && value !== "") {
+      collected[key] = value;
+    }
+  }
+
+  return collected;
+}
+
 // ── Agent Name Resolution ─────────────────────────────────────────────
 
 /**
@@ -369,9 +408,16 @@ export async function runAcpAgent(
     const toolFilters = computeToolFilters(agent);
     const toolCount = Object.keys(toolFilters).length;
 
+    // ── Step 4b: Collect env credentials ─────────────────────────────
+    const envCredentials = collectEnvCredentials(agent);
+    const envCredCount = Object.keys(envCredentials).length;
+
     console.log(`[clawmasons acp] Agent: ${agent.name}`);
     console.log(`[clawmasons acp] Role: ${options.role}`);
     console.log(`[clawmasons acp] Tool filters: ${toolCount} app(s)`);
+    if (envCredCount > 0) {
+      console.log(`[clawmasons acp] Env credentials: ${envCredCount} key(s) from process.env`);
+    }
 
     // ── Step 5: Create session and start infrastructure ────────────────
     session = createSession({
@@ -380,6 +426,7 @@ export async function runAcpAgent(
       role: options.role,
       acpPort: acpAgentPort,
       proxyPort,
+      ...(envCredCount > 0 ? { credentials: envCredentials } : {}),
     });
 
     console.log("[clawmasons acp] Starting infrastructure (proxy + credential-service)...");
