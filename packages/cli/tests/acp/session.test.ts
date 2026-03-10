@@ -769,4 +769,88 @@ describe("generateAgentComposeYml", () => {
 
     expect(yml).toContain('"5555:5555"');
   });
+
+  it("includes role mounts in agent volumes", () => {
+    const yml = generateAgentComposeYml({
+      ...defaultOpts,
+      roleMounts: [
+        { source: "/host/data", target: "/container/data", readonly: false },
+      ],
+    });
+
+    expect(yml).toContain('"/host/data:/container/data"');
+    expect(yml).toContain('"/projects/myapp:/workspace"');
+  });
+
+  it("appends :ro for readonly role mounts", () => {
+    const yml = generateAgentComposeYml({
+      ...defaultOpts,
+      roleMounts: [
+        { source: "/host/config", target: "/etc/config", readonly: true },
+      ],
+    });
+
+    expect(yml).toContain('"/host/config:/etc/config:ro"');
+  });
+
+  it("has no extra mounts when roleMounts is undefined", () => {
+    const yml = generateAgentComposeYml(defaultOpts);
+    const volumeSection = yml.split("volumes:")[1]!.split("environment:")[0]!;
+
+    // Only workspace mount
+    const mountLines = volumeSection.split("\n").filter((l) => l.includes("- \""));
+    expect(mountLines).toHaveLength(1);
+    expect(mountLines[0]).toContain("/workspace");
+  });
+});
+
+// ── generateAcpComposeYml role mounts ────────────────────────────────
+
+describe("generateAcpComposeYml role mounts", () => {
+  const defaultOpts = {
+    dockerBuildPath: "/chapters/acme/docker",
+    projectDir: "/projects/my-project",
+    agent: "note-taker",
+    role: "writer",
+    logsDir: "/projects/my-project/.clawmasons/logs",
+    proxyToken: "test-proxy-token",
+    credentialProxyToken: "test-cred-token",
+    acpPort: 3002,
+  };
+
+  it("includes role mounts in agent service volumes", () => {
+    const yml = generateAcpComposeYml({
+      ...defaultOpts,
+      roleMounts: [
+        { source: "/data/shared", target: "/mnt/shared", readonly: false },
+      ],
+    });
+
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    expect(agentSection).toContain('"/data/shared:/mnt/shared"');
+  });
+
+  it("does not add role mounts to proxy volumes", () => {
+    const yml = generateAcpComposeYml({
+      ...defaultOpts,
+      roleMounts: [
+        { source: "/data/shared", target: "/mnt/shared", readonly: false },
+      ],
+    });
+
+    const proxySection = yml.split("credential-service:")[0]!;
+    expect(proxySection).not.toContain("/mnt/shared");
+  });
+
+  it("appends :ro for readonly role mounts in legacy compose", () => {
+    const yml = generateAcpComposeYml({
+      ...defaultOpts,
+      roleMounts: [
+        { source: "/configs", target: "/etc/app", readonly: true },
+      ],
+    });
+
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    expect(agentSection).toContain('"/configs:/etc/app:ro"');
+  });
 });

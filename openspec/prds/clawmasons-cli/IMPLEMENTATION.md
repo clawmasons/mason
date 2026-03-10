@@ -94,7 +94,7 @@ Wire the role schema extensions from CHANGE 3 into Dockerfile generation and Doc
 
 **Testable output:** Unit tests verify: (a) Dockerfile with custom baseImage uses correct FROM, (b) Dockerfile with aptPackages includes apt-get install, (c) Dockerfile without these fields is unchanged, (d) compose volumes include role mounts with env vars resolved, (e) readonly mounts append `:ro`. Integration: `clawmasons chapter build` on a chapter with role mounts produces correct Docker artifacts.
 
-**Not Implemented Yet**
+**Implemented:** [spec](../../changes/archive/2026-03-10-agent-dockerfile-mounts/spec.md)
 
 ---
 

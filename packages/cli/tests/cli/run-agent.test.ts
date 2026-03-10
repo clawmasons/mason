@@ -390,6 +390,53 @@ describe("generateComposeYml", () => {
     expect(yml).toContain('dockerfile: "proxy/reviewer/Dockerfile"');
     expect(yml).toContain('dockerfile: "agent/coder/reviewer/Dockerfile"');
   });
+
+  it("includes role mounts in agent volumes", () => {
+    const yml = generateComposeYml({
+      ...defaultOpts,
+      roleMounts: [
+        { source: "/host/data", target: "/container/data", readonly: false },
+      ],
+    });
+
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    expect(agentSection).toContain('"/host/data:/container/data"');
+    expect(agentSection).toContain('"/projects/my-project:/workspace"');
+  });
+
+  it("appends :ro for readonly role mounts", () => {
+    const yml = generateComposeYml({
+      ...defaultOpts,
+      roleMounts: [
+        { source: "/configs", target: "/etc/app", readonly: true },
+      ],
+    });
+
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    expect(agentSection).toContain('"/configs:/etc/app:ro"');
+  });
+
+  it("does not add role mounts to proxy volumes", () => {
+    const yml = generateComposeYml({
+      ...defaultOpts,
+      roleMounts: [
+        { source: "/host/data", target: "/mnt/data", readonly: false },
+      ],
+    });
+
+    const proxySection = yml.split("credential-service:")[0]!;
+    expect(proxySection).not.toContain("/mnt/data");
+  });
+
+  it("agent has no extra mounts when roleMounts is undefined", () => {
+    const yml = generateComposeYml(defaultOpts);
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    const volumeSection = agentSection.split("volumes:")[1]!.split("depends_on:")[0]!;
+
+    const mountLines = volumeSection.split("\n").filter((l) => l.includes("- \""));
+    expect(mountLines).toHaveLength(1);
+    expect(mountLines[0]).toContain("/workspace");
+  });
 });
 
 // ── runAgent (integration) ──────────────────────────────────────────────
