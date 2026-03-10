@@ -41,3 +41,36 @@ If `insertAuditLog()` throws an error (e.g., disk full, database locked), the au
 - **WHEN** `auditPostHook()` is called and `insertAuditLog()` throws an error
 - **THEN** the error is caught and logged to stderr
 - **AND** the tool call result is returned to the runtime normally
+
+### Requirement: HookContext supports ACP session metadata
+The `HookContext` interface SHALL contain optional fields `sessionType` (string, e.g., `"acp"`) and `acpClient` (string, e.g., `"zed"`). When provided, these values SHALL be included in the `AuditLogEntry` as `session_type` and `acp_client` columns. When not provided, the columns SHALL be NULL (backward compatible with direct proxy sessions).
+
+#### Scenario: ACP tool call logged with session metadata
+- **WHEN** `auditPostHook()` is called with a context that has `sessionType: "acp"` and `acpClient: "zed"`
+- **THEN** `insertAuditLog()` is called with an entry containing `session_type: "acp"` and `acp_client: "zed"`
+
+#### Scenario: Direct proxy call logged without session metadata
+- **WHEN** `auditPostHook()` is called with a context that has no `sessionType` or `acpClient`
+- **THEN** `insertAuditLog()` is called with an entry containing `session_type: null` and `acp_client: null`
+
+### Requirement: logDroppedServers logs each dropped MCP server as an audit entry
+The `logDroppedServers(db, unmatched, agentName, roleName, acpClient?)` function SHALL create one audit entry per dropped server with `status: "dropped"`, `session_type: "acp"`, the server name as both `app_name` and `tool_name`, the drop reason as `result`, and `duration_ms: 0`. Database write failures SHALL be caught and logged to stderr (same resilience as `auditPostHook`).
+
+#### Scenario: Dropped servers logged
+- **WHEN** `logDroppedServers()` is called with two unmatched servers
+- **THEN** two audit entries are created with `status: "dropped"` and `session_type: "acp"`
+
+#### Scenario: Empty unmatched list is a no-op
+- **WHEN** `logDroppedServers()` is called with an empty unmatched list
+- **THEN** no audit entries are created
+
+#### Scenario: Database write failure for dropped servers is swallowed
+- **WHEN** `logDroppedServers()` is called and `insertAuditLog()` throws an error
+- **THEN** the error is caught and logged to stderr
+- **AND** the function does not throw
+
+### Requirement: AuditLogEntry status type includes "dropped"
+The `AuditLogEntry.status` field SHALL accept `"dropped"` as a valid status value, in addition to the existing `"success"`, `"error"`, `"denied"`, and `"timeout"` values.
+
+### Requirement: audit_log schema includes session_type and acp_client columns
+The `audit_log` table SHALL contain nullable `session_type` (TEXT) and `acp_client` (TEXT) columns. These columns are added via `ALTER TABLE` migrations at database open time, wrapped in try/catch for idempotency. The `queryAuditLog` function SHALL support filtering by `session_type`.

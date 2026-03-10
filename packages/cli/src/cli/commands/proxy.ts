@@ -131,6 +131,8 @@ export async function startProxy(
       ?? agent.proxy?.type
       ?? "sse";
     const authToken = process.env.CHAPTER_PROXY_TOKEN || undefined;
+    const sessionType = process.env.CHAPTER_SESSION_TYPE || undefined;
+    const acpClient = process.env.CHAPTER_ACP_CLIENT || undefined;
 
     server = new ChapterProxyServer({
       port,
@@ -143,6 +145,8 @@ export async function startProxy(
       approvalPatterns: approvalPatterns.length > 0 ? approvalPatterns : undefined,
       resourceRouter,
       promptRouter,
+      sessionType,
+      acpClient,
     });
 
     await server.start();
