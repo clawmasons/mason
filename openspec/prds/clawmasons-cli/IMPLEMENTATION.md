@@ -117,7 +117,7 @@ Implement the `clawmasons init` command that creates a lodge directory structure
 
 **Testable output:** Unit tests verify: (a) creates CLAWMASONS_HOME and config.json from scratch, (b) creates LODGE_HOME with CHARTER.md and chapters/, (c) registers lodge in config.json, (d) idempotent — skips if already initialized, (e) does not overwrite existing CHARTER.md, (f) custom --lodge-home is registered correctly. CLI test: `clawmasons init --lodge test` creates expected directory structure.
 
-**Not Implemented Yet**
+**Implemented:** [spec](../../changes/archive/2026-03-10-lodge-init-command/spec.md)
 
 ---
 
