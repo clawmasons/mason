@@ -165,7 +165,7 @@ Update E2E tests to use `chapter build` instead of the separate `pack` -> `docke
 
 **Testable output:** (a) `docker-init-full.test.ts` uses `chapter build` as setup, (b) all existing assertions about Docker artifacts still pass, (c) new assertion: `chapter.lock.json` exists after build, (d) ACP tests reference `run-acp-agent`, (e) no tests reference removed commands (`docker-init`, `run-init`, `acp-proxy`), (f) full E2E suite passes.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived change](../../changes/archive/2026-03-10-e2e-test-updates/) ([proposal](../../changes/archive/2026-03-10-e2e-test-updates/proposal.md), [design](../../changes/archive/2026-03-10-e2e-test-updates/design.md), [tasks](../../changes/archive/2026-03-10-e2e-test-updates/tasks.md)). Source: `e2e/tests/docker-init-full.test.ts`, `e2e/tests/acp-proxy.test.ts`. 1028 total tests passing.
 
 ---
 
