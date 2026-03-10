@@ -110,6 +110,19 @@ export function findRoleEntry(
 }
 
 /**
+ * Find a role entry in chapters.json by role name only.
+ * Useful when lodge/chapter are not known (e.g., run-agent from a project directory).
+ * Returns the first matching entry or undefined.
+ */
+export function findRoleEntryByRole(
+  home: string,
+  role: string,
+): ChapterEntry | undefined {
+  const data = readChaptersJson(home);
+  return data.chapters.find((entry) => entry.role === role);
+}
+
+/**
  * Insert or update a role entry in chapters.json.
  * Matches by composite key (lodge, chapter, role).
  * If found, updates the existing entry's fields and sets updatedAt.
