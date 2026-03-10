@@ -67,6 +67,9 @@ export interface ResolvedRole {
     maxConcurrentTasks?: number;
     requireApprovalFor?: string[];
   };
+  mounts?: Array<{ source: string; target: string; readonly: boolean }>;
+  baseImage?: string;
+  aptPackages?: string[];
   tasks: ResolvedTask[];
   apps: ResolvedApp[];
   skills: ResolvedSkill[];

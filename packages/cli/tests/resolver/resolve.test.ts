@@ -715,6 +715,74 @@ describe("resolveAgent", () => {
     });
   });
 
+  describe("role schema extensions (mounts, baseImage, aptPackages)", () => {
+    it("resolves role with mounts, baseImage, and aptPackages", () => {
+      const packages = new Map<string, DiscoveredPackage>();
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
+        name: "Test",
+        slug: "test",
+        runtimes: ["claude-code"],
+        roles: ["@test/role"],
+        credentials: [],
+        resources: [],
+      }));
+      packages.set("@test/role", makePkg("@test/role", "1.0.0", {
+        type: "role",
+        risk: "LOW",
+        permissions: {},
+        mounts: [
+          { source: "${LODGE_HOME}", target: "/home/mason/${LODGE}", readonly: false },
+          { source: "/tmp/cache", target: "/cache", readonly: true },
+        ],
+        baseImage: "node:22-bookworm",
+        aptPackages: ["git", "curl", "jq"],
+      }));
+
+      const resolved = resolveAgent("@test/agent", packages);
+      const role = resolved.roles[0];
+      expect(role.mounts).toHaveLength(2);
+      expect(role.mounts![0]).toEqual({ source: "${LODGE_HOME}", target: "/home/mason/${LODGE}", readonly: false });
+      expect(role.mounts![1]).toEqual({ source: "/tmp/cache", target: "/cache", readonly: true });
+      expect(role.baseImage).toBe("node:22-bookworm");
+      expect(role.aptPackages).toEqual(["git", "curl", "jq"]);
+    });
+
+    it("resolves role without new fields (backwards compatible)", () => {
+      const packages = new Map<string, DiscoveredPackage>();
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
+        name: "Test",
+        slug: "test",
+        runtimes: ["claude-code"],
+        roles: ["@test/role"],
+        credentials: [],
+        resources: [],
+      }));
+      packages.set("@test/role", makePkg("@test/role", "1.0.0", {
+        type: "role",
+        risk: "LOW",
+        permissions: {},
+      }));
+
+      const resolved = resolveAgent("@test/agent", packages);
+      const role = resolved.roles[0];
+      expect(role.mounts).toBeUndefined();
+      expect(role.baseImage).toBeUndefined();
+      expect(role.aptPackages).toBeUndefined();
+    });
+
+    it("existing repo-ops fixture has no mounts/baseImage/aptPackages", () => {
+      const packages = buildRepoOpsFixture();
+      const resolved = resolveAgent("@clawmasons/agent-repo-ops", packages);
+      for (const role of resolved.roles) {
+        expect(role.mounts).toBeUndefined();
+        expect(role.baseImage).toBeUndefined();
+        expect(role.aptPackages).toBeUndefined();
+      }
+    });
+  });
+
   describe("minimal agents", () => {
     it("resolves agent with role that has no tasks or skills", () => {
       const packages = new Map<string, DiscoveredPackage>();
