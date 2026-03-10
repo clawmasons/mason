@@ -16,9 +16,9 @@ import type { ChapterEntry } from "../../src/runtime/home.js";
 
 // ── Command Registration ────────────────────────────────────────────────
 
-describe("CLI run-agent command", () => {
-  it("has the run-agent command registered", () => {
-    const cmd = program.commands.find((c) => c.name() === "run-agent");
+describe("CLI agent command", () => {
+  it("has the agent command registered at top level", () => {
+    const cmd = program.commands.find((c) => c.name() === "agent");
     expect(cmd).toBeDefined();
     if (cmd) {
       expect(cmd.description()).toContain("Run a chapter agent");
@@ -551,7 +551,7 @@ describe("runAgent", () => {
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("run-agent failed");
+    expect(errorOutput).toContain("agent failed");
     expect(errorOutput).toContain("init-role");
   });
 
@@ -788,7 +788,7 @@ describe("runAgent", () => {
     expect(logOutput).toContain("note-taker");
     expect(logOutput).toContain("writer");
     expect(logOutput).toContain("log00001");
-    expect(logOutput).toContain("run-agent complete");
+    expect(logOutput).toContain("agent complete");
   });
 
   // ── Error Cases ──────────────────────────────────────────────────────
@@ -803,7 +803,7 @@ describe("runAgent", () => {
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("run-agent failed");
+    expect(errorOutput).toContain("agent failed");
     expect(errorOutput).toContain("Docker Compose");
   });
 

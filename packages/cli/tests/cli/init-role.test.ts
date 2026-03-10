@@ -59,8 +59,10 @@ function makeResolvedAgent(
 // ── Command Registration ─────────────────────────────────────────────────
 
 describe("CLI init-role command", () => {
-  it("has the init-role command registered", () => {
-    const cmd = program.commands.find((c) => c.name() === "init-role");
+  it("has the init-role command registered under chapter", () => {
+    const chapterCmd = program.commands.find((c) => c.name() === "chapter");
+    expect(chapterCmd).toBeDefined();
+    const cmd = chapterCmd!.commands.find((c) => c.name() === "init-role");
     expect(cmd).toBeDefined();
     if (cmd) {
       expect(cmd.description()).toContain("host-wide runtime");

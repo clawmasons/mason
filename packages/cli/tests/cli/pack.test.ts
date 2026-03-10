@@ -5,8 +5,10 @@ import * as path from "node:path";
 import { program } from "../../src/cli/index.js";
 
 describe("CLI pack command", () => {
-  it("has the pack command registered", () => {
-    const cmd = program.commands.find((c) => c.name() === "pack");
+  it("has the pack command registered under chapter", () => {
+    const chapterCmd = program.commands.find((c) => c.name() === "chapter");
+    expect(chapterCmd).toBeDefined();
+    const cmd = chapterCmd!.commands.find((c) => c.name() === "pack");
     expect(cmd).toBeDefined();
     if (cmd) {
       expect(cmd.description()).toContain("pack");

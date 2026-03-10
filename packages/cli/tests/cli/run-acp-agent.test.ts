@@ -554,13 +554,13 @@ describe("runAcpAgent", () => {
     expect(gitignorePattern).toBe(".clawmasons");
   });
 
-  it("uses run-acp-agent prefix in log messages", async () => {
+  it("uses acp prefix in log messages", async () => {
     const deps = makeDeps();
 
     await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("[clawmasons run-acp-agent]");
+    expect(logOutput).toContain("[clawmasons acp]");
     expect(logOutput).not.toContain("[chapter acp-proxy]");
   });
 
@@ -649,7 +649,7 @@ describe("run-acp-agent help text", () => {
   function getHelpOutput(): string {
     const program = new Command();
     registerRunAcpAgentCommand(program);
-    const cmd = program.commands.find((c) => c.name() === "run-acp-agent");
+    const cmd = program.commands.find((c) => c.name() === "acp");
     expect(cmd).toBeDefined();
     let output = "";
     cmd!.configureOutput({ writeOut: (str: string) => { output += str; } });
@@ -684,7 +684,7 @@ describe("run-acp-agent help text", () => {
   it("contains ACP client configuration example", () => {
     const help = getHelpOutput();
     expect(help).toContain("mcpServers");
-    expect(help).toContain("run-acp-agent");
+    expect(help).toContain("acp");
     expect(help).toContain("--role");
   });
 

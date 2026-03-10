@@ -271,7 +271,7 @@ export interface RunAgentDeps {
 
 export function registerRunAgentCommand(program: Command): void {
   program
-    .command("run-agent")
+    .command("agent")
     .description("Run a chapter agent interactively against this project")
     .argument("<agent>", "Agent name (e.g., note-taker)")
     .argument("<role>", "Role name (e.g., writer)")
@@ -312,7 +312,7 @@ export async function runAgent(
 
       if (!entry) {
         throw new Error(
-          `Role "${role}" not initialized and auto-init failed. Run "clawmasons init-role --role ${role}" from your chapter workspace.`,
+          `Role "${role}" not initialized and auto-init failed. Run "clawmasons chapter init-role --role ${role}" from your chapter workspace.`,
         );
       }
     }
@@ -400,10 +400,10 @@ export async function runAgent(
 
     console.log(`  Services stopped.`);
     console.log(`  Session retained at: .clawmasons/sessions/${sessionId}/`);
-    console.log(`\n  run-agent complete\n`);
+    console.log(`\n  agent complete\n`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`\n  run-agent failed: ${message}\n`);
+    console.error(`\n  agent failed: ${message}\n`);
     process.exit(1);
   }
 }

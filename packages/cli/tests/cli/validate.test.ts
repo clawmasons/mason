@@ -6,8 +6,11 @@ import { program } from "../../src/cli/index.js";
 import { runValidate } from "../../src/cli/commands/validate.js";
 
 describe("CLI validate command", () => {
-  it("has the validate command registered", () => {
-    const validateCmd = program.commands.find((cmd) => cmd.name() === "validate");
+  const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
+
+  it("has the validate command registered under chapter", () => {
+    expect(chapterCmd).toBeDefined();
+    const validateCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "validate");
     expect(validateCmd).toBeDefined();
     if (validateCmd) {
       expect(validateCmd.description()).toContain("Validate");
@@ -15,7 +18,7 @@ describe("CLI validate command", () => {
   });
 
   it("validate command accepts a member argument", () => {
-    const validateCmd = program.commands.find((cmd) => cmd.name() === "validate");
+    const validateCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "validate");
     expect(validateCmd).toBeDefined();
     if (validateCmd) {
       const args = validateCmd.registeredArguments;
@@ -26,7 +29,7 @@ describe("CLI validate command", () => {
   });
 
   it("validate command has --json option", () => {
-    const validateCmd = program.commands.find((cmd) => cmd.name() === "validate");
+    const validateCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "validate");
     expect(validateCmd).toBeDefined();
     if (validateCmd) {
       const jsonOption = validateCmd.options.find((opt) => opt.long === "--json");
