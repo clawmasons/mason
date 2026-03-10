@@ -237,6 +237,71 @@ describe("generateAgentDockerfile", () => {
     expect(writerResult).toContain("agent/note-taker/writer/workspace/");
     expect(reviewerResult).toContain("agent/note-taker/reviewer/workspace/");
   });
+
+  // ── ACP Mode Tests ────────────────────────────────────────────────────
+
+  it("ACP mode: uses claude-agent-acp entrypoint for claude-code runtime", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0], { acpMode: true });
+
+    expect(result).toContain('ENTRYPOINT ["claude-agent-acp"]');
+    expect(result).not.toContain('ENTRYPOINT ["claude"]');
+  });
+
+  it("ACP mode: uses pi-agent-acp entrypoint for pi-coding-agent runtime", () => {
+    const agent = makeNoteTakerAgent();
+    agent.runtimes = ["pi-coding-agent"];
+    const result = generateAgentDockerfile(agent, agent.roles[0], { acpMode: true });
+
+    expect(result).toContain('ENTRYPOINT ["pi-agent-acp"]');
+    expect(result).not.toContain('ENTRYPOINT ["pi"]');
+  });
+
+  it("ACP mode: uses split command for node runtime", () => {
+    const agent = makeNoteTakerAgent();
+    agent.runtimes = ["node"];
+    const result = generateAgentDockerfile(agent, agent.roles[0], { acpMode: true });
+
+    expect(result).toContain('ENTRYPOINT ["node","src/index.js","--acp"]');
+  });
+
+  it("ACP mode: falls back to default entrypoint for unknown runtime", () => {
+    const agent = makeNoteTakerAgent();
+    agent.runtimes = ["custom-runtime"];
+    const result = generateAgentDockerfile(agent, agent.roles[0], { acpMode: true });
+
+    expect(result).toContain('ENTRYPOINT ["npx", "custom-runtime"]');
+    expect(result).toContain("ACP mode requested but no ACP command mapping");
+  });
+
+  it("ACP mode: includes [ACP mode] marker in header comment", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0], { acpMode: true });
+
+    expect(result).toContain("[ACP mode]");
+  });
+
+  it("ACP mode: non-ACP header does not include [ACP mode] marker", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).not.toContain("[ACP mode]");
+  });
+
+  it("ACP mode: acpMode false behaves same as omitted", () => {
+    const agent = makeNoteTakerAgent();
+    const withFalse = generateAgentDockerfile(agent, agent.roles[0], { acpMode: false });
+    const withoutOption = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(withFalse).toBe(withoutOption);
+  });
+
+  it("ACP mode: still installs the runtime even in ACP mode", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0], { acpMode: true });
+
+    expect(result).toContain("npm install -g @anthropic-ai/claude-code");
+  });
 });
 
 // ── Proxy Dockerfile Tests ─────────────────────────────────────────────
