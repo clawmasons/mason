@@ -23,6 +23,18 @@ The `materializeWorkspace` method SHALL return a `MaterializationResult` which i
 - **WHEN** `materializeWorkspace()` is called on a valid resolved agent
 - **THEN** the result SHALL be a Map where each key is a relative path (e.g., `.claude/settings.json`) and each value is the string content of that file
 
+### Requirement: MaterializeOptions supports ACP mode
+
+The `materializeWorkspace` method SHALL accept an optional fourth parameter `options?: MaterializeOptions` where `MaterializeOptions` contains `acpMode?: boolean`. When `acpMode` is true, materializers SHALL generate additional ACP agent configuration files (e.g., `.chapter/acp.json`).
+
+#### Scenario: Options parameter is optional
+- **WHEN** `materializeWorkspace()` is called without the `options` parameter
+- **THEN** the materializer SHALL behave identically to pre-ACP behavior (no `.chapter/acp.json` generated)
+
+#### Scenario: ACP mode generates ACP config
+- **WHEN** `materializeWorkspace()` is called with `{ acpMode: true }`
+- **THEN** the result SHALL contain `.chapter/acp.json` with port and command fields
+
 ### Requirement: ComposeServiceDef captures docker-compose service fields
 
 The `ComposeServiceDef` type SHALL include fields for a docker-compose service: `build`, `restart`, `volumes`, `working_dir`, `environment`, `depends_on`, `stdin_open`, `tty`, and `networks`.

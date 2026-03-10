@@ -185,7 +185,15 @@ Add the `acp` field to the agent schema and extend Claude Code + pi-coding-agent
 
 **Testable output:** (a) Agent schema accepts `acp: { port: 3002 }` field, (b) Claude Code materializer in ACP mode produces ACP-specific config file, (c) pi-coding-agent materializer same, (d) mcp-agent materializer produces correct workspace, (e) `ACP_RUNTIME_COMMANDS` correctly maps `"claude-code"` → `"claude-agent-acp"`, `"pi-coding-agent"` → `"pi-agent-acp"`, `"node"` → `"node src/index.js --acp"`.
 
-**Not Implemented Yet**
+**Implemented**
+
+- Archived change: [2026-03-10-agent-schema-acp-extension](../../changes/archive/2026-03-10-agent-schema-acp-extension/)
+  - [Proposal](../../changes/archive/2026-03-10-agent-schema-acp-extension/proposal.md)
+  - [Design](../../changes/archive/2026-03-10-agent-schema-acp-extension/design.md)
+  - [Tasks](../../changes/archive/2026-03-10-agent-schema-acp-extension/tasks.md)
+- Spec: [agent-schema-acp-extension](../../specs/agent-schema-acp-extension/spec.md)
+- Source: `packages/shared/src/schemas/agent.ts`, `packages/shared/src/types.ts`, `packages/cli/src/materializer/common.ts`, `packages/cli/src/materializer/claude-code.ts`, `packages/cli/src/materializer/pi-coding-agent.ts`, `packages/cli/src/materializer/mcp-agent.ts`
+- Tests: `packages/cli/tests/materializer/claude-code.test.ts`, `packages/cli/tests/materializer/pi-coding-agent.test.ts`, `packages/cli/tests/materializer/mcp-agent.test.ts`
 
 ---
 
