@@ -560,7 +560,7 @@ describe("runAcpAgent", () => {
     await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("[chapter run-acp-agent]");
+    expect(logOutput).toContain("[clawmasons run-acp-agent]");
     expect(logOutput).not.toContain("[chapter acp-proxy]");
   });
 

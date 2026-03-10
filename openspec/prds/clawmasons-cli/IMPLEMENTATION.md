@@ -27,7 +27,7 @@ Rename the CLI binary, program name, and all internal references from `chapter` 
 
 **Testable output:** `npx clawmasons --help` works. All existing E2E tests pass with the new binary name. `npx chapter` no longer resolves.
 
-**Not Implemented Yet**
+**Implemented:** [spec](../../changes/archive/2026-03-10-cli-binary-rename/spec.md)
 
 ---
 

@@ -495,7 +495,7 @@ describe("generateDockerfiles", () => {
     expect(logOutput).toContain("agent/note-taker/reviewer/Dockerfile");
   });
 
-  it("proxy Dockerfile uses chapter proxy entrypoint", () => {
+  it("proxy Dockerfile uses clawmasons proxy entrypoint", () => {
     setupMockNodeModules();
 
     generateDockerfiles(tmpDir);
@@ -503,7 +503,7 @@ describe("generateDockerfiles", () => {
     const dockerfile = fs.readFileSync(
       path.join(tmpDir, "proxy", "writer", "Dockerfile"), "utf-8",
     );
-    expect(dockerfile).toContain("chapter");
+    expect(dockerfile).toContain("clawmasons");
     expect(dockerfile).toContain("proxy");
     expect(dockerfile).toContain("--agent");
   });

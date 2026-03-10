@@ -4,7 +4,7 @@
   "description": "Clawmasons Chapter CLI — AI agent packaging, governance, and runtime orchestration",
   "type": "module",
   "bin": {
-    "chapter": "dist/cli/bin.js"
+    "clawmasons": "dist/cli/bin.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

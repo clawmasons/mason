@@ -3,7 +3,7 @@ import { program } from "../../src/cli/index.js";
 
 describe("CLI entry point", () => {
   it("has the correct program name", () => {
-    expect(program.name()).toBe("chapter");
+    expect(program.name()).toBe("clawmasons");
   });
 
   it("has a version matching package.json", () => {

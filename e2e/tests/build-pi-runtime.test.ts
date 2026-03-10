@@ -90,7 +90,7 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
       );
       expect(dockerfile).toContain("FROM node:");
       expect(dockerfile).toContain("USER mason");
-      expect(dockerfile).toContain("chapter");
+      expect(dockerfile).toContain("clawmasons");
       expect(dockerfile).toContain("proxy");
       expect(dockerfile).toContain("COPY node_modules/");
       expect(dockerfile).not.toContain("npm install");
