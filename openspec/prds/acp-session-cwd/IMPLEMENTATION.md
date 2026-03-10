@@ -149,7 +149,7 @@ Modify the ACP bridge to intercept `session/new` requests, extract the `cwd` fie
 
 **Testable output:** (a) Proxy + credential-service start at `run-acp-agent` launch, (b) agent container NOT started until `session/new` arrives, (c) `session/new` with `cwd` mounts that directory as `/workspace`, (d) `session/new` without `cwd` uses `process.cwd()`, (e) `.clawmasons/` created in `cwd` directory, (f) `.gitignore` updated in `cwd` directory, (g) on disconnect, only agent container stops, (h) subsequent `session/new` starts new agent container, (i) proxy + credential-service remain running across sessions.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived change](../../changes/archive/2026-03-10-acp-session-cwd-bridge/) ([proposal](../../changes/archive/2026-03-10-acp-session-cwd-bridge/proposal.md), [design](../../changes/archive/2026-03-10-acp-session-cwd-bridge/design.md), [tasks](../../changes/archive/2026-03-10-acp-session-cwd-bridge/tasks.md)). Source: `packages/cli/src/acp/bridge.ts`, `packages/cli/src/acp/session.ts`, `packages/cli/src/cli/commands/run-acp-agent.ts`. Tests: `packages/cli/tests/acp/bridge.test.ts` (30 tests), `packages/cli/tests/acp/session.test.ts` (59 tests), `packages/cli/tests/cli/run-acp-agent.test.ts` (30 tests). 1028 total tests passing.
 
 ---
 

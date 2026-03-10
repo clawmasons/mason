@@ -5,9 +5,9 @@ import {
   type RunAcpAgentDeps,
 } from "../../src/cli/commands/run-acp-agent.js";
 import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
-import type { AcpSessionConfig } from "../../src/acp/session.js";
+import type { AcpSessionConfig, InfrastructureInfo, AgentSessionInfo } from "../../src/acp/session.js";
 import type { AcpBridge, AcpBridgeConfig } from "../../src/acp/bridge.js";
-import type { AcpSession, SessionInfo } from "../../src/acp/session.js";
+import type { AcpSession } from "../../src/acp/session.js";
 import type { ChapterEntry } from "../../src/runtime/home.js";
 
 // ── Test Fixtures ────────────────────────────────────────────────────
@@ -54,24 +54,28 @@ function makeResolvedAgent(name = "test-agent"): ResolvedAgent {
   };
 }
 
-type MockBridgeType = Pick<AcpBridge, "start" | "connectToAgent" | "stop"> & {
+type MockBridgeType = Pick<AcpBridge, "start" | "connectToAgent" | "stop" | "resetForNewSession"> & {
   onClientConnect?: (() => void) | undefined;
   onClientDisconnect?: (() => void) | undefined;
   onAgentError?: ((error: Error) => void) | undefined;
+  onSessionNew?: ((cwd: string) => Promise<void>) | undefined;
 };
 
 function makeMockBridge() {
   let startCalled = false;
   let connectCalled = false;
   let stopCalled = false;
+  let resetCalled = false;
 
   const bridge: MockBridgeType = {
     start: async () => { startCalled = true; },
     connectToAgent: async () => { connectCalled = true; },
     stop: async () => { stopCalled = true; },
+    resetForNewSession: () => { resetCalled = true; },
     onClientConnect: undefined,
     onClientDisconnect: undefined,
     onAgentError: undefined,
+    onSessionNew: undefined,
   };
 
   return {
@@ -79,35 +83,65 @@ function makeMockBridge() {
     get startCalled() { return startCalled; },
     get connectCalled() { return connectCalled; },
     get stopCalled() { return stopCalled; },
+    get resetCalled() { return resetCalled; },
   };
 }
 
-type MockSessionType = Pick<AcpSession, "start" | "stop" | "isRunning">;
+type MockSessionType = Pick<AcpSession, "start" | "stop" | "isRunning" | "startInfrastructure" | "startAgent" | "stopAgent" | "isInfrastructureRunning" | "isAgentRunning">;
 
 function makeMockSession() {
-  let startCalled = false;
+  let startInfraCalled = false;
+  let startAgentCalled = false;
+  let stopAgentCalled = false;
   let stopCalled = false;
+  let agentProjectDir: string | undefined;
+
+  const infraInfo: InfrastructureInfo = {
+    sessionId: "infra-session-01",
+    sessionDir: "/fake/infra/dir",
+    composeFile: "/fake/infra-compose.yml",
+    proxyServiceName: "proxy-test-role",
+    proxyToken: "fake-proxy-token",
+    credentialProxyToken: "fake-cred-token",
+    dockerBuildPath: "/fake/docker-build",
+  };
+
+  const agentInfo: AgentSessionInfo = {
+    sessionId: "agent-session-01",
+    sessionDir: "/fake/agent/dir",
+    composeFile: "/fake/agent-compose.yml",
+    acpPort: 3002,
+    agentServiceName: "agent-test-agent-test-role",
+    projectDir: "/fake/project",
+  };
 
   const session: MockSessionType = {
-    start: async (): Promise<SessionInfo> => {
-      startCalled = true;
-      return {
-        sessionId: "test-session-01",
-        sessionDir: "/fake/session/dir",
-        composeFile: "/fake/compose.yml",
-        acpPort: 3002,
-        proxyServiceName: "proxy-test-role",
-        agentServiceName: "agent-test-agent-test-role",
-      };
+    start: async () => {
+      throw new Error("Legacy start() should not be called in deferred mode");
     },
     stop: async () => { stopCalled = true; },
-    isRunning: () => startCalled && !stopCalled,
+    isRunning: () => false,
+    startInfrastructure: async (): Promise<InfrastructureInfo> => {
+      startInfraCalled = true;
+      return infraInfo;
+    },
+    startAgent: async (projectDir: string): Promise<AgentSessionInfo> => {
+      startAgentCalled = true;
+      agentProjectDir = projectDir;
+      return { ...agentInfo, projectDir };
+    },
+    stopAgent: async () => { stopAgentCalled = true; },
+    isInfrastructureRunning: () => startInfraCalled,
+    isAgentRunning: () => startAgentCalled && !stopAgentCalled,
   };
 
   return {
     session,
-    get startCalled() { return startCalled; },
+    get startInfraCalled() { return startInfraCalled; },
+    get startAgentCalled() { return startAgentCalled; },
+    get stopAgentCalled() { return stopAgentCalled; },
     get stopCalled() { return stopCalled; },
+    get agentProjectDir() { return agentProjectDir; },
   };
 }
 
@@ -147,11 +181,12 @@ function makeDeps(overrides?: {
     createBridgeFn: () => bridge as unknown as AcpBridge,
     createSessionFn: () => session as unknown as AcpSession,
     getClawmasonsHomeFn: () => "/fake/clawmasons-home",
-    findRoleEntryByRoleFn: (_home: string, _role: string) => roleEntry,
+    findRoleEntryByRoleFn: () => roleEntry,
     initRoleFn: async () => {
       if (overrides?.initRoleCalled) overrides.initRoleCalled.value = true;
     },
     ensureGitignoreEntryFn: () => false,
+    mkdirSyncFn: () => {},
   };
 }
 
@@ -245,26 +280,29 @@ describe("runAcpAgent", () => {
     expect(bridgeConfig?.containerPort).toBe(3002);
   });
 
-  it("starts the Docker session", async () => {
+  it("starts infrastructure (not full session) on startup", async () => {
     const mockSession = makeMockSession();
     const deps = makeDeps({ session: mockSession.session });
 
     await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
-    expect(mockSession.startCalled).toBe(true);
+    expect(mockSession.startInfraCalled).toBe(true);
+    // Agent should NOT be started yet (deferred to session/new)
+    expect(mockSession.startAgentCalled).toBe(false);
   });
 
-  it("connects bridge to agent after session starts", async () => {
+  it("starts bridge but does NOT connect to agent on startup", async () => {
     const mockBridge = makeMockBridge();
     const deps = makeDeps({ bridge: mockBridge.bridge });
 
     await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(mockBridge.startCalled).toBe(true);
-    expect(mockBridge.connectCalled).toBe(true);
+    // connectToAgent is deferred to onSessionNew callback
+    expect(mockBridge.connectCalled).toBe(false);
   });
 
-  it("logs ready message with port info", async () => {
+  it("logs ready message with port info and deferred mode", async () => {
     const deps = makeDeps();
 
     await runAcpAgent("/fake/root", { role: "test-role", port: 3001 }, deps);
@@ -272,6 +310,7 @@ describe("runAcpAgent", () => {
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("Ready");
     expect(logOutput).toContain("3001");
+    expect(logOutput).toContain("deferred");
   });
 
   it("uses default port 3001 when not specified", async () => {
@@ -321,11 +360,16 @@ describe("runAcpAgent", () => {
     expect(errorOutput).toContain("No agent packages found");
   });
 
-  it("exits 1 when session fails to start", async () => {
+  it("exits 1 when infrastructure fails to start", async () => {
     const failingSession: MockSessionType = {
-      start: async () => { throw new Error("Docker compose failed"); },
+      start: async () => { throw new Error("should not be called"); },
       stop: async () => {},
       isRunning: () => false,
+      startInfrastructure: async () => { throw new Error("Docker compose failed"); },
+      startAgent: async () => { throw new Error("should not be called"); },
+      stopAgent: async () => {},
+      isInfrastructureRunning: () => false,
+      isAgentRunning: () => false,
     };
 
     const deps = makeDeps({ session: failingSession });
@@ -337,45 +381,24 @@ describe("runAcpAgent", () => {
     expect(errorOutput).toContain("Docker compose failed");
   });
 
-  it("exits 1 when bridge fails to connect to agent", async () => {
-    const failingBridge: MockBridgeType = {
-      start: async () => {},
-      connectToAgent: async () => { throw new Error("Agent unreachable"); },
-      stop: async () => {},
-      onClientConnect: undefined,
-      onClientDisconnect: undefined,
-      onAgentError: undefined,
-    };
-
-    const deps = makeDeps({ bridge: failingBridge });
-
-    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
-
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("Agent unreachable");
-  });
-
   it("cleans up bridge and session on startup failure", async () => {
     const mockBridge = makeMockBridge();
     const mockSession = makeMockSession();
 
-    // Make connectToAgent fail after session started
-    const bridge: MockBridgeType = {
-      ...mockBridge.bridge,
-      connectToAgent: async () => { throw new Error("Connection refused"); },
+    // Make startInfrastructure fail
+    const failingSession: MockSessionType = {
+      ...mockSession.session,
+      startInfrastructure: async () => { throw new Error("Infra failed"); },
     };
 
     const deps = makeDeps({
-      bridge,
-      session: mockSession.session,
+      bridge: mockBridge.bridge,
+      session: failingSession,
     });
 
     await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
-    // Bridge and session should have been cleaned up
-    expect(mockBridge.stopCalled).toBe(true);
     expect(mockSession.stopCalled).toBe(true);
   });
 
@@ -406,13 +429,22 @@ describe("runAcpAgent", () => {
     expect(mockBridge.bridge.onAgentError).toBeDefined();
   });
 
-  it("logs session ID after session starts", async () => {
+  it("sets onSessionNew callback on bridge", async () => {
+    const mockBridge = makeMockBridge();
+    const deps = makeDeps({ bridge: mockBridge.bridge });
+
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+
+    expect(mockBridge.bridge.onSessionNew).toBeDefined();
+  });
+
+  it("logs infrastructure session ID after startup", async () => {
     const deps = makeDeps();
 
     await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("test-session-01");
+    expect(logOutput).toContain("infra-session-01");
   });
 
   it("uses --agent flag for agent name", async () => {
@@ -475,7 +507,7 @@ describe("runAcpAgent", () => {
 
     const deps: RunAcpAgentDeps = {
       ...makeDeps({ initRoleCalled }),
-      findRoleEntryByRoleFn: (_home: string, _role: string) => {
+      findRoleEntryByRoleFn: () => {
         callCount++;
         // First call: not found; second call (after init): found
         if (callCount === 1) return undefined;
@@ -500,7 +532,7 @@ describe("runAcpAgent", () => {
     expect(errorOutput).toContain("auto-init failed");
   });
 
-  it("calls ensureGitignoreEntry for .clawmasons", async () => {
+  it("calls ensureGitignoreEntry for .clawmasons on chapter workspace", async () => {
     let gitignoreDir: string | undefined;
     let gitignorePattern: string | undefined;
 
@@ -527,5 +559,83 @@ describe("runAcpAgent", () => {
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("[chapter run-acp-agent]");
     expect(logOutput).not.toContain("[chapter acp-proxy]");
+  });
+
+  // ── onSessionNew callback tests ──────────────────────────────────────
+
+  it("onSessionNew callback starts agent and connects bridge", async () => {
+    const mockBridge = makeMockBridge();
+    const mockSession = makeMockSession();
+    const deps = makeDeps({ bridge: mockBridge.bridge, session: mockSession.session });
+
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+
+    // Simulate session/new arriving
+    expect(mockBridge.bridge.onSessionNew).toBeDefined();
+    await mockBridge.bridge.onSessionNew!("/projects/myapp");
+
+    expect(mockSession.startAgentCalled).toBe(true);
+    expect(mockSession.agentProjectDir).toBe("/projects/myapp");
+    expect(mockBridge.connectCalled).toBe(true);
+  });
+
+  it("onSessionNew creates .clawmasons directory in cwd", async () => {
+    const mockBridge = makeMockBridge();
+    const mkdirCalls: Array<{ path: string; recursive: boolean }> = [];
+
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps({ bridge: mockBridge.bridge }),
+      mkdirSyncFn: (dirPath: string, opts?: { recursive?: boolean }) => {
+        mkdirCalls.push({ path: dirPath, recursive: opts?.recursive ?? false });
+      },
+    };
+
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+    await mockBridge.bridge.onSessionNew!("/projects/myapp");
+
+    expect(mkdirCalls).toContainEqual({
+      path: "/projects/myapp/.clawmasons",
+      recursive: true,
+    });
+  });
+
+  it("onSessionNew ensures .gitignore in cwd directory", async () => {
+    const mockBridge = makeMockBridge();
+    const gitignoreCalls: Array<{ dir: string; pattern: string }> = [];
+
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps({ bridge: mockBridge.bridge }),
+      ensureGitignoreEntryFn: (dir: string, pattern: string) => {
+        gitignoreCalls.push({ dir, pattern });
+        return false;
+      },
+    };
+
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+    await mockBridge.bridge.onSessionNew!("/projects/myapp");
+
+    // Should have two calls: one for rootDir on startup, one for cwd on session/new
+    expect(gitignoreCalls).toContainEqual({ dir: "/projects/myapp", pattern: ".clawmasons" });
+  });
+
+  it("onClientDisconnect stops agent but not infrastructure", async () => {
+    const mockBridge = makeMockBridge();
+    const mockSession = makeMockSession();
+    const deps = makeDeps({ bridge: mockBridge.bridge, session: mockSession.session });
+
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+
+    // Start an agent first
+    await mockBridge.bridge.onSessionNew!("/projects/myapp");
+
+    // Trigger disconnect
+    mockBridge.bridge.onClientDisconnect!();
+
+    // Wait for async disconnect handler
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(mockSession.stopAgentCalled).toBe(true);
+    expect(mockSession.stopCalled).toBe(false); // Infrastructure stays up
+    expect(mockBridge.resetCalled).toBe(true);
   });
 });

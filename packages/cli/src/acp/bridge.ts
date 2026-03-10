@@ -5,7 +5,12 @@
  * a host-side endpoint (where editors connect) and a container-side
  * ACP agent endpoint (inside Docker).
  *
- * PRD refs: REQ-001 (ACP endpoint), PRD 7.1 (Architecture), PRD 7.4 (Tool Call Flow)
+ * Supports deferred agent startup: when `onSessionNew` is set, the bridge
+ * intercepts the first POST request, extracts a `cwd` field from the body,
+ * and calls the callback to launch the agent container before relaying.
+ *
+ * PRD refs: REQ-001 (ACP endpoint), REQ-005 (ACP Session CWD Support),
+ *           PRD 7.1 (Architecture), PRD 7.4 (Tool Call Flow)
  */
 
 import {
@@ -59,6 +64,7 @@ export class AcpBridge {
   private agentConnected = false;
   private clientSeen = false;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private sessionPending = false;
 
   /** Invoked when the first client request arrives. */
   onClientConnect?: () => void;
@@ -68,6 +74,18 @@ export class AcpBridge {
 
   /** Invoked when a relay to the agent fails. */
   onAgentError?: (error: Error) => void;
+
+  /**
+   * Invoked when a session-initiating POST request arrives and the agent
+   * is not yet connected. The bridge buffers the request body, extracts
+   * the `cwd` field (if present), and calls this callback. The callback
+   * should start the agent container and call `connectToAgent()`.
+   * After the callback resolves, the buffered request is relayed.
+   *
+   * If not set, the bridge behaves as before (returns 503 when agent
+   * is not connected).
+   */
+  onSessionNew?: (cwd: string) => Promise<void>;
 
   constructor(config: AcpBridgeConfig) {
     this.config = {
@@ -135,6 +153,7 @@ export class AcpBridge {
     this.clearIdleTimer();
     this.agentConnected = false;
     this.clientSeen = false;
+    this.sessionPending = false;
 
     const server = this.server;
     if (!server) return;
@@ -148,6 +167,18 @@ export class AcpBridge {
     });
   }
 
+  /**
+   * Reset bridge state for a new session. Called after agent disconnect
+   * so the bridge can accept a new `session/new` from the next client.
+   * The HTTP server remains running.
+   */
+  resetForNewSession(): void {
+    this.clearIdleTimer();
+    this.agentConnected = false;
+    this.clientSeen = false;
+    this.sessionPending = false;
+  }
+
   // ── Request Handling ──────────────────────────────────────────────
 
   private handleRequest(req: IncomingMessage, res: ServerResponse): void {
@@ -157,6 +188,18 @@ export class AcpBridge {
     if (req.method === "GET" && url.pathname === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ status: "ok" }));
+      return;
+    }
+
+    // If agent is not connected and we have a session handler, try deferred start
+    if (!this.agentConnected && this.onSessionNew && req.method === "POST") {
+      // Prevent concurrent session starts
+      if (this.sessionPending) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Session startup in progress" }));
+        return;
+      }
+      this.handleDeferredSession(req, res);
       return;
     }
 
@@ -176,6 +219,118 @@ export class AcpBridge {
 
     // Relay to container agent
     this.relayToAgent(req, res);
+  }
+
+  /**
+   * Handle a POST request when the agent is not yet connected.
+   * Buffer the body, extract `cwd`, call `onSessionNew`, then relay.
+   */
+  private handleDeferredSession(req: IncomingMessage, res: ServerResponse): void {
+    this.sessionPending = true;
+    const chunks: Buffer[] = [];
+
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      const body = Buffer.concat(chunks);
+      const cwd = extractCwdFromBody(body);
+
+      const sessionNewHandler = this.onSessionNew;
+      if (!sessionNewHandler) {
+        this.sessionPending = false;
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Agent not connected" }));
+        return;
+      }
+
+      void sessionNewHandler(cwd).then(() => {
+        this.sessionPending = false;
+
+        // Track client connection
+        if (!this.clientSeen) {
+          this.clientSeen = true;
+          this.onClientConnect?.();
+        }
+        this.resetIdleTimer();
+
+        // Now relay the buffered request to the agent
+        this.relayBufferedToAgent(req, res, body);
+      }).catch((err) => {
+        this.sessionPending = false;
+        const message = err instanceof Error ? err.message : String(err);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: `Session startup failed: ${message}` }));
+        }
+      });
+    });
+
+    req.on("error", () => {
+      this.sessionPending = false;
+      if (!res.headersSent) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Request read error" }));
+      }
+    });
+  }
+
+  /**
+   * Relay a buffered request body to the agent (used after deferred session start).
+   */
+  private relayBufferedToAgent(
+    clientReq: IncomingMessage,
+    clientRes: ServerResponse,
+    body: Buffer,
+  ): void {
+    const { containerHost, containerPort, requestTimeoutMs } = this.config;
+
+    // Build relay headers, stripping hop-by-hop
+    const relayHeaders: Record<string, string | string[]> = {};
+    for (const [key, value] of Object.entries(clientReq.headers)) {
+      if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase()) && value !== undefined) {
+        relayHeaders[key] = value;
+      }
+    }
+    // Set correct content-length for the buffered body
+    relayHeaders["content-length"] = String(body.length);
+
+    const agentReq = httpRequest(
+      {
+        hostname: containerHost,
+        port: containerPort,
+        path: clientReq.url ?? "/",
+        method: clientReq.method ?? "POST",
+        headers: relayHeaders,
+        timeout: requestTimeoutMs,
+      },
+      (agentRes) => {
+        const responseHeaders: Record<string, string | string[] | undefined> = {};
+        for (const [key, value] of Object.entries(agentRes.headers)) {
+          if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
+            responseHeaders[key] = value;
+          }
+        }
+
+        clientRes.writeHead(agentRes.statusCode ?? 200, responseHeaders);
+        agentRes.pipe(clientRes);
+      },
+    );
+
+    agentReq.on("error", (err) => {
+      const error = new Error(`Agent relay failed: ${err.message}`);
+      this.onAgentError?.(error);
+
+      if (!clientRes.headersSent) {
+        clientRes.writeHead(502, { "Content-Type": "application/json" });
+        clientRes.end(JSON.stringify({ error: "Bad Gateway — agent unreachable" }));
+      }
+    });
+
+    agentReq.on("timeout", () => {
+      agentReq.destroy(new Error("Agent request timed out"));
+    });
+
+    // Write the buffered body instead of piping
+    agentReq.end(body);
   }
 
   private relayToAgent(clientReq: IncomingMessage, clientRes: ServerResponse): void {
@@ -276,4 +431,32 @@ export class AcpBridge {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Attempt to extract a `cwd` field from a JSON request body.
+ * Handles both JSON-RPC style (`params.cwd`) and flat (`cwd`) formats.
+ * Returns `process.cwd()` if extraction fails or `cwd` is not present.
+ */
+export function extractCwdFromBody(body: Buffer): string {
+  try {
+    const parsed = JSON.parse(body.toString("utf-8")) as Record<string, unknown>;
+
+    // Check params.cwd (JSON-RPC style)
+    if (parsed.params && typeof parsed.params === "object") {
+      const params = parsed.params as Record<string, unknown>;
+      if (typeof params.cwd === "string" && params.cwd.length > 0) {
+        return params.cwd;
+      }
+    }
+
+    // Check top-level cwd
+    if (typeof parsed.cwd === "string" && parsed.cwd.length > 0) {
+      return parsed.cwd;
+    }
+  } catch {
+    // Not valid JSON — fall through to default
+  }
+
+  return process.cwd();
 }
