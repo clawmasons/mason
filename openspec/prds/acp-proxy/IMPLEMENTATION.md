@@ -247,9 +247,17 @@ Create `packages/cli/src/acp/bridge.ts` — the bidirectional bridge that relays
 - Protocol handling: relay ACP messages without interpretation (transparent proxy)
 - Error handling: connection refused, timeout, container exit
 
-**Testable output:** Unit tests with mock TCP/WebSocket: (a) bridge starts and accepts connections on host port, (b) messages relayed host→container and container→host, (c) client disconnect event fires, (d) agent exit event fires when container connection drops, (e) bridge stop tears down cleanly.
+**Testable output:** Unit tests with mock HTTP servers: (a) bridge starts and accepts connections on host port, (b) messages relayed host->container and container->host, (c) client disconnect event fires, (d) agent error event fires when container connection drops, (e) bridge stop tears down cleanly, (f) connectToAgent succeeds/fails/retries appropriately.
 
-**Not Implemented Yet**
+**Implemented**
+
+- Archived change: [2026-03-10-acp-bridge](../../changes/archive/2026-03-10-acp-bridge/)
+  - [Proposal](../../changes/archive/2026-03-10-acp-bridge/proposal.md)
+  - [Design](../../changes/archive/2026-03-10-acp-bridge/design.md)
+  - [Tasks](../../changes/archive/2026-03-10-acp-bridge/tasks.md)
+- Spec: [acp-bridge](../../specs/acp-bridge/spec.md)
+- Source: `packages/cli/src/acp/bridge.ts`
+- Tests: `packages/cli/tests/acp/bridge.test.ts`
 
 ---
 
