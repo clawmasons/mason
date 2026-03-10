@@ -23,6 +23,33 @@ export const PROVIDER_ENV_VARS: Record<string, string> = {
 };
 
 /**
+ * Mapping from runtime identifiers to their ACP agent commands.
+ *
+ * Used by materializers (to generate .chapter/acp.json) and by
+ * Dockerfile generators (to set ACP mode entrypoints).
+ *
+ * @see PRD §7.6 — Agent Schema Extension
+ */
+export const ACP_RUNTIME_COMMANDS: Record<string, string> = {
+  "claude-code": "claude-agent-acp",
+  "pi-coding-agent": "pi-agent-acp",
+  "node": "node src/index.js --acp",
+};
+
+/**
+ * Generate .chapter/acp.json content for ACP agent mode.
+ *
+ * Contains the ACP port and command so the container entrypoint
+ * knows how to start the agent in ACP mode.
+ */
+export function generateAcpConfigJson(
+  acpPort: number,
+  acpCommand: string,
+): string {
+  return JSON.stringify({ port: acpPort, command: acpCommand }, null, 2);
+}
+
+/**
  * Format a role's permitted tools as a readable list.
  * Each line: "  - {appShortName}: tool1, tool2, tool3"
  */

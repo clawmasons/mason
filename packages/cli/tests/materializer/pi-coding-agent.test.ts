@@ -421,6 +421,52 @@ describe("piCodingAgentMaterializer", () => {
         ]);
       });
     });
+
+    describe("ACP mode", () => {
+      it("does not generate .chapter/acp.json when acpMode is false", () => {
+        const agent = makePiAgent();
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        expect(result.has(".chapter/acp.json")).toBe(false);
+      });
+
+      it("generates .chapter/acp.json when acpMode is true", () => {
+        const agent = makePiAgent();
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
+
+        expect(result.has(".chapter/acp.json")).toBe(true);
+        const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
+        expect(acpConfig.port).toBe(3002);
+        expect(acpConfig.command).toBe("pi-agent-acp");
+      });
+
+      it("uses agent acp.port when specified", () => {
+        const agent = makePiAgent();
+        agent.acp = { port: 5000 };
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
+
+        const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
+        expect(acpConfig.port).toBe(5000);
+      });
+
+      it("maps pi-coding-agent runtime to pi-agent-acp command", () => {
+        const agent = makePiAgent();
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
+
+        const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
+        expect(acpConfig.command).toBe("pi-agent-acp");
+      });
+
+      it("still generates all standard workspace files in ACP mode", () => {
+        const agent = makePiAgent();
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
+
+        expect(result.has("AGENTS.md")).toBe(true);
+        expect(result.has(".pi/settings.json")).toBe(true);
+        expect(result.has(".pi/mcp.json")).toBe(true);
+        expect(result.has(".pi/extensions/chapter-mcp/index.ts")).toBe(true);
+      });
+    });
   });
 
   describe("PROVIDER_ENV_VARS", () => {

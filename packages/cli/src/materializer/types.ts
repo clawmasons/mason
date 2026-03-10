@@ -7,6 +7,14 @@ import type { ResolvedAgent } from "@clawmasons/shared";
 export type MaterializationResult = Map<string, string>;
 
 /**
+ * Options for workspace materialization.
+ */
+export interface MaterializeOptions {
+  /** When true, generate ACP agent configuration alongside standard workspace files. */
+  acpMode?: boolean;
+}
+
+/**
  * The contract all runtime materializers implement.
  *
  * A materializer translates the abstract chapter dependency graph into
@@ -25,5 +33,6 @@ export interface RuntimeMaterializer {
     agent: ResolvedAgent,
     proxyEndpoint: string,
     proxyToken?: string,
+    options?: MaterializeOptions,
   ): MaterializationResult;
 }

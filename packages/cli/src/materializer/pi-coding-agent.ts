@@ -1,12 +1,14 @@
 import type { ResolvedAgent, ResolvedRole, ResolvedTask } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
-import type { RuntimeMaterializer, MaterializationResult } from "./types.js";
+import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions } from "./types.js";
 import {
   formatPermittedTools,
   collectAllSkills,
   collectAllTasks,
   generateAgentsMd,
   generateSkillReadme,
+  ACP_RUNTIME_COMMANDS,
+  generateAcpConfigJson,
 } from "./common.js";
 
 /**
@@ -174,6 +176,7 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
     agent: ResolvedAgent,
     proxyEndpoint: string,
     proxyToken?: string,
+    options?: MaterializeOptions,
   ): MaterializationResult {
     const result: MaterializationResult = new Map();
 
@@ -210,6 +213,14 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
         `skills/${skillShortName}/README.md`,
         generateSkillReadme(skill),
       );
+    }
+
+    // ACP mode: generate .chapter/acp.json with port and command
+    if (options?.acpMode) {
+      const acpPort = agent.acp?.port ?? 3002;
+      const primaryRuntime = agent.runtimes[0] ?? "pi-coding-agent";
+      const acpCommand = ACP_RUNTIME_COMMANDS[primaryRuntime] ?? primaryRuntime;
+      result.set(".chapter/acp.json", generateAcpConfigJson(acpPort, acpCommand));
     }
 
     return result;

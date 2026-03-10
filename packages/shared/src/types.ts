@@ -93,4 +93,7 @@ export interface ResolvedAgent {
     provider: string;
     model: string;
   };
+  acp?: {
+    port: number;
+  };
 }
