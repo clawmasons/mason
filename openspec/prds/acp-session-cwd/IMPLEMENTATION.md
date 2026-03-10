@@ -43,7 +43,7 @@ function ensureClawmasonsHome(home: string): void;
 
 **Testable output:** Unit tests: (a) `getClawmasonsHome()` reads `CLAWMASONS_HOME` env var, (b) defaults to `~/.clawmasons` when unset, (c) `readChaptersJson` returns empty chapters array when file doesn't exist, (d) `upsertRoleEntry` creates new entry, (e) `upsertRoleEntry` updates existing entry by lodge/chapter/role key, (f) `findRoleEntry` returns matching entry or undefined, (g) `ensureClawmasonsHome` creates directory and `.gitignore`.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived change](../../changes/archive/2026-03-10-clawmasons-home-utility/) ([proposal](../../changes/archive/2026-03-10-clawmasons-home-utility/proposal.md), [design](../../changes/archive/2026-03-10-clawmasons-home-utility/design.md), [tasks](../../changes/archive/2026-03-10-clawmasons-home-utility/tasks.md)). Source: `packages/cli/src/runtime/home.ts`. Tests: `packages/cli/tests/runtime/home.test.ts` (18 tests).
 
 ---
 
