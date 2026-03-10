@@ -8,6 +8,7 @@ import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
 import { generateAgentDockerfile } from "../../generator/agent-dockerfile.js";
+import { generateCredentialServiceDockerfile } from "../../generator/credential-service-dockerfile.js";
 import { claudeCodeMaterializer } from "../../materializer/claude-code.js";
 import { piCodingAgentMaterializer } from "../../materializer/pi-coding-agent.js";
 import type { RuntimeMaterializer } from "../../materializer/types.js";
@@ -481,6 +482,16 @@ export function generateDockerfiles(dockerDir: string): void {
   }
 
   console.log(`\n  Generating Dockerfiles for ${agents.length} agent(s) and ${allRoles.size} role(s)...`);
+
+  // Generate credential service Dockerfile — one per chapter
+  {
+    const dockerfile = generateCredentialServiceDockerfile();
+    const dockerfilePath = path.join(dockerDir, "credential-service", "Dockerfile");
+
+    fs.mkdirSync(path.dirname(dockerfilePath), { recursive: true });
+    fs.writeFileSync(dockerfilePath, dockerfile);
+    console.log("  Created credential-service/Dockerfile");
+  }
 
   // Generate proxy Dockerfiles — one per unique role
   for (const [, role] of allRoles) {

@@ -193,7 +193,7 @@ Extend `docker-init` to generate a Dockerfile for the credential service contain
 
 **Testable output:** After `docker-init`, `docker/credential-service/Dockerfile` exists. Dockerfile contains `USER mason`. Dockerfile installs `@clawmasons/credential-service`. Dockerfile entrypoint runs the CLI. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-09-docker-init-credential-service/proposal.md) | [design](../../changes/archive/2026-03-09-docker-init-credential-service/design.md) | [tasks](../../changes/archive/2026-03-09-docker-init-credential-service/tasks.md) | [spec delta](../../changes/archive/2026-03-09-docker-init-credential-service/specs/docker-install-pipeline/delta.md)
 
 ---
 
