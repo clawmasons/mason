@@ -207,7 +207,7 @@ Create an end-to-end test that starts the `clawmasons acp` agent from an ACP cli
 
 **Testable output:** E2E test suite passes: ACP client can spawn clawmasons, establish a session, list tools, and tear down — validating the full ACP client integration path.
 
-**Not Implemented Yet**
+**Implemented:** `e2e/tests/acp-client-spawn.test.ts`
 
 ---
 
