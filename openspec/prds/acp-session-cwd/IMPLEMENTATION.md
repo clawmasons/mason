@@ -115,7 +115,7 @@ The key behavioral change: `run-agent` no longer requires a pre-existing `.clawm
 
 **Testable output:** (a) Reads role from `chapters.json` when initialized, (b) auto-invokes `init-role` when role not found, (c) creates per-project `.clawmasons/sessions/<id>/` for session state, (d) appends `.clawmasons` to project `.gitignore`, (e) uses `targetDir` from `chapters.json` when set, (f) mounts CWD as `/workspace` (unchanged behavior).
 
-**Not Implemented Yet**
+**Implemented** -- [Archived change](../../changes/archive/2026-03-10-run-agent-clawmasons-home/) ([proposal](../../changes/archive/2026-03-10-run-agent-clawmasons-home/proposal.md), [design](../../changes/archive/2026-03-10-run-agent-clawmasons-home/design.md), [tasks](../../changes/archive/2026-03-10-run-agent-clawmasons-home/tasks.md)). Source: `packages/cli/src/cli/commands/run-agent.ts`, `packages/cli/src/runtime/home.ts`. Tests: `packages/cli/tests/cli/run-agent.test.ts` (50 tests), `packages/cli/tests/runtime/home.test.ts` (22 tests). 974 total tests passing.
 
 ---
 

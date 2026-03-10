@@ -8,6 +8,7 @@ import {
   readChaptersJson,
   writeChaptersJson,
   findRoleEntry,
+  findRoleEntryByRole,
   upsertRoleEntry,
   type ChapterEntry,
   type ChaptersJson,
@@ -228,6 +229,59 @@ describe("findRoleEntry", () => {
 
   it("returns undefined when chapters.json is missing", () => {
     const result = findRoleEntry(tmpDir, "acme", "platform", "writer");
+    expect(result).toBeUndefined();
+  });
+});
+
+describe("findRoleEntryByRole", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-home-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function seedChaptersJson(entries: ChapterEntry[]): void {
+    writeChaptersJson(tmpDir, { chapters: entries });
+  }
+
+  it("returns matching entry by role name only", () => {
+    seedChaptersJson([
+      makeEntry({ lodge: "acme", chapter: "platform", role: "writer" }),
+      makeEntry({ lodge: "acme", chapter: "platform", role: "editor" }),
+    ]);
+
+    const result = findRoleEntryByRole(tmpDir, "writer");
+    expect(result).toBeDefined();
+    expect(result!.role).toBe("writer");
+    expect(result!.lodge).toBe("acme");
+  });
+
+  it("returns first match when multiple lodges have same role", () => {
+    seedChaptersJson([
+      makeEntry({ lodge: "acme", chapter: "platform", role: "writer" }),
+      makeEntry({ lodge: "other", chapter: "tools", role: "writer" }),
+    ]);
+
+    const result = findRoleEntryByRole(tmpDir, "writer");
+    expect(result).toBeDefined();
+    expect(result!.lodge).toBe("acme");
+  });
+
+  it("returns undefined when not found", () => {
+    seedChaptersJson([
+      makeEntry({ lodge: "acme", chapter: "platform", role: "writer" }),
+    ]);
+
+    const result = findRoleEntryByRole(tmpDir, "nonexistent");
+    expect(result).toBeUndefined();
+  });
+
+  it("returns undefined when chapters.json is missing", () => {
+    const result = findRoleEntryByRole(tmpDir, "writer");
     expect(result).toBeUndefined();
   });
 });

@@ -12,7 +12,7 @@ import {
   displayCredentials,
   runAgent,
 } from "../../src/cli/commands/run-agent.js";
-import type { RunConfig } from "../../src/cli/commands/run-init.js";
+import type { ChapterEntry } from "../../src/runtime/home.js";
 
 // ── Command Registration ────────────────────────────────────────────────
 
@@ -402,6 +402,21 @@ describe("runAgent", () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
+  // Default chapter entry returned by findRoleEntryByRoleFn
+  function makeChapterEntry(overrides?: Partial<ChapterEntry>): ChapterEntry {
+    return {
+      lodge: "acme",
+      chapter: "platform",
+      role: "writer",
+      dockerBuild: dockerBuildPath,
+      roleDir: path.join(tmpDir, "clawmasons-home", "acme", "platform", "writer"),
+      agents: ["note-taker"],
+      createdAt: "2026-03-10T00:00:00Z",
+      updatedAt: "2026-03-10T00:00:00Z",
+      ...overrides,
+    };
+  }
+
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-run-agent-test-"));
 
@@ -425,19 +440,9 @@ describe("runAgent", () => {
       "FROM node:20\n",
     );
 
-    // Set up the project directory with .clawmasons/chapter.json
+    // Set up the project directory (no .clawmasons/chapter.json needed now)
     projectDir = path.join(tmpDir, "my-project");
-    fs.mkdirSync(path.join(projectDir, ".clawmasons"), { recursive: true });
-
-    const runConfig: RunConfig = {
-      chapter: "acme.platform",
-      "docker-registries": ["local"],
-      "docker-build": dockerBuildPath,
-    };
-    fs.writeFileSync(
-      path.join(projectDir, ".clawmasons", "chapter.json"),
-      JSON.stringify(runConfig, null, 2),
-    );
+    fs.mkdirSync(projectDir, { recursive: true });
 
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -455,14 +460,35 @@ describe("runAgent", () => {
     agentExitCode?: number;
     downExitCode?: number;
     sessionId?: string;
+    chapterEntry?: ChapterEntry | null;
+    initRoleCalled?: { called: boolean };
+    gitignoreCalled?: { called: boolean; dir?: string; pattern?: string };
   }) {
     const calls: Array<{ composeFile: string; args: string[]; opts?: { interactive?: boolean } }> = [];
+    const entry = overrides?.chapterEntry === null
+      ? undefined
+      : overrides?.chapterEntry ?? makeChapterEntry();
 
     return {
       calls,
       deps: {
         generateSessionIdFn: () => overrides?.sessionId ?? "abcd1234",
         checkDockerComposeFn: () => {},
+        getClawmasonsHomeFn: () => path.join(tmpDir, "clawmasons-home"),
+        findRoleEntryByRoleFn: () => entry,
+        initRoleFn: async () => {
+          if (overrides?.initRoleCalled) {
+            overrides.initRoleCalled.called = true;
+          }
+        },
+        ensureGitignoreEntryFn: (dir: string, pattern: string) => {
+          if (overrides?.gitignoreCalled) {
+            overrides.gitignoreCalled.called = true;
+            overrides.gitignoreCalled.dir = dir;
+            overrides.gitignoreCalled.pattern = pattern;
+          }
+          return false;
+        },
         execComposeFn: async (
           composeFile: string,
           args: string[],
@@ -487,7 +513,49 @@ describe("runAgent", () => {
     };
   }
 
-  it("creates session directory with docker-compose.yml", async () => {
+  it("reads role from chapters.json when initialized", async () => {
+    const { deps } = makeMockDeps({ sessionId: "sess0001" });
+
+    await runAgent(projectDir, "note-taker", "writer", deps);
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("acme.platform");
+    expect(logOutput).toContain("note-taker");
+    expect(logOutput).toContain("writer");
+  });
+
+  it("auto-invokes init-role when role not found", async () => {
+    const initRoleCalled = { called: false };
+    let callCount = 0;
+
+    const { deps } = makeMockDeps({ initRoleCalled });
+
+    // Override findRoleEntryByRoleFn to return undefined first, then the entry
+    deps.findRoleEntryByRoleFn = () => {
+      callCount++;
+      if (callCount === 1) return undefined; // First call: not found
+      return makeChapterEntry(); // Second call (after auto-init): found
+    };
+
+    await runAgent(projectDir, "note-taker", "writer", deps);
+
+    expect(initRoleCalled.called).toBe(true);
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("Auto-initializing");
+  });
+
+  it("exits 1 when auto-init fails and role still not found", async () => {
+    const { deps } = makeMockDeps({ chapterEntry: null });
+
+    await runAgent(projectDir, "note-taker", "writer", deps);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const errorOutput = errorSpy.mock.calls.flat().join("\n");
+    expect(errorOutput).toContain("run-agent failed");
+    expect(errorOutput).toContain("init-role");
+  });
+
+  it("creates per-project .clawmasons/sessions/<id>/ for session state", async () => {
     const { deps } = makeMockDeps({ sessionId: "sess0001" });
 
     await runAgent(projectDir, "note-taker", "writer", deps);
@@ -504,6 +572,58 @@ describe("runAgent", () => {
     expect(content).toContain("agent-note-taker-writer:");
   });
 
+  it("appends .clawmasons to project .gitignore", async () => {
+    const gitignoreCalled = { called: false, dir: "", pattern: "" };
+    const { deps } = makeMockDeps({ gitignoreCalled });
+
+    await runAgent(projectDir, "note-taker", "writer", deps);
+
+    expect(gitignoreCalled.called).toBe(true);
+    expect(gitignoreCalled.dir).toBe(projectDir);
+    expect(gitignoreCalled.pattern).toBe(".clawmasons");
+  });
+
+  it("uses targetDir from chapters.json when set", async () => {
+    const customDir = path.join(tmpDir, "custom-roles", "writer");
+    const customDockerBuild = path.join(tmpDir, "custom-docker");
+
+    // Create Dockerfiles at custom docker build path
+    fs.mkdirSync(path.join(customDockerBuild, "proxy", "writer"), { recursive: true });
+    fs.writeFileSync(path.join(customDockerBuild, "proxy", "writer", "Dockerfile"), "FROM node:20\n");
+    fs.mkdirSync(path.join(customDockerBuild, "agent", "note-taker", "writer"), { recursive: true });
+    fs.writeFileSync(path.join(customDockerBuild, "agent", "note-taker", "writer", "Dockerfile"), "FROM node:20\n");
+    fs.mkdirSync(path.join(customDockerBuild, "credential-service"), { recursive: true });
+    fs.writeFileSync(path.join(customDockerBuild, "credential-service", "Dockerfile"), "FROM node:20\n");
+
+    const entry = makeChapterEntry({
+      targetDir: customDir,
+      roleDir: customDir,
+      dockerBuild: customDockerBuild,
+    });
+
+    const { deps } = makeMockDeps({ sessionId: "target01", chapterEntry: entry });
+
+    await runAgent(projectDir, "note-taker", "writer", deps);
+
+    const composeFile = path.join(
+      projectDir, ".clawmasons", "sessions", "target01", "docker", "docker-compose.yml",
+    );
+    const content = fs.readFileSync(composeFile, "utf-8");
+    expect(content).toContain(`context: "${customDockerBuild}"`);
+  });
+
+  it("mounts CWD as /workspace (unchanged behavior)", async () => {
+    const { deps } = makeMockDeps({ sessionId: "mount001" });
+
+    await runAgent(projectDir, "note-taker", "writer", deps);
+
+    const composeFile = path.join(
+      projectDir, ".clawmasons", "sessions", "mount001", "docker", "docker-compose.yml",
+    );
+    const content = fs.readFileSync(composeFile, "utf-8");
+    expect(content).toContain(`"${projectDir}:/workspace"`);
+  });
+
   it("generates unique session IDs per invocation", async () => {
     let callCount = 0;
     const ids = ["aaaa1111", "bbbb2222"];
@@ -511,6 +631,10 @@ describe("runAgent", () => {
     const baseDeps = {
       checkDockerComposeFn: () => {},
       execComposeFn: async () => 0,
+      getClawmasonsHomeFn: () => path.join(tmpDir, "clawmasons-home"),
+      findRoleEntryByRoleFn: () => makeChapterEntry(),
+      initRoleFn: async () => {},
+      ensureGitignoreEntryFn: () => false,
     };
 
     await runAgent(projectDir, "note-taker", "writer", {
@@ -667,28 +791,13 @@ describe("runAgent", () => {
 
   // ── Error Cases ──────────────────────────────────────────────────────
 
-  it("exits 1 when .clawmasons/chapter.json is missing", async () => {
-    const emptyProject = path.join(tmpDir, "empty-project");
-    fs.mkdirSync(emptyProject, { recursive: true });
-
-    await runAgent(emptyProject, "note-taker", "writer", {
-      checkDockerComposeFn: () => {},
-      execComposeFn: async () => 0,
-    });
-
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("run-agent failed");
-    expect(errorOutput).toContain("run-init");
-  });
-
   it("exits 1 when docker compose is not available", async () => {
-    await runAgent(projectDir, "note-taker", "writer", {
-      checkDockerComposeFn: () => {
-        throw new Error("Docker Compose v2 is required");
-      },
-      execComposeFn: async () => 0,
-    });
+    const { deps } = makeMockDeps();
+    deps.checkDockerComposeFn = () => {
+      throw new Error("Docker Compose v2 is required");
+    };
+
+    await runAgent(projectDir, "note-taker", "writer", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
