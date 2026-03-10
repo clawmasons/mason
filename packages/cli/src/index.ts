@@ -43,7 +43,10 @@ export {
 export {
   claudeCodeMaterializer,
   piCodingAgentMaterializer,
+  mcpAgentMaterializer,
   PROVIDER_ENV_VARS,
+  ACP_RUNTIME_COMMANDS,
   type RuntimeMaterializer,
   type MaterializationResult,
+  type MaterializeOptions,
 } from "./materializer/index.js";

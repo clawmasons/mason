@@ -31,6 +31,22 @@ async function main(): Promise<void> {
     resolver,
   );
 
+  // Apply session overrides if provided (from ACP proxy)
+  const sessionOverridesJson = process.env.CREDENTIAL_SESSION_OVERRIDES;
+  if (sessionOverridesJson) {
+    try {
+      const overrides = JSON.parse(sessionOverridesJson) as Record<string, string>;
+      service.setSessionOverrides(overrides);
+      console.log(
+        `[credential-service] Loaded ${Object.keys(overrides).length} session credential override(s).`,
+      );
+    } catch (err) {
+      console.error("[credential-service] Invalid CREDENTIAL_SESSION_OVERRIDES JSON:", err);
+      service.close();
+      process.exit(1);
+    }
+  }
+
   const client = new CredentialWSClient(service);
 
   console.log(`[credential-service] Connecting to proxy at ${proxyUrl}...`);

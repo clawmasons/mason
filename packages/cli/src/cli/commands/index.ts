@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { registerAcpProxyCommand } from "./acp-proxy.js";
 import { registerAddCommand } from "./add.js";
 import { registerBuildCommand } from "./build.js";
 import { registerDockerInitCommand } from "./docker-init.js";
@@ -13,6 +14,7 @@ import { registerRunInitCommand } from "./run-init.js";
 import { registerValidateCommand } from "./validate.js";
 
 export function registerCommands(program: Command): void {
+  registerAcpProxyCommand(program);
   registerAddCommand(program);
   registerBuildCommand(program);
   registerDockerInitCommand(program);

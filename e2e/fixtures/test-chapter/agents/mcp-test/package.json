@@ -9,5 +9,8 @@
     "runtimes": ["node"],
     "roles": ["@test/role-mcp-test"],
     "credentials": ["TEST_TOKEN"]
+  },
+  "dependencies": {
+    "@clawmasons/mcp-agent": "*"
   }
 }

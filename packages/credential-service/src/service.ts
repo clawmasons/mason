@@ -68,6 +68,24 @@ export class CredentialService {
   }
 
   /**
+   * Set session-scoped credential overrides.
+   *
+   * Session overrides take highest priority during credential resolution,
+   * checked before env, keychain, and dotenv sources. Used by the ACP proxy
+   * to inject credentials extracted from ACP client `mcpServers` env fields.
+   */
+  setSessionOverrides(overrides: Record<string, string>): void {
+    this.resolver.setSessionOverrides(overrides);
+  }
+
+  /**
+   * Clear all session-scoped credential overrides.
+   */
+  clearSessionOverrides(): void {
+    this.resolver.clearSessionOverrides();
+  }
+
+  /**
    * Close the database connection.
    */
   close(): void {

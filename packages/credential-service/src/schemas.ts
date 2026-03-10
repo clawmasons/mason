@@ -27,7 +27,7 @@ export const credentialSuccessSchema = z.object({
   id: z.string(),
   key: z.string(),
   value: z.string(),
-  source: z.enum(["env", "keychain", "dotenv"]),
+  source: z.enum(["env", "keychain", "dotenv", "session"]),
 });
 
 export const credentialErrorSchema = z.object({
