@@ -159,7 +159,7 @@ Add `--chapter` and `--init-agent` options to the `clawmasons acp` command. When
 
 **Testable output:** Integration test: `clawmasons acp --chapter initiate --role chapter-creator` on a clean system creates lodge, chapter, builds, and starts ACP endpoint. Idempotent test: running again skips init/build. Unit test: bootstrap logic calls init and build in correct order with correct CWD.
 
-**Not Implemented Yet**
+**Implemented:** [spec](../../changes/archive/2026-03-10-acp-chapter-bootstrap/spec.md)
 
 ---
 
