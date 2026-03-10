@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import { registerAddCommand } from "./add.js";
 import { registerBuildCommand } from "./build.js";
 import { registerInitCommand } from "./init.js";
+import { registerInitRoleCommand } from "./init-role.js";
 import { registerListCommand } from "./list.js";
 import { registerPackCommand } from "./pack.js";
 import { registerPermissionsCommand } from "./permissions.js";
@@ -14,6 +15,7 @@ export function registerCommands(program: Command): void {
   registerAddCommand(program);
   registerBuildCommand(program);
   registerInitCommand(program);
+  registerInitRoleCommand(program);
   registerListCommand(program);
   registerPackCommand(program);
   registerPermissionsCommand(program);

@@ -97,7 +97,7 @@ The docker-compose.yaml uses environment variable substitution for `PROJECT_DIR`
 
 **Testable output:** (a) Creates role directory at `CLAWMASONS_HOME/<lodge>/<chapter>/<role>/`, (b) generates `docker-compose.yaml` with proxy, credential-service, and agent services, (c) `chapters.json` updated with new entry, (d) `--target-dir` overrides role directory location, (e) re-running backs up existing `docker-compose.yaml`, (f) `CLAWMASONS_HOME/.gitignore` created if missing, (g) multiple agents for same role all appear in compose.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived change](../../changes/archive/2026-03-10-chapter-init-role/) ([proposal](../../changes/archive/2026-03-10-chapter-init-role/proposal.md), [design](../../changes/archive/2026-03-10-chapter-init-role/design.md), [tasks](../../changes/archive/2026-03-10-chapter-init-role/tasks.md)). Source: `packages/cli/src/cli/commands/init-role.ts`. Tests: `packages/cli/tests/cli/init-role.test.ts` (18 tests).
 
 ---
 
