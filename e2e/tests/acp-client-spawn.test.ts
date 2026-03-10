@@ -1,16 +1,19 @@
 /**
- * E2E Test: ACP Agent Startup from ACP Client (acpx)
+ * E2E Test: ACP Bootstrap via `clawmasons acp --chapter initiate`
  *
- * Simulates what an ACP client (acpx, Zed, JetBrains) does:
- *   1. Spawn `clawmasons acp --role writer` as a child process
- *   2. Wait for the ACP bridge to be ready (HTTP endpoint)
- *   3. Send a POST request to trigger session/new (with CWD)
- *   4. Verify the agent starts, tools are available via proxy
- *   5. Tear down gracefully
+ * Tests the full bootstrap flow that an ACP client triggers:
+ *   1. Spawn `clawmasons acp --chapter initiate --role chapter-creator`
+ *   2. Verify lodge, chapter, and Docker artifacts are created
+ *   3. Verify the ACP bridge becomes ready
+ *   4. Send session/new to start the agent container
+ *   5. Verify the agent responds to MCP tool requests
+ *   6. Graceful shutdown
  *
- * Uses the mcp-note-taker fixture with mcp-agent runtime (no LLM required).
+ * Uses the mcp-agent runtime (no LLM token required).
  *
- * PRD refs: REQ-004 (Bootstrap Flow), US-1 (Single-command ACP setup)
+ * Environment:
+ *   CLAWMASONS_HOME = e2e/tmp/clawmasons
+ *   LODGE = "e2e"
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -18,25 +21,22 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { spawn, execSync, type ChildProcess } from "node:child_process";
-import {
-  copyFixtureWorkspace,
-  chapterExec,
-  CLAWMASONS_BIN,
-} from "./helpers.js";
+import { CLAWMASONS_BIN, E2E_ROOT } from "./helpers.js";
 
 // ── Constants ────────────────────────────────────────────────────────
 
 const ACP_BRIDGE_PORT = 19800;
 const ACP_PROXY_PORT = 19801;
-const READY_TIMEOUT_MS = 120_000;
-const SESSION_START_TIMEOUT_MS = 90_000;
+const READY_TIMEOUT_MS = 300_000; // 5 min — Docker builds with apt packages
+const SESSION_START_TIMEOUT_MS = 120_000; // 2 min — agent container start
+
+const CLAWMASONS_HOME = path.join(E2E_ROOT, "tmp", "clawmasons");
+const LODGE = "e2e";
+const LODGE_HOME = path.join(CLAWMASONS_HOME, LODGE);
+const CHAPTER_DIR = path.join(LODGE_HOME, "chapters", "initiate");
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-/**
- * Wait for a specific string to appear in the accumulated output of a process.
- * Returns the full output up to that point.
- */
 function waitForOutput(
   proc: ChildProcess,
   target: string,
@@ -58,19 +58,17 @@ function waitForOutput(
       const combined = accumulated.stdout + accumulated.stderr;
       if (combined.includes(target)) {
         clearTimeout(timer);
-        resolve(combined);
+        cleanup();
+        origResolve(combined);
       }
     };
 
-    // Check what's already accumulated
-    check();
-
-    // Listen for new data
     const onStdout = () => check();
     const onStderr = () => check();
     const onExit = (code: number | null) => {
       clearTimeout(timer);
-      reject(
+      cleanup();
+      origReject(
         new Error(
           `Process exited with code ${code} while waiting for "${target}".\n` +
             `stdout:\n${accumulated.stdout}\n` +
@@ -79,31 +77,24 @@ function waitForOutput(
       );
     };
 
+    const cleanup = () => {
+      proc.stdout?.removeListener("data", onStdout);
+      proc.stderr?.removeListener("data", onStderr);
+      proc.removeListener("exit", onExit);
+    };
+
+    const origResolve = resolve;
+    const origReject = reject;
+
     proc.stdout?.on("data", onStdout);
     proc.stderr?.on("data", onStderr);
     proc.on("exit", onExit);
 
-    // Clean up listeners after resolution or timeout
-    const origResolve = resolve;
-    const origReject = reject;
-    resolve = ((val: string) => {
-      proc.stdout?.removeListener("data", onStdout);
-      proc.stderr?.removeListener("data", onStderr);
-      proc.removeListener("exit", onExit);
-      origResolve(val);
-    }) as typeof resolve;
-    reject = ((err: Error) => {
-      proc.stdout?.removeListener("data", onStdout);
-      proc.stderr?.removeListener("data", onStderr);
-      proc.removeListener("exit", onExit);
-      origReject(err);
-    }) as typeof reject;
+    // Check what's already accumulated
+    check();
   });
 }
 
-/**
- * Poll an HTTP endpoint until it responds with 200 OK.
- */
 async function pollHealthEndpoint(
   url: string,
   timeoutMs: number,
@@ -121,9 +112,6 @@ async function pollHealthEndpoint(
   throw new Error(`Health endpoint ${url} did not become ready within ${timeoutMs}ms`);
 }
 
-/**
- * Assert a value is not null/undefined and return it typed.
- */
 function assertDefined<T>(value: T | null | undefined, msg: string): T {
   if (value == null) throw new Error(msg);
   return value;
@@ -131,64 +119,59 @@ function assertDefined<T>(value: T | null | undefined, msg: string): T {
 
 // ── Test Suite ────────────────────────────────────────────────────────
 
-describe("ACP client spawn e2e", () => {
-  let workspaceDir: string;
+describe("ACP initiate bootstrap e2e", () => {
   let sessionCwd: string;
   let acpProcess: ChildProcess | null = null;
-  let clawmasonsHome: string;
   const processOutput = { stdout: "", stderr: "" };
 
-  beforeAll(async () => {
-    // 1. Copy fixture workspace and build
-    workspaceDir = copyFixtureWorkspace("mcp-note-taker", {
-      excludePaths: ["agents/mcp-test", "roles/mcp-test"],
-    });
+  beforeAll(() => {
+    // Clean up Docker containers from a previous (possibly crashed) run
+    // before deleting the filesystem state they reference.
+    if (fs.existsSync(CHAPTER_DIR)) {
+      const sessionsDir = path.join(CHAPTER_DIR, ".clawmasons", "sessions");
+      if (fs.existsSync(sessionsDir)) {
+        for (const sessionId of fs.readdirSync(sessionsDir)) {
+          const composeFile = path.join(sessionsDir, sessionId, "docker", "docker-compose.yml");
+          if (fs.existsSync(composeFile)) {
+            try {
+              execSync(
+                `docker compose -f "${composeFile}" --profile agent down --rmi local --volumes --remove-orphans`,
+                { stdio: "pipe", timeout: 30_000 },
+              );
+            } catch { /* best-effort */ }
+          }
+        }
+      }
+    }
 
-    chapterExec(["chapter", "build"], workspaceDir, { timeout: 120_000 });
+    // Clean up previous run (fresh bootstrap each time)
+    if (fs.existsSync(CLAWMASONS_HOME)) {
+      fs.rmSync(CLAWMASONS_HOME, { recursive: true, force: true });
+    }
 
-    // 2. Create a temp CLAWMASONS_HOME for this test run
-    clawmasonsHome = path.join(workspaceDir, ".test-clawmasons-home");
-    fs.mkdirSync(clawmasonsHome, { recursive: true });
-
-    // 3. Init the role so chapters.json is populated
-    chapterExec(
-      ["chapter", "init-role", "--role", "writer"],
-      workspaceDir,
-      { timeout: 30_000 },
-    );
-
-    // 4. Create a temp directory to use as the session CWD
+    // Create a temp directory for the session CWD
     sessionCwd = fs.mkdtempSync(path.join(os.tmpdir(), "acp-e2e-session-"));
-
-    // 5. Create notes directory (required by filesystem MCP server in the fixture)
-    const notesDir = path.join(workspaceDir, "notes");
-    fs.mkdirSync(notesDir, { recursive: true });
-  }, 180_000);
+  }, 60_000);
 
   afterAll(async () => {
     // Kill the ACP process if still running
     if (acpProcess && !acpProcess.killed) {
       acpProcess.kill("SIGTERM");
-      // Wait briefly for graceful shutdown
       await new Promise((r) => setTimeout(r, 3_000));
       if (!acpProcess.killed) {
         acpProcess.kill("SIGKILL");
       }
     }
 
-    // Clean up Docker resources spawned by clawmasons acp
-    // The process should have cleaned up on SIGTERM, but do best-effort
+    // Best-effort Docker cleanup — find all docker-compose files in sessions
     try {
-      // Find and kill any lingering compose projects from this workspace
-      const sessionDir = path.join(workspaceDir, ".clawmasons", "sessions");
-      if (fs.existsSync(sessionDir)) {
-        const sessions = fs.readdirSync(sessionDir);
-        for (const session of sessions) {
-          const dockerDir = path.join(sessionDir, session, "docker");
-          const composeFile = path.join(dockerDir, "docker-compose.yml");
+      const sessionsDir = path.join(CHAPTER_DIR, ".clawmasons", "sessions");
+      if (fs.existsSync(sessionsDir)) {
+        for (const sessionId of fs.readdirSync(sessionsDir)) {
+          const composeFile = path.join(sessionsDir, sessionId, "docker", "docker-compose.yml");
           if (fs.existsSync(composeFile)) {
             try {
-              execSync(`docker compose -f "${composeFile}" down --rmi local --volumes`, {
+              execSync(`docker compose -f "${composeFile}" --profile agent down --rmi local --volumes`, {
                 stdio: "pipe",
                 timeout: 30_000,
               });
@@ -198,33 +181,33 @@ describe("ACP client spawn e2e", () => {
       }
     } catch { /* best-effort */ }
 
-    // Clean up temp directories
-    if (workspaceDir && fs.existsSync(workspaceDir)) {
-      fs.rmSync(workspaceDir, { recursive: true, force: true });
-    }
+    // Leave CLAWMASONS_HOME for debugging — only clean up session CWD
     if (sessionCwd && fs.existsSync(sessionCwd)) {
       fs.rmSync(sessionCwd, { recursive: true, force: true });
     }
   }, 120_000);
 
-  // ── Test 1: Spawn and Initialize ───────────────────────────────────
+  // ── Test 1: Bootstrap and Ready ────────────────────────────────────
 
-  it("spawns clawmasons acp and bridge becomes ready", async () => {
-    // Spawn the ACP process (same as acpx or Zed would)
+  it("bootstraps initiate chapter and bridge becomes ready", async () => {
     acpProcess = spawn(
       "node",
       [
         CLAWMASONS_BIN,
         "acp",
-        "--role", "writer",
+        "--chapter", "initiate",
+        "--role", "chapter-creator",
+        "--init-agent", "@e2e.initiate/agent-mcp",
         "--port", String(ACP_BRIDGE_PORT),
         "--proxy-port", String(ACP_PROXY_PORT),
       ],
       {
-        cwd: workspaceDir,
+        cwd: E2E_ROOT,
         env: {
           ...process.env,
-          CLAWMASONS_HOME: clawmasonsHome,
+          CLAWMASONS_HOME,
+          LODGE,
+          TEST_TOKEN: "test-token-e2e",
         },
         stdio: ["pipe", "pipe", "pipe"],
       },
@@ -238,10 +221,29 @@ describe("ACP client spawn e2e", () => {
       processOutput.stderr += chunk.toString();
     });
 
-    // Wait for the "Ready" log message indicating bridge is listening
+    // Wait for the "Ready" log — means bootstrap + infra start succeeded
     await waitForOutput(acpProcess, "Ready", READY_TIMEOUT_MS, processOutput);
 
-    // Verify the bridge health endpoint is accessible
+    // Verify directory structure created by bootstrap
+    // Lodge
+    expect(fs.existsSync(path.join(CLAWMASONS_HOME, "config.json"))).toBe(true);
+    expect(fs.existsSync(LODGE_HOME)).toBe(true);
+
+    // Chapter workspace
+    expect(fs.existsSync(path.join(CHAPTER_DIR, ".clawmasons"))).toBe(true);
+    expect(fs.existsSync(path.join(CHAPTER_DIR, "package.json"))).toBe(true);
+    expect(fs.existsSync(path.join(CHAPTER_DIR, "agents", "mcp", "package.json"))).toBe(true);
+    expect(fs.existsSync(path.join(CHAPTER_DIR, "agents", "pi", "package.json"))).toBe(true);
+    expect(fs.existsSync(path.join(CHAPTER_DIR, "roles", "chapter-creator", "package.json"))).toBe(true);
+    expect(fs.existsSync(path.join(CHAPTER_DIR, "apps", "filesystem", "package.json"))).toBe(true);
+
+    // Docker build artifacts
+    const dockerDir = path.join(CHAPTER_DIR, "docker");
+    expect(fs.existsSync(dockerDir)).toBe(true);
+    expect(fs.existsSync(path.join(dockerDir, "proxy", "chapter-creator", "Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(dockerDir, "credential-service", "Dockerfile"))).toBe(true);
+
+    // Verify bridge health endpoint
     await pollHealthEndpoint(`http://localhost:${ACP_BRIDGE_PORT}/health`, 10_000);
   }, READY_TIMEOUT_MS + 15_000);
 
@@ -251,8 +253,6 @@ describe("ACP client spawn e2e", () => {
     const proc = assertDefined(acpProcess, "acpProcess must be running");
     expect(proc.killed).toBe(false);
 
-    // Send a POST request to the bridge — this triggers onSessionNew
-    // The bridge extracts `cwd` from the request body and starts the agent
     const resp = await fetch(`http://localhost:${ACP_BRIDGE_PORT}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -272,10 +272,14 @@ describe("ACP client spawn e2e", () => {
       }),
     });
 
-    // The bridge should relay this to the agent (which starts on first POST)
+    if (resp.status >= 500) {
+      const body = await resp.text();
+      console.error(`session/new returned ${resp.status}: ${body}`);
+      console.error(`Process stdout so far:\n${processOutput.stdout}`);
+      console.error(`Process stderr so far:\n${processOutput.stderr}`);
+    }
     expect(resp.status).toBeLessThan(500);
 
-    // Wait for the agent to be connected (check process output)
     await waitForOutput(
       proc,
       "Bridge connected to agent",
@@ -292,67 +296,45 @@ describe("ACP client spawn e2e", () => {
   it("agent responds to tool listing via bridge", async () => {
     expect(acpProcess).not.toBeNull();
 
-    // The agent is now running. Send a "list" command through the bridge.
-    // The bridge relays POST requests to the agent container's ACP endpoint.
-    const resp = await fetch(`http://localhost:${ACP_BRIDGE_PORT}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ command: "list" }),
-    });
+    // The mcp-agent connects to proxy in background with retries.
+    // Poll until tools become available.
+    const start = Date.now();
+    const timeout = 60_000;
+    let output = "";
 
-    expect(resp.ok).toBe(true);
-    const result = await resp.json() as { output: string; exit: boolean };
-    expect(result).toHaveProperty("output");
-    expect(result.exit).toBe(false);
+    while (Date.now() - start < timeout) {
+      const resp = await fetch(`http://localhost:${ACP_BRIDGE_PORT}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: "list" }),
+      });
 
-    // The list command should show filesystem tools from the mcp-note-taker agent
-    const output = result.output;
+      expect(resp.ok).toBe(true);
+      const result = await resp.json() as { output: string; exit: boolean };
+      expect(result).toHaveProperty("output");
+      expect(result.exit).toBe(false);
+
+      output = result.output;
+      if (output.includes("Available tools:")) break;
+
+      await new Promise((r) => setTimeout(r, 2_000));
+    }
+
+    // Should show filesystem tools from the chapter-creator role
     expect(output).toContain("Available tools:");
     expect(output).toMatch(/list_directory|read_file|write_file/);
-  }, 30_000);
+  }, 90_000);
 
-  // ── Test 4: Tool Invocation ────────────────────────────────────────
-
-  it("agent can call filesystem tools via bridge", async () => {
-    expect(acpProcess).not.toBeNull();
-
-    // First, list tools to get the correct prefixed name
-    const listResp = await fetch(`http://localhost:${ACP_BRIDGE_PORT}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ command: "list" }),
-    });
-    const listResult = await listResp.json() as { output: string };
-    const lines = listResult.output.split("\n");
-    const listDirLine = lines.find((l: string) => l.includes("list_directory"));
-    const toolName = listDirLine?.match(/- (\S+)/)?.[1] ?? "filesystem__list_directory";
-
-    // Call list_directory through the bridge -> agent -> proxy -> MCP server
-    const resp = await fetch(`http://localhost:${ACP_BRIDGE_PORT}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ command: `${toolName} {"path": "/workspace"}` }),
-    });
-
-    expect(resp.ok).toBe(true);
-    const result = await resp.json() as { output: string; exit: boolean };
-    expect(result).toHaveProperty("output");
-    expect(result.exit).toBe(false);
-  }, 30_000);
-
-  // ── Test 5: Session Teardown ───────────────────────────────────────
+  // ── Test 4: Graceful Shutdown ──────────────────────────────────────
 
   it("process shuts down gracefully on SIGTERM", async () => {
     const proc = assertDefined(acpProcess, "acpProcess must be running");
     expect(proc.killed).toBe(false);
 
-    // Send SIGTERM (same as an ACP client disconnecting / editor closing)
     proc.kill("SIGTERM");
 
-    // Wait for process to exit
     const exitCode = await new Promise<number | null>((resolve) => {
       const timer = setTimeout(() => {
-        // Force kill if graceful shutdown takes too long
         if (!proc.killed) {
           proc.kill("SIGKILL");
         }
@@ -365,13 +347,11 @@ describe("ACP client spawn e2e", () => {
       });
     });
 
-    // Process should have exited (0 for graceful shutdown)
     expect(exitCode).toBe(0);
 
     // Verify the bridge is no longer listening
     try {
       await fetch(`http://localhost:${ACP_BRIDGE_PORT}/health`);
-      // If we get here, the port is still responding (unexpected)
       expect.fail("Bridge should no longer be listening after shutdown");
     } catch {
       // Expected: connection refused

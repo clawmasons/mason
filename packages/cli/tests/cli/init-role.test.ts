@@ -252,8 +252,8 @@ describe("generateInitRoleComposeYml", () => {
 
     expect(yaml).toContain("agent-note-taker-writer:");
     expect(yaml).toContain("agent-reviewer-writer:");
-    // Only one proxy and one credential-service
-    const proxyMatches = yaml.match(/proxy-writer:/g);
+    // Only one proxy service definition (match "  proxy-writer:" at start of line)
+    const proxyMatches = yaml.match(/^  proxy-writer:/gm);
     expect(proxyMatches).toHaveLength(1);
     // credential-service appears as a service name and in depends_on references
     expect(yaml).toContain("credential-service:\n");

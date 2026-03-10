@@ -422,7 +422,7 @@ describe("generateProxyDockerfile", () => {
     const result = generateProxyDockerfile(agent.roles[0], agent.name);
 
     expect(result).toContain('ENTRYPOINT ["node", "node_modules/.bin/clawmasons"]');
-    expect(result).toContain('CMD ["proxy", "--agent", "@acme.platform/agent-note-taker"]');
+    expect(result).toContain('CMD ["chapter", "proxy", "--agent", "@acme.platform/agent-note-taker", "--transport", "streamable-http"]');
   });
 
   it("includes role name in header comment", () => {

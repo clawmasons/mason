@@ -47,6 +47,6 @@ RUN groupadd -r mason && useradd -r -g mason -m mason \\
 USER mason
 
 ENTRYPOINT ["node", "node_modules/.bin/clawmasons"]
-CMD ["proxy", "--agent", "${agentName}"]
+CMD ["chapter", "proxy", "--agent", "${agentName}", "--transport", "streamable-http"]
 `;
 }

@@ -190,9 +190,9 @@ export async function runInit(
 
   // Generate .clawmasons/chapter.json
   const configPath = path.join(targetDir, "/.clawmasons/", "chapter.json");
-  const managingChapter = { 
-    chapter: "grand.chapter-builder",
-    version: "0.1.0" 
+  const managingChapter = {
+    chapter: projectScope,
+    version: "0.1.0"
   };
   fs.writeFileSync(configPath, JSON.stringify(managingChapter, null, 2) + "\n");
   created.push(".clawmasons/chapter.json");

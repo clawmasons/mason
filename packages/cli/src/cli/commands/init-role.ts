@@ -171,6 +171,7 @@ services:
       dockerfile: "${credentialServiceDockerfile}"
     environment:
       - CREDENTIAL_PROXY_TOKEN=\${CREDENTIAL_PROXY_TOKEN}
+      - CREDENTIAL_PROXY_URL=ws://${proxyServiceName}:9090
     depends_on:
       - ${proxyServiceName}
     restart: "no"

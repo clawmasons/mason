@@ -107,6 +107,7 @@ function makeMockSession() {
     sessionDir: "/fake/infra/dir",
     composeFile: "/fake/infra-compose.yml",
     proxyServiceName: "proxy-test-role",
+    agentServiceName: "agent-test-agent-test-role",
     proxyToken: "fake-proxy-token",
     credentialProxyToken: "fake-cred-token",
     dockerBuildPath: "/fake/docker-build",
@@ -207,6 +208,8 @@ function makeDeps(overrides?: {
       lodgeHome: "/fake/clawmasons-home/testuser",
     }),
     existsSyncFn: () => false,
+    readFileSyncFn: () => "{}",
+    writeFileSyncFn: () => {},
   };
 }
 
@@ -229,6 +232,8 @@ function makeBootstrapDeps(overrides?: Partial<BootstrapChapterDeps>): Bootstrap
     }),
     existsSyncFn: () => false,
     mkdirSyncFn: () => {},
+    readFileSyncFn: () => "{}",
+    writeFileSyncFn: () => {},
     ...overrides,
   };
 }
@@ -386,7 +391,7 @@ describe("runAcpAgent", () => {
     await runAcpAgent("/fake/root", { role: "my-role", agent: "my-agent" }, deps);
 
     expect(sessionConfig?.role).toBe("my-role");
-    expect(sessionConfig?.agent).toBe("my-agent");
+    expect(sessionConfig?.agent).toBe("test-agent"); // Uses agent.slug, not the --agent flag
     expect(sessionConfig?.projectDir).toBe("/fake/root");
   });
 

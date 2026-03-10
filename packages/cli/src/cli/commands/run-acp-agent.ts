@@ -3,6 +3,7 @@ import * as path from "node:path";
 import type { Command } from "commander";
 import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
 import { computeToolFilters } from "@clawmasons/shared";
+import { ACP_RUNTIME_COMMANDS } from "../../materializer/common.js";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
@@ -81,6 +82,10 @@ export interface RunAcpAgentDeps {
   }) => { clawmasonsHome: string; lodge: string; lodgeHome: string };
   /** Override fs.existsSync (for testing). */
   existsSyncFn?: (filePath: string) => boolean;
+  /** Override fs.readFileSync (for testing). */
+  readFileSyncFn?: (filePath: string, encoding: BufferEncoding) => string;
+  /** Override fs.writeFileSync (for testing). */
+  writeFileSyncFn?: (filePath: string, data: string) => void;
 }
 
 // ── Help Text ─────────────────────────────────────────────────────────
@@ -291,6 +296,10 @@ export interface BootstrapChapterDeps {
   }) => { clawmasonsHome: string; lodge: string; lodgeHome: string };
   existsSyncFn: (filePath: string) => boolean;
   mkdirSyncFn: (dirPath: string, options?: { recursive?: boolean }) => void;
+  /** Override fs.readFileSync (for testing). */
+  readFileSyncFn?: (filePath: string, encoding: BufferEncoding) => string;
+  /** Override fs.writeFileSync (for testing). */
+  writeFileSyncFn?: (filePath: string, data: string) => void;
 }
 
 /**
@@ -338,6 +347,21 @@ export async function bootstrapChapter(
     console.log("[clawmasons acp] Running chapter build...");
     await deps.runBuildFn(chapterDir, undefined, {});
 
+    // Write docker-build path into .clawmasons/chapter.json so AcpSession can find it
+    const readFile = deps.readFileSyncFn ?? fs.readFileSync;
+    const writeFile = deps.writeFileSyncFn ?? fs.writeFileSync;
+    const chapterJsonPath = path.join(chapterDir, ".clawmasons", "chapter.json");
+    const dockerBuildPath = path.join(chapterDir, "docker");
+    let chapterJson: Record<string, unknown> = {};
+    try {
+      chapterJson = JSON.parse(readFile(chapterJsonPath, "utf-8")) as Record<string, unknown>;
+    } catch { /* start fresh if missing/invalid */ }
+    chapterJson["docker-build"] = dockerBuildPath;
+    if (!chapterJson["docker-registries"]) {
+      chapterJson["docker-registries"] = ["local"];
+    }
+    writeFile(chapterJsonPath, JSON.stringify(chapterJson, null, 2) + "\n");
+
     console.log(`[clawmasons acp] Bootstrap complete for '${chapterName}'.`);
   } else {
     console.log(`[clawmasons acp] Chapter '${chapterName}' already initialized. Skipping bootstrap.`);
@@ -367,6 +391,8 @@ export async function runAcpAgent(
   const runBuildDep = deps?.runBuildFn ?? runBuild;
   const resolveLodgeVarsDep = deps?.resolveLodgeVarsFn ?? resolveLodgeVars;
   const existsSyncDep = deps?.existsSyncFn ?? fs.existsSync;
+  const readFileSyncDep = deps?.readFileSyncFn;
+  const writeFileSyncDep = deps?.writeFileSyncFn;
 
   const port = options.port ?? 3001;
   const proxyPort = options.proxyPort ?? 3000;
@@ -406,6 +432,8 @@ export async function runAcpAgent(
           resolveLodgeVarsFn: resolveLodgeVarsDep,
           existsSyncFn: existsSyncDep,
           mkdirSyncFn: mkdirSync,
+          readFileSyncFn: readFileSyncDep,
+          writeFileSyncFn: writeFileSyncDep,
         });
       } else {
         // Non-initiate: just resolve the chapter directory
@@ -468,13 +496,20 @@ export async function runAcpAgent(
     }
 
     // ── Step 5: Create session and start infrastructure ────────────────
+    const runtime = agent.runtimes[0] ?? "node";
+    const acpRuntimeCmd = ACP_RUNTIME_COMMANDS[runtime];
+    const acpCommand = acpRuntimeCmd
+      ? [...acpRuntimeCmd.split(" ").slice(1), "--port", String(acpAgentPort)]
+      : undefined;
+
     session = createSession({
       projectDir: effectiveRootDir,
-      agent: agentName,
+      agent: agent.slug,
       role: options.role,
       acpPort: acpAgentPort,
       proxyPort,
       ...(envCredCount > 0 ? { credentials: envCredentials } : {}),
+      acpCommand,
     });
 
     console.log("[clawmasons acp] Starting infrastructure (proxy + credential-service)...");

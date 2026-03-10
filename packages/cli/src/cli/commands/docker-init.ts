@@ -100,6 +100,7 @@ const FRAMEWORK_PACKAGES = [
   "@clawmasons/proxy",
   "@clawmasons/shared",
   "@clawmasons/mcp-agent",
+  "@clawmasons/credential-service",
 ];
 
 /**

@@ -1,0 +1,19 @@
+{
+  "name": "@{{projectScope}}/agent-mcp",
+  "version": "1.0.0",
+  "chapter": {
+    "type": "agent",
+    "name": "MCP Agent",
+    "slug": "mcp",
+    "description": "General-purpose MCP tool-calling agent (no LLM required)",
+    "runtimes": ["mcp-agent"],
+    "roles": ["@{{projectScope}}/role-chapter-creator"],
+    "credentials": ["TEST_TOKEN"],
+    "acp": {
+      "port": 3002
+    }
+  },
+  "dependencies": {
+    "@clawmasons/mcp-agent": "*"
+  }
+}

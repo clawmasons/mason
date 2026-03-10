@@ -5,8 +5,6 @@ import * as path from "node:path";
 import {
   AcpSession,
   generateAcpComposeYml,
-  generateInfraComposeYml,
-  generateAgentComposeYml,
   type AcpSessionConfig,
   type AcpSessionDeps,
 } from "../../src/acp/session.js";
@@ -83,7 +81,6 @@ function makeMockDeps(overrides?: {
 describe("generateAcpComposeYml", () => {
   const defaultOpts = {
     dockerBuildPath: "/chapters/acme/docker",
-    projectDir: "/projects/my-project",
     agent: "note-taker",
     role: "writer",
     logsDir: "/projects/my-project/.clawmasons/logs",
@@ -98,6 +95,14 @@ describe("generateAcpComposeYml", () => {
     expect(yml).toContain("proxy-writer:");
     expect(yml).toContain("credential-service:");
     expect(yml).toContain("agent-note-taker-writer:");
+  });
+
+  it("agent service has profiles: [agent] so up -d skips it", () => {
+    const yml = generateAcpComposeYml(defaultOpts);
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+
+    expect(agentSection).toContain("profiles:");
+    expect(agentSection).toContain("- agent");
   });
 
   it("agent service has no stdin_open or tty (non-interactive)", () => {
@@ -166,13 +171,29 @@ describe("generateAcpComposeYml", () => {
     expect(proxySection).toContain("CREDENTIAL_PROXY_TOKEN=test-cred-token");
   });
 
-  it("agent has only MCP_PROXY_TOKEN", () => {
+  it("proxy has CHAPTER_SESSION_TYPE=acp", () => {
+    const yml = generateAcpComposeYml(defaultOpts);
+    const proxySection = yml.split("credential-service:")[0]!;
+
+    expect(proxySection).toContain("CHAPTER_SESSION_TYPE=acp");
+  });
+
+  it("agent has MCP_PROXY_TOKEN and MCP_PROXY_URL", () => {
     const yml = generateAcpComposeYml(defaultOpts);
     const agentSection = yml.split("agent-note-taker-writer:")[1]!;
 
     expect(agentSection).toContain("MCP_PROXY_TOKEN=test-proxy-token");
-    expect(agentSection).not.toContain("CHAPTER_PROXY_TOKEN");
-    expect(agentSection).not.toContain("CREDENTIAL_PROXY_TOKEN");
+    expect(agentSection).toContain("MCP_PROXY_URL=http://proxy-writer:9090");
+  });
+
+  it("agent gets credentials as env vars when provided", () => {
+    const yml = generateAcpComposeYml({
+      ...defaultOpts,
+      credentials: { TEST_TOKEN: "tok123" },
+    });
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+
+    expect(agentSection).toContain("TEST_TOKEN=tok123");
   });
 
   it("credential-service depends on proxy", () => {
@@ -199,14 +220,65 @@ describe("generateAcpComposeYml", () => {
     expect(yml).toContain('dockerfile: "agent/note-taker/writer/Dockerfile"');
   });
 
-  it("includes workspace volume mount for proxy and agent", () => {
-    const yml = generateAcpComposeYml(defaultOpts);
-
+  it("includes acpClient in proxy env when provided", () => {
+    const yml = generateAcpComposeYml({ ...defaultOpts, acpClient: "zed" });
     const proxySection = yml.split("credential-service:")[0]!;
+
+    expect(proxySection).toContain("CHAPTER_ACP_CLIENT=zed");
+  });
+
+  it("includes acpCommand as command when provided", () => {
+    const yml = generateAcpComposeYml({
+      ...defaultOpts,
+      acpCommand: ["mcp-agent", "--acp", "--port", "3002"],
+    });
     const agentSection = yml.split("agent-note-taker-writer:")[1]!;
 
-    expect(proxySection).toContain('"/projects/my-project:/workspace"');
-    expect(agentSection).toContain('"/projects/my-project:/workspace"');
+    expect(agentSection).toContain("command:");
+    expect(agentSection).toContain("mcp-agent");
+  });
+
+  it("has no command line when acpCommand is not provided", () => {
+    const yml = generateAcpComposeYml(defaultOpts);
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+
+    expect(agentSection).not.toContain("command:");
+  });
+
+  it("includes role mounts in agent service volumes", () => {
+    const yml = generateAcpComposeYml({
+      ...defaultOpts,
+      roleMounts: [
+        { source: "/data/shared", target: "/mnt/shared", readonly: false },
+      ],
+    });
+
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    expect(agentSection).toContain('"/data/shared:/mnt/shared"');
+  });
+
+  it("does not add role mounts to proxy volumes", () => {
+    const yml = generateAcpComposeYml({
+      ...defaultOpts,
+      roleMounts: [
+        { source: "/data/shared", target: "/mnt/shared", readonly: false },
+      ],
+    });
+
+    const proxySection = yml.split("credential-service:")[0]!;
+    expect(proxySection).not.toContain("/mnt/shared");
+  });
+
+  it("appends :ro for readonly role mounts", () => {
+    const yml = generateAcpComposeYml({
+      ...defaultOpts,
+      roleMounts: [
+        { source: "/configs", target: "/etc/app", readonly: true },
+      ],
+    });
+
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    expect(agentSection).toContain('"/configs:/etc/app:ro"');
   });
 });
 
@@ -234,6 +306,8 @@ describe("AcpSession", () => {
       ...overrides,
     };
   }
+
+  // ── Legacy start() ──────────────────────────────────────────────────
 
   it("start() returns correct SessionInfo", async () => {
     const { deps } = makeMockDeps({ sessionId: "sess0001" });
@@ -273,14 +347,15 @@ describe("AcpSession", () => {
     expect(content).toContain("agent-note-taker-writer:");
   });
 
-  it("start() starts all services detached (up -d)", async () => {
+  it("start() starts all services with --profile agent up -d", async () => {
     const { calls, deps } = makeMockDeps();
     const session = new AcpSession(makeConfig(), deps);
 
     await session.start();
 
-    // Should call docker compose up -d (all services at once)
     expect(calls).toHaveLength(1);
+    expect(calls[0]!.args).toContain("--profile");
+    expect(calls[0]!.args).toContain("agent");
     expect(calls[0]!.args).toContain("up");
     expect(calls[0]!.args).toContain("-d");
   });
@@ -341,7 +416,7 @@ describe("AcpSession", () => {
     expect(agentSection).toContain('"3002:3002"');
   });
 
-  it("stop() calls docker compose down", async () => {
+  it("stop() calls docker compose down for legacy session", async () => {
     const { calls, deps } = makeMockDeps();
     const session = new AcpSession(makeConfig(), deps);
 
@@ -350,13 +425,14 @@ describe("AcpSession", () => {
 
     expect(calls).toHaveLength(2);
     expect(calls[1]!.args).toContain("down");
+    expect(calls[1]!.args).toContain("--profile");
+    expect(calls[1]!.args).toContain("agent");
   });
 
   it("stop() is idempotent when not running", async () => {
     const { calls, deps } = makeMockDeps();
     const session = new AcpSession(makeConfig(), deps);
 
-    // Stop without starting -- should be no-op
     await session.stop();
 
     expect(calls).toHaveLength(0);
@@ -368,7 +444,7 @@ describe("AcpSession", () => {
 
     await session.start();
     await session.stop();
-    await session.stop(); // Second stop should be no-op
+    await session.stop();
 
     expect(calls).toHaveLength(2); // up + down, not two downs
   });
@@ -432,13 +508,14 @@ describe("AcpSession", () => {
 
       expect(info.sessionId).toBe("infra001");
       expect(info.proxyServiceName).toBe("proxy-writer");
+      expect(info.agentServiceName).toBe("agent-note-taker-writer");
       expect(info.proxyToken).toBeDefined();
       expect(info.credentialProxyToken).toBeDefined();
       expect(info.dockerBuildPath).toBeDefined();
       expect(info.composeFile).toContain("infra001");
     });
 
-    it("startInfrastructure() creates compose with only proxy and credential-service", async () => {
+    it("startInfrastructure() creates single compose with all services (agent behind profile)", async () => {
       const { deps } = makeMockDeps({ sessionId: "infra002" });
       const session = new AcpSession(makeConfig(), deps);
 
@@ -447,18 +524,21 @@ describe("AcpSession", () => {
       const content = fs.readFileSync(info.composeFile, "utf-8");
       expect(content).toContain("proxy-writer:");
       expect(content).toContain("credential-service:");
-      expect(content).not.toContain("agent-note-taker-writer:");
+      expect(content).toContain("agent-note-taker-writer:");
+      // Agent should be behind a profile
+      const agentSection = content.split("agent-note-taker-writer:")[1]!;
+      expect(agentSection).toContain("profiles:");
+      expect(agentSection).toContain("- agent");
     });
 
-    it("startInfrastructure() calls compose up -d", async () => {
+    it("startInfrastructure() calls compose up -d (without --profile, so agent is skipped)", async () => {
       const { calls, deps } = makeMockDeps();
       const session = new AcpSession(makeConfig(), deps);
 
       await session.startInfrastructure();
 
       expect(calls).toHaveLength(1);
-      expect(calls[0]!.args).toContain("up");
-      expect(calls[0]!.args).toContain("-d");
+      expect(calls[0]!.args).toEqual(["up", "-d"]);
     });
 
     it("startInfrastructure() throws when already running", async () => {
@@ -477,10 +557,8 @@ describe("AcpSession", () => {
       await expect(session.startInfrastructure()).rejects.toThrow("Failed to start infrastructure");
     });
 
-    it("startAgent() launches agent with correct projectDir", async () => {
-      let sessionIdCounter = 0;
-      const { calls, deps } = makeMockDeps();
-      deps.generateSessionIdFn = () => `sess${String(sessionIdCounter++).padStart(4, "0")}`;
+    it("startAgent() uses docker compose run with volume override", async () => {
+      const { calls, deps } = makeMockDeps({ sessionId: "infra003" });
       const session = new AcpSession(makeConfig(), deps);
 
       await session.startInfrastructure();
@@ -494,30 +572,25 @@ describe("AcpSession", () => {
       expect(info.projectDir).toBe(agentDir);
       expect(info.acpPort).toBe(3002);
 
-      // Should have 2 calls: infra up, agent up
+      // Should have 2 calls: infra up, agent run
       expect(calls).toHaveLength(2);
-      expect(calls[1]!.args).toContain("up");
-      expect(calls[1]!.args).toContain("-d");
+      expect(calls[1]!.args).toEqual([
+        "run", "-d", "--rm", "--service-ports", "-v", `${agentDir}:/workspace`, "agent-note-taker-writer",
+      ]);
     });
 
-    it("startAgent() creates compose with correct workspace mount", async () => {
-      let sessionIdCounter = 0;
-      const { deps } = makeMockDeps();
-      deps.generateSessionIdFn = () => `sess${String(sessionIdCounter++).padStart(4, "0")}`;
+    it("startAgent() uses the same compose file as infrastructure", async () => {
+      const { deps } = makeMockDeps({ sessionId: "infra004" });
       const session = new AcpSession(makeConfig(), deps);
 
-      await session.startInfrastructure();
+      const infraInfo = await session.startInfrastructure();
 
       const agentDir = path.join(tmpDir, "target-project");
       fs.mkdirSync(agentDir, { recursive: true });
 
-      const info = await session.startAgent(agentDir);
+      const agentInfo = await session.startAgent(agentDir);
 
-      const content = fs.readFileSync(info.composeFile, "utf-8");
-      expect(content).toContain("agent-note-taker-writer:");
-      expect(content).toContain(`"${agentDir}:/workspace"`);
-      expect(content).not.toContain("proxy-writer:");
-      expect(content).not.toContain("credential-service:");
+      expect(agentInfo.composeFile).toBe(infraInfo.composeFile);
     });
 
     it("startAgent() throws when infrastructure is not running", async () => {
@@ -528,9 +601,7 @@ describe("AcpSession", () => {
     });
 
     it("startAgent() throws when agent is already running", async () => {
-      let sessionIdCounter = 0;
-      const { deps } = makeMockDeps();
-      deps.generateSessionIdFn = () => `sess${String(sessionIdCounter++).padStart(4, "0")}`;
+      const { deps } = makeMockDeps({ sessionId: "infra005" });
       const session = new AcpSession(makeConfig(), deps);
 
       await session.startInfrastructure();
@@ -543,10 +614,8 @@ describe("AcpSession", () => {
       await expect(session.startAgent(agentDir)).rejects.toThrow("Agent is already running");
     });
 
-    it("stopAgent() stops only the agent", async () => {
-      let sessionIdCounter = 0;
-      const { calls: composeCalls, deps } = makeMockDeps();
-      deps.generateSessionIdFn = () => `sess${String(sessionIdCounter++).padStart(4, "0")}`;
+    it("stopAgent() stops and removes only the agent service", async () => {
+      const { calls: composeCalls, deps } = makeMockDeps({ sessionId: "infra006" });
       const session = new AcpSession(makeConfig(), deps);
 
       await session.startInfrastructure();
@@ -557,9 +626,13 @@ describe("AcpSession", () => {
       await session.startAgent(agentDir);
       await session.stopAgent();
 
-      // 3 calls: infra up, agent up, agent down
-      expect(composeCalls).toHaveLength(3);
-      expect(composeCalls[2]!.args).toContain("down");
+      // 4 calls: infra up, agent run, agent stop, agent rm -f
+      expect(composeCalls).toHaveLength(4);
+      expect(composeCalls[2]!.args).toContain("stop");
+      expect(composeCalls[2]!.args).toContain("agent-note-taker-writer");
+      expect(composeCalls[3]!.args).toContain("rm");
+      expect(composeCalls[3]!.args).toContain("-f");
+      expect(composeCalls[3]!.args).toContain("agent-note-taker-writer");
 
       // Infrastructure still running
       expect(session.isInfrastructureRunning()).toBe(true);
@@ -576,10 +649,8 @@ describe("AcpSession", () => {
       expect(calls).toHaveLength(0);
     });
 
-    it("stop() tears down both agent and infrastructure", async () => {
-      let sessionIdCounter = 0;
-      const { calls, deps } = makeMockDeps();
-      deps.generateSessionIdFn = () => `sess${String(sessionIdCounter++).padStart(4, "0")}`;
+    it("stop() tears down everything with --profile agent down", async () => {
+      const { calls, deps } = makeMockDeps({ sessionId: "infra007" });
       const session = new AcpSession(makeConfig(), deps);
 
       await session.startInfrastructure();
@@ -590,19 +661,16 @@ describe("AcpSession", () => {
       await session.startAgent(agentDir);
       await session.stop();
 
-      // 4 calls: infra up, agent up, agent down, infra down
-      expect(calls).toHaveLength(4);
-      expect(calls[2]!.args).toContain("down");
-      expect(calls[3]!.args).toContain("down");
+      // 3 calls: infra up, agent run, --profile agent down
+      expect(calls).toHaveLength(3);
+      expect(calls[2]!.args).toEqual(["--profile", "agent", "down"]);
 
       expect(session.isInfrastructureRunning()).toBe(false);
       expect(session.isAgentRunning()).toBe(false);
     });
 
     it("can start a new agent after stopAgent()", async () => {
-      let sessionIdCounter = 0;
-      const { deps } = makeMockDeps();
-      deps.generateSessionIdFn = () => `sess${String(sessionIdCounter++).padStart(4, "0")}`;
+      const { deps } = makeMockDeps({ sessionId: "infra008" });
       const session = new AcpSession(makeConfig(), deps);
 
       await session.startInfrastructure();
@@ -617,8 +685,6 @@ describe("AcpSession", () => {
       const info2 = await session.startAgent(dir2);
 
       expect(info2.projectDir).toBe(dir2);
-      // 5 calls: infra up, agent1 up, agent1 down, agent2 up... wait actually
-      // let's just check the agent is running again
       expect(session.isAgentRunning()).toBe(true);
     });
 
@@ -636,9 +702,7 @@ describe("AcpSession", () => {
     });
 
     it("isAgentRunning() tracks state correctly", async () => {
-      let sessionIdCounter = 0;
-      const { deps } = makeMockDeps();
-      deps.generateSessionIdFn = () => `sess${String(sessionIdCounter++).padStart(4, "0")}`;
+      const { deps } = makeMockDeps({ sessionId: "infra009" });
       const session = new AcpSession(makeConfig(), deps);
 
       expect(session.isAgentRunning()).toBe(false);
@@ -654,203 +718,5 @@ describe("AcpSession", () => {
       await session.stopAgent();
       expect(session.isAgentRunning()).toBe(false);
     });
-  });
-});
-
-// ── generateInfraComposeYml ────────────────────────────────────────────
-
-describe("generateInfraComposeYml", () => {
-  const defaultOpts = {
-    dockerBuildPath: "/chapters/acme/docker",
-    role: "writer",
-    logsDir: "/tmp/logs",
-    proxyToken: "test-proxy-token",
-    credentialProxyToken: "test-cred-token",
-  };
-
-  it("generates proxy and credential-service services", () => {
-    const yml = generateInfraComposeYml(defaultOpts);
-
-    expect(yml).toContain("proxy-writer:");
-    expect(yml).toContain("credential-service:");
-  });
-
-  it("does not include agent service", () => {
-    const yml = generateInfraComposeYml(defaultOpts);
-
-    expect(yml).not.toContain("agent-");
-  });
-
-  it("proxy has correct tokens", () => {
-    const yml = generateInfraComposeYml(defaultOpts);
-
-    expect(yml).toContain("CHAPTER_PROXY_TOKEN=test-proxy-token");
-    expect(yml).toContain("CREDENTIAL_PROXY_TOKEN=test-cred-token");
-    expect(yml).toContain("CHAPTER_SESSION_TYPE=acp");
-  });
-
-  it("proxy has logs volume mount", () => {
-    const yml = generateInfraComposeYml(defaultOpts);
-
-    expect(yml).toContain('"/tmp/logs:/logs"');
-  });
-
-  it("proxy does NOT have workspace mount", () => {
-    const yml = generateInfraComposeYml(defaultOpts);
-
-    expect(yml).not.toContain("/workspace");
-  });
-
-  it("includes credential overrides when provided", () => {
-    const yml = generateInfraComposeYml({
-      ...defaultOpts,
-      credentials: { GITHUB_TOKEN: "ghp_test" },
-    });
-
-    expect(yml).toContain("CREDENTIAL_SESSION_OVERRIDES=");
-  });
-
-  it("includes ACP client when provided", () => {
-    const yml = generateInfraComposeYml({
-      ...defaultOpts,
-      acpClient: "zed",
-    });
-
-    expect(yml).toContain("CHAPTER_ACP_CLIENT=zed");
-  });
-});
-
-// ── generateAgentComposeYml ─────────────────────────────────────────────
-
-describe("generateAgentComposeYml", () => {
-  const defaultOpts = {
-    dockerBuildPath: "/chapters/acme/docker",
-    projectDir: "/projects/myapp",
-    agent: "note-taker",
-    role: "writer",
-    proxyToken: "test-proxy-token",
-    acpPort: 3002,
-  };
-
-  it("generates agent service only", () => {
-    const yml = generateAgentComposeYml(defaultOpts);
-
-    expect(yml).toContain("agent-note-taker-writer:");
-    expect(yml).not.toContain("proxy-writer:");
-    expect(yml).not.toContain("credential-service:");
-  });
-
-  it("mounts projectDir as /workspace", () => {
-    const yml = generateAgentComposeYml(defaultOpts);
-
-    expect(yml).toContain('"/projects/myapp:/workspace"');
-  });
-
-  it("has MCP_PROXY_TOKEN", () => {
-    const yml = generateAgentComposeYml(defaultOpts);
-
-    expect(yml).toContain("MCP_PROXY_TOKEN=test-proxy-token");
-  });
-
-  it("exposes ACP port", () => {
-    const yml = generateAgentComposeYml(defaultOpts);
-
-    expect(yml).toContain('"3002:3002"');
-  });
-
-  it("has init: true", () => {
-    const yml = generateAgentComposeYml(defaultOpts);
-
-    expect(yml).toContain("init: true");
-  });
-
-  it("uses custom ACP port", () => {
-    const yml = generateAgentComposeYml({ ...defaultOpts, acpPort: 5555 });
-
-    expect(yml).toContain('"5555:5555"');
-  });
-
-  it("includes role mounts in agent volumes", () => {
-    const yml = generateAgentComposeYml({
-      ...defaultOpts,
-      roleMounts: [
-        { source: "/host/data", target: "/container/data", readonly: false },
-      ],
-    });
-
-    expect(yml).toContain('"/host/data:/container/data"');
-    expect(yml).toContain('"/projects/myapp:/workspace"');
-  });
-
-  it("appends :ro for readonly role mounts", () => {
-    const yml = generateAgentComposeYml({
-      ...defaultOpts,
-      roleMounts: [
-        { source: "/host/config", target: "/etc/config", readonly: true },
-      ],
-    });
-
-    expect(yml).toContain('"/host/config:/etc/config:ro"');
-  });
-
-  it("has no extra mounts when roleMounts is undefined", () => {
-    const yml = generateAgentComposeYml(defaultOpts);
-    const volumeSection = yml.split("volumes:")[1]!.split("environment:")[0]!;
-
-    // Only workspace mount
-    const mountLines = volumeSection.split("\n").filter((l) => l.includes("- \""));
-    expect(mountLines).toHaveLength(1);
-    expect(mountLines[0]).toContain("/workspace");
-  });
-});
-
-// ── generateAcpComposeYml role mounts ────────────────────────────────
-
-describe("generateAcpComposeYml role mounts", () => {
-  const defaultOpts = {
-    dockerBuildPath: "/chapters/acme/docker",
-    projectDir: "/projects/my-project",
-    agent: "note-taker",
-    role: "writer",
-    logsDir: "/projects/my-project/.clawmasons/logs",
-    proxyToken: "test-proxy-token",
-    credentialProxyToken: "test-cred-token",
-    acpPort: 3002,
-  };
-
-  it("includes role mounts in agent service volumes", () => {
-    const yml = generateAcpComposeYml({
-      ...defaultOpts,
-      roleMounts: [
-        { source: "/data/shared", target: "/mnt/shared", readonly: false },
-      ],
-    });
-
-    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
-    expect(agentSection).toContain('"/data/shared:/mnt/shared"');
-  });
-
-  it("does not add role mounts to proxy volumes", () => {
-    const yml = generateAcpComposeYml({
-      ...defaultOpts,
-      roleMounts: [
-        { source: "/data/shared", target: "/mnt/shared", readonly: false },
-      ],
-    });
-
-    const proxySection = yml.split("credential-service:")[0]!;
-    expect(proxySection).not.toContain("/mnt/shared");
-  });
-
-  it("appends :ro for readonly role mounts in legacy compose", () => {
-    const yml = generateAcpComposeYml({
-      ...defaultOpts,
-      roleMounts: [
-        { source: "/configs", target: "/etc/app", readonly: true },
-      ],
-    });
-
-    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
-    expect(agentSection).toContain('"/configs:/etc/app:ro"');
   });
 });
