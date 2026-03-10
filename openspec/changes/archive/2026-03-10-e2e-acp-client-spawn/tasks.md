@@ -1,0 +1,11 @@
+- [x] Create `e2e/tests/acp-client-spawn.test.ts` with ACP client spawn test suite
+- [x] Test 1: Spawn clawmasons acp, verify bridge becomes ready
+- [x] Test 2: Send POST to trigger session/new, verify agent container starts
+- [x] Test 3: Verify tool listing via bridge
+- [x] Test 4: Verify filesystem tool invocation via bridge
+- [x] Test 5: Verify graceful shutdown on SIGTERM
+- [x] TypeScript compiles without errors
+- [x] ESLint passes without errors
+- [x] All existing unit tests pass (1140/1140)
+- [x] Update IMPLEMENTATION.md to mark Change 9 as implemented
+- [x] Create archive entry
