@@ -3,7 +3,7 @@
  *
  * Exercises the ACP proxy pipeline end-to-end:
  *   1. Copy fixture workspace to temp dir
- *   2. Run `chapter pack` + `chapter docker-init`
+ *   2. Run `chapter build` (resolve + pack + docker-init)
  *   3. Start proxy container with ACP session metadata
  *   4. Connect MCP client and verify governed tools
  *   5. Make tool calls and verify audit logging with ACP metadata
@@ -307,18 +307,11 @@ describe("ACP proxy Docker e2e", () => {
     if (fs.existsSync(mcpTestAgent)) fs.rmSync(mcpTestAgent, { recursive: true, force: true });
     if (fs.existsSync(mcpTestRole)) fs.rmSync(mcpTestRole, { recursive: true, force: true });
 
-    // 2. Run chapter pack
-    execFileSync("node", [CHAPTER_BIN, "pack"], {
+    // 2. Run chapter build (resolve + pack + docker-init in one step)
+    execFileSync("node", [CHAPTER_BIN, "build"], {
       cwd: workspaceDir,
       stdio: "pipe",
-      timeout: 60_000,
-    });
-
-    // 3. Run chapter docker-init
-    execFileSync("node", [CHAPTER_BIN, "docker-init"], {
-      cwd: workspaceDir,
-      stdio: "pipe",
-      timeout: 60_000,
+      timeout: 120_000,
     });
 
     dockerDir = path.join(workspaceDir, "docker");
