@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type { Command } from "commander";
 import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
 import { computeToolFilters } from "@clawmasons/shared";
@@ -49,6 +51,8 @@ export interface RunAcpAgentDeps {
   ) => Promise<void>;
   /** Override .gitignore entry management (for testing). */
   ensureGitignoreEntryFn?: (dir: string, pattern: string) => boolean;
+  /** Override fs.mkdirSync (for testing). */
+  mkdirSyncFn?: (dirPath: string, options?: { recursive?: boolean }) => void;
 }
 
 // ── Command Registration ──────────────────────────────────────────────
@@ -125,6 +129,7 @@ export async function runAcpAgent(
   const findRole = deps?.findRoleEntryByRoleFn ?? findRoleEntryByRole;
   const autoInitRole = deps?.initRoleFn ?? initRole;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
+  const mkdirSync = deps?.mkdirSyncFn ?? fs.mkdirSync;
 
   const port = options.port ?? 3001;
   const proxyPort = options.proxyPort ?? 3000;
@@ -169,7 +174,7 @@ export async function runAcpAgent(
       }
     }
 
-    // Ensure .clawmasons is in project's .gitignore
+    // Ensure .clawmasons is in chapter workspace's .gitignore
     ensureGitignore(rootDir, ".clawmasons");
 
     // ── Step 2: Discover packages ──────────────────────────────────────
@@ -189,34 +194,69 @@ export async function runAcpAgent(
     console.log(`[chapter run-acp-agent] Role: ${options.role}`);
     console.log(`[chapter run-acp-agent] Tool filters: ${toolCount} app(s)`);
 
-    // ── Step 5: Start ACP bridge endpoint ──────────────────────────────
+    // ── Step 5: Create session and start infrastructure ────────────────
+    session = createSession({
+      projectDir: rootDir,
+      agent: agentName,
+      role: options.role,
+      acpPort: acpAgentPort,
+      proxyPort,
+    });
+
+    console.log("[chapter run-acp-agent] Starting infrastructure (proxy + credential-service)...");
+    const infraInfo = await session.startInfrastructure();
+    console.log(`[chapter run-acp-agent] Infrastructure started (${infraInfo.sessionId})`);
+
+    // ── Step 6: Start ACP bridge endpoint ──────────────────────────────
     bridge = createBridge({
       hostPort: port,
       containerHost: "localhost",
       containerPort: acpAgentPort,
     });
 
-    // ── Step 6: Wire bridge lifecycle events ───────────────────────────
+    // ── Step 7: Wire bridge lifecycle events ───────────────────────────
     bridge.onClientConnect = () => {
       console.log("[chapter run-acp-agent] ACP client connected");
     };
 
     bridge.onClientDisconnect = () => {
-      console.log("[chapter run-acp-agent] ACP client disconnected — tearing down session...");
+      console.log("[chapter run-acp-agent] ACP client disconnected — stopping agent container...");
       void (async () => {
         try {
-          if (bridge) await bridge.stop();
+          if (session) await session.stopAgent();
         } catch { /* best-effort */ }
-        try {
-          if (session) await session.stop();
-        } catch { /* best-effort */ }
-        console.log("[chapter run-acp-agent] Session torn down. Exiting.");
-        process.exit(0);
+        if (bridge) bridge.resetForNewSession();
+        console.log("[chapter run-acp-agent] Agent stopped. Waiting for next session/new...");
       })();
     };
 
     bridge.onAgentError = (error: Error) => {
       console.error(`[chapter run-acp-agent] Agent error: ${error.message}`);
+    };
+
+    // Wire session/new handler for deferred agent start
+    // Capture references for use in the closure (avoids non-null assertions)
+    const sessionRef = session;
+    const bridgeRef = bridge;
+    bridge.onSessionNew = async (cwd: string) => {
+      console.log(`[chapter run-acp-agent] session/new received — cwd: "${cwd}"`);
+
+      // Create .clawmasons/ in the CWD for session state
+      const clawmasonsDir = path.join(cwd, ".clawmasons");
+      mkdirSync(clawmasonsDir, { recursive: true });
+
+      // Ensure .gitignore in the CWD directory
+      ensureGitignore(cwd, ".clawmasons");
+
+      // Start agent container with CWD mounted as /workspace
+      console.log("[chapter run-acp-agent] Starting agent container...");
+      const agentInfo = await sessionRef.startAgent(cwd);
+      console.log(`[chapter run-acp-agent] Agent started (${agentInfo.sessionId})`);
+
+      // Connect bridge to the agent
+      console.log("[chapter run-acp-agent] Connecting bridge to agent...");
+      await bridgeRef.connectToAgent();
+      console.log("[chapter run-acp-agent] Bridge connected to agent.");
     };
 
     await bridge.start();
@@ -226,32 +266,12 @@ export async function runAcpAgent(
       `  Agent:      ${agent.name}\n` +
       `  Role:       ${options.role}\n` +
       `  ACP port:   ${port}\n` +
-      `  Proxy port: ${proxyPort}\n`,
+      `  Proxy port: ${proxyPort}\n` +
+      `  Mode:       deferred (agent starts on session/new)\n`,
     );
 
-    // ── Step 7: Create and start session ───────────────────────────────
-    // In the current v1 model, we start the Docker session immediately
-    // rather than waiting for client mcpServers (since the bridge is a
-    // transparent relay and doesn't parse ACP protocol messages).
-    session = createSession({
-      projectDir: rootDir,
-      agent: agentName,
-      role: options.role,
-      acpPort: acpAgentPort,
-      proxyPort,
-    });
-
-    console.log("[chapter run-acp-agent] Starting Docker session...");
-    const sessionInfo = await session.start();
-    console.log(`[chapter run-acp-agent] Docker session started (${sessionInfo.sessionId})`);
-
-    // ── Step 8: Connect bridge to container agent ──────────────────────
-    console.log("[chapter run-acp-agent] Connecting bridge to container agent...");
-    await bridge.connectToAgent();
-    console.log("[chapter run-acp-agent] Bridge connected to agent. ACP endpoint is active.");
-
     // The process stays alive via the bridge HTTP server.
-    // Shutdown happens via SIGINT/SIGTERM or client disconnect.
+    // Shutdown happens via SIGINT/SIGTERM.
 
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
