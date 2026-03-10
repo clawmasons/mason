@@ -50,6 +50,11 @@ describe("CLI build command", () => {
     const cmd = program.commands.find((c) => c.name() === "acp-proxy");
     expect(cmd).toBeUndefined();
   });
+
+  it("run-acp-agent IS a registered command", () => {
+    const cmd = program.commands.find((c) => c.name() === "run-acp-agent");
+    expect(cmd).toBeDefined();
+  });
 });
 
 describe("runBuild", () => {

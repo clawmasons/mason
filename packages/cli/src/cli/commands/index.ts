@@ -8,6 +8,7 @@ import { registerPackCommand } from "./pack.js";
 import { registerPermissionsCommand } from "./permissions.js";
 import { registerProxyCommand } from "./proxy.js";
 import { registerRemoveCommand } from "./remove.js";
+import { registerRunAcpAgentCommand } from "./run-acp-agent.js";
 import { registerRunAgentCommand } from "./run-agent.js";
 import { registerValidateCommand } from "./validate.js";
 
@@ -21,6 +22,7 @@ export function registerCommands(program: Command): void {
   registerPermissionsCommand(program);
   registerProxyCommand(program);
   registerRemoveCommand(program);
+  registerRunAcpAgentCommand(program);
   registerRunAgentCommand(program);
   registerValidateCommand(program);
 }
