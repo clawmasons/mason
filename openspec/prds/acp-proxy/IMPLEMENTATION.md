@@ -329,7 +329,15 @@ Create the top-level CLI command that wires together matcher, rewriter, session,
 
 **Testable output:** (a) Command registers with correct options and defaults, (b) startup sequence resolves agent and computes filters, (c) ACP endpoint starts on configured port, (d) SIGTERM triggers graceful shutdown, (e) integration test: full startup → mock client connect → verify session started → disconnect → verify teardown.
 
-**Not Implemented Yet**
+**Implemented**
+
+- Archived change: [2026-03-10-acp-proxy-cli-command](../../changes/archive/2026-03-10-acp-proxy-cli-command/)
+  - [Proposal](../../changes/archive/2026-03-10-acp-proxy-cli-command/proposal.md)
+  - [Design](../../changes/archive/2026-03-10-acp-proxy-cli-command/design.md)
+  - [Tasks](../../changes/archive/2026-03-10-acp-proxy-cli-command/tasks.md)
+- Spec: [acp-proxy-cli-command](../../specs/acp-proxy-cli-command/spec.md)
+- Source: `packages/cli/src/cli/commands/acp-proxy.ts`
+- Tests: `packages/cli/tests/cli/acp-proxy.test.ts`
 
 ---
 
