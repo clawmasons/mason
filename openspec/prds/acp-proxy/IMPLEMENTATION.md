@@ -121,7 +121,16 @@ Create `packages/mcp-agent/` — a proper agent package that responds to ACP req
 
 **Testable output:** (a) REPL mode: start mcp-agent, type `list` → see available tools, type `<tool> <json>` → call tool and see result, type unknown command → see help. (b) ACP mode: start with `--acp`, connect ACP client, send tool command → get result. (c) Existing mcp-test e2e tests pass with new package.
 
-**Not Implemented Yet**
+**Implemented**
+
+- Archived change: [2026-03-10-mcp-agent-package](../../changes/archive/2026-03-10-mcp-agent-package/)
+  - [Proposal](../../changes/archive/2026-03-10-mcp-agent-package/proposal.md)
+  - [Design](../../changes/archive/2026-03-10-mcp-agent-package/design.md)
+  - [Tasks](../../changes/archive/2026-03-10-mcp-agent-package/tasks.md)
+- Spec: [mcp-agent-package](../../specs/mcp-agent-package/spec.md)
+- Source: `packages/mcp-agent/src/` (index.ts, tool-caller.ts, mcp-client.ts, acp-server.ts)
+- Tests: `packages/mcp-agent/tests/tool-caller.test.ts`
+- Updated fixture: `e2e/fixtures/test-chapter/agents/mcp-test/` (delegates to @clawmasons/mcp-agent)
 
 ---
 
