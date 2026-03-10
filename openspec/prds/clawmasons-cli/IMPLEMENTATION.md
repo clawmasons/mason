@@ -247,4 +247,4 @@ Extend the `--help` output for `clawmasons acp` to include a complete ACP client
 
 **Testable output:** `clawmasons acp --help` output includes the ACP client config JSON example with `agent_servers`, env vars, and usage instructions.
 
-**Not Implemented Yet**
+**Implemented:** 2026-03-10 — Extended help epilog with agent_servers config block, LODGE/LODGE_HOME env vars, bootstrap flow explanation, and two config examples (bootstrap and existing workspace).

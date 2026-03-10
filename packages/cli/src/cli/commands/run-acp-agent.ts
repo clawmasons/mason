@@ -101,13 +101,61 @@ Side Effects:
 Environment:
   CLAWMASONS_HOME    Base directory for chapter runtime state.
                      Default: ~/.clawmasons
+  LODGE              Lodge name for multi-tenant setups.
+                     Default: auto-detected from CLAWMASONS_HOME
+  LODGE_HOME         Lodge home directory override.
+                     Default: $CLAWMASONS_HOME/$LODGE
 
-ACP Client Configuration Example (Zed / JetBrains):
+  Credential env vars (e.g. OPEN_ROUTER_KEY, ANTHROPIC_API_KEY) are
+  passed through to the credential-service when set in the client's
+  env block. The credential-service checks process.env as priority 1
+  (after session overrides).
+
+Bootstrap Flow (--chapter initiate):
+  When --chapter initiate is specified, the CLI runs a full bootstrap:
+    1. Lodge init   — creates ~/.clawmasons/<lodge>/ (idempotent)
+    2. Chapter init — scaffolds the "initiate" chapter from template
+    3. Chapter build — builds the chapter workspace
+  The agent then starts against the bootstrapped chapter directory.
+  Use this for zero-setup onboarding with a new lodge.
+
+ACP Client Configuration Example (Zed / acpx):
+  Add to your editor's agent_servers config (e.g. Zed settings.json):
+
   {
-    "mcpServers": {
-      "clawmasons": {
-        "command": "clawmasons",
-        "args": ["acp", "--role", "<role-name>"],
+    "agent_servers": {
+      "Clawmasons": {
+        "type": "custom",
+        "command": "npx",
+        "args": [
+          "clawmasons",
+          "acp",
+          "--chapter", "initiate",
+          "--role", "chapter-creator",
+          "--init-agent", "pi"
+        ],
+        "env": {
+          "CLAWMASONS_HOME": "~/.clawmasons",
+          "LODGE": "acme",
+          "LODGE_HOME": "~/.clawmasons/acme",
+          "OPEN_ROUTER_KEY": "$OPENROUTER_API_KEY"
+        }
+      }
+    }
+  }
+
+  For an existing chapter workspace (no bootstrap):
+
+  {
+    "agent_servers": {
+      "Clawmasons": {
+        "type": "custom",
+        "command": "npx",
+        "args": [
+          "clawmasons",
+          "acp",
+          "--role", "<role-name>"
+        ],
         "env": {
           "CLAWMASONS_HOME": "~/.clawmasons"
         }

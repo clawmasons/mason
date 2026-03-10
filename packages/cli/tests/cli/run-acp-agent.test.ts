@@ -721,11 +721,14 @@ describe("run-acp-agent help text", () => {
     expect(help).toContain("~/.clawmasons");
   });
 
-  it("contains ACP client configuration example", () => {
+  it("contains ACP client configuration example with agent_servers", () => {
     const help = getHelpOutput();
-    expect(help).toContain("mcpServers");
+    expect(help).toContain("agent_servers");
+    expect(help).toContain("Clawmasons");
     expect(help).toContain("acp");
     expect(help).toContain("--role");
+    expect(help).toContain("--chapter");
+    expect(help).toContain("--init-agent");
   });
 
   it("exports the help epilog as a constant", () => {
@@ -733,6 +736,11 @@ describe("run-acp-agent help text", () => {
     expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("Side Effects");
     expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("Environment");
     expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("ACP Client Configuration Example");
+    expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("agent_servers");
+    expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("LODGE");
+    expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("LODGE_HOME");
+    expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("Bootstrap Flow");
+    expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("OPEN_ROUTER_KEY");
   });
 
   it("contains --chapter option in help", () => {
