@@ -2,23 +2,12 @@ import { type MockInstance, describe, it, expect, beforeEach, afterEach, vi } fr
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { program } from "../../src/cli/index.js";
 import {
   readChapterConfig,
   createDockerPackageJson,
   runDockerInit,
   generateDockerfiles,
 } from "../../src/cli/commands/docker-init.js";
-
-describe("CLI docker-init command", () => {
-  it("has the docker-init command registered", () => {
-    const cmd = program.commands.find((c) => c.name() === "docker-init");
-    expect(cmd).toBeDefined();
-    if (cmd) {
-      expect(cmd.description()).toContain("Docker");
-    }
-  });
-});
 
 describe("readChapterConfig", () => {
   let tmpDir: string;

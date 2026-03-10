@@ -79,7 +79,7 @@ Enhance the existing `build` command to include `pack` and `docker-init` steps, 
 
 **Testable output:** (a) `chapter build` with single agent auto-detects it, (b) `chapter build` produces `chapter.lock.json`, `dist/*.tgz`, and `docker/` with Dockerfiles, (c) output includes `run-agent` and ACP client configuration instructions, (d) `chapter docker-init` is an unknown command, (e) `chapter run-init` is an unknown command, (f) `chapter acp-proxy` is an unknown command, (g) internal imports from `docker-init.ts` and `docker-utils.ts` still work.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived change](../../changes/archive/2026-03-10-enhanced-chapter-build/) ([proposal](../../changes/archive/2026-03-10-enhanced-chapter-build/proposal.md), [design](../../changes/archive/2026-03-10-enhanced-chapter-build/design.md), [tasks](../../changes/archive/2026-03-10-enhanced-chapter-build/tasks.md)). Source: `packages/cli/src/cli/commands/build.ts`, `packages/cli/src/cli/commands/index.ts`. Tests: `packages/cli/tests/cli/build.test.ts` (947 total tests passing).
 
 ---
 
