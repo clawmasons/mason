@@ -213,7 +213,15 @@ Extend `agent-dockerfile.ts` to generate Dockerfiles that support ACP agent mode
 
 **Testable output:** (a) Non-ACP mode Dockerfile unchanged (regression), (b) ACP mode Dockerfile for Claude Code uses `claude-agent-acp` CMD, (c) ACP mode for pi-coding-agent uses `pi-agent-acp`, (d) ACP mode for mcp-agent uses `node src/index.js --acp`.
 
-**Not Implemented Yet**
+**Implemented**
+
+- Archived change: [2026-03-10-agent-dockerfile-acp-entrypoint](../../changes/archive/2026-03-10-agent-dockerfile-acp-entrypoint/)
+  - [Proposal](../../changes/archive/2026-03-10-agent-dockerfile-acp-entrypoint/proposal.md)
+  - [Design](../../changes/archive/2026-03-10-agent-dockerfile-acp-entrypoint/design.md)
+  - [Tasks](../../changes/archive/2026-03-10-agent-dockerfile-acp-entrypoint/tasks.md)
+- Spec: [agent-dockerfile-acp-entrypoint](../../specs/agent-dockerfile-acp-entrypoint/spec.md)
+- Source: `packages/cli/src/generator/agent-dockerfile.ts`
+- Tests: `packages/cli/tests/generator/agent-dockerfile.test.ts`
 
 ---
 
