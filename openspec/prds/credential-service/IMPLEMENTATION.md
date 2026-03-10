@@ -236,14 +236,14 @@ Create the `mcp-test` agent and role packages for integration and end-to-end tes
 **User Story:** As a developer, I run `chapter run-agent mcp-test mcp-test-role` and get an interactive shell. I type `list` and see the available tools. I type `some-tool {"arg": "value"}` and see the tool's response. This proves the entire credential → proxy → tool pipeline works.
 
 **Scope:**
-- New: `chapter-core/agents/mcp-test/package.json` — agent package with `credentials: ["TEST_TOKEN"]`
-- New: `chapter-core/agents/mcp-test/src/index.ts` — interactive REPL agent
-- New: `chapter-core/roles/mcp-test/package.json` — role package with `risk: "LOW"`, wildcard permissions
-- New: integration test: `tests/integration/credential-flow.test.ts` — test credential retrieval via mcp-test agent (SDK mode, no Docker)
+- New: `e2e/fixtures/test-chapter/agents/mcp-test/package.json` — agent package with `credentials: ["TEST_TOKEN"]`
+- New: `e2e/fixtures/test-chapter/agents/mcp-test/src/index.ts` — interactive REPL agent
+- New: `e2e/fixtures/test-chapter/roles/mcp-test/package.json` — role package with `risk: "LOW"`, wildcard permissions
+- New: `packages/cli/tests/integration/credential-flow.test.ts` — integration test for credential retrieval via proxy + credential service (SDK mode, no Docker)
 
-**Testable output:** `mcp-test` agent package validates with `chapter validate`. Agent declares `TEST_TOKEN` credential. Role has `risk: "LOW"` and wildcard permissions. Integration test: start proxy + credential service (SDK mode) → agent-entry bootstraps mcp-test → `TEST_TOKEN` credential received → `list` returns tools → tool call works. `npx tsc --noEmit` compiles. `npx vitest run` passes.
+**Testable output:** Agent declares `TEST_TOKEN` credential. Role has `risk: "LOW"` and wildcard permissions. Integration test: start proxy + credential service (SDK mode) → connect-agent → `credential_request` tool → `TEST_TOKEN` credential received → audit log recorded. `npx tsc --noEmit` compiles. `npx vitest run` passes (724 tests, 45 test files).
 
-**Not Implemented Yet**
+**Implemented** — [spec](../../specs/mcp-test-agent/spec.md) | [proposal](../../changes/archive/2026-03-09-mcp-test-agent-package/proposal.md) | [design](../../changes/archive/2026-03-09-mcp-test-agent-package/design.md) | [tasks](../../changes/archive/2026-03-09-mcp-test-agent-package/tasks.md)
 
 ---
 
