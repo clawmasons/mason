@@ -11,6 +11,8 @@ export interface HookContext {
   toolName: string;
   prefixedToolName: string;
   arguments: unknown;
+  sessionType?: string;
+  acpClient?: string;
 }
 
 export interface AuditPreHookResult {
@@ -50,6 +52,8 @@ export function auditPostHook(
     status,
     duration_ms: durationMs,
     timestamp: new Date().toISOString(),
+    session_type: context.sessionType,
+    acp_client: context.acpClient,
   };
 
   try {
@@ -57,5 +61,50 @@ export function auditPostHook(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[chapter] audit log write failed: ${message}`);
+  }
+}
+
+// ── Dropped Server Logging ─────────────────────────────────────────────
+
+export interface DroppedServer {
+  name: string;
+  reason: string;
+}
+
+/**
+ * Log each dropped (unmatched) MCP server as an audit entry with status "dropped".
+ *
+ * Called during ACP session setup when MCP servers from the ACP client
+ * don't match any chapter App.
+ */
+export function logDroppedServers(
+  db: Database.Database,
+  unmatched: DroppedServer[],
+  agentName: string,
+  roleName: string,
+  acpClient?: string,
+): void {
+  for (const server of unmatched) {
+    const entry: AuditLogEntry = {
+      id: generateId(),
+      agent_name: agentName,
+      role_name: roleName,
+      app_name: server.name,
+      tool_name: server.name,
+      arguments: undefined,
+      result: JSON.stringify(server.reason),
+      status: "dropped",
+      duration_ms: 0,
+      timestamp: new Date().toISOString(),
+      session_type: "acp",
+      acp_client: acpClient,
+    };
+
+    try {
+      insertAuditLog(db, entry);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[chapter] audit log write failed (dropped server "${server.name}"): ${message}`);
+    }
   }
 }

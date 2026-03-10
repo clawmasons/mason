@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { auditPreHook, auditPostHook } from "../../src/hooks/audit.js";
+import { auditPreHook, auditPostHook, logDroppedServers } from "../../src/hooks/audit.js";
 import type { HookContext } from "../../src/hooks/audit.js";
 import { openDatabase, queryAuditLog } from "../../src/db.js";
 import type Database from "better-sqlite3";
@@ -159,6 +159,157 @@ describe("auditPostHook", () => {
     stderrSpy.mockRestore();
 
     // Reopen db for afterEach cleanup
+    db = openDatabase(":memory:");
+  });
+
+  // ── ACP Session Metadata ────────────────────────────────────────────
+
+  it("writes session_type and acp_client when provided in context", () => {
+    const ctx = makeContext({ sessionType: "acp", acpClient: "zed" });
+    const pre = { id: "test-acp-1", startTime: Date.now() - 10 };
+
+    auditPostHook(ctx, pre, null, "success", db);
+
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].session_type).toBe("acp");
+    expect(entries[0].acp_client).toBe("zed");
+  });
+
+  it("writes null session_type and acp_client when not provided (backward compat)", () => {
+    const ctx = makeContext();
+    const pre = { id: "test-acp-2", startTime: Date.now() };
+
+    auditPostHook(ctx, pre, null, "success", db);
+
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].session_type).toBeNull();
+    expect(entries[0].acp_client).toBeNull();
+  });
+
+  it("writes session_type without acp_client", () => {
+    const ctx = makeContext({ sessionType: "acp" });
+    const pre = { id: "test-acp-3", startTime: Date.now() };
+
+    auditPostHook(ctx, pre, null, "success", db);
+
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].session_type).toBe("acp");
+    expect(entries[0].acp_client).toBeNull();
+  });
+});
+
+// ── logDroppedServers ──────────────────────────────────────────────────
+
+describe("logDroppedServers", () => {
+  let db: Database.Database;
+
+  beforeEach(() => {
+    db = openDatabase(":memory:");
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it("logs each dropped server as an audit entry with status 'dropped'", () => {
+    const unmatched = [
+      { name: "personal-notes", reason: "No chapter App matches server name" },
+      { name: "my-custom-tool", reason: "No chapter App matches server name" },
+    ];
+
+    logDroppedServers(db, unmatched, "note-taker", "writer", "zed");
+
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(2);
+
+    // Entries are in DESC order by timestamp; both have same timestamp so order may vary
+    const names = entries.map((e) => e.app_name).sort();
+    expect(names).toEqual(["my-custom-tool", "personal-notes"]);
+
+    for (const entry of entries) {
+      expect(entry.status).toBe("dropped");
+      expect(entry.session_type).toBe("acp");
+      expect(entry.acp_client).toBe("zed");
+      expect(entry.agent_name).toBe("note-taker");
+      expect(entry.role_name).toBe("writer");
+      expect(entry.duration_ms).toBe(0);
+      expect(entry.tool_name).toBe(entry.app_name);
+    }
+  });
+
+  it("includes the drop reason in the result field", () => {
+    const unmatched = [
+      { name: "personal-notes", reason: "No chapter App matches server name" },
+    ];
+
+    logDroppedServers(db, unmatched, "note-taker", "writer");
+
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(1);
+    expect(JSON.parse(entries[0].result!)).toBe("No chapter App matches server name");
+  });
+
+  it("handles empty unmatched list (no-op)", () => {
+    logDroppedServers(db, [], "note-taker", "writer");
+
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(0);
+  });
+
+  it("writes acp_client as null when not provided", () => {
+    const unmatched = [
+      { name: "personal-notes", reason: "No match" },
+    ];
+
+    logDroppedServers(db, unmatched, "note-taker", "writer");
+
+    const entries = queryAuditLog(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].acp_client).toBeNull();
+    expect(entries[0].session_type).toBe("acp");
+  });
+
+  it("can be filtered by session_type", () => {
+    // Log a dropped server (acp session)
+    logDroppedServers(db, [{ name: "notes", reason: "no match" }], "agent", "role");
+
+    // Log a regular tool call (no session type)
+    const ctx = makeContext();
+    const pre = { id: "regular-1", startTime: Date.now() };
+    auditPostHook(ctx, pre, null, "success", db);
+
+    const acpEntries = queryAuditLog(db, { session_type: "acp" });
+    expect(acpEntries).toHaveLength(1);
+    expect(acpEntries[0].status).toBe("dropped");
+
+    const allEntries = queryAuditLog(db);
+    expect(allEntries).toHaveLength(2);
+  });
+
+  it("swallows database errors without throwing", () => {
+    db.close();
+
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(() => {
+      logDroppedServers(
+        db,
+        [{ name: "notes", reason: "no match" }],
+        "agent",
+        "role",
+      );
+    }).not.toThrow();
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[chapter] audit log write failed"),
+    );
+
+    stderrSpy.mockRestore();
+
+    // Reopen for afterEach cleanup
     db = openDatabase(":memory:");
   });
 });

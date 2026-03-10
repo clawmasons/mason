@@ -360,7 +360,15 @@ Extend audit logging to capture ACP session metadata (session type, client edito
 
 **Testable output:** (a) Schema migration adds columns without breaking existing data, (b) ACP tool calls logged with `session_type: "acp"`, (c) direct proxy calls still have `session_type: null` (backward compatible), (d) dropped servers appear in audit log with `status: "dropped"`, (e) `acp_client` captured when available.
 
-**Not Implemented Yet**
+**Implemented**
+
+- Archived change: [2026-03-10-audit-logging-acp-extensions](../../changes/archive/2026-03-10-audit-logging-acp-extensions/)
+  - [Proposal](../../changes/archive/2026-03-10-audit-logging-acp-extensions/proposal.md)
+  - [Design](../../changes/archive/2026-03-10-audit-logging-acp-extensions/design.md)
+  - [Tasks](../../changes/archive/2026-03-10-audit-logging-acp-extensions/tasks.md)
+- Spec: [audit-logging-hook](../../specs/audit-logging-hook/spec.md) (updated with ACP extensions)
+- Source: `packages/proxy/src/db.ts`, `packages/proxy/src/hooks/audit.ts`, `packages/proxy/src/server.ts`, `packages/cli/src/acp/session.ts`, `packages/cli/src/cli/commands/proxy.ts`
+- Tests: `packages/proxy/tests/hooks/audit.test.ts` (9 new tests), `packages/proxy/tests/db.test.ts`
 
 ---
 

@@ -45,6 +45,10 @@ export interface ChapterProxyServerConfig {
   roleName?: string;
   /** Risk level for the agent's role. Controls connection limits. */
   riskLevel?: RiskLevel;
+  /** Session type for audit logging (e.g., "acp" for ACP sessions). */
+  sessionType?: string;
+  /** ACP client editor name for audit logging (e.g., "zed", "jetbrains"). */
+  acpClient?: string;
 }
 
 // ── credential_request Tool Definition ──────────────────────────────────
@@ -358,6 +362,8 @@ export class ChapterProxyServer {
             toolName: name,
             prefixedToolName: name,
             arguments: args,
+            sessionType: this.config.sessionType,
+            acpClient: this.config.acpClient,
           };
           const pre = auditPreHook(ctx);
           auditPostHook(ctx, pre, `Unknown tool: ${name}`, "denied", db);
@@ -376,6 +382,8 @@ export class ChapterProxyServer {
             toolName: route.originalToolName,
             prefixedToolName: route.prefixedToolName,
             arguments: args,
+            sessionType: this.config.sessionType,
+            acpClient: this.config.acpClient,
           }
         : undefined;
       const pre = ctx ? auditPreHook(ctx) : undefined;

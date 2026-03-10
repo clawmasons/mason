@@ -14,9 +14,11 @@ export interface AuditLogEntry {
   tool_name: string;
   arguments?: string;
   result?: string;
-  status: "success" | "error" | "denied" | "timeout";
+  status: "success" | "error" | "denied" | "timeout" | "dropped";
   duration_ms?: number;
   timestamp: string;
+  session_type?: string;
+  acp_client?: string;
 }
 
 export interface ApprovalRequest {
@@ -38,6 +40,7 @@ export interface AuditLogFilters {
   app_name?: string;
   tool_name?: string;
   status?: string;
+  session_type?: string;
   limit?: number;
 }
 
@@ -86,6 +89,12 @@ export function openDatabase(dbPath: string = DEFAULT_DB_PATH): Database.Databas
   db.pragma("journal_mode = WAL");
   db.exec(CREATE_AUDIT_LOG);
   db.exec(CREATE_APPROVAL_REQUESTS);
+
+  // ── Schema Migrations (idempotent) ──────────────────────────────────
+  // Add ACP session columns to audit_log (nullable for backward compat)
+  try { db.exec("ALTER TABLE audit_log ADD COLUMN session_type TEXT"); } catch { /* column already exists */ }
+  try { db.exec("ALTER TABLE audit_log ADD COLUMN acp_client TEXT"); } catch { /* column already exists */ }
+
   return db;
 }
 
@@ -93,10 +102,23 @@ export function openDatabase(dbPath: string = DEFAULT_DB_PATH): Database.Databas
 
 export function insertAuditLog(db: Database.Database, entry: AuditLogEntry): void {
   const stmt = db.prepare(`
-    INSERT INTO audit_log (id, agent_name, role_name, app_name, tool_name, arguments, result, status, duration_ms, timestamp)
-    VALUES (@id, @agent_name, @role_name, @app_name, @tool_name, @arguments, @result, @status, @duration_ms, @timestamp)
+    INSERT INTO audit_log (id, agent_name, role_name, app_name, tool_name, arguments, result, status, duration_ms, timestamp, session_type, acp_client)
+    VALUES (@id, @agent_name, @role_name, @app_name, @tool_name, @arguments, @result, @status, @duration_ms, @timestamp, @session_type, @acp_client)
   `);
-  stmt.run(entry);
+  stmt.run({
+    id: entry.id,
+    agent_name: entry.agent_name,
+    role_name: entry.role_name,
+    app_name: entry.app_name,
+    tool_name: entry.tool_name,
+    arguments: entry.arguments ?? null,
+    result: entry.result ?? null,
+    status: entry.status,
+    duration_ms: entry.duration_ms ?? null,
+    timestamp: entry.timestamp,
+    session_type: entry.session_type ?? null,
+    acp_client: entry.acp_client ?? null,
+  });
 }
 
 export function queryAuditLog(
@@ -121,6 +143,10 @@ export function queryAuditLog(
   if (filters?.status) {
     conditions.push("status = @status");
     params.status = filters.status;
+  }
+  if (filters?.session_type) {
+    conditions.push("session_type = @session_type");
+    params.session_type = filters.session_type;
   }
 
   let sql = "SELECT * FROM audit_log";

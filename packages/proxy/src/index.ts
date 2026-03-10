@@ -15,8 +15,8 @@ export {
   generateId,
 } from "./db.js";
 export type { AuditLogEntry, ApprovalRequest, AuditLogFilters } from "./db.js";
-export { auditPreHook, auditPostHook } from "./hooks/audit.js";
-export type { HookContext, AuditPreHookResult } from "./hooks/audit.js";
+export { auditPreHook, auditPostHook, logDroppedServers } from "./hooks/audit.js";
+export type { HookContext, AuditPreHookResult, DroppedServer } from "./hooks/audit.js";
 export { matchesApprovalPattern, requestApproval } from "./hooks/approval.js";
 export type { ApprovalOptions } from "./hooks/approval.js";
 export { SessionStore, handleConnectAgent } from "./handlers/connect-agent.js";
