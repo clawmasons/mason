@@ -4,7 +4,7 @@ import { queryKeychain } from "./keychain.js";
 /** Successful credential resolution. */
 export interface ResolveSuccess {
   value: string;
-  source: "env" | "keychain" | "dotenv";
+  source: "env" | "keychain" | "dotenv" | "session";
 }
 
 /** Failed credential resolution. */
@@ -27,6 +27,7 @@ export interface CredentialResolverConfig {
 
 /**
  * Resolves credential values from multiple sources in priority order:
+ * 0. Session overrides (set via setSessionOverrides, used by ACP proxy)
  * 1. Environment variables (process.env)
  * 2. macOS Keychain (darwin only)
  * 3. .env file
@@ -35,6 +36,7 @@ export class CredentialResolver {
   private readonly envFilePath: string;
   private readonly keychainService: string;
   private dotenvCache: Record<string, string> | null = null;
+  private sessionOverrides: Record<string, string> = {};
 
   constructor(config: CredentialResolverConfig = {}) {
     this.envFilePath = config.envFilePath ?? ".env";
@@ -42,13 +44,37 @@ export class CredentialResolver {
   }
 
   /**
+   * Set session-scoped credential overrides.
+   *
+   * Session overrides take highest priority during resolution,
+   * checked before env, keychain, and dotenv sources. Used by the
+   * ACP proxy to inject credentials extracted from ACP client configs.
+   */
+  setSessionOverrides(overrides: Record<string, string>): void {
+    this.sessionOverrides = { ...overrides };
+  }
+
+  /**
+   * Clear all session-scoped credential overrides.
+   */
+  clearSessionOverrides(): void {
+    this.sessionOverrides = {};
+  }
+
+  /**
    * Resolve a credential key from available sources.
    *
-   * Checks sources in priority order: env → keychain → dotenv.
+   * Checks sources in priority order: session overrides → env → keychain → dotenv.
    * Returns the value and source on success, or an error with
    * the list of sources attempted on failure.
    */
   async resolve(key: string): Promise<ResolveResult> {
+    // 0. Session overrides (highest priority)
+    const sessionValue = this.sessionOverrides[key];
+    if (sessionValue !== undefined) {
+      return { value: sessionValue, source: "session" };
+    }
+
     const sourcesAttempted: string[] = [];
 
     // 1. Environment variables
