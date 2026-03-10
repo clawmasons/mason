@@ -395,6 +395,15 @@ Comprehensive integration test exercising the full ACP proxy lifecycle using the
   7. Graceful shutdown on SIGTERM
 - Cleanup: remove temp DB, stop containers
 
-**Testable output:** `npx vitest run e2e/tests/acp-proxy.test.ts` passes. All 7 scenarios verified.
+**Testable output:** `npx vitest run e2e/tests/acp-proxy.test.ts` passes. 16 tests covering all key scenarios.
 
-**Not Implemented Yet**
+**Implemented**
+
+- Archived change: [2026-03-10-e2e-acp-integration-test](../../changes/archive/2026-03-10-e2e-acp-integration-test/)
+  - [Proposal](../../changes/archive/2026-03-10-e2e-acp-integration-test/proposal.md)
+  - [Design](../../changes/archive/2026-03-10-e2e-acp-integration-test/design.md)
+  - [Tasks](../../changes/archive/2026-03-10-e2e-acp-integration-test/tasks.md)
+- Tests: `e2e/tests/acp-proxy.test.ts` (16 tests)
+  - ACP module integration: matcher + rewriter + warnings pipeline (6 tests)
+  - Dropped server audit logging (3 tests)
+  - Docker proxy E2E with ACP session metadata (7 tests)
