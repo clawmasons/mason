@@ -79,7 +79,7 @@ ACP Client Configuration Example (Zed / JetBrains):
     "mcpServers": {
       "clawmasons": {
         "command": "clawmasons",
-        "args": ["run-acp-agent", "--role", "<role-name>"],
+        "args": ["acp", "--role", "<role-name>"],
         "env": {
           "CLAWMASONS_HOME": "~/.clawmasons"
         }
@@ -92,7 +92,7 @@ ACP Client Configuration Example (Zed / JetBrains):
 
 export function registerRunAcpAgentCommand(program: Command): void {
   program
-    .command("run-acp-agent")
+    .command("acp")
     .description("Start an ACP-compliant agent endpoint for editor integration")
     .requiredOption("--role <name>", "Role to use for the session")
     .option("--agent <name>", "Agent package name (auto-detected if only one)")
@@ -174,7 +174,7 @@ export async function runAcpAgent(
 
   // Graceful shutdown handler
   const shutdown = async () => {
-    console.log("\n[clawmasons run-acp-agent] Shutting down...");
+    console.log("\n[clawmasons acp] Shutting down...");
     try {
       if (bridge) await bridge.stop();
     } catch { /* best-effort */ }
@@ -195,7 +195,7 @@ export async function runAcpAgent(
 
     // Auto-init if role not found
     if (!entry) {
-      console.log(`\n[clawmasons run-acp-agent] Role "${options.role}" not found in chapters.json. Auto-initializing...`);
+      console.log(`\n[clawmasons acp] Role "${options.role}" not found in chapters.json. Auto-initializing...`);
       await autoInitRole(rootDir, { role: options.role });
 
       // Re-read after init
@@ -203,7 +203,7 @@ export async function runAcpAgent(
 
       if (!entry) {
         throw new Error(
-          `Role "${options.role}" not initialized and auto-init failed. Run "clawmasons init-role --role ${options.role}" from your chapter workspace.`,
+          `Role "${options.role}" not initialized and auto-init failed. Run "clawmasons chapter init-role --role ${options.role}" from your chapter workspace.`,
         );
       }
     }
@@ -212,21 +212,21 @@ export async function runAcpAgent(
     ensureGitignore(rootDir, ".clawmasons");
 
     // ── Step 2: Discover packages ──────────────────────────────────────
-    console.log("[clawmasons run-acp-agent] Discovering packages...");
+    console.log("[clawmasons acp] Discovering packages...");
     const packages = discover(rootDir);
 
     // ── Step 3: Resolve agent ──────────────────────────────────────────
     const agentName = resolveAgentName(options.agent, packages);
-    console.log(`[clawmasons run-acp-agent] Resolving agent "${agentName}"...`);
+    console.log(`[clawmasons acp] Resolving agent "${agentName}"...`);
     const agent = resolve(agentName, packages);
 
     // ── Step 4: Compute tool filters ───────────────────────────────────
     const toolFilters = computeToolFilters(agent);
     const toolCount = Object.keys(toolFilters).length;
 
-    console.log(`[clawmasons run-acp-agent] Agent: ${agent.name}`);
-    console.log(`[clawmasons run-acp-agent] Role: ${options.role}`);
-    console.log(`[clawmasons run-acp-agent] Tool filters: ${toolCount} app(s)`);
+    console.log(`[clawmasons acp] Agent: ${agent.name}`);
+    console.log(`[clawmasons acp] Role: ${options.role}`);
+    console.log(`[clawmasons acp] Tool filters: ${toolCount} app(s)`);
 
     // ── Step 5: Create session and start infrastructure ────────────────
     session = createSession({
@@ -237,9 +237,9 @@ export async function runAcpAgent(
       proxyPort,
     });
 
-    console.log("[clawmasons run-acp-agent] Starting infrastructure (proxy + credential-service)...");
+    console.log("[clawmasons acp] Starting infrastructure (proxy + credential-service)...");
     const infraInfo = await session.startInfrastructure();
-    console.log(`[clawmasons run-acp-agent] Infrastructure started (${infraInfo.sessionId})`);
+    console.log(`[clawmasons acp] Infrastructure started (${infraInfo.sessionId})`);
 
     // ── Step 6: Start ACP bridge endpoint ──────────────────────────────
     bridge = createBridge({
@@ -250,22 +250,22 @@ export async function runAcpAgent(
 
     // ── Step 7: Wire bridge lifecycle events ───────────────────────────
     bridge.onClientConnect = () => {
-      console.log("[clawmasons run-acp-agent] ACP client connected");
+      console.log("[clawmasons acp] ACP client connected");
     };
 
     bridge.onClientDisconnect = () => {
-      console.log("[clawmasons run-acp-agent] ACP client disconnected — stopping agent container...");
+      console.log("[clawmasons acp] ACP client disconnected — stopping agent container...");
       void (async () => {
         try {
           if (session) await session.stopAgent();
         } catch { /* best-effort */ }
         if (bridge) bridge.resetForNewSession();
-        console.log("[clawmasons run-acp-agent] Agent stopped. Waiting for next session/new...");
+        console.log("[clawmasons acp] Agent stopped. Waiting for next session/new...");
       })();
     };
 
     bridge.onAgentError = (error: Error) => {
-      console.error(`[clawmasons run-acp-agent] Agent error: ${error.message}`);
+      console.error(`[clawmasons acp] Agent error: ${error.message}`);
     };
 
     // Wire session/new handler for deferred agent start
@@ -273,7 +273,7 @@ export async function runAcpAgent(
     const sessionRef = session;
     const bridgeRef = bridge;
     bridge.onSessionNew = async (cwd: string) => {
-      console.log(`[clawmasons run-acp-agent] session/new received — cwd: "${cwd}"`);
+      console.log(`[clawmasons acp] session/new received — cwd: "${cwd}"`);
 
       // Create .clawmasons/ in the CWD for session state
       const clawmasonsDir = path.join(cwd, ".clawmasons");
@@ -283,20 +283,20 @@ export async function runAcpAgent(
       ensureGitignore(cwd, ".clawmasons");
 
       // Start agent container with CWD mounted as /workspace
-      console.log("[clawmasons run-acp-agent] Starting agent container...");
+      console.log("[clawmasons acp] Starting agent container...");
       const agentInfo = await sessionRef.startAgent(cwd);
-      console.log(`[clawmasons run-acp-agent] Agent started (${agentInfo.sessionId})`);
+      console.log(`[clawmasons acp] Agent started (${agentInfo.sessionId})`);
 
       // Connect bridge to the agent
-      console.log("[clawmasons run-acp-agent] Connecting bridge to agent...");
+      console.log("[clawmasons acp] Connecting bridge to agent...");
       await bridgeRef.connectToAgent();
-      console.log("[clawmasons run-acp-agent] Bridge connected to agent.");
+      console.log("[clawmasons acp] Bridge connected to agent.");
     };
 
     await bridge.start();
 
     console.log(
-      `\n[clawmasons run-acp-agent] Ready -- waiting for ACP client on port ${port}\n` +
+      `\n[clawmasons acp] Ready -- waiting for ACP client on port ${port}\n` +
       `  Agent:      ${agent.name}\n` +
       `  Role:       ${options.role}\n` +
       `  ACP port:   ${port}\n` +
@@ -309,7 +309,7 @@ export async function runAcpAgent(
 
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`\n[clawmasons run-acp-agent] Failed: ${message}\n`);
+    console.error(`\n[clawmasons acp] Failed: ${message}\n`);
 
     // Clean up on startup failure
     try { if (bridge) await bridge.stop(); } catch { /* best-effort */ }

@@ -6,8 +6,11 @@ import { program } from "../../src/cli/index.js";
 import { runPermissions } from "../../src/cli/commands/permissions.js";
 
 describe("CLI permissions command", () => {
-  it("has the permissions command registered", () => {
-    const permsCmd = program.commands.find((cmd) => cmd.name() === "permissions");
+  const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
+
+  it("has the permissions command registered under chapter", () => {
+    expect(chapterCmd).toBeDefined();
+    const permsCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "permissions");
     expect(permsCmd).toBeDefined();
     if (permsCmd) {
       expect(permsCmd.description()).toContain("permission");
@@ -15,7 +18,7 @@ describe("CLI permissions command", () => {
   });
 
   it("permissions command accepts a member argument", () => {
-    const permsCmd = program.commands.find((cmd) => cmd.name() === "permissions");
+    const permsCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "permissions");
     expect(permsCmd).toBeDefined();
     if (permsCmd) {
       const args = permsCmd.registeredArguments;
@@ -26,7 +29,7 @@ describe("CLI permissions command", () => {
   });
 
   it("permissions command has --json option", () => {
-    const permsCmd = program.commands.find((cmd) => cmd.name() === "permissions");
+    const permsCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "permissions");
     expect(permsCmd).toBeDefined();
     if (permsCmd) {
       const jsonOption = permsCmd.options.find((opt) => opt.long === "--json");

@@ -479,8 +479,8 @@ describe("chapter init", () => {
 
         const logCalls = vi.mocked(console.log).mock.calls.flat().join("\n");
         expect(logCalls).toContain("Template: test-template");
-        expect(logCalls).toContain("clawmasons validate @test.unit/agent-note-taker");
-        expect(logCalls).toContain("clawmasons list");
+        expect(logCalls).toContain("clawmasons chapter validate @test.unit/agent-note-taker");
+        expect(logCalls).toContain("clawmasons chapter list");
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }

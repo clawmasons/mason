@@ -49,7 +49,7 @@ Reorganize commands into the new hierarchy: top-level `init`, `agent`, `acp` com
 
 **Testable output:** `clawmasons --help` shows `init`, `agent`, `acp`, `chapter`. `clawmasons chapter --help` shows all subcommands. `clawmasons agent <agent> <role>` works. `clawmasons acp --role <role>` works. Old names (`run-agent`, `run-acp-agent`) are rejected. All E2E tests pass.
 
-**Not Implemented Yet**
+**Implemented:** [spec](../../changes/archive/2026-03-10-restructure-cli-commands/spec.md)
 
 ---
 

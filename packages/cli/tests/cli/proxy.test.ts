@@ -54,30 +54,33 @@ vi.mock("@clawmasons/proxy", () => ({
 // ── Command Registration Tests ──────────────────────────────────────
 
 describe("chapter proxy command", () => {
-  it("is registered on the program", () => {
-    const proxyCmd = program.commands.find((cmd) => cmd.name() === "proxy");
+  const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
+
+  it("is registered under chapter", () => {
+    expect(chapterCmd).toBeDefined();
+    const proxyCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "proxy");
     expect(proxyCmd).toBeDefined();
   });
 
   it("has a description", () => {
-    const proxyCmd = program.commands.find((cmd) => cmd.name() === "proxy");
+    const proxyCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "proxy");
     expect(proxyCmd?.description()).toContain("proxy");
   });
 
   it("has --port option", () => {
-    const proxyCmd = program.commands.find((cmd) => cmd.name() === "proxy");
+    const proxyCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "proxy");
     const opt = proxyCmd?.options.find((o) => o.long === "--port");
     expect(opt).toBeDefined();
   });
 
   it("has --startup-timeout option", () => {
-    const proxyCmd = program.commands.find((cmd) => cmd.name() === "proxy");
+    const proxyCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "proxy");
     const opt = proxyCmd?.options.find((o) => o.long === "--startup-timeout");
     expect(opt).toBeDefined();
   });
 
   it("has --agent option", () => {
-    const proxyCmd = program.commands.find((cmd) => cmd.name() === "proxy");
+    const proxyCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "proxy");
     const opt = proxyCmd?.options.find((o) => o.long === "--agent");
     expect(opt).toBeDefined();
   });
