@@ -15,8 +15,11 @@ import { execFileSync } from "node:child_process";
 const mockExecFileSync = vi.mocked(execFileSync);
 
 describe("CLI remove command", () => {
-  it("has the remove command registered", () => {
-    const removeCmd = program.commands.find((cmd) => cmd.name() === "remove");
+  const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
+
+  it("has the remove command registered under chapter", () => {
+    expect(chapterCmd).toBeDefined();
+    const removeCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "remove");
     expect(removeCmd).toBeDefined();
     if (removeCmd) {
       expect(removeCmd.description()).toContain("Remove");
@@ -24,7 +27,7 @@ describe("CLI remove command", () => {
   });
 
   it("remove command accepts a pkg argument", () => {
-    const removeCmd = program.commands.find((cmd) => cmd.name() === "remove");
+    const removeCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "remove");
     expect(removeCmd).toBeDefined();
     if (removeCmd) {
       const args = removeCmd.registeredArguments;
@@ -35,7 +38,7 @@ describe("CLI remove command", () => {
   });
 
   it("remove command has --force option", () => {
-    const removeCmd = program.commands.find((cmd) => cmd.name() === "remove");
+    const removeCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "remove");
     expect(removeCmd).toBeDefined();
     if (removeCmd) {
       const forceOption = removeCmd.options.find((opt) => opt.long === "--force");

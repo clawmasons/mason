@@ -2,3 +2,4 @@ export { computeToolFilters, getAppShortName, type ToolFilter } from "@clawmason
 export { generateProxyDockerfile } from "./proxy-dockerfile.js";
 export { generateAgentDockerfile } from "./agent-dockerfile.js";
 export { generateCredentialServiceDockerfile } from "./credential-service-dockerfile.js";
+export { resolveEnvVars, resolveRoleMountVolumes, type RoleMount } from "./mount-volumes.js";

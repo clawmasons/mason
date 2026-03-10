@@ -190,9 +190,9 @@ export async function runInit(
 
   // Generate .clawmasons/chapter.json
   const configPath = path.join(targetDir, "/.clawmasons/", "chapter.json");
-  const managingChapter = { 
-    chapter: "grand.chapter-builder",
-    version: "0.1.0" 
+  const managingChapter = {
+    chapter: projectScope,
+    version: "0.1.0"
   };
   fs.writeFileSync(configPath, JSON.stringify(managingChapter, null, 2) + "\n");
   created.push(".clawmasons/chapter.json");
@@ -232,12 +232,12 @@ export async function runInit(
   if (usedTemplate) {
     console.log(`\nTemplate: ${options.template}`);
     console.log("\nNext steps:");
-    console.log(`  chapter list                                    List discovered packages`);
-    console.log(`  chapter validate @${projectScope}/agent-note-taker   Validate the agent graph`);
-    console.log(`  chapter build @${projectScope}/agent-note-taker      Build the agent lock file\n`);
+    console.log(`  clawmasons chapter list                                    List discovered packages`);
+    console.log(`  clawmasons chapter validate @${projectScope}/agent-note-taker   Validate the agent graph`);
+    console.log(`  clawmasons chapter build @${projectScope}/agent-note-taker      Build the agent lock file\n`);
   } else {
     console.log("\nNext steps:");
-    console.log("  chapter add <package>    Add a chapter component");
-    console.log("  chapter build <agent>    Build and validate an agent\n");
+    console.log("  clawmasons chapter add <package>    Add a chapter component");
+    console.log("  clawmasons chapter build <agent>    Build and validate an agent\n");
   }
 }

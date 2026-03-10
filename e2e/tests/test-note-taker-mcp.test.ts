@@ -39,7 +39,7 @@ describe("mcp-agent note-taker e2e", () => {
     });
 
     // Build: resolve + pack + docker-init
-    chapterExec(["build"], workspaceDir, { timeout: 120_000 });
+    chapterExec(["chapter", "build"], workspaceDir, { timeout: 120_000 });
 
     dockerDir = path.join(workspaceDir, "docker");
 

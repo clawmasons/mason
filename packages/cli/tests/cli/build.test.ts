@@ -6,8 +6,11 @@ import { program } from "../../src/cli/index.js";
 import { runBuild } from "../../src/cli/commands/build.js";
 
 describe("CLI build command", () => {
-  it("has the build command registered", () => {
-    const buildCmd = program.commands.find((cmd) => cmd.name() === "build");
+  const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
+
+  it("has the build command registered under chapter", () => {
+    expect(chapterCmd).toBeDefined();
+    const buildCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "build");
     expect(buildCmd).toBeDefined();
     if (buildCmd) {
       expect(buildCmd.description()).toContain("Build");
@@ -15,7 +18,7 @@ describe("CLI build command", () => {
   });
 
   it("build command accepts an optional agent argument", () => {
-    const buildCmd = program.commands.find((cmd) => cmd.name() === "build");
+    const buildCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "build");
     expect(buildCmd).toBeDefined();
     if (buildCmd) {
       const args = buildCmd.registeredArguments;
@@ -26,7 +29,7 @@ describe("CLI build command", () => {
   });
 
   it("build command has --output and --json options", () => {
-    const buildCmd = program.commands.find((cmd) => cmd.name() === "build");
+    const buildCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "build");
     expect(buildCmd).toBeDefined();
     if (buildCmd) {
       const outputOption = buildCmd.options.find((opt) => opt.long === "--output");
@@ -36,23 +39,17 @@ describe("CLI build command", () => {
     }
   });
 
-  it("docker-init is NOT a registered command", () => {
-    const cmd = program.commands.find((c) => c.name() === "docker-init");
-    expect(cmd).toBeUndefined();
+  it("deprecated commands are NOT registered at top level", () => {
+    const topLevelNames = program.commands.map((c) => c.name());
+    expect(topLevelNames).not.toContain("docker-init");
+    expect(topLevelNames).not.toContain("run-init");
+    expect(topLevelNames).not.toContain("acp-proxy");
+    expect(topLevelNames).not.toContain("run-acp-agent");
+    expect(topLevelNames).not.toContain("run-agent");
   });
 
-  it("run-init is NOT a registered command", () => {
-    const cmd = program.commands.find((c) => c.name() === "run-init");
-    expect(cmd).toBeUndefined();
-  });
-
-  it("acp-proxy is NOT a registered command", () => {
-    const cmd = program.commands.find((c) => c.name() === "acp-proxy");
-    expect(cmd).toBeUndefined();
-  });
-
-  it("run-acp-agent IS a registered command", () => {
-    const cmd = program.commands.find((c) => c.name() === "run-acp-agent");
+  it("acp IS a registered top-level command", () => {
+    const cmd = program.commands.find((c) => c.name() === "acp");
     expect(cmd).toBeDefined();
   });
 });
@@ -318,9 +315,9 @@ describe("runBuild", () => {
     await runBuild(tmpDir, "@test/agent-ops", {});
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    // Should contain run-agent instruction
-    expect(logOutput).toContain("chapter run-agent");
-    expect(logOutput).toContain("run-acp-agent");
+    // Should contain agent instruction
+    expect(logOutput).toContain("clawmasons agent");
+    expect(logOutput).toContain("clawmasons acp");
     expect(logOutput).toContain("mcpServers");
   });
 });

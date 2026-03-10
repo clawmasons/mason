@@ -3,6 +3,7 @@ import * as path from "node:path";
 import type { Command } from "commander";
 import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
 import { computeToolFilters } from "@clawmasons/shared";
+import { ACP_RUNTIME_COMMANDS } from "../../materializer/common.js";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
@@ -10,10 +11,14 @@ import { AcpBridge, type AcpBridgeConfig } from "../../acp/bridge.js";
 import {
   getClawmasonsHome,
   findRoleEntryByRole,
+  resolveLodgeVars,
   type ChapterEntry,
 } from "../../runtime/home.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import { initRole, type InitRoleOptions, type InitRoleDeps } from "./init-role.js";
+import { initLodge, type LodgeInitOptions, type LodgeInitResult } from "./lodge-init.js";
+import { runInit, type InitOptions } from "./init.js";
+import { runBuild } from "./build.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -22,6 +27,8 @@ export interface RunAcpAgentOptions {
   role: string;
   port?: number;
   proxyPort?: number;
+  chapter?: string;
+  initAgent?: string;
 }
 
 /**
@@ -53,6 +60,32 @@ export interface RunAcpAgentDeps {
   ensureGitignoreEntryFn?: (dir: string, pattern: string) => boolean;
   /** Override fs.mkdirSync (for testing). */
   mkdirSyncFn?: (dirPath: string, options?: { recursive?: boolean }) => void;
+  /** Override lodge init for bootstrap (for testing). */
+  initLodgeFn?: (options: LodgeInitOptions) => LodgeInitResult;
+  /** Override chapter init for bootstrap (for testing). */
+  runInitFn?: (
+    targetDir: string,
+    options: InitOptions,
+    deps?: { templatesDir?: string; skipNpmInstall?: boolean },
+  ) => Promise<void>;
+  /** Override chapter build for bootstrap (for testing). */
+  runBuildFn?: (
+    rootDir: string,
+    agentName: string | undefined,
+    options: Record<string, unknown>,
+  ) => Promise<void>;
+  /** Override lodge variable resolution (for testing). */
+  resolveLodgeVarsFn?: (options?: {
+    home?: string;
+    lodge?: string;
+    lodgeHome?: string;
+  }) => { clawmasonsHome: string; lodge: string; lodgeHome: string };
+  /** Override fs.existsSync (for testing). */
+  existsSyncFn?: (filePath: string) => boolean;
+  /** Override fs.readFileSync (for testing). */
+  readFileSyncFn?: (filePath: string, encoding: BufferEncoding) => string;
+  /** Override fs.writeFileSync (for testing). */
+  writeFileSyncFn?: (filePath: string, data: string) => void;
 }
 
 // ── Help Text ─────────────────────────────────────────────────────────
@@ -73,13 +106,61 @@ Side Effects:
 Environment:
   CLAWMASONS_HOME    Base directory for chapter runtime state.
                      Default: ~/.clawmasons
+  LODGE              Lodge name for multi-tenant setups.
+                     Default: auto-detected from CLAWMASONS_HOME
+  LODGE_HOME         Lodge home directory override.
+                     Default: $CLAWMASONS_HOME/$LODGE
 
-ACP Client Configuration Example (Zed / JetBrains):
+  Credential env vars (e.g. OPEN_ROUTER_KEY, ANTHROPIC_API_KEY) are
+  passed through to the credential-service when set in the client's
+  env block. The credential-service checks process.env as priority 1
+  (after session overrides).
+
+Bootstrap Flow (--chapter initiate):
+  When --chapter initiate is specified, the CLI runs a full bootstrap:
+    1. Lodge init   — creates ~/.clawmasons/<lodge>/ (idempotent)
+    2. Chapter init — scaffolds the "initiate" chapter from template
+    3. Chapter build — builds the chapter workspace
+  The agent then starts against the bootstrapped chapter directory.
+  Use this for zero-setup onboarding with a new lodge.
+
+ACP Client Configuration Example (Zed / acpx):
+  Add to your editor's agent_servers config (e.g. Zed settings.json):
+
   {
-    "mcpServers": {
-      "chapter": {
-        "command": "chapter",
-        "args": ["run-acp-agent", "--role", "<role-name>"],
+    "agent_servers": {
+      "Clawmasons": {
+        "type": "custom",
+        "command": "npx",
+        "args": [
+          "clawmasons",
+          "acp",
+          "--chapter", "initiate",
+          "--role", "chapter-creator",
+          "--init-agent", "pi"
+        ],
+        "env": {
+          "CLAWMASONS_HOME": "~/.clawmasons",
+          "LODGE": "acme",
+          "LODGE_HOME": "~/.clawmasons/acme",
+          "OPEN_ROUTER_KEY": "$OPENROUTER_API_KEY"
+        }
+      }
+    }
+  }
+
+  For an existing chapter workspace (no bootstrap):
+
+  {
+    "agent_servers": {
+      "Clawmasons": {
+        "type": "custom",
+        "command": "npx",
+        "args": [
+          "clawmasons",
+          "acp",
+          "--role", "<role-name>"
+        ],
         "env": {
           "CLAWMASONS_HOME": "~/.clawmasons"
         }
@@ -92,21 +173,64 @@ ACP Client Configuration Example (Zed / JetBrains):
 
 export function registerRunAcpAgentCommand(program: Command): void {
   program
-    .command("run-acp-agent")
+    .command("acp")
     .description("Start an ACP-compliant agent endpoint for editor integration")
     .requiredOption("--role <name>", "Role to use for the session")
     .option("--agent <name>", "Agent package name (auto-detected if only one)")
     .option("--port <number>", "ACP endpoint port (default: 3001)", "3001")
     .option("--proxy-port <number>", "Internal chapter proxy port (default: 3000)", "3000")
+    .option("--chapter <name>", "Chapter name (use 'initiate' for full bootstrap flow)")
+    .option("--init-agent <name>", "Agent name override for bootstrap (auto-detected if only one)")
     .addHelpText("after", RUN_ACP_AGENT_HELP_EPILOG)
-    .action(async (options: { agent?: string; role: string; port: string; proxyPort: string }) => {
+    .action(async (options: { agent?: string; role: string; port: string; proxyPort: string; chapter?: string; initAgent?: string }) => {
       await runAcpAgent(process.cwd(), {
         agent: options.agent,
         role: options.role,
         port: parseInt(options.port, 10),
         proxyPort: parseInt(options.proxyPort, 10),
+        chapter: options.chapter,
+        initAgent: options.initAgent,
       });
     });
+}
+
+// ── Environment Variable Credential Collection ───────────────────────
+
+/**
+ * Collect environment variables from process.env that match the agent's
+ * declared credentials (agent-level + app-level across all roles).
+ *
+ * This enables the ACP client's `env` block to flow credentials through
+ * to the credential-service container as session overrides.
+ *
+ * @param agent - The resolved agent with credential declarations
+ * @param env - The environment to read from (defaults to process.env)
+ * @returns A record of credential key -> value for all matched env vars
+ */
+export function collectEnvCredentials(
+  agent: ResolvedAgent,
+  env: Record<string, string | undefined> = process.env,
+): Record<string, string> {
+  // Build the set of all declared credential keys
+  const declaredKeys = new Set<string>(agent.credentials);
+  for (const role of agent.roles) {
+    for (const app of role.apps) {
+      for (const key of app.credentials) {
+        declaredKeys.add(key);
+      }
+    }
+  }
+
+  // Collect matching env vars
+  const collected: Record<string, string> = {};
+  for (const key of declaredKeys) {
+    const value = env[key];
+    if (value !== undefined && value !== "") {
+      collected[key] = value;
+    }
+  }
+
+  return collected;
 }
 
 // ── Agent Name Resolution ─────────────────────────────────────────────
@@ -148,6 +272,104 @@ export function resolveAgentName(
   return agentName;
 }
 
+// ── Chapter Bootstrap ─────────────────────────────────────────────────
+
+/**
+ * Dependencies for bootstrapChapter, extracted from RunAcpAgentDeps.
+ */
+export interface BootstrapChapterDeps {
+  initLodgeFn: (options: LodgeInitOptions) => LodgeInitResult;
+  runInitFn: (
+    targetDir: string,
+    options: InitOptions,
+    deps?: { templatesDir?: string; skipNpmInstall?: boolean },
+  ) => Promise<void>;
+  runBuildFn: (
+    rootDir: string,
+    agentName: string | undefined,
+    options: Record<string, unknown>,
+  ) => Promise<void>;
+  resolveLodgeVarsFn: (options?: {
+    home?: string;
+    lodge?: string;
+    lodgeHome?: string;
+  }) => { clawmasonsHome: string; lodge: string; lodgeHome: string };
+  existsSyncFn: (filePath: string) => boolean;
+  mkdirSyncFn: (dirPath: string, options?: { recursive?: boolean }) => void;
+  /** Override fs.readFileSync (for testing). */
+  readFileSyncFn?: (filePath: string, encoding: BufferEncoding) => string;
+  /** Override fs.writeFileSync (for testing). */
+  writeFileSyncFn?: (filePath: string, data: string) => void;
+}
+
+/**
+ * Bootstrap a chapter workspace. When chapterName is "initiate", runs the
+ * full flow: lodge init -> chapter init (with template) -> chapter build.
+ * For other chapter names, resolves the chapter directory without bootstrap.
+ *
+ * Returns the chapter directory to use as rootDir for the ACP session.
+ */
+export async function bootstrapChapter(
+  chapterName: string,
+  deps: BootstrapChapterDeps,
+): Promise<string> {
+  // 1. Init lodge (idempotent)
+  console.log("[clawmasons acp] Initializing lodge...");
+  const lodgeResult = deps.initLodgeFn({});
+  const { lodge, lodgeHome } = lodgeResult;
+
+  if (lodgeResult.skipped) {
+    console.log(`[clawmasons acp] Lodge '${lodge}' already initialized.`);
+  } else {
+    console.log(`[clawmasons acp] Lodge '${lodge}' initialized at ${lodgeHome}`);
+  }
+
+  // 2. Resolve chapter directory
+  const chapterDir = path.join(lodgeHome, "chapters", chapterName);
+
+  // 3. For "initiate" chapter, run full bootstrap if needed
+  const chapterMarker = path.join(chapterDir, ".clawmasons");
+  if (!deps.existsSyncFn(chapterMarker)) {
+    console.log(`[clawmasons acp] Bootstrapping '${chapterName}' chapter...`);
+
+    // Create the chapter directory
+    deps.mkdirSyncFn(chapterDir, { recursive: true });
+
+    // Init chapter with template
+    console.log("[clawmasons acp] Running chapter init...");
+    await deps.runInitFn(
+      chapterDir,
+      { name: `${lodge}.${chapterName}`, template: chapterName },
+      { skipNpmInstall: true },
+    );
+
+    // Build the chapter
+    console.log("[clawmasons acp] Running chapter build...");
+    await deps.runBuildFn(chapterDir, undefined, {});
+
+    // Write docker-build path into .clawmasons/chapter.json so AcpSession can find it
+    const readFile = deps.readFileSyncFn ?? fs.readFileSync;
+    const writeFile = deps.writeFileSyncFn ?? fs.writeFileSync;
+    const chapterJsonPath = path.join(chapterDir, ".clawmasons", "chapter.json");
+    const dockerBuildPath = path.join(chapterDir, "docker");
+    let chapterJson: Record<string, unknown> = {};
+    try {
+      chapterJson = JSON.parse(readFile(chapterJsonPath, "utf-8")) as Record<string, unknown>;
+    } catch { /* start fresh if missing/invalid */ }
+    chapterJson["docker-build"] = dockerBuildPath;
+    if (!chapterJson["docker-registries"]) {
+      chapterJson["docker-registries"] = ["local"];
+    }
+    writeFile(chapterJsonPath, JSON.stringify(chapterJson, null, 2) + "\n");
+
+    console.log(`[clawmasons acp] Bootstrap complete for '${chapterName}'.`);
+  } else {
+    console.log(`[clawmasons acp] Chapter '${chapterName}' already initialized. Skipping bootstrap.`);
+  }
+
+  return chapterDir;
+}
+
 // ── Main Orchestrator ─────────────────────────────────────────────────
 
 export async function runAcpAgent(
@@ -164,17 +386,27 @@ export async function runAcpAgent(
   const autoInitRole = deps?.initRoleFn ?? initRole;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
   const mkdirSync = deps?.mkdirSyncFn ?? fs.mkdirSync;
+  const initLodgeDep = deps?.initLodgeFn ?? initLodge;
+  const runInitDep = deps?.runInitFn ?? runInit;
+  const runBuildDep = deps?.runBuildFn ?? runBuild;
+  const resolveLodgeVarsDep = deps?.resolveLodgeVarsFn ?? resolveLodgeVars;
+  const existsSyncDep = deps?.existsSyncFn ?? fs.existsSync;
+  const readFileSyncDep = deps?.readFileSyncFn;
+  const writeFileSyncDep = deps?.writeFileSyncFn;
 
   const port = options.port ?? 3001;
   const proxyPort = options.proxyPort ?? 3000;
   const acpAgentPort = 3002;
+
+  // Resolve effective rootDir based on --chapter flag
+  let effectiveRootDir = rootDir;
 
   let session: AcpSession | null = null;
   let bridge: AcpBridge | null = null;
 
   // Graceful shutdown handler
   const shutdown = async () => {
-    console.log("\n[chapter run-acp-agent] Shutting down...");
+    console.log("\n[clawmasons acp] Shutting down...");
     try {
       if (bridge) await bridge.stop();
     } catch { /* best-effort */ }
@@ -189,57 +421,100 @@ export async function runAcpAgent(
   process.on("SIGTERM", onSignal);
 
   try {
+    // ── Step 0: Chapter bootstrap (if --chapter specified) ──────────────
+    if (options.chapter) {
+      if (options.chapter === "initiate") {
+        // Full bootstrap: lodge init -> chapter init -> chapter build
+        effectiveRootDir = await bootstrapChapter(options.chapter, {
+          initLodgeFn: initLodgeDep,
+          runInitFn: runInitDep,
+          runBuildFn: runBuildDep,
+          resolveLodgeVarsFn: resolveLodgeVarsDep,
+          existsSyncFn: existsSyncDep,
+          mkdirSyncFn: mkdirSync,
+          readFileSyncFn: readFileSyncDep,
+          writeFileSyncFn: writeFileSyncDep,
+        });
+      } else {
+        // Non-initiate: just resolve the chapter directory
+        const { lodgeHome } = resolveLodgeVarsDep();
+        effectiveRootDir = path.join(lodgeHome, "chapters", options.chapter);
+        if (!existsSyncDep(effectiveRootDir)) {
+          throw new Error(
+            `Chapter '${options.chapter}' not found at ${effectiveRootDir}. ` +
+            `Use '--chapter initiate' for automatic bootstrap, or create the chapter manually.`,
+          );
+        }
+        console.log(`[clawmasons acp] Using chapter '${options.chapter}' at ${effectiveRootDir}`);
+      }
+    }
+
     // ── Step 1: Resolve role from CLAWMASONS_HOME ───────────────────────
     const home = getHome();
     let entry = findRole(home, options.role);
 
     // Auto-init if role not found
     if (!entry) {
-      console.log(`\n[chapter run-acp-agent] Role "${options.role}" not found in chapters.json. Auto-initializing...`);
-      await autoInitRole(rootDir, { role: options.role });
+      console.log(`\n[clawmasons acp] Role "${options.role}" not found in chapters.json. Auto-initializing...`);
+      await autoInitRole(effectiveRootDir, { role: options.role });
 
       // Re-read after init
       entry = findRole(home, options.role);
 
       if (!entry) {
         throw new Error(
-          `Role "${options.role}" not initialized and auto-init failed. Run "chapter init-role --role ${options.role}" from your chapter workspace.`,
+          `Role "${options.role}" not initialized and auto-init failed. Run "clawmasons chapter init-role --role ${options.role}" from your chapter workspace.`,
         );
       }
     }
 
     // Ensure .clawmasons is in chapter workspace's .gitignore
-    ensureGitignore(rootDir, ".clawmasons");
+    ensureGitignore(effectiveRootDir, ".clawmasons");
 
     // ── Step 2: Discover packages ──────────────────────────────────────
-    console.log("[chapter run-acp-agent] Discovering packages...");
-    const packages = discover(rootDir);
+    console.log("[clawmasons acp] Discovering packages...");
+    const packages = discover(effectiveRootDir);
 
     // ── Step 3: Resolve agent ──────────────────────────────────────────
-    const agentName = resolveAgentName(options.agent, packages);
-    console.log(`[chapter run-acp-agent] Resolving agent "${agentName}"...`);
+    const agentName = resolveAgentName(options.initAgent ?? options.agent, packages);
+    console.log(`[clawmasons acp] Resolving agent "${agentName}"...`);
     const agent = resolve(agentName, packages);
 
     // ── Step 4: Compute tool filters ───────────────────────────────────
     const toolFilters = computeToolFilters(agent);
     const toolCount = Object.keys(toolFilters).length;
 
-    console.log(`[chapter run-acp-agent] Agent: ${agent.name}`);
-    console.log(`[chapter run-acp-agent] Role: ${options.role}`);
-    console.log(`[chapter run-acp-agent] Tool filters: ${toolCount} app(s)`);
+    // ── Step 4b: Collect env credentials ─────────────────────────────
+    const envCredentials = collectEnvCredentials(agent);
+    const envCredCount = Object.keys(envCredentials).length;
+
+    console.log(`[clawmasons acp] Agent: ${agent.name}`);
+    console.log(`[clawmasons acp] Role: ${options.role}`);
+    console.log(`[clawmasons acp] Tool filters: ${toolCount} app(s)`);
+    if (envCredCount > 0) {
+      console.log(`[clawmasons acp] Env credentials: ${envCredCount} key(s) from process.env`);
+    }
 
     // ── Step 5: Create session and start infrastructure ────────────────
+    const runtime = agent.runtimes[0] ?? "node";
+    const acpRuntimeCmd = ACP_RUNTIME_COMMANDS[runtime];
+    const acpCommand = acpRuntimeCmd
+      ? [...acpRuntimeCmd.split(" ").slice(1), "--port", String(acpAgentPort)]
+      : undefined;
+
     session = createSession({
-      projectDir: rootDir,
-      agent: agentName,
+      projectDir: effectiveRootDir,
+      agent: agent.slug,
       role: options.role,
       acpPort: acpAgentPort,
       proxyPort,
+      ...(envCredCount > 0 ? { credentials: envCredentials } : {}),
+      acpCommand,
     });
 
-    console.log("[chapter run-acp-agent] Starting infrastructure (proxy + credential-service)...");
+    console.log("[clawmasons acp] Starting infrastructure (proxy + credential-service)...");
     const infraInfo = await session.startInfrastructure();
-    console.log(`[chapter run-acp-agent] Infrastructure started (${infraInfo.sessionId})`);
+    console.log(`[clawmasons acp] Infrastructure started (${infraInfo.sessionId})`);
 
     // ── Step 6: Start ACP bridge endpoint ──────────────────────────────
     bridge = createBridge({
@@ -250,22 +525,22 @@ export async function runAcpAgent(
 
     // ── Step 7: Wire bridge lifecycle events ───────────────────────────
     bridge.onClientConnect = () => {
-      console.log("[chapter run-acp-agent] ACP client connected");
+      console.log("[clawmasons acp] ACP client connected");
     };
 
     bridge.onClientDisconnect = () => {
-      console.log("[chapter run-acp-agent] ACP client disconnected — stopping agent container...");
+      console.log("[clawmasons acp] ACP client disconnected — stopping agent container...");
       void (async () => {
         try {
           if (session) await session.stopAgent();
         } catch { /* best-effort */ }
         if (bridge) bridge.resetForNewSession();
-        console.log("[chapter run-acp-agent] Agent stopped. Waiting for next session/new...");
+        console.log("[clawmasons acp] Agent stopped. Waiting for next session/new...");
       })();
     };
 
     bridge.onAgentError = (error: Error) => {
-      console.error(`[chapter run-acp-agent] Agent error: ${error.message}`);
+      console.error(`[clawmasons acp] Agent error: ${error.message}`);
     };
 
     // Wire session/new handler for deferred agent start
@@ -273,7 +548,7 @@ export async function runAcpAgent(
     const sessionRef = session;
     const bridgeRef = bridge;
     bridge.onSessionNew = async (cwd: string) => {
-      console.log(`[chapter run-acp-agent] session/new received — cwd: "${cwd}"`);
+      console.log(`[clawmasons acp] session/new received — cwd: "${cwd}"`);
 
       // Create .clawmasons/ in the CWD for session state
       const clawmasonsDir = path.join(cwd, ".clawmasons");
@@ -283,24 +558,25 @@ export async function runAcpAgent(
       ensureGitignore(cwd, ".clawmasons");
 
       // Start agent container with CWD mounted as /workspace
-      console.log("[chapter run-acp-agent] Starting agent container...");
+      console.log("[clawmasons acp] Starting agent container...");
       const agentInfo = await sessionRef.startAgent(cwd);
-      console.log(`[chapter run-acp-agent] Agent started (${agentInfo.sessionId})`);
+      console.log(`[clawmasons acp] Agent started (${agentInfo.sessionId})`);
 
       // Connect bridge to the agent
-      console.log("[chapter run-acp-agent] Connecting bridge to agent...");
+      console.log("[clawmasons acp] Connecting bridge to agent...");
       await bridgeRef.connectToAgent();
-      console.log("[chapter run-acp-agent] Bridge connected to agent.");
+      console.log("[clawmasons acp] Bridge connected to agent.");
     };
 
     await bridge.start();
 
+    const chapterInfo = options.chapter ? `\n  Chapter:    ${options.chapter}` : "";
     console.log(
-      `\n[chapter run-acp-agent] Ready -- waiting for ACP client on port ${port}\n` +
+      `\n[clawmasons acp] Ready -- waiting for ACP client on port ${port}\n` +
       `  Agent:      ${agent.name}\n` +
       `  Role:       ${options.role}\n` +
       `  ACP port:   ${port}\n` +
-      `  Proxy port: ${proxyPort}\n` +
+      `  Proxy port: ${proxyPort}${chapterInfo}\n` +
       `  Mode:       deferred (agent starts on session/new)\n`,
     );
 
@@ -309,7 +585,7 @@ export async function runAcpAgent(
 
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`\n[chapter run-acp-agent] Failed: ${message}\n`);
+    console.error(`\n[clawmasons acp] Failed: ${message}\n`);
 
     // Clean up on startup failure
     try { if (bridge) await bridge.stop(); } catch { /* best-effort */ }

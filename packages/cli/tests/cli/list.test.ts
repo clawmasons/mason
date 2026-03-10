@@ -6,8 +6,11 @@ import { program } from "../../src/cli/index.js";
 import { runList } from "../../src/cli/commands/list.js";
 
 describe("CLI list command", () => {
-  it("has the list command registered", () => {
-    const listCmd = program.commands.find((cmd) => cmd.name() === "list");
+  const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
+
+  it("has the list command registered under chapter", () => {
+    expect(chapterCmd).toBeDefined();
+    const listCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "list");
     expect(listCmd).toBeDefined();
     if (listCmd) {
       expect(listCmd.description()).toContain("List");
@@ -15,7 +18,7 @@ describe("CLI list command", () => {
   });
 
   it("list command has --json option", () => {
-    const listCmd = program.commands.find((cmd) => cmd.name() === "list");
+    const listCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "list");
     expect(listCmd).toBeDefined();
     if (listCmd) {
       const jsonOption = listCmd.options.find((opt) => opt.long === "--json");

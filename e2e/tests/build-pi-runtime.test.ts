@@ -27,7 +27,7 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
     workspaceDir = copyFixtureWorkspace("build-pi-runtime");
 
     // 2. Run chapter build (resolve + pack + docker-init)
-    chapterExec(["build", "@test/agent-test-note-taker"], workspaceDir, {
+    chapterExec(["chapter", "build", "@test/agent-test-note-taker"], workspaceDir, {
       timeout: 120_000,
     });
 
@@ -90,7 +90,7 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
       );
       expect(dockerfile).toContain("FROM node:");
       expect(dockerfile).toContain("USER mason");
-      expect(dockerfile).toContain("chapter");
+      expect(dockerfile).toContain("clawmasons");
       expect(dockerfile).toContain("proxy");
       expect(dockerfile).toContain("COPY node_modules/");
       expect(dockerfile).not.toContain("npm install");
@@ -199,11 +199,11 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
 
   describe("validate and list", () => {
     it("chapter validate exits 0", () => {
-      chapterExec(["validate", "@test/agent-test-note-taker"], workspaceDir);
+      chapterExec(["chapter", "validate", "@test/agent-test-note-taker"], workspaceDir);
     });
 
     it("chapter list --json includes the agent", () => {
-      const agents = chapterExecJson<unknown[]>(["list", "--json"], workspaceDir);
+      const agents = chapterExecJson<unknown[]>(["chapter", "list", "--json"], workspaceDir);
 
       expect(agents).toEqual(
         expect.arrayContaining([

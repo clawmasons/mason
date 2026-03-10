@@ -10,6 +10,11 @@ import {
   findRoleEntry,
   findRoleEntryByRole,
   upsertRoleEntry,
+  readConfigJson,
+  writeConfigJson,
+  upsertLodgeEntry,
+  getLodgeEntry,
+  resolveLodgeVars,
   type ChapterEntry,
   type ChaptersJson,
 } from "../../src/runtime/home.js";
@@ -378,6 +383,227 @@ describe("upsertRoleEntry", () => {
     expect(data.chapters).toHaveLength(1);
   });
 });
+
+// ── config.json (lodge registry) tests ──────────────────────────────────
+
+describe("readConfigJson", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-home-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns empty object when file does not exist", () => {
+    const result = readConfigJson(tmpDir);
+    expect(result).toEqual({});
+  });
+
+  it("parses valid config.json", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "config.json"),
+      JSON.stringify({ acme: { home: "/path/to/acme" } }),
+      "utf-8",
+    );
+
+    const result = readConfigJson(tmpDir);
+    expect(result["acme"]).toBeDefined();
+    expect(result["acme"].home).toBe("/path/to/acme");
+  });
+
+  it("throws on malformed JSON", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "config.json"),
+      "{ not valid",
+      "utf-8",
+    );
+
+    expect(() => readConfigJson(tmpDir)).toThrow("Failed to parse");
+  });
+});
+
+describe("writeConfigJson", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-home-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("creates file with correct content", () => {
+    writeConfigJson(tmpDir, { acme: { home: "/path/to/acme" } });
+
+    const content = fs.readFileSync(
+      path.join(tmpDir, "config.json"),
+      "utf-8",
+    );
+    const parsed = JSON.parse(content);
+    expect(parsed["acme"].home).toBe("/path/to/acme");
+  });
+
+  it("does not leave temp file after successful write", () => {
+    writeConfigJson(tmpDir, {});
+    expect(fs.existsSync(path.join(tmpDir, "config.json.tmp"))).toBe(false);
+  });
+});
+
+describe("upsertLodgeEntry", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-home-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("adds new lodge entry", () => {
+    upsertLodgeEntry(tmpDir, "acme", "/path/to/acme");
+
+    const config = readConfigJson(tmpDir);
+    expect(config["acme"].home).toBe("/path/to/acme");
+  });
+
+  it("updates existing lodge entry", () => {
+    writeConfigJson(tmpDir, { acme: { home: "/old/path" } });
+    upsertLodgeEntry(tmpDir, "acme", "/new/path");
+
+    const config = readConfigJson(tmpDir);
+    expect(config["acme"].home).toBe("/new/path");
+  });
+
+  it("preserves other entries", () => {
+    writeConfigJson(tmpDir, { other: { home: "/other" } });
+    upsertLodgeEntry(tmpDir, "acme", "/acme");
+
+    const config = readConfigJson(tmpDir);
+    expect(config["other"].home).toBe("/other");
+    expect(config["acme"].home).toBe("/acme");
+  });
+});
+
+describe("getLodgeEntry", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-home-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns entry when lodge exists", () => {
+    writeConfigJson(tmpDir, { acme: { home: "/path/to/acme" } });
+    const entry = getLodgeEntry(tmpDir, "acme");
+    expect(entry).toBeDefined();
+    expect(entry!.home).toBe("/path/to/acme");
+  });
+
+  it("returns undefined when lodge does not exist", () => {
+    writeConfigJson(tmpDir, {});
+    const entry = getLodgeEntry(tmpDir, "nonexistent");
+    expect(entry).toBeUndefined();
+  });
+
+  it("returns undefined when config.json is missing", () => {
+    const entry = getLodgeEntry(tmpDir, "acme");
+    expect(entry).toBeUndefined();
+  });
+});
+
+describe("resolveLodgeVars", () => {
+  const savedEnv: Record<string, string | undefined> = {};
+
+  function saveEnv(key: string): void {
+    savedEnv[key] = process.env[key];
+  }
+
+  function restoreEnv(key: string): void {
+    const val = savedEnv[key];
+    if (val !== undefined) {
+      process.env[key] = val;
+    } else {
+      delete process.env[key]; // eslint-disable-line @typescript-eslint/no-dynamic-delete
+    }
+  }
+
+  beforeEach(() => {
+    saveEnv("CLAWMASONS_HOME");
+    saveEnv("LODGE");
+    saveEnv("LODGE_HOME");
+    saveEnv("USER");
+    delete process.env["CLAWMASONS_HOME"];
+    delete process.env["LODGE"];
+    delete process.env["LODGE_HOME"];
+  });
+
+  afterEach(() => {
+    restoreEnv("CLAWMASONS_HOME");
+    restoreEnv("LODGE");
+    restoreEnv("LODGE_HOME");
+    restoreEnv("USER");
+  });
+
+  it("uses CLI options over env vars", () => {
+    process.env["CLAWMASONS_HOME"] = "/env/home";
+    process.env["LODGE"] = "envlodge";
+    process.env["LODGE_HOME"] = "/env/lodge";
+
+    const result = resolveLodgeVars({
+      home: "/cli/home",
+      lodge: "clilodge",
+      lodgeHome: "/cli/lodge",
+    });
+
+    expect(result.clawmasonsHome).toBe("/cli/home");
+    expect(result.lodge).toBe("clilodge");
+    expect(result.lodgeHome).toBe("/cli/lodge");
+  });
+
+  it("uses env vars when no CLI options", () => {
+    process.env["CLAWMASONS_HOME"] = "/env/home";
+    process.env["LODGE"] = "envlodge";
+    process.env["LODGE_HOME"] = "/env/lodge";
+
+    const result = resolveLodgeVars({});
+
+    expect(result.clawmasonsHome).toBe("/env/home");
+    expect(result.lodge).toBe("envlodge");
+    expect(result.lodgeHome).toBe("/env/lodge");
+  });
+
+  it("uses defaults when neither CLI nor env", () => {
+    process.env["USER"] = "testuser";
+
+    const result = resolveLodgeVars({});
+
+    expect(result.clawmasonsHome).toBe(
+      path.join(os.homedir(), ".clawmasons"),
+    );
+    expect(result.lodge).toBe("testuser");
+    expect(result.lodgeHome).toBe(
+      path.join(os.homedir(), ".clawmasons", "testuser"),
+    );
+  });
+
+  it("falls back to anonymous when USER is unset", () => {
+    delete process.env["USER"];
+
+    const result = resolveLodgeVars({});
+
+    expect(result.lodge).toBe("anonymous");
+  });
+});
+
+// ── helpers ─────────────────────────────────────────────────────────────
 
 // Helper to create a ChapterEntry with sensible defaults
 function makeEntry(overrides: Partial<ChapterEntry> = {}): ChapterEntry {

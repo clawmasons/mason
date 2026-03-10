@@ -34,7 +34,7 @@ describe("full chapter build → run-agent validation flow", () => {
     workspaceDir = copyFixtureWorkspace("build-pipeline");
 
     // 2. Run chapter build (resolve + pack + docker-init in one step)
-    chapterExec(["build"], workspaceDir, { timeout: 120_000 });
+    chapterExec(["chapter", "build"], workspaceDir, { timeout: 120_000 });
 
     dockerDir = path.join(workspaceDir, "docker");
   }, 120_000);
@@ -94,9 +94,9 @@ describe("full chapter build → run-agent validation flow", () => {
       ).toBe(true);
     });
 
-    it("has .bin/chapter symlink", () => {
-      const chapterBin = path.join(dockerDir, "node_modules", ".bin", "chapter");
-      expect(fs.existsSync(chapterBin)).toBe(true);
+    it("has .bin/clawmasons symlink", () => {
+      const clawmasonsBin = path.join(dockerDir, "node_modules", ".bin", "clawmasons");
+      expect(fs.existsSync(clawmasonsBin)).toBe(true);
     });
 
     it("has transitive dependencies (e.g., commander, zod)", () => {

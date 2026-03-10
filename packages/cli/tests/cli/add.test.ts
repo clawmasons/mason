@@ -14,8 +14,11 @@ import { execFileSync } from "node:child_process";
 const mockExecFileSync = vi.mocked(execFileSync);
 
 describe("CLI add command", () => {
-  it("has the add command registered", () => {
-    const addCmd = program.commands.find((cmd) => cmd.name() === "add");
+  const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
+
+  it("has the add command registered under chapter", () => {
+    expect(chapterCmd).toBeDefined();
+    const addCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "add");
     expect(addCmd).toBeDefined();
     if (addCmd) {
       expect(addCmd.description()).toContain("Add");
@@ -23,7 +26,7 @@ describe("CLI add command", () => {
   });
 
   it("add command accepts a pkg argument", () => {
-    const addCmd = program.commands.find((cmd) => cmd.name() === "add");
+    const addCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "add");
     expect(addCmd).toBeDefined();
     if (addCmd) {
       const args = addCmd.registeredArguments;

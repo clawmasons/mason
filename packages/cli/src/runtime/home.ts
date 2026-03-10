@@ -128,6 +128,111 @@ export function findRoleEntryByRole(
  * If found, updates the existing entry's fields and sets updatedAt.
  * If not found, appends with both createdAt and updatedAt.
  */
+// ── Lodge config.json helpers ──────────────────────────────────────────
+
+const CONFIG_JSON = "config.json";
+
+/**
+ * A single lodge entry in config.json.
+ */
+export interface LodgeConfigEntry {
+  home: string;
+}
+
+/**
+ * The top-level structure of config.json: { "<lodge>": { "home": "<path>" } }.
+ */
+export type ConfigJson = Record<string, LodgeConfigEntry>;
+
+/**
+ * Read and parse config.json from the CLAWMASONS_HOME directory.
+ * Returns {} when the file doesn't exist.
+ * Throws on malformed JSON.
+ */
+export function readConfigJson(home: string): ConfigJson {
+  const filePath = path.join(home, CONFIG_JSON);
+  if (!fs.existsSync(filePath)) {
+    return {};
+  }
+
+  const content = fs.readFileSync(filePath, "utf-8");
+  try {
+    return JSON.parse(content) as ConfigJson;
+  } catch (err) {
+    throw new Error(
+      `Failed to parse ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+/**
+ * Write config.json to the CLAWMASONS_HOME directory.
+ * Uses atomic write (temp file + rename) to prevent corruption.
+ */
+export function writeConfigJson(home: string, data: ConfigJson): void {
+  const filePath = path.join(home, CONFIG_JSON);
+  const tmpPath = `${filePath}.tmp`;
+  const content = JSON.stringify(data, null, 2) + "\n";
+  fs.writeFileSync(tmpPath, content, "utf-8");
+  fs.renameSync(tmpPath, filePath);
+}
+
+/**
+ * Register or update a lodge entry in config.json.
+ */
+export function upsertLodgeEntry(
+  home: string,
+  lodge: string,
+  lodgeHome: string,
+): void {
+  const data = readConfigJson(home);
+  data[lodge] = { home: lodgeHome };
+  writeConfigJson(home, data);
+}
+
+/**
+ * Get a lodge entry from config.json.
+ * Returns undefined if the lodge is not registered.
+ */
+export function getLodgeEntry(
+  home: string,
+  lodge: string,
+): LodgeConfigEntry | undefined {
+  const data = readConfigJson(home);
+  return data[lodge];
+}
+
+/**
+ * Resolve lodge variables from CLI options, env vars, and defaults.
+ * Priority: CLI flag > env var > default.
+ */
+export function resolveLodgeVars(options?: {
+  home?: string;
+  lodge?: string;
+  lodgeHome?: string;
+}): { clawmasonsHome: string; lodge: string; lodgeHome: string } {
+  const clawmasonsHome = options?.home
+    ?? process.env["CLAWMASONS_HOME"]
+    ?? path.join(os.homedir(), ".clawmasons");
+
+  const lodge = options?.lodge
+    ?? process.env["LODGE"]
+    ?? process.env["USER"]
+    ?? "anonymous";
+
+  const lodgeHome = options?.lodgeHome
+    ?? process.env["LODGE_HOME"]
+    ?? path.join(clawmasonsHome, lodge);
+
+  return {
+    clawmasonsHome: path.resolve(clawmasonsHome),
+    lodge,
+    lodgeHome: path.resolve(lodgeHome),
+  };
+}
+
+// ── chapters.json helpers (existing) ───────────────────────────────────
+
 export function upsertRoleEntry(home: string, entry: ChapterEntry): void {
   const data = readChaptersJson(home);
   const idx = data.chapters.findIndex(

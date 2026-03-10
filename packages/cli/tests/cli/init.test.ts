@@ -56,7 +56,7 @@ describe("chapter init", () => {
 
       const configPath = path.join(tmpDir, ".clawmasons", "chapter.json");
       const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      expect(config).toEqual({ chapter: "grand.chapter-builder", version: "0.1.0" });
+      expect(config).toEqual({ chapter: "test.unit", version: "0.1.0" });
     });
 
     it("creates .gitignore with standard entries", async () => {
@@ -479,8 +479,8 @@ describe("chapter init", () => {
 
         const logCalls = vi.mocked(console.log).mock.calls.flat().join("\n");
         expect(logCalls).toContain("Template: test-template");
-        expect(logCalls).toContain("chapter validate @test.unit/agent-note-taker");
-        expect(logCalls).toContain("chapter list");
+        expect(logCalls).toContain("clawmasons chapter validate @test.unit/agent-note-taker");
+        expect(logCalls).toContain("clawmasons chapter list");
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }
