@@ -1,0 +1,28 @@
+{
+  "name": "@clawmasons/mcp-agent",
+  "version": "0.1.0",
+  "description": "General-purpose MCP agent with REPL and ACP modes for testing and debugging the chapter proxy pipeline",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "bin": {
+    "mcp-agent": "./dist/mcp-agent.js"
+  },
+  "scripts": {
+    "build": "tsx esbuild.config.ts",
+    "build:types": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.0"
+  }
+}
