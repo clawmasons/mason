@@ -138,7 +138,7 @@ Create the `initiate` chapter template with the `chapter-creator` role, `create-
 
 **Testable output:** `clawmasons chapter init --name test.initiate --template initiate` creates a valid workspace. `clawmasons chapter build` succeeds on the scaffolded workspace (generates Dockerfiles with `node:22-bookworm` base, apt packages, and lodge mount). Template placeholders are correctly substituted.
 
-**Not Implemented Yet**
+**Implemented:** [spec](../../changes/archive/2026-03-10-initiate-chapter-template/spec.md)
 
 ---
 

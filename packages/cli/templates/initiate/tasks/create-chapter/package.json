@@ -1,0 +1,14 @@
+{
+  "name": "@{{projectScope}}/task-create-chapter",
+  "version": "1.0.0",
+  "chapter": {
+    "type": "task",
+    "taskType": "subagent",
+    "prompt": "./prompts/create-chapter.md",
+    "requires": {
+      "apps": ["@{{projectScope}}/app-filesystem"],
+      "skills": ["@{{projectScope}}/skill-create-chapter"]
+    },
+    "approval": "confirm"
+  }
+}
