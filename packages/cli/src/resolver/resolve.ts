@@ -188,7 +188,22 @@ function resolveRole(
 
   // Collect all apps referenced by permissions (these are the apps this role touches)
   const apps: ResolvedApp[] = [];
-  for (const appName of Object.keys(chapter.permissions)) {
+  const permissionKeys = Object.keys(chapter.permissions);
+  const hasWildcard = permissionKeys.includes("*");
+
+  if (hasWildcard) {
+    // Wildcard "*" means all apps in the workspace
+    for (const [, pkg] of packages) {
+      if (pkg.chapterField.type === "app") {
+        apps.push(resolveApp(pkg.name, packages, roleContext));
+      }
+    }
+  }
+
+  // Also resolve any explicitly named apps
+  for (const appName of permissionKeys) {
+    if (appName === "*") continue;
+    if (apps.some((a) => a.name === appName)) continue; // already added by wildcard
     try {
       apps.push(resolveApp(appName, packages, roleContext));
     } catch (e) {
