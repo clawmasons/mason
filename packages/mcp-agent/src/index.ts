@@ -125,35 +125,55 @@ export async function main(argv?: string[]): Promise<void> {
 
   let caller: ToolCaller | null = null;
 
-  if (proxyToken) {
-    try {
-      caller = await createMcpClient({ proxyUrl, proxyToken });
-      console.log("[mcp-agent] MCP session established.");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[mcp-agent] WARNING: Could not establish MCP session: ${msg}`);
-      console.error("[mcp-agent] Tool listing and calling will not work.");
+  // connectToProxy retries MCP session establishment
+  async function connectToProxy(): Promise<ToolCaller | null> {
+    if (!proxyToken) {
+      console.log("[mcp-agent] MCP_PROXY_TOKEN not set. Running in credential-only mode.");
+      return null;
     }
-  } else {
-    console.log("[mcp-agent] MCP_PROXY_TOKEN not set. Running in credential-only mode.");
+
+    const maxRetries = 15;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const c = await createMcpClient({ proxyUrl, proxyToken });
+        console.log("[mcp-agent] MCP session established.");
+        return c;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (attempt < maxRetries) {
+          console.log(`[mcp-agent] Proxy not ready (attempt ${attempt}/${maxRetries}): ${msg}`);
+          await new Promise((r) => setTimeout(r, 2000));
+        } else {
+          console.error(`[mcp-agent] WARNING: Could not establish MCP session after ${maxRetries} attempts: ${msg}`);
+          console.error("[mcp-agent] Tool listing and calling will not work.");
+        }
+      }
+    }
+    return null;
   }
 
-  if (!caller) {
-    // Create a no-op caller for credential-only mode
-    caller = {
+  // In ACP mode, start the server immediately and connect to proxy in background
+  if (cliArgs.acpMode) {
+    // Create a deferred caller that forwards to the real caller once connected
+    let realCaller: ToolCaller | null = null;
+    const deferredCaller: ToolCaller = {
       async listTools() {
+        if (realCaller) return realCaller.listTools();
         return [];
       },
-      async callTool() {
-        throw new Error("No MCP session available. Cannot call tools.");
+      async callTool(name: string, args: Record<string, unknown>) {
+        if (realCaller) return realCaller.callTool(name, args);
+        throw new Error("MCP session not yet established. Proxy connection in progress.");
       },
     };
-  }
 
-  // 3. Run in the selected mode
-  if (cliArgs.acpMode) {
     console.log(`[mcp-agent] Starting ACP server on port ${cliArgs.port}...`);
-    const server = await startAcpServer({ port: cliArgs.port, caller });
+    const server = await startAcpServer({ port: cliArgs.port, caller: deferredCaller });
+
+    // Connect to proxy in background
+    connectToProxy().then((c) => {
+      if (c) realCaller = c;
+    });
 
     // Handle graceful shutdown
     const shutdown = async () => {
@@ -165,6 +185,14 @@ export async function main(argv?: string[]): Promise<void> {
     process.on("SIGTERM", shutdown);
     process.on("SIGINT", shutdown);
   } else {
+    // REPL mode: connect synchronously before starting
+    caller = await connectToProxy();
+    if (!caller) {
+      caller = {
+        async listTools() { return []; },
+        async callTool() { throw new Error("No MCP session available. Cannot call tools."); },
+      };
+    }
     await runRepl(caller);
   }
 }
@@ -174,7 +202,9 @@ export async function main(argv?: string[]): Promise<void> {
 const isMain =
   typeof process !== "undefined" &&
   process.argv[1] &&
-  (process.argv[1].endsWith("mcp-agent.js") || process.argv[1].endsWith("index.js"));
+  (process.argv[1].endsWith("mcp-agent.js") ||
+   process.argv[1].endsWith("/mcp-agent") ||
+   process.argv[1].endsWith("index.js"));
 
 if (isMain) {
   main().catch((err) => {

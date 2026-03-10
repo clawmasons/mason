@@ -34,6 +34,7 @@ export const ACP_RUNTIME_COMMANDS: Record<string, string> = {
   "claude-code": "claude-agent-acp",
   "pi-coding-agent": "pi-agent-acp",
   "node": "node src/index.js --acp",
+  "mcp-agent": "mcp-agent --acp",
 };
 
 /**

@@ -130,6 +130,15 @@ RUN npm install -g @mariozechner/pi-coding-agent
         runtimeEntrypoint: `ENTRYPOINT ["pi"]`,
       };
 
+    case "mcp-agent":
+      return {
+        runtimeInstall: `
+# Runtime: mcp-agent (uses @clawmasons/mcp-agent from node_modules)
+ENV PATH="/app/node_modules/.bin:$PATH"
+`,
+        runtimeEntrypoint: `ENTRYPOINT ["mcp-agent"]`,
+      };
+
     default:
       return {
         runtimeInstall: `
