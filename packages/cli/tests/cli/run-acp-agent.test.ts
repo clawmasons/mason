@@ -4,8 +4,10 @@ import {
   runAcpAgent,
   resolveAgentName,
   registerRunAcpAgentCommand,
+  bootstrapChapter,
   RUN_ACP_AGENT_HELP_EPILOG,
   type RunAcpAgentDeps,
+  type BootstrapChapterDeps,
 } from "../../src/cli/commands/run-acp-agent.js";
 import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
 import type { AcpSessionConfig, InfrastructureInfo, AgentSessionInfo } from "../../src/acp/session.js";
@@ -190,6 +192,43 @@ function makeDeps(overrides?: {
     },
     ensureGitignoreEntryFn: () => false,
     mkdirSyncFn: () => {},
+    initLodgeFn: () => ({
+      skipped: false,
+      clawmasonsHome: "/fake/clawmasons-home",
+      lodge: "testuser",
+      lodgeHome: "/fake/clawmasons-home/testuser",
+    }),
+    runInitFn: async () => {},
+    runBuildFn: async () => {},
+    resolveLodgeVarsFn: () => ({
+      clawmasonsHome: "/fake/clawmasons-home",
+      lodge: "testuser",
+      lodgeHome: "/fake/clawmasons-home/testuser",
+    }),
+    existsSyncFn: () => false,
+  };
+}
+
+// ── Bootstrap helpers ───────────────────────────────────────────────
+
+function makeBootstrapDeps(overrides?: Partial<BootstrapChapterDeps>): BootstrapChapterDeps {
+  return {
+    initLodgeFn: () => ({
+      skipped: false,
+      clawmasonsHome: "/fake/clawmasons-home",
+      lodge: "testuser",
+      lodgeHome: "/fake/clawmasons-home/testuser",
+    }),
+    runInitFn: async () => {},
+    runBuildFn: async () => {},
+    resolveLodgeVarsFn: () => ({
+      clawmasonsHome: "/fake/clawmasons-home",
+      lodge: "testuser",
+      lodgeHome: "/fake/clawmasons-home/testuser",
+    }),
+    existsSyncFn: () => false,
+    mkdirSyncFn: () => {},
+    ...overrides,
   };
 }
 
@@ -693,5 +732,321 @@ describe("run-acp-agent help text", () => {
     expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("Side Effects");
     expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("Environment");
     expect(RUN_ACP_AGENT_HELP_EPILOG).toContain("ACP Client Configuration Example");
+  });
+
+  it("contains --chapter option in help", () => {
+    const help = getHelpOutput();
+    expect(help).toContain("--chapter");
+    expect(help).toContain("initiate");
+  });
+
+  it("contains --init-agent option in help", () => {
+    const help = getHelpOutput();
+    expect(help).toContain("--init-agent");
+  });
+});
+
+// ── bootstrapChapter ────────────────────────────────────────────────────
+
+describe("bootstrapChapter", () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("calls initLodge, runInit, and runBuild in order for initiate chapter", async () => {
+    const callOrder: string[] = [];
+
+    const deps = makeBootstrapDeps({
+      initLodgeFn: () => {
+        callOrder.push("initLodge");
+        return {
+          skipped: false,
+          clawmasonsHome: "/fake/home",
+          lodge: "testuser",
+          lodgeHome: "/fake/home/testuser",
+        };
+      },
+      runInitFn: async () => {
+        callOrder.push("runInit");
+      },
+      runBuildFn: async () => {
+        callOrder.push("runBuild");
+      },
+      existsSyncFn: () => false, // chapter doesn't exist yet
+    });
+
+    const result = await bootstrapChapter("initiate", deps);
+
+    expect(callOrder).toEqual(["initLodge", "runInit", "runBuild"]);
+    expect(result).toBe("/fake/home/testuser/chapters/initiate");
+  });
+
+  it("passes correct name and template to runInit", async () => {
+    let capturedOptions: { name: string; template?: string } | undefined;
+    let capturedTargetDir: string | undefined;
+
+    const deps = makeBootstrapDeps({
+      initLodgeFn: () => ({
+        skipped: false,
+        clawmasonsHome: "/fake/home",
+        lodge: "myuser",
+        lodgeHome: "/fake/home/myuser",
+      }),
+      runInitFn: async (targetDir, options) => {
+        capturedTargetDir = targetDir;
+        capturedOptions = options;
+      },
+      existsSyncFn: () => false,
+    });
+
+    await bootstrapChapter("initiate", deps);
+
+    expect(capturedTargetDir).toBe("/fake/home/myuser/chapters/initiate");
+    expect(capturedOptions?.name).toBe("myuser.initiate");
+    expect(capturedOptions?.template).toBe("initiate");
+  });
+
+  it("skips init and build when chapter already exists", async () => {
+    let initCalled = false;
+    let buildCalled = false;
+
+    const deps = makeBootstrapDeps({
+      runInitFn: async () => { initCalled = true; },
+      runBuildFn: async () => { buildCalled = true; },
+      existsSyncFn: (p: string) => p.endsWith(".clawmasons"), // chapter marker exists
+    });
+
+    const result = await bootstrapChapter("initiate", deps);
+
+    expect(initCalled).toBe(false);
+    expect(buildCalled).toBe(false);
+    expect(result).toBe("/fake/clawmasons-home/testuser/chapters/initiate");
+  });
+
+  it("creates chapter directory before init", async () => {
+    const mkdirCalls: string[] = [];
+
+    const deps = makeBootstrapDeps({
+      mkdirSyncFn: (dirPath: string) => {
+        mkdirCalls.push(dirPath);
+      },
+      existsSyncFn: () => false,
+    });
+
+    await bootstrapChapter("initiate", deps);
+
+    expect(mkdirCalls).toContain("/fake/clawmasons-home/testuser/chapters/initiate");
+  });
+
+  it("passes skipNpmInstall: true to runInit", async () => {
+    let capturedDeps: { skipNpmInstall?: boolean } | undefined;
+
+    const deps = makeBootstrapDeps({
+      runInitFn: async (_targetDir, _options, initDeps) => {
+        capturedDeps = initDeps;
+      },
+      existsSyncFn: () => false,
+    });
+
+    await bootstrapChapter("initiate", deps);
+
+    expect(capturedDeps?.skipNpmInstall).toBe(true);
+  });
+
+  it("logs bootstrap progress messages", async () => {
+    const deps = makeBootstrapDeps({
+      existsSyncFn: () => false,
+    });
+
+    await bootstrapChapter("initiate", deps);
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("Initializing lodge");
+    expect(logOutput).toContain("Running chapter init");
+    expect(logOutput).toContain("Running chapter build");
+    expect(logOutput).toContain("Bootstrap complete");
+  });
+
+  it("logs skip message when chapter already initialized", async () => {
+    const deps = makeBootstrapDeps({
+      existsSyncFn: (p: string) => p.endsWith(".clawmasons"),
+    });
+
+    await bootstrapChapter("initiate", deps);
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("already initialized");
+    expect(logOutput).toContain("Skipping bootstrap");
+  });
+});
+
+// ── runAcpAgent with --chapter ──────────────────────────────────────────
+
+describe("runAcpAgent with --chapter", () => {
+  let exitSpy: ReturnType<typeof vi.spyOn>;
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => { /* noop */ }) as never) as unknown as ReturnType<typeof vi.spyOn>;
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("runs bootstrap when --chapter initiate is specified", async () => {
+    let initLodgeCalled = false;
+    let runInitCalled = false;
+    let runBuildCalled = false;
+
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps(),
+      initLodgeFn: () => {
+        initLodgeCalled = true;
+        return {
+          skipped: false,
+          clawmasonsHome: "/fake/clawmasons-home",
+          lodge: "testuser",
+          lodgeHome: "/fake/clawmasons-home/testuser",
+        };
+      },
+      runInitFn: async () => { runInitCalled = true; },
+      runBuildFn: async () => { runBuildCalled = true; },
+      existsSyncFn: () => false,
+    };
+
+    await runAcpAgent("/fake/root", { role: "chapter-creator", chapter: "initiate" }, deps);
+
+    expect(initLodgeCalled).toBe(true);
+    expect(runInitCalled).toBe(true);
+    expect(runBuildCalled).toBe(true);
+  });
+
+  it("uses chapter directory as rootDir for discovery when --chapter initiate", async () => {
+    let discoveredRoot: string | undefined;
+
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps(),
+      discoverPackagesFn: (rootDir: string) => {
+        discoveredRoot = rootDir;
+        return new Map([["test-agent", makeDiscoveredPackage("agent")]]);
+      },
+      existsSyncFn: () => false,
+    };
+
+    await runAcpAgent("/fake/root", { role: "chapter-creator", chapter: "initiate" }, deps);
+
+    expect(discoveredRoot).toBe("/fake/clawmasons-home/testuser/chapters/initiate");
+  });
+
+  it("resolves non-initiate chapter to lodge chapters directory", async () => {
+    let discoveredRoot: string | undefined;
+
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps(),
+      discoverPackagesFn: (rootDir: string) => {
+        discoveredRoot = rootDir;
+        return new Map([["test-agent", makeDiscoveredPackage("agent")]]);
+      },
+      existsSyncFn: () => true, // chapter dir exists
+    };
+
+    await runAcpAgent("/fake/root", { role: "writer", chapter: "myproject" }, deps);
+
+    expect(discoveredRoot).toBe("/fake/clawmasons-home/testuser/chapters/myproject");
+  });
+
+  it("fails when non-initiate chapter directory does not exist", async () => {
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps(),
+      existsSyncFn: () => false, // chapter dir doesn't exist
+    };
+
+    await runAcpAgent("/fake/root", { role: "writer", chapter: "nonexistent" }, deps);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const errorOutput = errorSpy.mock.calls.flat().join("\n");
+    expect(errorOutput).toContain("not found");
+    expect(errorOutput).toContain("nonexistent");
+  });
+
+  it("does not run bootstrap when no --chapter flag", async () => {
+    let initLodgeCalled = false;
+
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps(),
+      initLodgeFn: () => {
+        initLodgeCalled = true;
+        return {
+          skipped: false,
+          clawmasonsHome: "/fake/clawmasons-home",
+          lodge: "testuser",
+          lodgeHome: "/fake/clawmasons-home/testuser",
+        };
+      },
+    };
+
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+
+    expect(initLodgeCalled).toBe(false);
+  });
+
+  it("uses --init-agent for agent resolution when specified", async () => {
+    let resolvedName: string | undefined;
+
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps(),
+      resolveAgentFn: (name: string) => {
+        resolvedName = name;
+        return makeResolvedAgent(name);
+      },
+      existsSyncFn: () => false,
+    };
+
+    await runAcpAgent("/fake/root", {
+      role: "chapter-creator",
+      chapter: "initiate",
+      initAgent: "custom-init-agent",
+    }, deps);
+
+    expect(resolvedName).toBe("custom-init-agent");
+  });
+
+  it("passes effectiveRootDir to session config when --chapter is used", async () => {
+    let sessionConfig: AcpSessionConfig | undefined;
+
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps(),
+      createSessionFn: (config: AcpSessionConfig) => {
+        sessionConfig = config;
+        return makeMockSession().session as unknown as AcpSession;
+      },
+      existsSyncFn: () => false,
+    };
+
+    await runAcpAgent("/fake/root", { role: "chapter-creator", chapter: "initiate" }, deps);
+
+    expect(sessionConfig?.projectDir).toBe("/fake/clawmasons-home/testuser/chapters/initiate");
+  });
+
+  it("includes chapter name in ready message", async () => {
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps(),
+      existsSyncFn: () => false,
+    };
+
+    await runAcpAgent("/fake/root", { role: "chapter-creator", chapter: "initiate" }, deps);
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("Chapter:    initiate");
   });
 });
