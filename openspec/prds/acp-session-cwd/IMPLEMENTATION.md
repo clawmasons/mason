@@ -133,7 +133,7 @@ At this stage, `run-acp-agent` still starts the Docker session immediately at st
 
 **Testable output:** (a) `chapter run-acp-agent --role writer` starts ACP endpoint, (b) auto-inits role if not in `chapters.json`, (c) uses `CLAWMASONS_HOME` for role resolution, (d) all existing ACP proxy tests pass under new command name, (e) old `acp-proxy` command does not exist.
 
-**Not Implemented Yet**
+**Implemented** -- [Archived change](../../changes/archive/2026-03-10-rename-acp-proxy-run-acp-agent/) ([proposal](../../changes/archive/2026-03-10-rename-acp-proxy-run-acp-agent/proposal.md), [design](../../changes/archive/2026-03-10-rename-acp-proxy-run-acp-agent/design.md), [tasks](../../changes/archive/2026-03-10-rename-acp-proxy-run-acp-agent/tasks.md)). Source: `packages/cli/src/cli/commands/run-acp-agent.ts`. Tests: `packages/cli/tests/cli/run-acp-agent.test.ts` (26 tests). Warning prefix updated in `packages/cli/src/acp/warnings.ts`. 980 total tests passing.
 
 ---
 

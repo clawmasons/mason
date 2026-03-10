@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  acpProxy,
+  runAcpAgent,
   resolveAgentName,
-  type AcpProxyDeps,
-} from "../../src/cli/commands/acp-proxy.js";
+  type RunAcpAgentDeps,
+} from "../../src/cli/commands/run-acp-agent.js";
 import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
 import type { AcpSessionConfig } from "../../src/acp/session.js";
 import type { AcpBridge, AcpBridgeConfig } from "../../src/acp/bridge.js";
 import type { AcpSession, SessionInfo } from "../../src/acp/session.js";
+import type { ChapterEntry } from "../../src/runtime/home.js";
 
 // ── Test Fixtures ────────────────────────────────────────────────────
 
@@ -110,34 +111,53 @@ function makeMockSession() {
   };
 }
 
+function makeRoleEntry(overrides?: Partial<ChapterEntry>): ChapterEntry {
+  return {
+    lodge: "test-lodge",
+    chapter: "test-chapter",
+    role: "test-role",
+    dockerBuild: "/fake/docker-build",
+    roleDir: "/fake/role-dir",
+    agents: ["test-agent"],
+    createdAt: "2026-03-10T00:00:00Z",
+    updatedAt: "2026-03-10T00:00:00Z",
+    ...overrides,
+  };
+}
+
 function makeDeps(overrides?: {
   packages?: Map<string, DiscoveredPackage>;
   agent?: ResolvedAgent;
   bridge?: MockBridgeType;
   session?: MockSessionType;
-}): AcpProxyDeps {
+  roleEntry?: ChapterEntry | undefined;
+  initRoleCalled?: { value: boolean };
+}): RunAcpAgentDeps {
   const packages = overrides?.packages ?? new Map([
     ["test-agent", makeDiscoveredPackage("agent")],
   ]);
   const agent = overrides?.agent ?? makeResolvedAgent();
   const bridge = overrides?.bridge ?? makeMockBridge().bridge;
   const session = overrides?.session ?? makeMockSession().session;
+  const roleEntry = overrides && "roleEntry" in overrides ? overrides.roleEntry : makeRoleEntry();
 
   return {
     discoverPackagesFn: () => packages,
     resolveAgentFn: () => agent,
     createBridgeFn: () => bridge as unknown as AcpBridge,
     createSessionFn: () => session as unknown as AcpSession,
+    getClawmasonsHomeFn: () => "/fake/clawmasons-home",
+    findRoleEntryByRoleFn: (_home: string, _role: string) => roleEntry,
+    initRoleFn: async () => {
+      if (overrides?.initRoleCalled) overrides.initRoleCalled.value = true;
+    },
+    ensureGitignoreEntryFn: () => false,
   };
 }
 
-// ── Command Registration ────────────────────────────────────────────────
-// acp-proxy has been removed as a CLI entry point (REQ-007).
-// Command registration tests are in build.test.ts (verifying removal).
-
 // ── resolveAgentName ────────────────────────────────────────────────────
 
-describe("resolveAgentName (acp-proxy)", () => {
+describe("resolveAgentName (run-acp-agent)", () => {
   it("returns agent flag when provided", () => {
     const packages = new Map<string, DiscoveredPackage>();
     expect(resolveAgentName("my-agent", packages)).toBe("my-agent");
@@ -169,9 +189,9 @@ describe("resolveAgentName (acp-proxy)", () => {
   });
 });
 
-// ── acpProxy ────────────────────────────────────────────────────────────
+// ── runAcpAgent ────────────────────────────────────────────────────────────
 
-describe("acpProxy", () => {
+describe("runAcpAgent", () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
   let logSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
@@ -190,7 +210,7 @@ describe("acpProxy", () => {
     let discoveredRoot: string | undefined;
     let resolvedName: string | undefined;
 
-    const deps: AcpProxyDeps = {
+    const deps: RunAcpAgentDeps = {
       ...makeDeps(),
       discoverPackagesFn: (rootDir: string) => {
         discoveredRoot = rootDir;
@@ -202,7 +222,7 @@ describe("acpProxy", () => {
       },
     };
 
-    await acpProxy("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(discoveredRoot).toBe("/fake/root");
     expect(resolvedName).toBe("test-agent");
@@ -211,7 +231,7 @@ describe("acpProxy", () => {
   it("starts the bridge on the configured port", async () => {
     let bridgeConfig: AcpBridgeConfig | undefined;
 
-    const deps: AcpProxyDeps = {
+    const deps: RunAcpAgentDeps = {
       ...makeDeps(),
       createBridgeFn: (config: AcpBridgeConfig) => {
         bridgeConfig = config;
@@ -219,7 +239,7 @@ describe("acpProxy", () => {
       },
     };
 
-    await acpProxy("/fake/root", { role: "test-role", port: 4001 }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role", port: 4001 }, deps);
 
     expect(bridgeConfig?.hostPort).toBe(4001);
     expect(bridgeConfig?.containerPort).toBe(3002);
@@ -229,7 +249,7 @@ describe("acpProxy", () => {
     const mockSession = makeMockSession();
     const deps = makeDeps({ session: mockSession.session });
 
-    await acpProxy("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(mockSession.startCalled).toBe(true);
   });
@@ -238,7 +258,7 @@ describe("acpProxy", () => {
     const mockBridge = makeMockBridge();
     const deps = makeDeps({ bridge: mockBridge.bridge });
 
-    await acpProxy("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(mockBridge.startCalled).toBe(true);
     expect(mockBridge.connectCalled).toBe(true);
@@ -247,7 +267,7 @@ describe("acpProxy", () => {
   it("logs ready message with port info", async () => {
     const deps = makeDeps();
 
-    await acpProxy("/fake/root", { role: "test-role", port: 3001 }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role", port: 3001 }, deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("Ready");
@@ -257,7 +277,7 @@ describe("acpProxy", () => {
   it("uses default port 3001 when not specified", async () => {
     let bridgeConfig: AcpBridgeConfig | undefined;
 
-    const deps: AcpProxyDeps = {
+    const deps: RunAcpAgentDeps = {
       ...makeDeps(),
       createBridgeFn: (config: AcpBridgeConfig) => {
         bridgeConfig = config;
@@ -265,7 +285,7 @@ describe("acpProxy", () => {
       },
     };
 
-    await acpProxy("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(bridgeConfig?.hostPort).toBe(3001);
   });
@@ -273,7 +293,7 @@ describe("acpProxy", () => {
   it("passes role and agent to session config", async () => {
     let sessionConfig: AcpSessionConfig | undefined;
 
-    const deps: AcpProxyDeps = {
+    const deps: RunAcpAgentDeps = {
       ...makeDeps(),
       createSessionFn: (config: AcpSessionConfig) => {
         sessionConfig = config;
@@ -281,7 +301,7 @@ describe("acpProxy", () => {
       },
     };
 
-    await acpProxy("/fake/root", { role: "my-role", agent: "my-agent" }, deps);
+    await runAcpAgent("/fake/root", { role: "my-role", agent: "my-agent" }, deps);
 
     expect(sessionConfig?.role).toBe("my-role");
     expect(sessionConfig?.agent).toBe("my-agent");
@@ -289,12 +309,12 @@ describe("acpProxy", () => {
   });
 
   it("exits 1 when no agents found", async () => {
-    const deps: AcpProxyDeps = {
+    const deps: RunAcpAgentDeps = {
       ...makeDeps(),
       discoverPackagesFn: () => new Map(),
     };
 
-    await acpProxy("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -310,7 +330,7 @@ describe("acpProxy", () => {
 
     const deps = makeDeps({ session: failingSession });
 
-    await acpProxy("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -329,7 +349,7 @@ describe("acpProxy", () => {
 
     const deps = makeDeps({ bridge: failingBridge });
 
-    await acpProxy("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -351,7 +371,7 @@ describe("acpProxy", () => {
       session: mockSession.session,
     });
 
-    await acpProxy("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     // Bridge and session should have been cleaned up
@@ -363,7 +383,7 @@ describe("acpProxy", () => {
     const mockBridge = makeMockBridge();
     const deps = makeDeps({ bridge: mockBridge.bridge });
 
-    await acpProxy("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(mockBridge.bridge.onClientConnect).toBeDefined();
   });
@@ -372,7 +392,7 @@ describe("acpProxy", () => {
     const mockBridge = makeMockBridge();
     const deps = makeDeps({ bridge: mockBridge.bridge });
 
-    await acpProxy("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(mockBridge.bridge.onClientDisconnect).toBeDefined();
   });
@@ -381,7 +401,7 @@ describe("acpProxy", () => {
     const mockBridge = makeMockBridge();
     const deps = makeDeps({ bridge: mockBridge.bridge });
 
-    await acpProxy("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(mockBridge.bridge.onAgentError).toBeDefined();
   });
@@ -389,7 +409,7 @@ describe("acpProxy", () => {
   it("logs session ID after session starts", async () => {
     const deps = makeDeps();
 
-    await acpProxy("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("test-session-01");
@@ -398,7 +418,7 @@ describe("acpProxy", () => {
   it("uses --agent flag for agent name", async () => {
     let resolvedName: string | undefined;
 
-    const deps: AcpProxyDeps = {
+    const deps: RunAcpAgentDeps = {
       ...makeDeps(),
       resolveAgentFn: (name: string) => {
         resolvedName = name;
@@ -406,7 +426,7 @@ describe("acpProxy", () => {
       },
     };
 
-    await acpProxy("/fake/root", { role: "test-role", agent: "custom-agent" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role", agent: "custom-agent" }, deps);
 
     expect(resolvedName).toBe("custom-agent");
   });
@@ -414,7 +434,7 @@ describe("acpProxy", () => {
   it("passes proxy port to session config", async () => {
     let sessionConfig: AcpSessionConfig | undefined;
 
-    const deps: AcpProxyDeps = {
+    const deps: RunAcpAgentDeps = {
       ...makeDeps(),
       createSessionFn: (config: AcpSessionConfig) => {
         sessionConfig = config;
@@ -422,8 +442,90 @@ describe("acpProxy", () => {
       },
     };
 
-    await acpProxy("/fake/root", { role: "test-role", proxyPort: 4000 }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role", proxyPort: 4000 }, deps);
 
     expect(sessionConfig?.proxyPort).toBe(4000);
+  });
+
+  // ── CLAWMASONS_HOME + auto-init tests ──────────────────────────────
+
+  it("reads role from CLAWMASONS_HOME on startup", async () => {
+    let homePassed: string | undefined;
+    let rolePassed: string | undefined;
+
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps(),
+      getClawmasonsHomeFn: () => "/custom/home",
+      findRoleEntryByRoleFn: (home: string, role: string) => {
+        homePassed = home;
+        rolePassed = role;
+        return makeRoleEntry();
+      },
+    };
+
+    await runAcpAgent("/fake/root", { role: "writer" }, deps);
+
+    expect(homePassed).toBe("/custom/home");
+    expect(rolePassed).toBe("writer");
+  });
+
+  it("auto-invokes init-role when role not found", async () => {
+    const initRoleCalled = { value: false };
+    let callCount = 0;
+
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps({ initRoleCalled }),
+      findRoleEntryByRoleFn: (_home: string, _role: string) => {
+        callCount++;
+        // First call: not found; second call (after init): found
+        if (callCount === 1) return undefined;
+        return makeRoleEntry();
+      },
+    };
+
+    await runAcpAgent("/fake/root", { role: "writer" }, deps);
+
+    expect(initRoleCalled.value).toBe(true);
+  });
+
+  it("exits 1 when auto-init fails to create role entry", async () => {
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps({ roleEntry: undefined }),
+    };
+
+    await runAcpAgent("/fake/root", { role: "writer" }, deps);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const errorOutput = errorSpy.mock.calls.flat().join("\n");
+    expect(errorOutput).toContain("auto-init failed");
+  });
+
+  it("calls ensureGitignoreEntry for .clawmasons", async () => {
+    let gitignoreDir: string | undefined;
+    let gitignorePattern: string | undefined;
+
+    const deps: RunAcpAgentDeps = {
+      ...makeDeps(),
+      ensureGitignoreEntryFn: (dir: string, pattern: string) => {
+        gitignoreDir = dir;
+        gitignorePattern = pattern;
+        return false;
+      },
+    };
+
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+
+    expect(gitignoreDir).toBe("/fake/root");
+    expect(gitignorePattern).toBe(".clawmasons");
+  });
+
+  it("uses run-acp-agent prefix in log messages", async () => {
+    const deps = makeDeps();
+
+    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("[chapter run-acp-agent]");
+    expect(logOutput).not.toContain("[chapter acp-proxy]");
   });
 });

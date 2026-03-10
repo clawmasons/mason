@@ -5,10 +5,17 @@ import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpBridge, type AcpBridgeConfig } from "../../acp/bridge.js";
+import {
+  getClawmasonsHome,
+  findRoleEntryByRole,
+  type ChapterEntry,
+} from "../../runtime/home.js";
+import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
+import { initRole, type InitRoleOptions, type InitRoleDeps } from "./init-role.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-export interface AcpProxyOptions {
+export interface RunAcpAgentOptions {
   agent?: string;
   role: string;
   port?: number;
@@ -16,9 +23,9 @@ export interface AcpProxyOptions {
 }
 
 /**
- * Dependencies for acpProxy, injectable for testing.
+ * Dependencies for runAcpAgent, injectable for testing.
  */
-export interface AcpProxyDeps {
+export interface RunAcpAgentDeps {
   /** Override package discovery (for testing). */
   discoverPackagesFn?: (rootDir: string) => Map<string, DiscoveredPackage>;
   /** Override agent resolution (for testing). */
@@ -27,20 +34,35 @@ export interface AcpProxyDeps {
   createSessionFn?: (config: AcpSessionConfig, sessionDeps?: AcpSessionDeps) => AcpSession;
   /** Override AcpBridge construction (for testing). */
   createBridgeFn?: (config: AcpBridgeConfig) => AcpBridge;
+  /** Override CLAWMASONS_HOME resolution (for testing). */
+  getClawmasonsHomeFn?: () => string;
+  /** Override chapters.json role lookup (for testing). */
+  findRoleEntryByRoleFn?: (
+    home: string,
+    role: string,
+  ) => ChapterEntry | undefined;
+  /** Override init-role invocation for auto-init (for testing). */
+  initRoleFn?: (
+    rootDir: string,
+    options: InitRoleOptions,
+    deps?: InitRoleDeps,
+  ) => Promise<void>;
+  /** Override .gitignore entry management (for testing). */
+  ensureGitignoreEntryFn?: (dir: string, pattern: string) => boolean;
 }
 
 // ── Command Registration ──────────────────────────────────────────────
 
-export function registerAcpProxyCommand(program: Command): void {
+export function registerRunAcpAgentCommand(program: Command): void {
   program
-    .command("acp-proxy")
-    .description("Start an ACP-compliant proxy endpoint for editor integration")
+    .command("run-acp-agent")
+    .description("Start an ACP-compliant agent endpoint for editor integration")
     .requiredOption("--role <name>", "Role to use for the session")
     .option("--agent <name>", "Agent package name (auto-detected if only one)")
     .option("--port <number>", "ACP endpoint port (default: 3001)", "3001")
     .option("--proxy-port <number>", "Internal chapter proxy port (default: 3000)", "3000")
     .action(async (options: { agent?: string; role: string; port: string; proxyPort: string }) => {
-      await acpProxy(process.cwd(), {
+      await runAcpAgent(process.cwd(), {
         agent: options.agent,
         role: options.role,
         port: parseInt(options.port, 10),
@@ -90,15 +112,19 @@ export function resolveAgentName(
 
 // ── Main Orchestrator ─────────────────────────────────────────────────
 
-export async function acpProxy(
+export async function runAcpAgent(
   rootDir: string,
-  options: AcpProxyOptions,
-  deps?: AcpProxyDeps,
+  options: RunAcpAgentOptions,
+  deps?: RunAcpAgentDeps,
 ): Promise<void> {
   const discover = deps?.discoverPackagesFn ?? discoverPackages;
   const resolve = deps?.resolveAgentFn ?? resolveAgent;
   const createSession = deps?.createSessionFn ?? ((config: AcpSessionConfig, sessionDeps?: AcpSessionDeps) => new AcpSession(config, sessionDeps));
   const createBridge = deps?.createBridgeFn ?? ((config: AcpBridgeConfig) => new AcpBridge(config));
+  const getHome = deps?.getClawmasonsHomeFn ?? getClawmasonsHome;
+  const findRole = deps?.findRoleEntryByRoleFn ?? findRoleEntryByRole;
+  const autoInitRole = deps?.initRoleFn ?? initRole;
+  const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
 
   const port = options.port ?? 3001;
   const proxyPort = options.proxyPort ?? 3000;
@@ -109,7 +135,7 @@ export async function acpProxy(
 
   // Graceful shutdown handler
   const shutdown = async () => {
-    console.log("\n[chapter acp-proxy] Shutting down...");
+    console.log("\n[chapter run-acp-agent] Shutting down...");
     try {
       if (bridge) await bridge.stop();
     } catch { /* best-effort */ }
@@ -124,37 +150,59 @@ export async function acpProxy(
   process.on("SIGTERM", onSignal);
 
   try {
-    // ── Step 1: Discover packages ──────────────────────────────────────
-    console.log("[chapter acp-proxy] Discovering packages...");
+    // ── Step 1: Resolve role from CLAWMASONS_HOME ───────────────────────
+    const home = getHome();
+    let entry = findRole(home, options.role);
+
+    // Auto-init if role not found
+    if (!entry) {
+      console.log(`\n[chapter run-acp-agent] Role "${options.role}" not found in chapters.json. Auto-initializing...`);
+      await autoInitRole(rootDir, { role: options.role });
+
+      // Re-read after init
+      entry = findRole(home, options.role);
+
+      if (!entry) {
+        throw new Error(
+          `Role "${options.role}" not initialized and auto-init failed. Run "chapter init-role --role ${options.role}" from your chapter workspace.`,
+        );
+      }
+    }
+
+    // Ensure .clawmasons is in project's .gitignore
+    ensureGitignore(rootDir, ".clawmasons");
+
+    // ── Step 2: Discover packages ──────────────────────────────────────
+    console.log("[chapter run-acp-agent] Discovering packages...");
     const packages = discover(rootDir);
 
-    // ── Step 2: Resolve agent ──────────────────────────────────────────
+    // ── Step 3: Resolve agent ──────────────────────────────────────────
     const agentName = resolveAgentName(options.agent, packages);
-    console.log(`[chapter acp-proxy] Resolving agent "${agentName}"...`);
+    console.log(`[chapter run-acp-agent] Resolving agent "${agentName}"...`);
     const agent = resolve(agentName, packages);
 
-    // ── Step 3: Compute tool filters ───────────────────────────────────
+    // ── Step 4: Compute tool filters ───────────────────────────────────
     const toolFilters = computeToolFilters(agent);
     const toolCount = Object.keys(toolFilters).length;
 
-    console.log(`[chapter acp-proxy] Agent: ${agent.name}`);
-    console.log(`[chapter acp-proxy] Role: ${options.role}`);
-    console.log(`[chapter acp-proxy] Tool filters: ${toolCount} app(s)`);
+    console.log(`[chapter run-acp-agent] Agent: ${agent.name}`);
+    console.log(`[chapter run-acp-agent] Role: ${options.role}`);
+    console.log(`[chapter run-acp-agent] Tool filters: ${toolCount} app(s)`);
 
-    // ── Step 4: Start ACP bridge endpoint ──────────────────────────────
+    // ── Step 5: Start ACP bridge endpoint ──────────────────────────────
     bridge = createBridge({
       hostPort: port,
       containerHost: "localhost",
       containerPort: acpAgentPort,
     });
 
-    // ── Step 5: Wire bridge lifecycle events ───────────────────────────
+    // ── Step 6: Wire bridge lifecycle events ───────────────────────────
     bridge.onClientConnect = () => {
-      console.log("[chapter acp-proxy] ACP client connected");
+      console.log("[chapter run-acp-agent] ACP client connected");
     };
 
     bridge.onClientDisconnect = () => {
-      console.log("[chapter acp-proxy] ACP client disconnected — tearing down session...");
+      console.log("[chapter run-acp-agent] ACP client disconnected — tearing down session...");
       void (async () => {
         try {
           if (bridge) await bridge.stop();
@@ -162,26 +210,26 @@ export async function acpProxy(
         try {
           if (session) await session.stop();
         } catch { /* best-effort */ }
-        console.log("[chapter acp-proxy] Session torn down. Exiting.");
+        console.log("[chapter run-acp-agent] Session torn down. Exiting.");
         process.exit(0);
       })();
     };
 
     bridge.onAgentError = (error: Error) => {
-      console.error(`[chapter acp-proxy] Agent error: ${error.message}`);
+      console.error(`[chapter run-acp-agent] Agent error: ${error.message}`);
     };
 
     await bridge.start();
 
     console.log(
-      `\n[chapter acp-proxy] Ready -- waiting for ACP client on port ${port}\n` +
+      `\n[chapter run-acp-agent] Ready -- waiting for ACP client on port ${port}\n` +
       `  Agent:      ${agent.name}\n` +
       `  Role:       ${options.role}\n` +
       `  ACP port:   ${port}\n` +
       `  Proxy port: ${proxyPort}\n`,
     );
 
-    // ── Step 6: Create and start session ───────────────────────────────
+    // ── Step 7: Create and start session ───────────────────────────────
     // In the current v1 model, we start the Docker session immediately
     // rather than waiting for client mcpServers (since the bridge is a
     // transparent relay and doesn't parse ACP protocol messages).
@@ -193,21 +241,21 @@ export async function acpProxy(
       proxyPort,
     });
 
-    console.log("[chapter acp-proxy] Starting Docker session...");
+    console.log("[chapter run-acp-agent] Starting Docker session...");
     const sessionInfo = await session.start();
-    console.log(`[chapter acp-proxy] Docker session started (${sessionInfo.sessionId})`);
+    console.log(`[chapter run-acp-agent] Docker session started (${sessionInfo.sessionId})`);
 
-    // ── Step 7: Connect bridge to container agent ──────────────────────
-    console.log("[chapter acp-proxy] Connecting bridge to container agent...");
+    // ── Step 8: Connect bridge to container agent ──────────────────────
+    console.log("[chapter run-acp-agent] Connecting bridge to container agent...");
     await bridge.connectToAgent();
-    console.log("[chapter acp-proxy] Bridge connected to agent. ACP proxy is active.");
+    console.log("[chapter run-acp-agent] Bridge connected to agent. ACP endpoint is active.");
 
     // The process stays alive via the bridge HTTP server.
     // Shutdown happens via SIGINT/SIGTERM or client disconnect.
 
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`\n[chapter acp-proxy] Failed: ${message}\n`);
+    console.error(`\n[chapter run-acp-agent] Failed: ${message}\n`);
 
     // Clean up on startup failure
     try { if (bridge) await bridge.stop(); } catch { /* best-effort */ }
