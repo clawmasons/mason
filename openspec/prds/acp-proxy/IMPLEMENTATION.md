@@ -288,7 +288,15 @@ Create the Docker session lifecycle management for ACP, adapting the existing `r
 
 **Testable output:** (a) Generated docker-compose.yml has correct three services, (b) agent service uses ACP entrypoint, (c) proxy service gets matched apps only, (d) credential-service gets session override env vars, (e) agent service exposes ACP port for bridge connection.
 
-**Not Implemented Yet**
+**Implemented**
+
+- Archived change: [2026-03-10-docker-session-orchestration](../../changes/archive/2026-03-10-docker-session-orchestration/)
+  - [Proposal](../../changes/archive/2026-03-10-docker-session-orchestration/proposal.md)
+  - [Design](../../changes/archive/2026-03-10-docker-session-orchestration/design.md)
+  - [Tasks](../../changes/archive/2026-03-10-docker-session-orchestration/tasks.md)
+- Spec: [acp-session](../../specs/acp-session/spec.md)
+- Source: `packages/cli/src/acp/session.ts`
+- Tests: `packages/cli/tests/acp/session.test.ts`
 
 ---
 
