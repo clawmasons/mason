@@ -12,6 +12,7 @@ function makeGithubApp(): ResolvedApp {
     env: { GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}" },
     tools: ["create_issue", "list_repos", "create_pr", "get_pr", "create_review", "add_label", "delete_repo", "transfer_repo"],
     capabilities: ["resources", "tools"],
+    credentials: [],
   };
 }
 
@@ -25,6 +26,7 @@ function makeSlackApp(): ResolvedApp {
     env: { SLACK_BOT_TOKEN: "${SLACK_BOT_TOKEN}" },
     tools: ["send_message", "list_channels"],
     capabilities: ["tools"],
+    credentials: [],
   };
 }
 
@@ -75,6 +77,7 @@ function makeRepoOpsAgent(): ResolvedAgent {
     name: "@clawmasons/role-issue-manager",
     version: "2.0.0",
     description: "Manages GitHub issues: triage, label, assign.",
+    risk: "LOW",
     permissions: {
       "@clawmasons/app-github": {
         allow: ["create_issue", "list_repos", "add_label"],
@@ -98,6 +101,7 @@ function makeRepoOpsAgent(): ResolvedAgent {
     name: "@clawmasons/role-pr-reviewer",
     version: "1.0.0",
     description: "Reviews pull requests and provides feedback.",
+    risk: "LOW",
     permissions: {
       "@clawmasons/app-github": {
         allow: ["list_repos", "get_pr", "create_review"],
@@ -116,6 +120,7 @@ function makeRepoOpsAgent(): ResolvedAgent {
     slug: "repo-ops",
     description: "Repository operations agent for GitHub.",
     runtimes: ["claude-code", "codex"],
+    credentials: [],
     roles: [issueManager, prReviewer],
     proxy: {
       port: 9090,

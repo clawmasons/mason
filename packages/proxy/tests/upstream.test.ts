@@ -81,6 +81,7 @@ function makeStdioApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
     args: ["server.js"],
     tools: ["create_pr", "list_repos"],
     capabilities: ["tools"],
+    credentials: [],
     ...overrides,
   };
 }
@@ -93,6 +94,7 @@ function makeSseApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
     url: "http://localhost:3000/sse",
     tools: ["send_message"],
     capabilities: ["tools"],
+    credentials: [],
     ...overrides,
   };
 }
@@ -105,6 +107,7 @@ function makeStreamableApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
     url: "http://localhost:4000/mcp",
     tools: ["create_issue"],
     capabilities: ["tools"],
+    credentials: [],
     ...overrides,
   };
 }

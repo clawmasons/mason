@@ -29,7 +29,7 @@ export interface ValidationError {
 /**
  * Categories of validation warnings.
  */
-export type ValidationWarningCategory = "llm-config";
+export type ValidationWarningCategory = "llm-config" | "credential-coverage";
 
 /**
  * A single validation warning with category, message, and structured context.
@@ -41,6 +41,8 @@ export interface ValidationWarning {
   context: {
     agent?: string;
     runtime?: string;
+    credential?: string;
+    app?: string;
   };
 }
 

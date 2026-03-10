@@ -19,3 +19,7 @@ export { auditPreHook, auditPostHook } from "./hooks/audit.js";
 export type { HookContext, AuditPreHookResult } from "./hooks/audit.js";
 export { matchesApprovalPattern, requestApproval } from "./hooks/approval.js";
 export type { ApprovalOptions } from "./hooks/approval.js";
+export { SessionStore, handleConnectAgent } from "./handlers/connect-agent.js";
+export type { SessionEntry, RiskLevel } from "./handlers/connect-agent.js";
+export { CredentialRelay } from "./handlers/credential-relay.js";
+export type { CredentialRelayConfig, CredentialToolResult } from "./handlers/credential-relay.js";

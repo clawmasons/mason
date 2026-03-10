@@ -8,6 +8,8 @@ import {
   readRunConfig,
   validateDockerfiles,
   generateComposeYml,
+  resolveRequiredCredentials,
+  displayCredentials,
   runAgent,
 } from "../../src/cli/commands/run-agent.js";
 import type { RunConfig } from "../../src/cli/commands/run-init.js";
@@ -113,23 +115,30 @@ describe("validateDockerfiles", () => {
   function setupDockerfiles(agent: string, role: string): void {
     const proxyDir = path.join(tmpDir, "proxy", role);
     const agentDir = path.join(tmpDir, "agent", agent, role);
+    const credServiceDir = path.join(tmpDir, "credential-service");
     fs.mkdirSync(proxyDir, { recursive: true });
     fs.mkdirSync(agentDir, { recursive: true });
+    fs.mkdirSync(credServiceDir, { recursive: true });
     fs.writeFileSync(path.join(proxyDir, "Dockerfile"), "FROM node:20\n");
     fs.writeFileSync(path.join(agentDir, "Dockerfile"), "FROM node:20\n");
+    fs.writeFileSync(path.join(credServiceDir, "Dockerfile"), "FROM node:20\n");
   }
 
-  it("returns paths when both Dockerfiles exist", () => {
+  it("returns paths when all Dockerfiles exist", () => {
     setupDockerfiles("note-taker", "writer");
     const result = validateDockerfiles(tmpDir, "note-taker", "writer");
     expect(result.proxyDockerfile).toContain("proxy/writer/Dockerfile");
     expect(result.agentDockerfile).toContain("agent/note-taker/writer/Dockerfile");
+    expect(result.credentialServiceDockerfile).toContain("credential-service/Dockerfile");
   });
 
   it("throws when proxy Dockerfile is missing", () => {
     const agentDir = path.join(tmpDir, "agent", "note-taker", "writer");
+    const credServiceDir = path.join(tmpDir, "credential-service");
     fs.mkdirSync(agentDir, { recursive: true });
+    fs.mkdirSync(credServiceDir, { recursive: true });
     fs.writeFileSync(path.join(agentDir, "Dockerfile"), "FROM node:20\n");
+    fs.writeFileSync(path.join(credServiceDir, "Dockerfile"), "FROM node:20\n");
 
     expect(() => validateDockerfiles(tmpDir, "note-taker", "writer")).toThrow(
       "Proxy Dockerfile not found",
@@ -138,90 +147,248 @@ describe("validateDockerfiles", () => {
 
   it("throws when agent Dockerfile is missing", () => {
     const proxyDir = path.join(tmpDir, "proxy", "writer");
+    const credServiceDir = path.join(tmpDir, "credential-service");
     fs.mkdirSync(proxyDir, { recursive: true });
+    fs.mkdirSync(credServiceDir, { recursive: true });
     fs.writeFileSync(path.join(proxyDir, "Dockerfile"), "FROM node:20\n");
+    fs.writeFileSync(path.join(credServiceDir, "Dockerfile"), "FROM node:20\n");
 
     expect(() => validateDockerfiles(tmpDir, "note-taker", "writer")).toThrow(
       "Agent Dockerfile not found",
     );
+  });
+
+  it("throws when credential service Dockerfile is missing", () => {
+    const proxyDir = path.join(tmpDir, "proxy", "writer");
+    const agentDir = path.join(tmpDir, "agent", "note-taker", "writer");
+    fs.mkdirSync(proxyDir, { recursive: true });
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.writeFileSync(path.join(proxyDir, "Dockerfile"), "FROM node:20\n");
+    fs.writeFileSync(path.join(agentDir, "Dockerfile"), "FROM node:20\n");
+
+    expect(() => validateDockerfiles(tmpDir, "note-taker", "writer")).toThrow(
+      "Credential service Dockerfile not found",
+    );
+  });
+});
+
+// ── resolveRequiredCredentials ───────────────────────────────────────────
+
+describe("resolveRequiredCredentials", () => {
+  it("collects credentials from agent", () => {
+    const result = resolveRequiredCredentials(
+      "researcher",
+      ["OPENAI_API_KEY", "SERP_API_KEY"],
+      [],
+    );
+
+    expect(result.size).toBe(2);
+    expect(result.get("OPENAI_API_KEY")).toEqual(["researcher"]);
+    expect(result.get("SERP_API_KEY")).toEqual(["researcher"]);
+  });
+
+  it("collects credentials from role apps", () => {
+    const result = resolveRequiredCredentials(
+      "researcher",
+      [],
+      [
+        { name: "web-search", credentials: ["SERP_API_KEY"] },
+        { name: "llm-api", credentials: ["OPENAI_API_KEY"] },
+      ],
+    );
+
+    expect(result.size).toBe(2);
+    expect(result.get("SERP_API_KEY")).toEqual(["web-search"]);
+    expect(result.get("OPENAI_API_KEY")).toEqual(["llm-api"]);
+  });
+
+  it("merges declaring packages for shared credentials", () => {
+    const result = resolveRequiredCredentials(
+      "researcher",
+      ["SERP_API_KEY"],
+      [{ name: "web-search", credentials: ["SERP_API_KEY"] }],
+    );
+
+    expect(result.size).toBe(1);
+    expect(result.get("SERP_API_KEY")).toEqual(["researcher", "web-search"]);
+  });
+
+  it("returns empty map when no credentials", () => {
+    const result = resolveRequiredCredentials("researcher", [], []);
+    expect(result.size).toBe(0);
+  });
+});
+
+// ── displayCredentials ──────────────────────────────────────────────────
+
+describe("displayCredentials", () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("displays risk level with role name", () => {
+    const creds = new Map<string, string[]>();
+    creds.set("API_KEY", ["agent"]);
+
+    displayCredentials(creds, "HIGH", "web-research");
+
+    const output = logSpy.mock.calls.flat().join("\n");
+    expect(output).toContain("web-research");
+    expect(output).toContain("HIGH risk");
+  });
+
+  it("displays credential keys with declaring packages", () => {
+    const creds = new Map<string, string[]>();
+    creds.set("SERP_API_KEY", ["researcher", "web-search"]);
+    creds.set("OPENAI_API_KEY", ["researcher"]);
+
+    displayCredentials(creds, "MEDIUM", "web-research");
+
+    const output = logSpy.mock.calls.flat().join("\n");
+    expect(output).toContain("SERP_API_KEY");
+    expect(output).toContain("researcher, web-search");
+    expect(output).toContain("OPENAI_API_KEY");
+    expect(output).toContain("Required credentials:");
+  });
+
+  it("displays message when no credentials required", () => {
+    const creds = new Map<string, string[]>();
+
+    displayCredentials(creds, "LOW", "basic-role");
+
+    const output = logSpy.mock.calls.flat().join("\n");
+    expect(output).toContain("No credentials required");
+  });
+
+  it("deduplicates declaring packages", () => {
+    const creds = new Map<string, string[]>();
+    creds.set("API_KEY", ["agent", "agent"]);
+
+    displayCredentials(creds, "LOW", "test-role");
+
+    const output = logSpy.mock.calls.flat().join("\n");
+    // Should show "agent" only once, not "agent, agent"
+    expect(output).toContain("declared by: agent)");
   });
 });
 
 // ── generateComposeYml ──────────────────────────────────────────────────
 
 describe("generateComposeYml", () => {
+  const defaultOpts = {
+    dockerBuildPath: "/chapters/acme/docker",
+    projectDir: "/projects/my-project",
+    agent: "note-taker",
+    role: "writer",
+    logsDir: "/projects/my-project/.clawmasons/logs",
+    proxyToken: "test-token-abc",
+    credentialProxyToken: "cred-token-xyz",
+  };
+
   it("generates valid compose YAML with correct service names", () => {
-    const yml = generateComposeYml({
-      dockerBuildPath: "/chapters/acme/docker",
-      projectDir: "/projects/my-project",
-      agent: "note-taker",
-      role: "writer",
-      logsDir: "/projects/my-project/.clawmasons/logs",
-      proxyToken: "test-token-abc",
-    });
+    const yml = generateComposeYml(defaultOpts);
 
     // Service names
     expect(yml).toContain("proxy-writer:");
+    expect(yml).toContain("credential-service:");
     expect(yml).toContain("agent-note-taker-writer:");
 
     // Build contexts
     expect(yml).toContain('context: "/chapters/acme/docker"');
     expect(yml).toContain('dockerfile: "proxy/writer/Dockerfile"');
+    expect(yml).toContain('dockerfile: "credential-service/Dockerfile"');
     expect(yml).toContain('dockerfile: "agent/note-taker/writer/Dockerfile"');
 
     // Volumes
     expect(yml).toContain('"/projects/my-project:/workspace"');
     expect(yml).toContain('"/projects/my-project/.clawmasons/logs:/logs"');
 
-    // Agent depends on proxy
-    expect(yml).toContain("depends_on:");
-    expect(yml).toContain("- proxy-writer");
-
     // Agent is interactive
     expect(yml).toContain("stdin_open: true");
     expect(yml).toContain("tty: true");
     expect(yml).toContain("init: true");
+  });
 
-    // LLM provider API keys passed from host
-    expect(yml).toContain("environment:");
-    expect(yml).toContain("OPENROUTER_API_KEY");
-    expect(yml).toContain("ANTHROPIC_API_KEY");
+  it("includes CREDENTIAL_PROXY_TOKEN in proxy and credential-service environments", () => {
+    const yml = generateComposeYml(defaultOpts);
 
-    // CHAPTER_PROXY_TOKEN in both services
-    expect(yml).toContain("CHAPTER_PROXY_TOKEN=test-token-abc");
+    // Both proxy and credential-service should have CREDENTIAL_PROXY_TOKEN
+    const proxySection = yml.split("credential-service:")[0]!;
+    const credSection = yml.split("credential-service:")[1]!.split("agent-note-taker-writer:")[0]!;
+
+    expect(proxySection).toContain("CREDENTIAL_PROXY_TOKEN=cred-token-xyz");
+    expect(credSection).toContain("CREDENTIAL_PROXY_TOKEN=cred-token-xyz");
+  });
+
+  it("credential-service depends on proxy", () => {
+    const yml = generateComposeYml(defaultOpts);
+
+    // Extract credential-service section
+    const credSection = yml.split("credential-service:")[1]!.split("agent-note-taker-writer:")[0]!;
+    expect(credSection).toContain("depends_on:");
+    expect(credSection).toContain("- proxy-writer");
+  });
+
+  it("agent depends on credential-service, not directly on proxy", () => {
+    const yml = generateComposeYml(defaultOpts);
+
+    // Extract agent section
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    expect(agentSection).toContain("depends_on:");
+    expect(agentSection).toContain("- credential-service");
+    // Agent should NOT directly depend on proxy
+    expect(agentSection).not.toContain("- proxy-writer");
+  });
+
+  it("agent environment has only MCP_PROXY_TOKEN, no API keys", () => {
+    const yml = generateComposeYml(defaultOpts);
+
+    // Extract agent section
+    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+
+    // Should have MCP_PROXY_TOKEN
+    expect(agentSection).toContain("MCP_PROXY_TOKEN=test-token-abc");
+
+    // Should NOT have any API keys
+    expect(agentSection).not.toContain("OPENROUTER_API_KEY");
+    expect(agentSection).not.toContain("ANTHROPIC_API_KEY");
+    expect(agentSection).not.toContain("OPENAI_API_KEY");
+    expect(agentSection).not.toContain("GEMINI_API_KEY");
+    expect(agentSection).not.toContain("MISTRAL_API_KEY");
+    expect(agentSection).not.toContain("GROQ_API_KEY");
+    expect(agentSection).not.toContain("XAI_API_KEY");
+    expect(agentSection).not.toContain("AZURE_OPENAI_API_KEY");
+
+    // Should NOT have CHAPTER_PROXY_TOKEN (renamed to MCP_PROXY_TOKEN)
+    expect(agentSection).not.toContain("CHAPTER_PROXY_TOKEN");
+  });
+
+  it("proxy has CHAPTER_PROXY_TOKEN", () => {
+    const yml = generateComposeYml(defaultOpts);
+
+    const proxySection = yml.split("credential-service:")[0]!;
+    expect(proxySection).toContain("CHAPTER_PROXY_TOKEN=test-token-abc");
   });
 
   it("uses correct Dockerfile paths for different agent/role combos", () => {
     const yml = generateComposeYml({
-      dockerBuildPath: "/docker",
-      projectDir: "/proj",
+      ...defaultOpts,
       agent: "coder",
       role: "reviewer",
-      logsDir: "/proj/.clawmasons/logs",
       proxyToken: "token-123",
+      credentialProxyToken: "cred-456",
     });
 
     expect(yml).toContain("proxy-reviewer:");
     expect(yml).toContain("agent-coder-reviewer:");
     expect(yml).toContain('dockerfile: "proxy/reviewer/Dockerfile"');
     expect(yml).toContain('dockerfile: "agent/coder/reviewer/Dockerfile"');
-  });
-
-  it("includes CHAPTER_PROXY_TOKEN in both proxy and agent environments", () => {
-    const yml = generateComposeYml({
-      dockerBuildPath: "/docker",
-      projectDir: "/proj",
-      agent: "note-taker",
-      role: "writer",
-      logsDir: "/proj/.clawmasons/logs",
-      proxyToken: "my-secret-token",
-    });
-
-    // Token should appear in proxy and agent service environments
-    const proxySection = yml.split("agent-note-taker-writer:")[0]!;
-    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
-    expect(proxySection).toContain("CHAPTER_PROXY_TOKEN=my-secret-token");
-    expect(agentSection).toContain("CHAPTER_PROXY_TOKEN=my-secret-token");
   });
 });
 
@@ -241,7 +408,7 @@ describe("runAgent", () => {
     // Set up a mock chapter project with docker build directory
     dockerBuildPath = path.join(tmpDir, "chapter-project", "docker");
 
-    // Create proxy and agent Dockerfiles
+    // Create proxy, agent, and credential service Dockerfiles
     fs.mkdirSync(path.join(dockerBuildPath, "proxy", "writer"), { recursive: true });
     fs.writeFileSync(
       path.join(dockerBuildPath, "proxy", "writer", "Dockerfile"),
@@ -250,6 +417,11 @@ describe("runAgent", () => {
     fs.mkdirSync(path.join(dockerBuildPath, "agent", "note-taker", "writer"), { recursive: true });
     fs.writeFileSync(
       path.join(dockerBuildPath, "agent", "note-taker", "writer", "Dockerfile"),
+      "FROM node:20\n",
+    );
+    fs.mkdirSync(path.join(dockerBuildPath, "credential-service"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dockerBuildPath, "credential-service", "Dockerfile"),
       "FROM node:20\n",
     );
 
@@ -279,6 +451,7 @@ describe("runAgent", () => {
 
   function makeMockDeps(overrides?: {
     proxyExitCode?: number;
+    credServiceExitCode?: number;
     agentExitCode?: number;
     downExitCode?: number;
     sessionId?: string;
@@ -298,6 +471,10 @@ describe("runAgent", () => {
           calls.push({ composeFile, args, opts });
           // Determine which call this is based on args
           if (args.includes("-d")) {
+            // Check if it's credential-service or proxy
+            if (args.includes("credential-service")) {
+              return overrides?.credServiceExitCode ?? 0;
+            }
             return overrides?.proxyExitCode ?? 0;
           }
           if (args.includes("down")) {
@@ -323,6 +500,7 @@ describe("runAgent", () => {
 
     const content = fs.readFileSync(composeFile, "utf-8");
     expect(content).toContain("proxy-writer:");
+    expect(content).toContain("credential-service:");
     expect(content).toContain("agent-note-taker-writer:");
   });
 
@@ -351,7 +529,7 @@ describe("runAgent", () => {
     expect(sessions).toContain("bbbb2222");
   });
 
-  it("starts proxy detached then agent interactively", async () => {
+  it("starts proxy detached, then credential service, then agent interactively", async () => {
     const { calls, deps } = makeMockDeps();
 
     await runAgent(projectDir, "note-taker", "writer", deps);
@@ -361,19 +539,24 @@ describe("runAgent", () => {
     expect(calls[0]!.args).toContain("-d");
     expect(calls[0]!.args).toContain("proxy-writer");
 
-    // Second call: agent up (interactive)
+    // Second call: credential-service up -d
     expect(calls[1]!.args).toContain("up");
-    expect(calls[1]!.args).toContain("agent-note-taker-writer");
-    expect(calls[1]!.opts?.interactive).toBe(true);
+    expect(calls[1]!.args).toContain("-d");
+    expect(calls[1]!.args).toContain("credential-service");
+
+    // Third call: agent up (interactive)
+    expect(calls[2]!.args).toContain("up");
+    expect(calls[2]!.args).toContain("agent-note-taker-writer");
+    expect(calls[2]!.opts?.interactive).toBe(true);
   });
 
-  it("tears down proxy after agent exits", async () => {
+  it("tears down all services after agent exits", async () => {
     const { calls, deps } = makeMockDeps();
 
     await runAgent(projectDir, "note-taker", "writer", deps);
 
-    // Third call should be docker compose down
-    expect(calls[2]!.args).toContain("down");
+    // Fourth call should be docker compose down
+    expect(calls[3]!.args).toContain("down");
   });
 
   it("retains session directory after exit", async () => {
@@ -397,7 +580,76 @@ describe("runAgent", () => {
 
     expect(content).toContain(`context: "${dockerBuildPath}"`);
     expect(content).toContain('dockerfile: "proxy/writer/Dockerfile"');
+    expect(content).toContain('dockerfile: "credential-service/Dockerfile"');
     expect(content).toContain('dockerfile: "agent/note-taker/writer/Dockerfile"');
+  });
+
+  it("compose file has CREDENTIAL_PROXY_TOKEN in proxy and credential-service", async () => {
+    const { deps } = makeMockDeps({ sessionId: "tok00001" });
+
+    await runAgent(projectDir, "note-taker", "writer", deps);
+
+    const composeFile = path.join(
+      projectDir, ".clawmasons", "sessions", "tok00001", "docker", "docker-compose.yml",
+    );
+    const content = fs.readFileSync(composeFile, "utf-8");
+
+    // CREDENTIAL_PROXY_TOKEN should appear in both proxy and credential-service
+    expect(content).toContain("CREDENTIAL_PROXY_TOKEN=");
+
+    // Both tokens should be 64-char hex strings (32 bytes)
+    const tokenMatches = content.match(/CREDENTIAL_PROXY_TOKEN=([a-f0-9]+)/g);
+    expect(tokenMatches).toBeTruthy();
+    expect(tokenMatches!.length).toBeGreaterThanOrEqual(2);
+    for (const match of tokenMatches!) {
+      const value = match.split("=")[1]!;
+      expect(value).toMatch(/^[a-f0-9]{64}$/);
+    }
+  });
+
+  it("compose file has no API keys in agent environment", async () => {
+    const { deps } = makeMockDeps({ sessionId: "nokeys01" });
+
+    await runAgent(projectDir, "note-taker", "writer", deps);
+
+    const composeFile = path.join(
+      projectDir, ".clawmasons", "sessions", "nokeys01", "docker", "docker-compose.yml",
+    );
+    const content = fs.readFileSync(composeFile, "utf-8");
+    const agentSection = content.split("agent-note-taker-writer:")[1]!;
+
+    expect(agentSection).toContain("MCP_PROXY_TOKEN=");
+    expect(agentSection).not.toContain("OPENROUTER_API_KEY");
+    expect(agentSection).not.toContain("ANTHROPIC_API_KEY");
+    expect(agentSection).not.toContain("OPENAI_API_KEY");
+  });
+
+  it("generates unique tokens per invocation", async () => {
+    const { deps: deps1 } = makeMockDeps({ sessionId: "uniq0001" });
+    const { deps: deps2 } = makeMockDeps({ sessionId: "uniq0002" });
+
+    await runAgent(projectDir, "note-taker", "writer", deps1);
+    await runAgent(projectDir, "note-taker", "writer", deps2);
+
+    const file1 = path.join(
+      projectDir, ".clawmasons", "sessions", "uniq0001", "docker", "docker-compose.yml",
+    );
+    const file2 = path.join(
+      projectDir, ".clawmasons", "sessions", "uniq0002", "docker", "docker-compose.yml",
+    );
+
+    const content1 = fs.readFileSync(file1, "utf-8");
+    const content2 = fs.readFileSync(file2, "utf-8");
+
+    // Extract CHAPTER_PROXY_TOKEN from each
+    const proxyToken1 = content1.match(/CHAPTER_PROXY_TOKEN=([a-f0-9]+)/)![1];
+    const proxyToken2 = content2.match(/CHAPTER_PROXY_TOKEN=([a-f0-9]+)/)![1];
+    expect(proxyToken1).not.toBe(proxyToken2);
+
+    // Extract CREDENTIAL_PROXY_TOKEN from each
+    const credToken1 = content1.match(/CREDENTIAL_PROXY_TOKEN=([a-f0-9]+)/)![1];
+    const credToken2 = content2.match(/CREDENTIAL_PROXY_TOKEN=([a-f0-9]+)/)![1];
+    expect(credToken1).not.toBe(credToken2);
   });
 
   it("logs session info and completion message", async () => {
@@ -468,6 +720,18 @@ describe("runAgent", () => {
     expect(errorOutput).toContain("Agent Dockerfile not found");
   });
 
+  it("exits 1 when credential service Dockerfile is missing", async () => {
+    // Remove the credential service Dockerfile
+    fs.rmSync(path.join(dockerBuildPath, "credential-service"), { recursive: true });
+
+    const { deps } = makeMockDeps();
+    await runAgent(projectDir, "note-taker", "writer", deps);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const errorOutput = errorSpy.mock.calls.flat().join("\n");
+    expect(errorOutput).toContain("Credential service Dockerfile not found");
+  });
+
   it("exits 1 when proxy fails to start", async () => {
     const { deps } = makeMockDeps({ proxyExitCode: 1 });
 
@@ -476,6 +740,16 @@ describe("runAgent", () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("Failed to start proxy");
+  });
+
+  it("exits 1 when credential service fails to start", async () => {
+    const { deps } = makeMockDeps({ credServiceExitCode: 1 });
+
+    await runAgent(projectDir, "note-taker", "writer", deps);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const errorOutput = errorSpy.mock.calls.flat().join("\n");
+    expect(errorOutput).toContain("Failed to start credential service");
   });
 
   it("creates logs directory if it does not exist", async () => {

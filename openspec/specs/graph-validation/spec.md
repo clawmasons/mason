@@ -59,6 +59,26 @@ The system SHALL check that every resolved app has valid launch configuration: s
 - **WHEN** an app has `transport: "sse"` but `url` is undefined
 - **THEN** validation fails with an app launch config error identifying the app and the missing field
 
+### Requirement: Validate credential coverage
+The system SHALL check that for each agent, the agent's declared `credentials` list is a superset of the union of all `app.credentials` across the agent's roles. If an app declares a credential that the agent does not declare, a **warning** (not an error) SHALL be emitted. Warnings do not affect the `valid` flag of the validation result.
+
+#### Scenario: Agent declares all app credentials
+- **WHEN** an agent declares `credentials: ["SERP_API_KEY"]` and its roles contain apps where the union of all `app.credentials` is `["SERP_API_KEY"]`
+- **THEN** validation produces no credential coverage warnings
+
+#### Scenario: Agent missing an app credential
+- **WHEN** an agent declares `credentials: []` and its roles contain an app `@clawmasons/app-web-search` with `credentials: ["SERP_API_KEY"]`
+- **THEN** validation emits a warning: `Agent "<agentName>" does not declare credential "SERP_API_KEY" required by app "@clawmasons/app-web-search"` with category `credential-coverage`
+- **AND** the validation result still has `valid: true`
+
+#### Scenario: No credentials on either side
+- **WHEN** an agent declares `credentials: []` and all apps in its roles also have `credentials: []`
+- **THEN** validation produces no credential coverage warnings
+
+#### Scenario: Agent has extra credentials
+- **WHEN** an agent declares `credentials: ["SERP_API_KEY", "EXTRA_KEY"]` and apps only require `["SERP_API_KEY"]`
+- **THEN** validation produces no credential coverage warnings
+
 ### Requirement: Collect all validation errors
 The system SHALL collect all validation errors across all check categories rather than failing on the first error. The validation result SHALL contain all errors found, enabling developers to fix all problems in a single pass.
 

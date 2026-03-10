@@ -109,6 +109,50 @@ describe("appChapterFieldSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("validates credentials as array of strings", () => {
+    const result = appChapterFieldSchema.safeParse({
+      type: "app",
+      transport: "stdio",
+      command: "npx",
+      args: ["-y", "server"],
+      tools: ["t"],
+      capabilities: ["tools"],
+      credentials: ["API_KEY", "SECRET"],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.credentials).toEqual(["API_KEY", "SECRET"]);
+    }
+  });
+
+  it("rejects non-string items in credentials array", () => {
+    const result = appChapterFieldSchema.safeParse({
+      type: "app",
+      transport: "stdio",
+      command: "npx",
+      args: ["-y", "server"],
+      tools: ["t"],
+      capabilities: ["tools"],
+      credentials: [123],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("defaults credentials to empty array when omitted", () => {
+    const result = appChapterFieldSchema.safeParse({
+      type: "app",
+      transport: "stdio",
+      command: "npx",
+      args: ["-y", "server"],
+      tools: ["t"],
+      capabilities: ["tools"],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.credentials).toEqual([]);
+    }
+  });
+
   it("accepts optional description", () => {
     const result = appChapterFieldSchema.safeParse({
       type: "app",

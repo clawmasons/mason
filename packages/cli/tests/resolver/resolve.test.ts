@@ -29,6 +29,7 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
     env: { GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}" },
     tools: ["create_issue", "list_repos", "create_pr", "get_pr", "create_review", "add_label", "delete_repo", "transfer_repo"],
     capabilities: ["resources", "tools"],
+    credentials: [],
   }));
 
   packages.set("@clawmasons/app-slack", makePkg("@clawmasons/app-slack", "1.0.0", {
@@ -39,6 +40,7 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
     env: { SLACK_BOT_TOKEN: "${SLACK_BOT_TOKEN}" },
     tools: ["send_message"],
     capabilities: ["tools"],
+    credentials: [],
   }));
 
   // Skills
@@ -82,6 +84,7 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
   // Roles
   packages.set("@clawmasons/role-issue-manager", makePkg("@clawmasons/role-issue-manager", "2.0.0", {
     type: "role",
+    risk: "LOW",
     description: "Manages GitHub issues: triage, label, assign.",
     tasks: ["@clawmasons/task-triage-issue", "@clawmasons/task-assign-issue"],
     skills: ["@clawmasons/skill-labeling"],
@@ -103,6 +106,7 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
 
   packages.set("@clawmasons/role-pr-reviewer", makePkg("@clawmasons/role-pr-reviewer", "1.0.0", {
     type: "role",
+    risk: "LOW",
     description: "Reviews pull requests and provides feedback.",
     tasks: ["@clawmasons/task-review-pr"],
     permissions: {
@@ -121,6 +125,7 @@ function buildRepoOpsFixture(): Map<string, DiscoveredPackage> {
     description: "Repository operations agent for GitHub.",
     runtimes: ["claude-code", "codex"],
     roles: ["@clawmasons/role-issue-manager", "@clawmasons/role-pr-reviewer"],
+    credentials: [],
     resources: [{ type: "github-repo", ref: "clawmasons/openclaw", access: "read-write" }],
     proxy: { port: 9090, type: "sse" },
   }));
@@ -280,6 +285,7 @@ describe("resolveAgent", () => {
         slug: "bad",
         runtimes: ["claude-code"],
         roles: ["@clawmasons/app-github"],
+        credentials: [],
         resources: [],
       }));
       packages.set("@clawmasons/app-github", makePkg("@clawmasons/app-github", "1.0.0", {
@@ -289,6 +295,7 @@ describe("resolveAgent", () => {
         args: [],
         tools: ["t"],
         capabilities: ["tools"],
+        credentials: [],
       }));
 
       expect(() => resolveAgent("@clawmasons/agent-bad", packages))
@@ -305,10 +312,12 @@ describe("resolveAgent", () => {
         slug: "test",
         runtimes: ["claude-code"],
         roles: ["@test/role"],
+        credentials: [],
         resources: [],
       }));
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
+        risk: "LOW",
         tasks: ["@test/skill-not-task"],
         permissions: {},
       }));
@@ -332,10 +341,12 @@ describe("resolveAgent", () => {
         slug: "test",
         runtimes: ["claude-code"],
         roles: ["@test/role"],
+        credentials: [],
         resources: [],
       }));
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
+        risk: "LOW",
         tasks: ["@test/task"],
         permissions: {},
       }));
@@ -359,10 +370,12 @@ describe("resolveAgent", () => {
         slug: "test",
         runtimes: ["claude-code"],
         roles: ["@test/role"],
+        credentials: [],
         resources: [],
       }));
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
+        risk: "LOW",
         tasks: ["@test/missing-task"],
         permissions: {},
       }));
@@ -381,10 +394,12 @@ describe("resolveAgent", () => {
         slug: "test",
         runtimes: ["claude-code"],
         roles: ["@test/role"],
+        credentials: [],
         resources: [],
       }));
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
+        risk: "LOW",
         permissions: {
           "@test/missing-app": { allow: ["foo"], deny: [] },
         },
@@ -400,6 +415,7 @@ describe("resolveAgent", () => {
       const packages = new Map<string, DiscoveredPackage>();
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
+        risk: "LOW",
         permissions: {},
       }));
 
@@ -419,10 +435,12 @@ describe("resolveAgent", () => {
         slug: "test",
         runtimes: ["claude-code"],
         roles: ["@test/role"],
+        credentials: [],
         resources: [],
       }));
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
+        risk: "LOW",
         tasks: ["@test/composite-task"],
         permissions: {},
       }));
@@ -458,10 +476,12 @@ describe("resolveAgent", () => {
         slug: "test",
         runtimes: ["claude-code"],
         roles: ["@test/role"],
+        credentials: [],
         resources: [],
       }));
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
+        risk: "LOW",
         tasks: ["@test/task-a"],
         permissions: {},
       }));
@@ -490,10 +510,12 @@ describe("resolveAgent", () => {
         slug: "test",
         runtimes: ["claude-code"],
         roles: ["@test/role"],
+        credentials: [],
         resources: [],
       }));
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
+        risk: "LOW",
         tasks: ["@test/task-a"],
         permissions: {},
       }));
@@ -518,6 +540,124 @@ describe("resolveAgent", () => {
     });
   });
 
+  describe("credentials and risk fields", () => {
+    it("propagates credentials on resolved agent", () => {
+      const packages = new Map<string, DiscoveredPackage>();
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
+        name: "Test",
+        slug: "test",
+        runtimes: ["claude-code"],
+        roles: ["@test/role"],
+        credentials: ["OPENAI_API_KEY", "SERP_API_KEY"],
+        resources: [],
+      }));
+      packages.set("@test/role", makePkg("@test/role", "1.0.0", {
+        type: "role",
+        risk: "LOW",
+        permissions: {},
+      }));
+
+      const resolved = resolveAgent("@test/agent", packages);
+      expect(resolved.credentials).toEqual(["OPENAI_API_KEY", "SERP_API_KEY"]);
+    });
+
+    it("defaults agent credentials to empty array when omitted", () => {
+      const packages = new Map<string, DiscoveredPackage>();
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
+        name: "Test",
+        slug: "test",
+        runtimes: ["claude-code"],
+        roles: ["@test/role"],
+        credentials: [],
+        resources: [],
+      }));
+      packages.set("@test/role", makePkg("@test/role", "1.0.0", {
+        type: "role",
+        risk: "LOW",
+        permissions: {},
+      }));
+
+      const resolved = resolveAgent("@test/agent", packages);
+      expect(resolved.credentials).toEqual([]);
+    });
+
+    it("propagates credentials on resolved app", () => {
+      const packages = new Map<string, DiscoveredPackage>();
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
+        name: "Test",
+        slug: "test",
+        runtimes: ["claude-code"],
+        roles: ["@test/role"],
+        credentials: [],
+        resources: [],
+      }));
+      packages.set("@test/role", makePkg("@test/role", "1.0.0", {
+        type: "role",
+        risk: "LOW",
+        permissions: {
+          "@test/app": { allow: ["tool1"], deny: [] },
+        },
+      }));
+      packages.set("@test/app", makePkg("@test/app", "1.0.0", {
+        type: "app",
+        transport: "stdio",
+        command: "node",
+        args: ["server.js"],
+        tools: ["tool1"],
+        capabilities: ["tools"],
+        credentials: ["API_KEY"],
+      }));
+
+      const resolved = resolveAgent("@test/agent", packages);
+      expect(resolved.roles[0].apps[0].credentials).toEqual(["API_KEY"]);
+    });
+
+    it("propagates risk on resolved role", () => {
+      const packages = new Map<string, DiscoveredPackage>();
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
+        name: "Test",
+        slug: "test",
+        runtimes: ["claude-code"],
+        roles: ["@test/role"],
+        credentials: [],
+        resources: [],
+      }));
+      packages.set("@test/role", makePkg("@test/role", "1.0.0", {
+        type: "role",
+        risk: "HIGH",
+        permissions: {},
+      }));
+
+      const resolved = resolveAgent("@test/agent", packages);
+      expect(resolved.roles[0].risk).toBe("HIGH");
+    });
+
+    it("defaults role risk to LOW when omitted", () => {
+      const packages = new Map<string, DiscoveredPackage>();
+      packages.set("@test/agent", makePkg("@test/agent", "1.0.0", {
+        type: "agent",
+        name: "Test",
+        slug: "test",
+        runtimes: ["claude-code"],
+        roles: ["@test/role"],
+        credentials: [],
+        resources: [],
+      }));
+      packages.set("@test/role", makePkg("@test/role", "1.0.0", {
+        type: "role",
+        risk: "LOW",
+        permissions: {},
+      }));
+
+      const resolved = resolveAgent("@test/agent", packages);
+      expect(resolved.roles[0].risk).toBe("LOW");
+    });
+  });
+
   describe("llm configuration", () => {
     it("resolves agent with llm field populated", () => {
       const packages = new Map<string, DiscoveredPackage>();
@@ -527,6 +667,7 @@ describe("resolveAgent", () => {
         slug: "coder",
         runtimes: ["pi-coding-agent"],
         roles: ["@test/role"],
+        credentials: [],
         resources: [],
         llm: {
           provider: "openrouter",
@@ -535,6 +676,7 @@ describe("resolveAgent", () => {
       }));
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
+        risk: "LOW",
         permissions: {},
       }));
 
@@ -553,10 +695,12 @@ describe("resolveAgent", () => {
         slug: "test",
         runtimes: ["claude-code"],
         roles: ["@test/role"],
+        credentials: [],
         resources: [],
       }));
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
+        risk: "LOW",
         permissions: {},
       }));
 
@@ -580,10 +724,12 @@ describe("resolveAgent", () => {
         slug: "test",
         runtimes: ["claude-code"],
         roles: ["@test/role"],
+        credentials: [],
         resources: [],
       }));
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
+        risk: "LOW",
         permissions: {},
       }));
 
@@ -602,10 +748,12 @@ describe("resolveAgent", () => {
         slug: "test",
         runtimes: ["claude-code"],
         roles: ["@test/role"],
+        credentials: [],
         resources: [],
       }));
       packages.set("@test/role", makePkg("@test/role", "1.0.0", {
         type: "role",
+        risk: "LOW",
         permissions: {},
       }));
 

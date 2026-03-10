@@ -183,6 +183,31 @@ function collectAppsFromTask(
 }
 
 /**
+ * Check credential coverage: every app credential should be declared
+ * by the agent. Emits warnings (not errors) for missing credentials.
+ */
+function checkCredentialCoverage(
+  agent: ResolvedAgent,
+  warnings: ValidationWarning[],
+): void {
+  const agentCredentials = new Set(agent.credentials);
+
+  for (const role of agent.roles) {
+    for (const app of role.apps) {
+      for (const credential of app.credentials) {
+        if (!agentCredentials.has(credential)) {
+          warnings.push({
+            category: "credential-coverage",
+            message: `Agent "${agent.agentName}" does not declare credential "${credential}" required by app "${app.name}"`,
+            context: { agent: agent.name, credential, app: app.name },
+          });
+        }
+      }
+    }
+  }
+}
+
+/**
  * Check LLM configuration: pi-coding-agent requires an `llm` field,
  * claude-code warns when `llm` is present (it only supports Anthropic).
  */
@@ -237,6 +262,9 @@ export function validateAgent(agent: ResolvedAgent): ValidationResult {
 
   // Check LLM configuration
   checkLlmConfig(agent, errors, warnings);
+
+  // Check credential coverage
+  checkCredentialCoverage(agent, warnings);
 
   return {
     valid: errors.length === 0,

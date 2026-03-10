@@ -7,6 +7,7 @@ export const appChapterFieldSchema = z
     transport: z.enum(["stdio", "sse", "streamable-http"]),
     tools: z.array(z.string()).min(1),
     capabilities: z.array(z.string()).min(1),
+    credentials: z.array(z.string()).optional().default([]),
     env: z.record(z.string(), z.string()).optional(),
     command: z.string().optional(),
     args: z.array(z.string()).optional(),
