@@ -258,6 +258,88 @@ describe("generateInitRoleComposeYml", () => {
     // credential-service appears as a service name and in depends_on references
     expect(yaml).toContain("credential-service:\n");
   });
+
+  it("includes role mounts in agent volumes", () => {
+    const yaml = generateInitRoleComposeYml({
+      dockerBuildPath: "/path/to/docker",
+      agents: [{ name: "@test/agent-note-taker", shortName: "note-taker" }],
+      role: "@test/role-writer",
+      roleShortName: "writer",
+      roleMounts: [
+        { source: "/host/data", target: "/container/data", readonly: false },
+      ],
+    });
+
+    const agentSection = yaml.split("agent-note-taker-writer:")[1]!;
+    expect(agentSection).toContain('"/host/data:/container/data"');
+    expect(agentSection).toContain("${PROJECT_DIR}:/workspace");
+  });
+
+  it("appends :ro for readonly role mounts", () => {
+    const yaml = generateInitRoleComposeYml({
+      dockerBuildPath: "/path/to/docker",
+      agents: [{ name: "@test/agent-note-taker", shortName: "note-taker" }],
+      role: "@test/role-writer",
+      roleShortName: "writer",
+      roleMounts: [
+        { source: "/configs", target: "/etc/app", readonly: true },
+      ],
+    });
+
+    const agentSection = yaml.split("agent-note-taker-writer:")[1]!;
+    expect(agentSection).toContain('"/configs:/etc/app:ro"');
+  });
+
+  it("does not add role mounts to proxy volumes", () => {
+    const yaml = generateInitRoleComposeYml({
+      dockerBuildPath: "/path/to/docker",
+      agents: [{ name: "@test/agent-note-taker", shortName: "note-taker" }],
+      role: "@test/role-writer",
+      roleShortName: "writer",
+      roleMounts: [
+        { source: "/host/data", target: "/mnt/data", readonly: false },
+      ],
+    });
+
+    const proxySection = yaml.split("credential-service:")[0]!;
+    expect(proxySection).not.toContain("/mnt/data");
+  });
+
+  it("includes role mounts in all agent services", () => {
+    const yaml = generateInitRoleComposeYml({
+      dockerBuildPath: "/path/to/docker",
+      agents: [
+        { name: "@test/agent-note-taker", shortName: "note-taker" },
+        { name: "@test/agent-reviewer", shortName: "reviewer" },
+      ],
+      role: "@test/role-writer",
+      roleShortName: "writer",
+      roleMounts: [
+        { source: "/shared", target: "/mnt/shared", readonly: false },
+      ],
+    });
+
+    const agent1Section = yaml.split("agent-note-taker-writer:")[1]!.split("agent-reviewer-writer:")[0]!;
+    const agent2Section = yaml.split("agent-reviewer-writer:")[1]!;
+
+    expect(agent1Section).toContain('"/shared:/mnt/shared"');
+    expect(agent2Section).toContain('"/shared:/mnt/shared"');
+  });
+
+  it("agent has no extra mounts when roleMounts is undefined", () => {
+    const yaml = generateInitRoleComposeYml({
+      dockerBuildPath: "/path/to/docker",
+      agents: [{ name: "@test/agent-note-taker", shortName: "note-taker" }],
+      role: "@test/role-writer",
+      roleShortName: "writer",
+    });
+
+    const agentSection = yaml.split("agent-note-taker-writer:")[1]!;
+    const volumeSection = agentSection.split("volumes:")[1]!.split("depends_on:")[0]!;
+    const mountLines = volumeSection.split("\n").filter((l) => l.includes("- \""));
+    expect(mountLines).toHaveLength(1);
+    expect(mountLines[0]).toContain("/workspace");
+  });
 });
 
 // ── initRole ─────────────────────────────────────────────────────────────

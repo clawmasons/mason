@@ -302,6 +302,79 @@ describe("generateAgentDockerfile", () => {
 
     expect(result).toContain("npm install -g @anthropic-ai/claude-code");
   });
+
+  // ── Base Image Tests ──────────────────────────────────────────────────
+
+  it("uses custom baseImage from role when specified", () => {
+    const agent = makeNoteTakerAgent();
+    const role = { ...agent.roles[0], baseImage: "node:22-bookworm" };
+    const result = generateAgentDockerfile(agent, role);
+
+    expect(result).toContain("FROM node:22-bookworm");
+    expect(result).not.toContain("FROM node:22-slim");
+  });
+
+  it("falls back to node:22-slim when baseImage is undefined", () => {
+    const agent = makeNoteTakerAgent();
+    const role = { ...agent.roles[0] };
+    delete role.baseImage;
+    const result = generateAgentDockerfile(agent, role);
+
+    expect(result).toContain("FROM node:22-slim");
+  });
+
+  // ── Apt Packages Tests ────────────────────────────────────────────────
+
+  it("includes apt-get install step when aptPackages specified", () => {
+    const agent = makeNoteTakerAgent();
+    const role = { ...agent.roles[0], aptPackages: ["git", "curl", "jq"] };
+    const result = generateAgentDockerfile(agent, role);
+
+    expect(result).toContain("apt-get update");
+    expect(result).toContain("apt-get install -y --no-install-recommends git curl jq");
+    expect(result).toContain("rm -rf /var/lib/apt/lists/*");
+  });
+
+  it("does not include apt-get step when aptPackages is undefined", () => {
+    const agent = makeNoteTakerAgent();
+    const role = { ...agent.roles[0] };
+    delete role.aptPackages;
+    const result = generateAgentDockerfile(agent, role);
+
+    expect(result).not.toContain("apt-get");
+  });
+
+  it("does not include apt-get step when aptPackages is empty", () => {
+    const agent = makeNoteTakerAgent();
+    const role = { ...agent.roles[0], aptPackages: [] };
+    const result = generateAgentDockerfile(agent, role);
+
+    expect(result).not.toContain("apt-get");
+  });
+
+  it("Dockerfile without baseImage or aptPackages is unchanged from default", () => {
+    const agent = makeNoteTakerAgent();
+    const role = { ...agent.roles[0] };
+    delete role.baseImage;
+    delete role.aptPackages;
+    const result = generateAgentDockerfile(agent, role);
+
+    expect(result).toContain("FROM node:22-slim");
+    expect(result).not.toContain("apt-get");
+  });
+
+  it("combines baseImage and aptPackages correctly", () => {
+    const agent = makeNoteTakerAgent();
+    const role = {
+      ...agent.roles[0],
+      baseImage: "ubuntu:24.04",
+      aptPackages: ["python3", "make"],
+    };
+    const result = generateAgentDockerfile(agent, role);
+
+    expect(result).toContain("FROM ubuntu:24.04");
+    expect(result).toContain("apt-get install -y --no-install-recommends python3 make");
+  });
 });
 
 // ── Proxy Dockerfile Tests ─────────────────────────────────────────────
