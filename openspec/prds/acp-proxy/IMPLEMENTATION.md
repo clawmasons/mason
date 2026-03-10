@@ -53,7 +53,15 @@ Create `packages/cli/src/acp/matcher.ts` — pure logic for matching ACP client 
 
 **Testable output:** Unit tests verifying: (a) name-based matching (case-insensitive), (b) unmatched servers get descriptive reasons, (c) empty mcpServers returns empty result, (d) all servers unmatched when no apps exist, (e) duplicate app short names use command/URL for disambiguation.
 
-**Not Implemented Yet**
+**Implemented**
+
+- Archived change: [2026-03-09-mcp-server-matcher](../../changes/archive/2026-03-09-mcp-server-matcher/)
+  - [Proposal](../../changes/archive/2026-03-09-mcp-server-matcher/proposal.md)
+  - [Design](../../changes/archive/2026-03-09-mcp-server-matcher/design.md)
+  - [Tasks](../../changes/archive/2026-03-09-mcp-server-matcher/tasks.md)
+- Spec: [mcp-server-matcher](../../specs/mcp-server-matcher/spec.md)
+- Source: `packages/cli/src/acp/matcher.ts`
+- Tests: `packages/cli/tests/acp/matcher.test.ts`
 
 ---
 
