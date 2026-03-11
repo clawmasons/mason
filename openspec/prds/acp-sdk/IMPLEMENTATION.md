@@ -155,7 +155,7 @@ Update `run-acp-agent.ts` to use the new SDK bridge and remove the `--transport`
 
 **PRD refs:** REQ-SDK-006
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-11-orchestrator-update-sdk/proposal.md) · [design](../../changes/archive/2026-03-11-orchestrator-update-sdk/design.md) · [tasks](../../changes/archive/2026-03-11-orchestrator-update-sdk/tasks.md)
 
 ---
 
