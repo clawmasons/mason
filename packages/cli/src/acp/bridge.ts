@@ -1,554 +1,372 @@
 /**
- * ACP Bridge — Bidirectional ACP <-> Container Communication
+ * ACP SDK Bridge — Dual-Connection ACP Protocol Mediator
  *
- * Transparent HTTP relay that bridges ACP protocol messages between
- * a host-side endpoint (where editors connect) and a container-side
- * ACP agent endpoint (inside Docker).
+ * The bridge presents an AgentSideConnection to the editor (via ndjson
+ * on provided streams) and a ClientSideConnection to the container agent
+ * (via docker compose run piped stdio). It handles deferred startup:
+ * `initialize` responds immediately with local capabilities, `session/new`
+ * starts the container, and subsequent messages are forwarded bidirectionally.
  *
- * Protocol-aware deferred startup: the bridge queues pre-session
- * messages (like `initialize`) and only starts the agent container
- * when `session/new` arrives with the required `cwd` field.
- * Earlier messages get a stub response; once the agent is up,
- * subsequent requests are relayed normally.
- *
- * PRD refs: REQ-001 (ACP endpoint), REQ-005 (ACP Session CWD Support),
- *           PRD 7.1 (Architecture), PRD 7.4 (Tool Call Flow)
+ * PRD refs: REQ-SDK-002, REQ-SDK-003, REQ-SDK-004, REQ-SDK-009,
+ *           REQ-SDK-010, REQ-SDK-013
  */
 
+import { Readable, Writable } from "node:stream";
+import type { ChildProcess } from "node:child_process";
 import {
-  createServer,
-  request as httpRequest,
-  type Server,
-  type IncomingMessage,
-  type ServerResponse,
-} from "node:http";
+  AgentSideConnection,
+  ClientSideConnection,
+  ndJsonStream,
+  PROTOCOL_VERSION,
+  type Agent,
+  type Client,
+  type InitializeRequest,
+  type InitializeResponse,
+  type NewSessionRequest,
+  type NewSessionResponse,
+  type PromptRequest,
+  type PromptResponse,
+  type CancelNotification,
+  type AuthenticateRequest,
+  type AuthenticateResponse,
+  type SessionNotification,
+  type RequestPermissionRequest,
+  type RequestPermissionResponse,
+  type ReadTextFileRequest,
+  type ReadTextFileResponse,
+  type WriteTextFileRequest,
+  type WriteTextFileResponse,
+  type CreateTerminalRequest,
+  type CreateTerminalResponse,
+  type TerminalOutputRequest,
+  type TerminalOutputResponse,
+  type ReleaseTerminalRequest,
+  type ReleaseTerminalResponse,
+  type WaitForTerminalExitRequest,
+  type WaitForTerminalExitResponse,
+  type KillTerminalRequest,
+  type KillTerminalResponse,
+  RequestError,
+} from "@agentclientprotocol/sdk";
 import type { AcpLogger } from "./logger.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
-export interface AcpBridgeConfig {
-  /** Port to listen on for ACP clients (e.g., 3001) */
-  hostPort: number;
-  /** Docker container hostname (e.g., "localhost") */
-  containerHost: string;
-  /** ACP agent port inside container (e.g., 3002) */
-  containerPort: number;
-  /** Maximum retries when connecting to agent (default: 10) */
-  connectRetries?: number;
-  /** Delay between retries in ms (default: 1000) */
-  connectRetryDelayMs?: number;
-  /** Idle timeout in ms before emitting onClientDisconnect (default: 30000) */
-  idleTimeoutMs?: number;
-  /** Request timeout in ms for relay requests to the agent (default: 30000) */
-  requestTimeoutMs?: number;
+export interface AcpSdkBridgeConfig {
+  /**
+   * Callback invoked when `session/new` arrives with a `cwd` field.
+   * Must start the container process and return a ChildProcess with
+   * piped stdin/stdout for ACP ndjson communication.
+   */
+  onSessionNew: (cwd: string) => ChildProcess | Promise<ChildProcess>;
   /** Optional logger for diagnostics. */
   logger?: AcpLogger;
 }
 
-// ── Hop-by-hop headers to strip when relaying ─────────────────────────
+// ── AcpSdkBridge ─────────────────────────────────────────────────────
 
-const HOP_BY_HOP_HEADERS = new Set([
-  "connection",
-  "keep-alive",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "te",
-  "trailers",
-  "transfer-encoding",
-  "upgrade",
-  "host",
-]);
+export class AcpSdkBridge {
+  private readonly config: AcpSdkBridgeConfig;
+  private readonly logger?: AcpLogger;
 
-// ── AcpBridge ─────────────────────────────────────────────────────────
+  private editorConnection: AgentSideConnection | null = null;
+  private containerConnection: ClientSideConnection | null = null;
+  private childProcess: ChildProcess | null = null;
+  private initializeParams: InitializeRequest | null = null;
+  private sessionActive = false;
 
-export class AcpBridge {
-  private config: Required<
-    Pick<AcpBridgeConfig, "hostPort" | "containerHost" | "containerPort" | "connectRetries" | "connectRetryDelayMs" | "idleTimeoutMs" | "requestTimeoutMs">
-  >;
-  private logger?: AcpLogger;
-  private server: Server | null = null;
-  private agentConnected = false;
-  private clientSeen = false;
-  private idleTimer: ReturnType<typeof setTimeout> | null = null;
-  private sessionPending = false;
-
-  /** Invoked when the first client request arrives. */
-  onClientConnect?: () => void;
-
-  /** Invoked when the client goes idle (no requests for idleTimeoutMs). */
-  onClientDisconnect?: () => void;
-
-  /** Invoked when a relay to the agent fails. */
-  onAgentError?: (error: Error) => void;
-
-  /**
-   * Invoked when a POST with a `cwd` field arrives (typically `session/new`)
-   * and the agent is not yet connected. The callback should start the agent
-   * container and call `connectToAgent()`.
-   *
-   * Pre-session messages (like `initialize`) that arrive before `session/new`
-   * receive a stub response so the client can complete the handshake.
-   */
-  onSessionNew?: (cwd: string) => Promise<void>;
-
-  constructor(config: AcpBridgeConfig) {
-    this.config = {
-      hostPort: config.hostPort,
-      containerHost: config.containerHost,
-      containerPort: config.containerPort,
-      connectRetries: config.connectRetries ?? 10,
-      connectRetryDelayMs: config.connectRetryDelayMs ?? 1000,
-      idleTimeoutMs: config.idleTimeoutMs ?? 30_000,
-      requestTimeoutMs: config.requestTimeoutMs ?? 30_000,
-    };
+  constructor(config: AcpSdkBridgeConfig) {
+    this.config = config;
     this.logger = config.logger;
   }
 
   /**
-   * Return the actual port the HTTP server is listening on.
-   * Useful when `hostPort` was 0 (OS-assigned).
+   * Start the bridge with the given editor-facing streams.
+   * Creates an AgentSideConnection that handles the ACP protocol
+   * with the editor.
    */
-  getPort(): number {
-    const addr = this.server?.address();
-    if (addr && typeof addr === "object") return addr.port;
-    return this.config.hostPort;
-  }
+  start(
+    editorInput: ReadableStream<Uint8Array>,
+    editorOutput: WritableStream<Uint8Array>,
+  ): void {
+    if (this.editorConnection) return;
 
-  /**
-   * Start the host-side HTTP server that accepts ACP client connections.
-   * Requests are proxied to the container agent once `connectToAgent()` succeeds.
-   */
-  async start(): Promise<void> {
-    if (this.server) return;
+    const stream = ndJsonStream(editorOutput, editorInput);
 
-    this.server = createServer((req, res) => {
-      this.handleRequest(req, res);
-    });
-
-    const server = this.server;
-    return new Promise<void>((resolve, reject) => {
-      server.on("error", reject);
-      server.listen(this.config.hostPort, () => {
-        server.removeListener("error", reject);
-        resolve();
-      });
-    });
-  }
-
-  /**
-   * Verify the container ACP agent endpoint is reachable.
-   * Retries up to `connectRetries` times with `connectRetryDelayMs` delay.
-   */
-  async connectToAgent(): Promise<void> {
-    const { containerHost, containerPort, connectRetries, connectRetryDelayMs } = this.config;
-    let lastError: Error | undefined;
-
-    for (let attempt = 0; attempt <= connectRetries; attempt++) {
-      try {
-        await this.healthCheck(containerHost, containerPort);
-        this.agentConnected = true;
-        this.logger?.log(`[bridge] Agent connected at ${containerHost}:${containerPort} (attempt ${attempt + 1})`);
-        return;
-      } catch (err) {
-        lastError = err instanceof Error ? err : new Error(String(err));
-        this.logger?.log(`[bridge] Health check attempt ${attempt + 1}/${connectRetries + 1} failed: ${lastError.message}`);
-        if (attempt < connectRetries) {
-          await delay(connectRetryDelayMs);
-        }
-      }
-    }
-
-    throw new Error(
-      `Failed to connect to ACP agent at ${containerHost}:${containerPort} after ${connectRetries + 1} attempts: ${lastError?.message ?? "unknown error"}`,
+    this.editorConnection = new AgentSideConnection(
+      (conn) => this.createEditorAgent(conn),
+      stream,
     );
+
+    this.logger?.log("[bridge] AgentSideConnection started for editor");
+
+    // Monitor editor connection lifecycle (REQ-SDK-009)
+    void this.editorConnection.closed.then(() => {
+      this.logger?.log("[bridge] Editor connection closed");
+      void this.cleanupContainer();
+    });
   }
 
   /**
-   * Stop the bridge: close the HTTP server and release resources.
+   * Promise that resolves when the editor connection closes.
+   */
+  get closed(): Promise<void> {
+    if (!this.editorConnection) {
+      return Promise.resolve();
+    }
+    return this.editorConnection.closed;
+  }
+
+  /**
+   * Stop the bridge: clean up container and editor connections.
    */
   async stop(): Promise<void> {
-    this.clearIdleTimer();
-    this.agentConnected = false;
-    this.clientSeen = false;
-    this.sessionPending = false;
+    await this.cleanupContainer();
+    this.editorConnection = null;
+    this.logger?.log("[bridge] Bridge stopped");
+  }
 
-    const server = this.server;
-    if (!server) return;
+  // ── Editor-Facing Agent Implementation ──────────────────────────────
 
-    this.server = null;
-    return new Promise<void>((resolve, reject) => {
-      server.close((err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+  private createEditorAgent(_conn: AgentSideConnection): Agent {
+    return {
+      initialize: (params) => this.handleInitialize(params),
+      newSession: (params) => this.handleNewSession(params),
+      prompt: (params) => this.handlePrompt(params),
+      cancel: (params) => this.handleCancel(params),
+      authenticate: (params) => this.handleAuthenticate(params),
+    };
   }
 
   /**
-   * Reset bridge state for a new session. Called after agent disconnect
-   * so the bridge can accept a new `session/new` from the next client.
-   * The HTTP server remains running.
+   * Handle `initialize` from the editor.
+   * Returns capabilities locally without starting a container. (REQ-SDK-004)
    */
-  resetForNewSession(): void {
-    this.clearIdleTimer();
-    this.agentConnected = false;
-    this.clientSeen = false;
-    this.sessionPending = false;
-  }
+  private async handleInitialize(params: InitializeRequest): Promise<InitializeResponse> {
+    this.logger?.log("[bridge] initialize from editor");
+    // Store for forwarding to container later
+    this.initializeParams = params;
 
-  // ── Request Handling ──────────────────────────────────────────────
-
-  private handleRequest(req: IncomingMessage, res: ServerResponse): void {
-    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-
-    // Health endpoint — always available
-    if (req.method === "GET" && url.pathname === "/health") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ status: "ok" }));
-      return;
-    }
-
-    this.logger?.log(`[bridge] ${req.method} ${url.pathname} (agent=${this.agentConnected ? "connected" : "pending"})`);
-
-    // If agent is not connected and we have a session handler, try deferred start
-    if (!this.agentConnected && this.onSessionNew && req.method === "POST") {
-      // Prevent concurrent session starts
-      if (this.sessionPending) {
-        this.logger?.log("[bridge] Rejecting request — session startup already in progress");
-        res.writeHead(503, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Session startup in progress" }));
-        return;
-      }
-      this.handleDeferredSession(req, res);
-      return;
-    }
-
-    // Agent must be connected for relay
-    if (!this.agentConnected) {
-      res.writeHead(503, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Agent not connected" }));
-      return;
-    }
-
-    // Track client connection
-    if (!this.clientSeen) {
-      this.clientSeen = true;
-      this.onClientConnect?.();
-    }
-    this.resetIdleTimer();
-
-    // Relay to container agent
-    this.relayToAgent(req, res);
+    return {
+      protocolVersion: params.protocolVersion ?? PROTOCOL_VERSION,
+      agentCapabilities: {},
+      agentInfo: { name: "clawmasons", version: "1.0.0" },
+    };
   }
 
   /**
-   * Handle a POST request when the agent is not yet connected.
-   *
-   * ACP protocol flow:
-   *   1. Client sends `initialize` (no cwd) — we return a stub response
-   *   2. Client sends `session/new` with required `cwd` — we start the agent
-   *
-   * If the body contains a `cwd` field, we treat it as session-initiating
-   * and call `onSessionNew(cwd)`. Otherwise we return a stub response
-   * so the client can proceed with the handshake.
+   * Handle `session/new` from the editor.
+   * Starts the container, creates ClientSideConnection, forwards
+   * initialize + session/new, returns the container's response. (REQ-SDK-004)
    */
-  private handleDeferredSession(req: IncomingMessage, res: ServerResponse): void {
-    const chunks: Buffer[] = [];
+  private async handleNewSession(params: NewSessionRequest): Promise<NewSessionResponse> {
+    const cwd = params.cwd ?? process.cwd();
+    this.logger?.log(`[bridge] session/new from editor — cwd: "${cwd}"`);
 
-    req.on("data", (chunk: Buffer) => chunks.push(chunk));
-    req.on("end", () => {
-      const body = Buffer.concat(chunks);
-      const { cwd, method, id } = parseRequestBody(body);
-
-      this.logger?.log(`[bridge] Deferred request: method=${method ?? "unknown"}, id=${id ?? "null"}, hasCwd=${cwd !== null}`);
-
-      // If no cwd found, this is a pre-session message (e.g., initialize).
-      // Return a stub response so the client can complete the handshake.
-      if (cwd === null) {
-        this.logger?.log(`[bridge] No cwd in request (method=${method}) — returning stub response`);
-        respondWithStub(res, method, id);
-        return;
-      }
-
-      // cwd found — this is the session-initiating message (session/new)
-      const sessionNewHandler = this.onSessionNew;
-      if (!sessionNewHandler) {
-        res.writeHead(503, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Agent not connected" }));
-        return;
-      }
-
-      this.sessionPending = true;
-      this.logger?.log(`[bridge] Starting agent for cwd="${cwd}" (triggered by method=${method})`);
-
-      void sessionNewHandler(cwd).then(() => {
-        this.sessionPending = false;
-
-        // Track client connection
-        if (!this.clientSeen) {
-          this.clientSeen = true;
-          this.onClientConnect?.();
-        }
-        this.resetIdleTimer();
-
-        // Relay the buffered session/new request to the agent
-        this.logger?.log("[bridge] Relaying buffered session request to agent");
-        this.relayBufferedToAgent(req, res, body);
-      }).catch((err) => {
-        this.sessionPending = false;
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger?.error(`[bridge] Session startup failed: ${message}`);
-        if (!res.headersSent) {
-          res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: `Session startup failed: ${message}` }));
-        }
-      });
-    });
-
-    req.on("error", () => {
-      this.sessionPending = false;
-      if (!res.headersSent) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Request read error" }));
-      }
-    });
-  }
-
-  /**
-   * Relay a buffered request body to the agent (used after deferred session start).
-   */
-  private relayBufferedToAgent(
-    clientReq: IncomingMessage,
-    clientRes: ServerResponse,
-    body: Buffer,
-  ): void {
-    const { containerHost, containerPort, requestTimeoutMs } = this.config;
-
-    // Build relay headers, stripping hop-by-hop
-    const relayHeaders: Record<string, string | string[]> = {};
-    for (const [key, value] of Object.entries(clientReq.headers)) {
-      if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase()) && value !== undefined) {
-        relayHeaders[key] = value;
-      }
+    if (this.sessionActive) {
+      this.logger?.log("[bridge] Cleaning up previous session");
+      await this.cleanupContainer();
     }
-    // Set correct content-length for the buffered body
-    relayHeaders["content-length"] = String(body.length);
 
-    const agentReq = httpRequest(
-      {
-        hostname: containerHost,
-        port: containerPort,
-        path: clientReq.url ?? "/",
-        method: clientReq.method ?? "POST",
-        headers: relayHeaders,
-        timeout: requestTimeoutMs,
-      },
-      (agentRes) => {
-        const responseHeaders: Record<string, string | string[] | undefined> = {};
-        for (const [key, value] of Object.entries(agentRes.headers)) {
-          if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
-            responseHeaders[key] = value;
-          }
-        }
+    // Start the container process
+    const child = await Promise.resolve(this.config.onSessionNew(cwd));
+    this.childProcess = child;
 
-        this.logger?.log(`[bridge] Relay response: ${agentRes.statusCode}`);
-        clientRes.writeHead(agentRes.statusCode ?? 200, responseHeaders);
-        agentRes.pipe(clientRes);
-      },
+    if (!child.stdin || !child.stdout) {
+      throw RequestError.internalError(undefined, "Container process missing stdin/stdout");
+    }
+
+    // Create ClientSideConnection to the container (REQ-SDK-003)
+    const containerOutput = Writable.toWeb(child.stdin) as WritableStream<Uint8Array>;
+    const containerInput = Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>;
+    const containerStream = ndJsonStream(containerOutput, containerInput);
+
+    this.containerConnection = new ClientSideConnection(
+      (agent) => this.createContainerClient(agent),
+      containerStream,
     );
 
-    agentReq.on("error", (err) => {
-      const error = new Error(`Agent relay failed: ${err.message}`);
-      this.logger?.error(`[bridge] ${error.message}`);
-      this.onAgentError?.(error);
+    this.sessionActive = true;
 
-      if (!clientRes.headersSent) {
-        clientRes.writeHead(502, { "Content-Type": "application/json" });
-        clientRes.end(JSON.stringify({ error: "Bad Gateway — agent unreachable" }));
-      }
+    // Monitor container connection lifecycle (REQ-SDK-013)
+    void this.containerConnection.closed.then(() => {
+      this.logger?.log("[bridge] Container connection closed");
+      this.handleContainerDisconnect();
     });
 
-    agentReq.on("timeout", () => {
-      agentReq.destroy(new Error("Agent request timed out"));
+    // Monitor child process exit (REQ-SDK-013)
+    child.on("exit", (code, signal) => {
+      this.logger?.log(`[bridge] Container process exited (code=${code}, signal=${signal})`);
+      this.handleContainerDisconnect();
     });
 
-    // Write the buffered body instead of piping
-    agentReq.end(body);
-  }
+    child.on("error", (err) => {
+      this.logger?.error(`[bridge] Container process error: ${err.message}`);
+      this.handleContainerDisconnect();
+    });
 
-  private relayToAgent(clientReq: IncomingMessage, clientRes: ServerResponse): void {
-    const { containerHost, containerPort, requestTimeoutMs } = this.config;
-
-    // Build relay headers, stripping hop-by-hop
-    const relayHeaders: Record<string, string | string[]> = {};
-    for (const [key, value] of Object.entries(clientReq.headers)) {
-      if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase()) && value !== undefined) {
-        relayHeaders[key] = value;
-      }
+    // Pipe container stderr to logger
+    if (child.stderr) {
+      child.stderr.on("data", (chunk: Buffer) => {
+        this.logger?.log(`[container] ${chunk.toString().trimEnd()}`);
+      });
     }
 
-    const agentReq = httpRequest(
-      {
-        hostname: containerHost,
-        port: containerPort,
-        path: clientReq.url ?? "/",
-        method: clientReq.method ?? "GET",
-        headers: relayHeaders,
-        timeout: requestTimeoutMs,
-      },
-      (agentRes) => {
-        // Relay response headers, stripping hop-by-hop
-        const responseHeaders: Record<string, string | string[] | undefined> = {};
-        for (const [key, value] of Object.entries(agentRes.headers)) {
-          if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
-            responseHeaders[key] = value;
-          }
-        }
+    // Forward initialize to the container
+    const initParams = this.initializeParams ?? {
+      protocolVersion: PROTOCOL_VERSION,
+    };
+    this.logger?.log("[bridge] Forwarding initialize to container");
+    await this.containerConnection.initialize(initParams);
 
-        this.logger?.log(`[bridge] Relay response: ${agentRes.statusCode}`);
-        clientRes.writeHead(agentRes.statusCode ?? 200, responseHeaders);
-        agentRes.pipe(clientRes);
-      },
-    );
+    // Forward session/new to the container
+    this.logger?.log("[bridge] Forwarding session/new to container");
+    const response = await this.containerConnection.newSession(params);
 
-    agentReq.on("error", (err) => {
-      const error = new Error(`Agent relay failed: ${err.message}`);
-      this.logger?.error(`[bridge] ${error.message}`);
-      this.onAgentError?.(error);
-
-      if (!clientRes.headersSent) {
-        clientRes.writeHead(502, { "Content-Type": "application/json" });
-        clientRes.end(JSON.stringify({ error: "Bad Gateway — agent unreachable" }));
-      }
-    });
-
-    agentReq.on("timeout", () => {
-      agentReq.destroy(new Error("Agent request timed out"));
-    });
-
-    // Pipe client request body to agent
-    clientReq.pipe(agentReq);
+    return response;
   }
 
-  // ── Health Check ──────────────────────────────────────────────────
-
-  private healthCheck(host: string, port: number): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const req = httpRequest(
-        { hostname: host, port, path: "/", method: "GET", timeout: 5000 },
-        (res) => {
-          // Drain the response
-          res.resume();
-          if (res.statusCode && res.statusCode < 500) {
-            resolve();
-          } else {
-            reject(new Error(`Agent health check returned status ${res.statusCode}`));
-          }
-        },
+  /**
+   * Handle `prompt` from the editor.
+   * Forwards to the container and returns its response.
+   */
+  private async handlePrompt(params: PromptRequest): Promise<PromptResponse> {
+    if (!this.containerConnection) {
+      throw RequestError.internalError(
+        undefined,
+        "No active session — send session/new first",
       );
-      req.on("error", (err) => reject(err));
-      req.on("timeout", () => {
-        req.destroy(new Error("Health check timed out"));
-      });
-      req.end();
-    });
-  }
-
-  // ── Idle Timer ────────────────────────────────────────────────────
-
-  private resetIdleTimer(): void {
-    this.clearIdleTimer();
-    this.idleTimer = setTimeout(() => {
-      this.onClientDisconnect?.();
-      this.clientSeen = false;
-    }, this.config.idleTimeoutMs);
-  }
-
-  private clearIdleTimer(): void {
-    if (this.idleTimer) {
-      clearTimeout(this.idleTimer);
-      this.idleTimer = null;
-    }
-  }
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Parse a JSON request body and extract cwd, method, and id fields.
- * Returns `cwd: null` if no cwd field is found (not a session-initiating message).
- */
-export function parseRequestBody(body: Buffer): { cwd: string | null; method: string | null; id: unknown } {
-  try {
-    const parsed = JSON.parse(body.toString("utf-8")) as Record<string, unknown>;
-    const method = typeof parsed.method === "string" ? parsed.method : null;
-    const id = parsed.id ?? null;
-
-    // Check params.cwd (JSON-RPC style — session/new sends cwd here)
-    if (parsed.params && typeof parsed.params === "object") {
-      const params = parsed.params as Record<string, unknown>;
-      if (typeof params.cwd === "string" && params.cwd.length > 0) {
-        return { cwd: params.cwd, method, id };
-      }
     }
 
-    // Check top-level cwd (flat format)
-    if (typeof parsed.cwd === "string" && parsed.cwd.length > 0) {
-      return { cwd: parsed.cwd, method, id };
+    this.logger?.log("[bridge] Forwarding prompt to container");
+    return this.containerConnection.prompt(params);
+  }
+
+  /**
+   * Handle `cancel` from the editor.
+   * Forwards cancel notification to the container. (REQ-SDK-010)
+   */
+  private async handleCancel(params: CancelNotification): Promise<void> {
+    if (!this.containerConnection) {
+      this.logger?.log("[bridge] cancel received but no container connection");
+      return;
     }
 
-    return { cwd: null, method, id };
-  } catch {
-    return { cwd: null, method: null, id: null };
-  }
-}
-
-/**
- * Attempt to extract a `cwd` field from a JSON request body.
- * Handles both JSON-RPC style (`params.cwd`) and flat (`cwd`) formats.
- * Returns `null` if `cwd` is not present.
- *
- * @deprecated Use `parseRequestBody` instead — it returns null when cwd is missing
- *             rather than falling back to process.cwd().
- */
-export function extractCwdFromBody(body: Buffer): string {
-  const { cwd } = parseRequestBody(body);
-  return cwd ?? process.cwd();
-}
-
-/**
- * Return a stub JSON-RPC response for pre-session messages.
- * For `initialize`, returns a minimal capabilities handshake.
- * For other methods, returns a JSON-RPC error indicating the session
- * hasn't started yet.
- */
-function respondWithStub(res: ServerResponse, method: string | null, id: unknown): void {
-  res.writeHead(200, { "Content-Type": "application/json" });
-
-  if (method === "initialize") {
-    res.end(JSON.stringify({
-      jsonrpc: "2.0",
-      id: id ?? null,
-      result: {
-        protocolVersion: "2025-03-26",
-        capabilities: {},
-        serverInfo: { name: "clawmasons", version: "1.0.0" },
-      },
-    }));
-    return;
+    this.logger?.log("[bridge] Forwarding cancel to container");
+    await this.containerConnection.cancel(params);
   }
 
-  // For non-initialize pre-session messages, return an error
-  res.end(JSON.stringify({
-    jsonrpc: "2.0",
-    id: id ?? null,
-    error: {
-      code: -32000,
-      message: "Waiting for session/new with cwd — agent not yet started",
-    },
-  }));
+  /**
+   * Handle `authenticate` from the editor.
+   * Forwards to the container if connected, otherwise returns empty.
+   */
+  private async handleAuthenticate(params: AuthenticateRequest): Promise<AuthenticateResponse> {
+    if (!this.containerConnection) {
+      return {};
+    }
+    return this.containerConnection.authenticate(params);
+  }
+
+  // ── Container-Facing Client Implementation ──────────────────────────
+
+  /**
+   * Create a Client implementation for the ClientSideConnection.
+   * Forwards notifications from the container back to the editor. (REQ-SDK-010)
+   */
+  private createContainerClient(_agent: Agent): Client {
+    return {
+      requestPermission: (params: RequestPermissionRequest) => this.forwardRequestPermission(params),
+      sessionUpdate: (params: SessionNotification) => this.forwardSessionUpdate(params),
+      readTextFile: (params: ReadTextFileRequest) => this.forwardReadTextFile(params),
+      writeTextFile: (params: WriteTextFileRequest) => this.forwardWriteTextFile(params),
+      createTerminal: (params: CreateTerminalRequest) => this.forwardCreateTerminal(params),
+      terminalOutput: (params: TerminalOutputRequest) => this.forwardTerminalOutput(params),
+      releaseTerminal: (params: ReleaseTerminalRequest) => this.forwardReleaseTerminal(params),
+      waitForTerminalExit: (params: WaitForTerminalExitRequest) => this.forwardWaitForTerminalExit(params),
+      killTerminal: (params: KillTerminalRequest) => this.forwardKillTerminal(params),
+    };
+  }
+
+  private async forwardSessionUpdate(params: SessionNotification): Promise<void> {
+    if (!this.editorConnection) return;
+    this.logger?.log("[bridge] Forwarding sessionUpdate to editor");
+    await this.editorConnection.sessionUpdate(params);
+  }
+
+  private async forwardRequestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
+    if (!this.editorConnection) {
+      throw RequestError.internalError(undefined, "Editor connection not available");
+    }
+    this.logger?.log("[bridge] Forwarding requestPermission to editor");
+    return this.editorConnection.requestPermission(params);
+  }
+
+  private async forwardReadTextFile(params: ReadTextFileRequest): Promise<ReadTextFileResponse> {
+    if (!this.editorConnection) {
+      throw RequestError.internalError(undefined, "Editor connection not available");
+    }
+    return this.editorConnection.readTextFile(params);
+  }
+
+  private async forwardWriteTextFile(params: WriteTextFileRequest): Promise<WriteTextFileResponse> {
+    if (!this.editorConnection) {
+      throw RequestError.internalError(undefined, "Editor connection not available");
+    }
+    return this.editorConnection.writeTextFile(params);
+  }
+
+  private async forwardCreateTerminal(params: CreateTerminalRequest): Promise<CreateTerminalResponse> {
+    if (!this.editorConnection) {
+      throw RequestError.internalError(undefined, "Editor connection not available");
+    }
+    // createTerminal returns a TerminalHandle; extract the terminalId for the raw response
+    const handle = await this.editorConnection.createTerminal(params);
+    return { terminalId: handle.id };
+  }
+
+  private async forwardTerminalOutput(params: TerminalOutputRequest): Promise<TerminalOutputResponse> {
+    if (!this.editorConnection) {
+      throw RequestError.internalError(undefined, "Editor connection not available");
+    }
+    return this.editorConnection.extMethod("terminal/output", params as unknown as Record<string, unknown>) as Promise<TerminalOutputResponse>;
+  }
+
+  private async forwardReleaseTerminal(params: ReleaseTerminalRequest): Promise<ReleaseTerminalResponse | void> {
+    if (!this.editorConnection) return;
+    return this.editorConnection.extMethod("terminal/release", params as unknown as Record<string, unknown>) as Promise<ReleaseTerminalResponse>;
+  }
+
+  private async forwardWaitForTerminalExit(params: WaitForTerminalExitRequest): Promise<WaitForTerminalExitResponse> {
+    if (!this.editorConnection) {
+      throw RequestError.internalError(undefined, "Editor connection not available");
+    }
+    return this.editorConnection.extMethod("terminal/waitForExit", params as unknown as Record<string, unknown>) as Promise<WaitForTerminalExitResponse>;
+  }
+
+  private async forwardKillTerminal(params: KillTerminalRequest): Promise<KillTerminalResponse | void> {
+    if (!this.editorConnection) return;
+    return this.editorConnection.extMethod("terminal/kill", params as unknown as Record<string, unknown>) as Promise<KillTerminalResponse>;
+  }
+
+  // ── Container Lifecycle ─────────────────────────────────────────────
+
+  private handleContainerDisconnect(): void {
+    if (!this.sessionActive) return;
+    this.logger?.log("[bridge] Container disconnected — cleaning up for next session");
+    this.containerConnection = null;
+    this.childProcess = null;
+    this.sessionActive = false;
+  }
+
+  private async cleanupContainer(): Promise<void> {
+    this.sessionActive = false;
+
+    if (this.childProcess) {
+      this.logger?.log("[bridge] Killing container child process");
+      this.childProcess.kill();
+      this.childProcess = null;
+    }
+
+    this.containerConnection = null;
+  }
 }

@@ -1,813 +1,455 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
-import { createServer, type Server } from "node:http";
-import { AcpBridge, extractCwdFromBody, parseRequestBody } from "../../src/acp/bridge.js";
+import { EventEmitter } from "node:events";
+import { Readable, Writable, PassThrough } from "node:stream";
+import type { ChildProcess } from "node:child_process";
+import {
+  ClientSideConnection,
+  ndJsonStream,
+  PROTOCOL_VERSION,
+  type Agent,
+  type SessionNotification,
+  type PromptResponse,
+} from "@agentclientprotocol/sdk";
+import { AcpSdkBridge } from "../../src/acp/bridge.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-/** Create a mock ACP agent server that echoes requests back. */
-function createMockAgent(port: number): Promise<Server> {
-  return new Promise((resolve, reject) => {
-    const server = createServer((req, res) => {
-      const url = new URL(req.url ?? "/", `http://localhost:${port}`);
+/**
+ * Create a pair of TransformStreams that connect an editor (client)
+ * to the bridge (agent). Returns streams suitable for both the bridge
+ * and a ClientSideConnection that acts as the editor.
+ */
+function createEditorStreamPair() {
+  // Editor writes to bridge, bridge reads
+  const editorToBridge = new TransformStream<Uint8Array, Uint8Array>();
+  // Bridge writes to editor, editor reads
+  const bridgeToEditor = new TransformStream<Uint8Array, Uint8Array>();
 
-      if (req.method === "GET" && url.pathname === "/") {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ status: "ok", mode: "acp" }));
-        return;
-      }
-
-      if (req.method === "POST") {
-        const chunks: Buffer[] = [];
-        req.on("data", (chunk: Buffer) => chunks.push(chunk));
-        req.on("end", () => {
-          const body = Buffer.concat(chunks).toString();
-          res.writeHead(200, {
-            "Content-Type": "application/json",
-            "x-echo-path": url.pathname,
-          });
-          res.end(JSON.stringify({ echo: body, path: url.pathname }));
-        });
-        return;
-      }
-
-      if (req.method === "GET") {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ path: url.pathname, method: "GET" }));
-        return;
-      }
-
-      res.writeHead(404);
-      res.end();
-    });
-
-    server.on("error", reject);
-    server.listen(port, () => {
-      server.removeListener("error", reject);
-      resolve(server);
-    });
-  });
+  return {
+    // For the bridge (agent side)
+    bridgeInput: editorToBridge.readable,
+    bridgeOutput: bridgeToEditor.writable,
+    // For the editor (client side)
+    editorInput: bridgeToEditor.readable,
+    editorOutput: editorToBridge.writable,
+  };
 }
 
-function closeServer(server: Server): Promise<void> {
-  return new Promise((resolve, reject) => {
-    server.close((err) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
+/**
+ * Create a mock ChildProcess that simulates a container agent.
+ * Uses Node.js PassThrough streams for stdin/stdout and an EventEmitter
+ * for process events.
+ */
+function createMockChildProcess(): {
+  child: ChildProcess;
+  /** The "stdin" the bridge writes to (mock container reads from) */
+  containerInput: PassThrough;
+  /** The "stdout" the bridge reads from (mock container writes to) */
+  containerOutput: PassThrough;
+  /** Simulate process exit */
+  simulateExit: (code: number) => void;
+  /** Simulate process error */
+  simulateError: (err: Error) => void;
+} {
+  const containerInput = new PassThrough();
+  const containerOutput = new PassThrough();
+  const emitter = new EventEmitter();
+
+  const child = Object.assign(emitter, {
+    stdin: containerInput,
+    stdout: containerOutput,
+    stderr: new PassThrough(),
+    pid: 12345,
+    connected: true,
+    exitCode: null as number | null,
+    signalCode: null as NodeJS.Signals | null,
+    killed: false,
+    stdio: [containerInput, containerOutput, new PassThrough(), null, null] as ChildProcess["stdio"],
+    channel: undefined,
+    kill: vi.fn(() => {
+      (child as unknown as { killed: boolean }).killed = true;
+      containerInput.destroy();
+      containerOutput.destroy();
+      return true;
+    }),
+    send: vi.fn(),
+    disconnect: vi.fn(),
+    unref: vi.fn(),
+    ref: vi.fn(),
+    [Symbol.dispose]: vi.fn(),
+  }) as unknown as ChildProcess;
+
+  return {
+    child,
+    containerInput,
+    containerOutput,
+    simulateExit: (code: number) => {
+      emitter.emit("exit", code, null);
+    },
+    simulateError: (err: Error) => {
+      emitter.emit("error", err);
+    },
+  };
 }
 
-async function httpGet(port: number, path: string): Promise<{ status: number; body: string; headers: Record<string, string | string[] | undefined> }> {
-  const { request } = await import("node:http");
-  return new Promise((resolve, reject) => {
-    const req = request({ hostname: "localhost", port, path, method: "GET" }, (res) => {
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk: Buffer) => chunks.push(chunk));
-      res.on("end", () => {
-        resolve({
-          status: res.statusCode ?? 0,
-          body: Buffer.concat(chunks).toString(),
-          headers: res.headers,
-        });
-      });
-    });
-    req.on("error", reject);
-    req.end();
-  });
-}
+/**
+ * Start a mock container agent that responds to ACP messages.
+ * Runs an AgentSideConnection on the mock child process streams.
+ */
+function startMockContainerAgent(
+  containerInput: PassThrough,
+  containerOutput: PassThrough,
+  agentOverrides?: Partial<Agent>,
+) {
+  // The container reads from containerInput (what bridge writes to child.stdin)
+  // The container writes to containerOutput (what bridge reads from child.stdout)
+  const { AgentSideConnection } = require("@agentclientprotocol/sdk") as typeof import("@agentclientprotocol/sdk");
 
-async function httpPost(
-  port: number,
-  path: string,
-  body: string,
-  headers?: Record<string, string>,
-): Promise<{ status: number; body: string; headers: Record<string, string | string[] | undefined> }> {
-  const { request } = await import("node:http");
-  return new Promise((resolve, reject) => {
-    const req = request(
-      {
-        hostname: "localhost",
-        port,
-        path,
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-      },
-      (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk: Buffer) => chunks.push(chunk));
-        res.on("end", () => {
-          resolve({
-            status: res.statusCode ?? 0,
-            body: Buffer.concat(chunks).toString(),
-            headers: res.headers,
-          });
-        });
-      },
-    );
-    req.on("error", reject);
-    req.write(body);
-    req.end();
-  });
-}
+  const inputWebStream = Readable.toWeb(containerInput) as ReadableStream<Uint8Array>;
+  const outputWebStream = Writable.toWeb(containerOutput) as WritableStream<Uint8Array>;
+  const stream = ndJsonStream(outputWebStream, inputWebStream);
 
-// ── Unique port allocation to prevent test collisions ─────────────────
+  const defaultAgent: Agent = {
+    async initialize() {
+      return {
+        protocolVersion: PROTOCOL_VERSION,
+        agentCapabilities: {},
+        agentInfo: { name: "mock-agent", version: "0.1.0" },
+      };
+    },
+    async newSession(params) {
+      return {
+        sessionId: "mock-session-123",
+      };
+    },
+    async prompt(params) {
+      return {
+        stopReason: "end_turn",
+      } satisfies PromptResponse;
+    },
+    async cancel() {},
+    async authenticate() {
+      return {};
+    },
+    ...agentOverrides,
+  };
 
-let portCounter = 14200;
-function nextPort(): number {
-  return portCounter++;
+  const conn = new AgentSideConnection(() => defaultAgent, stream);
+  return conn;
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────
 
-describe("AcpBridge", () => {
-  const cleanups: Array<() => Promise<void>> = [];
+describe("AcpSdkBridge", () => {
+  const cleanups: Array<() => Promise<void> | void> = [];
 
   afterEach(async () => {
-    // Clean up in reverse order
     for (const cleanup of cleanups.reverse()) {
       await cleanup();
     }
     cleanups.length = 0;
   });
 
-  describe("start()", () => {
-    it("starts and accepts connections on host port", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
+  describe("initialize", () => {
+    it("returns capabilities without starting container", async () => {
+      const streams = createEditorStreamPair();
+      const onSessionNew = vi.fn();
 
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-      });
-      await bridge.start();
+      const bridge = new AcpSdkBridge({ onSessionNew });
+      bridge.start(streams.bridgeInput, streams.bridgeOutput);
       cleanups.push(() => bridge.stop());
 
-      const res = await httpGet(hostPort, "/health");
-      expect(res.status).toBe(200);
-      expect(JSON.parse(res.body)).toEqual({ status: "ok" });
-    });
+      // Create an editor ClientSideConnection
+      const editorStream = ndJsonStream(streams.editorOutput, streams.editorInput);
+      const sessionUpdates: SessionNotification[] = [];
+      const editorConn = new ClientSideConnection(
+        () => ({
+          requestPermission: async () => ({ outcome: { outcome: "selected" as const, optionId: "allow" } }),
+          sessionUpdate: async (params) => { sessionUpdates.push(params); },
+        }),
+        editorStream,
+      );
+      cleanups.push(() => void 0); // editorConn cleanup is handled by stream closure
 
-    it("is idempotent — calling start twice does not throw", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
+      // Send initialize
+      const response = await editorConn.initialize({
+        protocolVersion: PROTOCOL_VERSION,
+        clientCapabilities: {},
       });
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
 
-      // Second call should be a no-op
-      await bridge.start();
-
-      const res = await httpGet(hostPort, "/health");
-      expect(res.status).toBe(200);
+      expect(response.protocolVersion).toBe(PROTOCOL_VERSION);
+      expect(response.agentInfo?.name).toBe("clawmasons");
+      expect(response.agentInfo?.version).toBe("1.0.0");
+      // Container should NOT have been started
+      expect(onSessionNew).not.toHaveBeenCalled();
     });
   });
 
-  describe("agent not connected", () => {
-    it("returns 503 when agent is not connected", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
+  describe("session/new", () => {
+    it("triggers onSessionNew callback with cwd and creates container connection", async () => {
+      const streams = createEditorStreamPair();
+      const { child, containerInput, containerOutput } = createMockChildProcess();
 
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
+      let receivedCwd: string | undefined;
+      const onSessionNew = vi.fn(async (cwd: string) => {
+        receivedCwd = cwd;
+        // Start mock agent on the container side
+        startMockContainerAgent(containerInput, containerOutput);
+        return child;
       });
-      await bridge.start();
+
+      const bridge = new AcpSdkBridge({ onSessionNew });
+      bridge.start(streams.bridgeInput, streams.bridgeOutput);
       cleanups.push(() => bridge.stop());
 
-      const res = await httpPost(hostPort, "/", '{"command":"list"}');
-      expect(res.status).toBe(503);
-      expect(JSON.parse(res.body)).toEqual({ error: "Agent not connected" });
+      // Create editor connection
+      const editorStream = ndJsonStream(streams.editorOutput, streams.editorInput);
+      const editorConn = new ClientSideConnection(
+        () => ({
+          requestPermission: async () => ({ outcome: { outcome: "selected" as const, optionId: "allow" } }),
+          sessionUpdate: async () => {},
+        }),
+        editorStream,
+      );
+
+      // Initialize first
+      await editorConn.initialize({
+        protocolVersion: PROTOCOL_VERSION,
+      });
+
+      // Send session/new
+      const response = await editorConn.newSession({
+        cwd: "/projects/myapp",
+        mcpServers: [],
+      });
+
+      expect(onSessionNew).toHaveBeenCalledWith("/projects/myapp");
+      expect(receivedCwd).toBe("/projects/myapp");
+      expect(response.sessionId).toBe("mock-session-123");
     });
   });
 
-  describe("connectToAgent()", () => {
-    it("succeeds when agent is reachable", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
+  describe("prompt forwarding", () => {
+    it("forwards prompt to container and returns response", async () => {
+      const streams = createEditorStreamPair();
+      const { child, containerInput, containerOutput } = createMockChildProcess();
 
-      const agent = await createMockAgent(containerPort);
-      cleanups.push(() => closeServer(agent));
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
+      const promptReceived = vi.fn();
+      const onSessionNew = vi.fn(async () => {
+        startMockContainerAgent(containerInput, containerOutput, {
+          async prompt(params) {
+            promptReceived(params);
+            return {
+              stopReason: "end_turn",
+            } satisfies PromptResponse;
+          },
+        });
+        return child;
       });
-      await bridge.start();
+
+      const bridge = new AcpSdkBridge({ onSessionNew });
+      bridge.start(streams.bridgeInput, streams.bridgeOutput);
       cleanups.push(() => bridge.stop());
 
-      await expect(bridge.connectToAgent()).resolves.toBeUndefined();
+      const editorStream = ndJsonStream(streams.editorOutput, streams.editorInput);
+      const editorConn = new ClientSideConnection(
+        () => ({
+          requestPermission: async () => ({ outcome: { outcome: "selected" as const, optionId: "allow" } }),
+          sessionUpdate: async () => {},
+        }),
+        editorStream,
+      );
+
+      await editorConn.initialize({ protocolVersion: PROTOCOL_VERSION });
+      await editorConn.newSession({ cwd: "/test", mcpServers: [] });
+
+      // Send prompt
+      const response = await editorConn.prompt({
+        sessionId: "mock-session-123",
+        prompt: [{ type: "text", text: "hello" }],
+      });
+
+      expect(promptReceived).toHaveBeenCalled();
+      expect(response.stopReason).toBe("end_turn");
     });
 
-    it("fails when agent is not reachable", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort(); // Nothing listening here
+    it("throws error when prompt sent without active session", async () => {
+      const streams = createEditorStreamPair();
+      const onSessionNew = vi.fn();
 
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
-        connectRetryDelayMs: 10,
-      });
-      await bridge.start();
+      const bridge = new AcpSdkBridge({ onSessionNew });
+      bridge.start(streams.bridgeInput, streams.bridgeOutput);
       cleanups.push(() => bridge.stop());
 
-      await expect(bridge.connectToAgent()).rejects.toThrow(/Failed to connect to ACP agent/);
+      const editorStream = ndJsonStream(streams.editorOutput, streams.editorInput);
+      const editorConn = new ClientSideConnection(
+        () => ({
+          requestPermission: async () => ({ outcome: { outcome: "selected" as const, optionId: "allow" } }),
+          sessionUpdate: async () => {},
+        }),
+        editorStream,
+      );
+
+      await editorConn.initialize({ protocolVersion: PROTOCOL_VERSION });
+
+      // Send prompt without session/new
+      await expect(
+        editorConn.prompt({
+          sessionId: "nonexistent",
+          prompt: [{ type: "text", text: "hello" }],
+        }),
+      ).rejects.toThrow();
     });
+  });
 
-    it("retries and succeeds when agent becomes reachable", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
+  describe("notification forwarding", () => {
+    it("forwards sessionUpdate from container to editor", async () => {
+      const streams = createEditorStreamPair();
+      const { child, containerInput, containerOutput } = createMockChildProcess();
 
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 5,
-        connectRetryDelayMs: 50,
+      let containerConn: import("@agentclientprotocol/sdk").AgentSideConnection | undefined;
+      const onSessionNew = vi.fn(async () => {
+        containerConn = startMockContainerAgent(containerInput, containerOutput);
+        return child;
       });
-      await bridge.start();
+
+      const bridge = new AcpSdkBridge({ onSessionNew });
+      bridge.start(streams.bridgeInput, streams.bridgeOutput);
       cleanups.push(() => bridge.stop());
 
-      // Start the agent after a brief delay
-      let agent: Server | undefined;
-      setTimeout(async () => {
-        agent = await createMockAgent(containerPort);
-      }, 100);
+      const sessionUpdates: SessionNotification[] = [];
+      const editorStream = ndJsonStream(streams.editorOutput, streams.editorInput);
+      const editorConn = new ClientSideConnection(
+        () => ({
+          requestPermission: async () => ({ outcome: { outcome: "selected" as const, optionId: "allow" } }),
+          sessionUpdate: async (params) => {
+            sessionUpdates.push(params);
+          },
+        }),
+        editorStream,
+      );
 
-      await expect(bridge.connectToAgent()).resolves.toBeUndefined();
+      await editorConn.initialize({ protocolVersion: PROTOCOL_VERSION });
+      await editorConn.newSession({ cwd: "/test", mcpServers: [] });
 
-      if (agent) {
-        cleanups.push(() => closeServer(agent!));
+      // Send sessionUpdate from container
+      if (containerConn) {
+        await containerConn.sessionUpdate({
+          sessionId: "mock-session-123",
+          update: {
+            sessionUpdate: "agent_message_chunk",
+            content: { type: "text", text: "hello from container" },
+          },
+        });
+
+        // Give time for the notification to propagate
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
+
+      expect(sessionUpdates.length).toBeGreaterThanOrEqual(1);
+      expect(sessionUpdates[0]!.sessionId).toBe("mock-session-123");
     });
   });
 
-  describe("relay", () => {
-    it("relays POST requests host -> container -> host", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
+  describe("container crash recovery", () => {
+    it("detects container exit and allows new session", async () => {
+      const streams = createEditorStreamPair();
+      const { child: child1, containerInput: input1, containerOutput: output1, simulateExit } = createMockChildProcess();
+      const { child: child2, containerInput: input2, containerOutput: output2 } = createMockChildProcess();
 
-      const agent = await createMockAgent(containerPort);
-      cleanups.push(() => closeServer(agent));
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
-      });
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-      await bridge.connectToAgent();
-
-      const res = await httpPost(hostPort, "/", '{"command":"list"}');
-      expect(res.status).toBe(200);
-
-      const body = JSON.parse(res.body);
-      expect(body.echo).toBe('{"command":"list"}');
-      expect(body.path).toBe("/");
-    });
-
-    it("relays GET requests and preserves path", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      const agent = await createMockAgent(containerPort);
-      cleanups.push(() => closeServer(agent));
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
-      });
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-      await bridge.connectToAgent();
-
-      const res = await httpGet(hostPort, "/some/path");
-      expect(res.status).toBe(200);
-
-      const body = JSON.parse(res.body);
-      expect(body.path).toBe("/some/path");
-      expect(body.method).toBe("GET");
-    });
-
-    it("relays response headers from agent to client", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      const agent = await createMockAgent(containerPort);
-      cleanups.push(() => closeServer(agent));
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
-      });
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-      await bridge.connectToAgent();
-
-      const res = await httpPost(hostPort, "/test-path", '{"data":"value"}');
-      expect(res.status).toBe(200);
-      expect(res.headers["x-echo-path"]).toBe("/test-path");
-    });
-  });
-
-  describe("events", () => {
-    it("emits onClientConnect on first client request", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      const agent = await createMockAgent(containerPort);
-      cleanups.push(() => closeServer(agent));
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
+      let callCount = 0;
+      const onSessionNew = vi.fn(async () => {
+        callCount++;
+        if (callCount === 1) {
+          startMockContainerAgent(input1, output1);
+          return child1;
+        }
+        startMockContainerAgent(input2, output2);
+        return child2;
       });
 
-      const connectFn = vi.fn();
-      bridge.onClientConnect = connectFn;
-
-      await bridge.start();
+      const bridge = new AcpSdkBridge({ onSessionNew });
+      bridge.start(streams.bridgeInput, streams.bridgeOutput);
       cleanups.push(() => bridge.stop());
-      await bridge.connectToAgent();
 
-      // First request triggers connect
-      await httpPost(hostPort, "/", '{"command":"test"}');
-      expect(connectFn).toHaveBeenCalledTimes(1);
+      const editorStream = ndJsonStream(streams.editorOutput, streams.editorInput);
+      const editorConn = new ClientSideConnection(
+        () => ({
+          requestPermission: async () => ({ outcome: { outcome: "selected" as const, optionId: "allow" } }),
+          sessionUpdate: async () => {},
+        }),
+        editorStream,
+      );
 
-      // Second request does not trigger another connect
-      await httpPost(hostPort, "/", '{"command":"test2"}');
-      expect(connectFn).toHaveBeenCalledTimes(1);
-    });
+      await editorConn.initialize({ protocolVersion: PROTOCOL_VERSION });
 
-    it("emits onClientDisconnect after idle timeout", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
+      // First session
+      const resp1 = await editorConn.newSession({ cwd: "/test1", mcpServers: [] });
+      expect(resp1.sessionId).toBe("mock-session-123");
 
-      const agent = await createMockAgent(containerPort);
-      cleanups.push(() => closeServer(agent));
+      // Simulate container crash
+      simulateExit(1);
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
-        idleTimeoutMs: 50, // Very short for testing
-      });
-
-      const disconnectFn = vi.fn();
-      bridge.onClientDisconnect = disconnectFn;
-
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-      await bridge.connectToAgent();
-
-      await httpPost(hostPort, "/", '{"command":"test"}');
-      expect(disconnectFn).toHaveBeenCalledTimes(0);
-
-      // Wait for idle timeout
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      expect(disconnectFn).toHaveBeenCalledTimes(1);
-    });
-
-    it("emits onAgentError when agent is unreachable during relay", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      // Start agent, connect, then kill it
-      const agent = await createMockAgent(containerPort);
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
-      });
-
-      const errorFn = vi.fn();
-      bridge.onAgentError = errorFn;
-
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-      await bridge.connectToAgent();
-
-      // Kill the agent
-      await closeServer(agent);
-
-      // Try to relay — should get 502 and onAgentError
-      const res = await httpPost(hostPort, "/", '{"command":"test"}');
-      expect(res.status).toBe(502);
-      expect(JSON.parse(res.body)).toEqual({ error: "Bad Gateway — agent unreachable" });
-      expect(errorFn).toHaveBeenCalledTimes(1);
-      expect(errorFn.mock.calls[0]![0]).toBeInstanceOf(Error);
+      // Second session should work
+      const resp2 = await editorConn.newSession({ cwd: "/test2", mcpServers: [] });
+      expect(resp2.sessionId).toBe("mock-session-123");
+      expect(onSessionNew).toHaveBeenCalledTimes(2);
     });
   });
 
   describe("stop()", () => {
-    it("tears down cleanly", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
+    it("kills child process and cleans up", async () => {
+      const streams = createEditorStreamPair();
+      const { child, containerInput, containerOutput } = createMockChildProcess();
 
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
+      const onSessionNew = vi.fn(async () => {
+        startMockContainerAgent(containerInput, containerOutput);
+        return child;
       });
-      await bridge.start();
+
+      const bridge = new AcpSdkBridge({ onSessionNew });
+      bridge.start(streams.bridgeInput, streams.bridgeOutput);
+
+      const editorStream = ndJsonStream(streams.editorOutput, streams.editorInput);
+      const editorConn = new ClientSideConnection(
+        () => ({
+          requestPermission: async () => ({ outcome: { outcome: "selected" as const, optionId: "allow" } }),
+          sessionUpdate: async () => {},
+        }),
+        editorStream,
+      );
+
+      await editorConn.initialize({ protocolVersion: PROTOCOL_VERSION });
+      await editorConn.newSession({ cwd: "/test", mcpServers: [] });
+
       await bridge.stop();
 
-      // After stop, connections should be refused
-      await expect(httpGet(hostPort, "/health")).rejects.toThrow();
+      expect(child.kill).toHaveBeenCalled();
     });
 
     it("is idempotent — calling stop twice does not throw", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
+      const streams = createEditorStreamPair();
+      const bridge = new AcpSdkBridge({ onSessionNew: vi.fn() });
+      bridge.start(streams.bridgeInput, streams.bridgeOutput);
 
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-      });
-      await bridge.start();
       await bridge.stop();
       await expect(bridge.stop()).resolves.toBeUndefined();
     });
   });
 
-  describe("onSessionNew (deferred agent start)", () => {
-    it("calls onSessionNew with cwd from POST body when agent not connected", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
+  describe("connection lifecycle", () => {
+    it("closed resolves when editor disconnects", async () => {
+      const streams = createEditorStreamPair();
+      const bridge = new AcpSdkBridge({ onSessionNew: vi.fn() });
+      bridge.start(streams.bridgeInput, streams.bridgeOutput);
 
-      const agent = await createMockAgent(containerPort);
-      cleanups.push(() => closeServer(agent));
+      // Close the editor output to simulate editor disconnect
+      const writer = streams.editorOutput.getWriter();
+      await writer.close();
 
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
-      });
-
-      let receivedCwd: string | undefined;
-      bridge.onSessionNew = async (cwd: string) => {
-        receivedCwd = cwd;
-        // Simulate starting agent and connecting
-        await bridge.connectToAgent();
-      };
-
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-
-      // Send POST — agent not connected yet, so onSessionNew should be called
-      const res = await httpPost(hostPort, "/", JSON.stringify({ params: { cwd: "/projects/myapp" } }));
-
-      expect(res.status).toBe(200);
-      expect(receivedCwd).toBe("/projects/myapp");
+      // The bridge's closed should resolve
+      await expect(bridge.closed).resolves.toBeUndefined();
     });
-
-    it("returns stub response for initialize (no cwd) without starting agent", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
-      });
-
-      let sessionNewCalled = false;
-      bridge.onSessionNew = async () => {
-        sessionNewCalled = true;
-      };
-
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-
-      const res = await httpPost(hostPort, "/", JSON.stringify({
-        jsonrpc: "2.0",
-        method: "initialize",
-        id: 1,
-        params: { protocolVersion: "2025-03-26", capabilities: {} },
-      }));
-
-      expect(res.status).toBe(200);
-      const body = JSON.parse(res.body);
-      expect(body.jsonrpc).toBe("2.0");
-      expect(body.id).toBe(1);
-      expect(body.result.protocolVersion).toBe("2025-03-26");
-      expect(body.result.serverInfo.name).toBe("clawmasons");
-      // onSessionNew should NOT have been called
-      expect(sessionNewCalled).toBe(false);
-    });
-
-    it("returns error stub for non-initialize pre-session message without cwd", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
-      });
-
-      bridge.onSessionNew = async () => {
-        // Should not be called
-      };
-
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-
-      const res = await httpPost(hostPort, "/", JSON.stringify({
-        jsonrpc: "2.0",
-        method: "session/prompt",
-        id: 5,
-        params: { text: "hello" },
-      }));
-
-      expect(res.status).toBe(200);
-      const body = JSON.parse(res.body);
-      expect(body.jsonrpc).toBe("2.0");
-      expect(body.id).toBe(5);
-      expect(body.error.code).toBe(-32000);
-      expect(body.error.message).toContain("session/new");
-    });
-
-    it("relays buffered request to agent after onSessionNew resolves", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      const agent = await createMockAgent(containerPort);
-      cleanups.push(() => closeServer(agent));
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
-      });
-
-      bridge.onSessionNew = async () => {
-        await bridge.connectToAgent();
-      };
-
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-
-      const body = JSON.stringify({ method: "initialize", params: { cwd: "/test" } });
-      const res = await httpPost(hostPort, "/", body);
-
-      expect(res.status).toBe(200);
-      // The mock agent echoes the body back
-      const parsed = JSON.parse(res.body);
-      expect(parsed.echo).toBe(body);
-    });
-
-    it("returns 500 when onSessionNew callback fails", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-      });
-
-      bridge.onSessionNew = async () => {
-        throw new Error("Agent container failed to start");
-      };
-
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-
-      const res = await httpPost(hostPort, "/", JSON.stringify({ params: { cwd: "/test" } }));
-
-      expect(res.status).toBe(500);
-      const parsed = JSON.parse(res.body);
-      expect(parsed.error).toContain("Session startup failed");
-    });
-
-    it("returns 503 when no onSessionNew and agent not connected", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-      });
-
-      // No onSessionNew set — old behavior
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-
-      const res = await httpPost(hostPort, "/", '{"command":"list"}');
-      expect(res.status).toBe(503);
-      expect(JSON.parse(res.body)).toEqual({ error: "Agent not connected" });
-    });
-
-    it("returns 503 when concurrent session starts are attempted", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      const agent = await createMockAgent(containerPort);
-      cleanups.push(() => closeServer(agent));
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
-      });
-
-      // Slow onSessionNew to create a window for concurrent requests
-      bridge.onSessionNew = async () => {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        await bridge.connectToAgent();
-      };
-
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-
-      // Send two concurrent session/new requests (both have cwd)
-      const [res1, res2] = await Promise.all([
-        httpPost(hostPort, "/", JSON.stringify({ method: "session/new", params: { cwd: "/test1" } })),
-        httpPost(hostPort, "/", JSON.stringify({ method: "session/new", params: { cwd: "/test2" } })),
-      ]);
-
-      // One should succeed (200) and the other should get 503
-      const statuses = [res1.status, res2.status].sort();
-      expect(statuses).toEqual([200, 503]);
-    });
-  });
-
-  describe("resetForNewSession()", () => {
-    it("allows new onSessionNew after reset", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      const agent = await createMockAgent(containerPort);
-      cleanups.push(() => closeServer(agent));
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-        connectRetries: 0,
-      });
-
-      let sessionNewCallCount = 0;
-      bridge.onSessionNew = async () => {
-        sessionNewCallCount++;
-        await bridge.connectToAgent();
-      };
-
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-
-      // First session
-      await httpPost(hostPort, "/", JSON.stringify({ params: { cwd: "/test1" } }));
-      expect(sessionNewCallCount).toBe(1);
-
-      // Second request should relay directly (agent already connected)
-      await httpPost(hostPort, "/", JSON.stringify({ data: "more" }));
-      expect(sessionNewCallCount).toBe(1); // Not called again
-
-      // Reset for new session
-      bridge.resetForNewSession();
-
-      // Third request triggers onSessionNew again
-      await httpPost(hostPort, "/", JSON.stringify({ params: { cwd: "/test2" } }));
-      expect(sessionNewCallCount).toBe(2);
-    });
-
-    it("server remains running after reset", async () => {
-      const hostPort = nextPort();
-      const containerPort = nextPort();
-
-      const bridge = new AcpBridge({
-        hostPort,
-        containerHost: "localhost",
-        containerPort,
-      });
-      await bridge.start();
-      cleanups.push(() => bridge.stop());
-
-      bridge.resetForNewSession();
-
-      // Health endpoint should still work
-      const res = await httpGet(hostPort, "/health");
-      expect(res.status).toBe(200);
-    });
-  });
-});
-
-// ── parseRequestBody ────────────────────────────────────────────────────
-
-describe("parseRequestBody", () => {
-  it("extracts cwd and method from JSON-RPC session/new", () => {
-    const body = Buffer.from(JSON.stringify({
-      jsonrpc: "2.0", method: "session/new", id: 2,
-      params: { cwd: "/projects/app", mcpServers: [] },
-    }));
-    const result = parseRequestBody(body);
-    expect(result.cwd).toBe("/projects/app");
-    expect(result.method).toBe("session/new");
-    expect(result.id).toBe(2);
-  });
-
-  it("returns null cwd for initialize (no cwd field)", () => {
-    const body = Buffer.from(JSON.stringify({
-      jsonrpc: "2.0", method: "initialize", id: 1,
-      params: { protocolVersion: "2025-03-26", capabilities: {} },
-    }));
-    const result = parseRequestBody(body);
-    expect(result.cwd).toBeNull();
-    expect(result.method).toBe("initialize");
-    expect(result.id).toBe(1);
-  });
-
-  it("returns null cwd for invalid JSON", () => {
-    const body = Buffer.from("not json");
-    const result = parseRequestBody(body);
-    expect(result.cwd).toBeNull();
-    expect(result.method).toBeNull();
-    expect(result.id).toBeNull();
-  });
-
-  it("extracts top-level cwd", () => {
-    const body = Buffer.from(JSON.stringify({ cwd: "/test" }));
-    const result = parseRequestBody(body);
-    expect(result.cwd).toBe("/test");
-  });
-
-  it("returns null cwd for empty string", () => {
-    const body = Buffer.from(JSON.stringify({ params: { cwd: "" } }));
-    const result = parseRequestBody(body);
-    expect(result.cwd).toBeNull();
-  });
-});
-
-// ── extractCwdFromBody (deprecated) ─────────────────────────────────────
-
-describe("extractCwdFromBody", () => {
-  it("extracts cwd from params.cwd (JSON-RPC style)", () => {
-    const body = Buffer.from(JSON.stringify({ method: "initialize", params: { cwd: "/projects/app" } }));
-    expect(extractCwdFromBody(body)).toBe("/projects/app");
-  });
-
-  it("extracts cwd from top-level cwd field", () => {
-    const body = Buffer.from(JSON.stringify({ cwd: "/projects/app" }));
-    expect(extractCwdFromBody(body)).toBe("/projects/app");
-  });
-
-  it("prefers params.cwd over top-level cwd", () => {
-    const body = Buffer.from(JSON.stringify({ cwd: "/top-level", params: { cwd: "/params-level" } }));
-    expect(extractCwdFromBody(body)).toBe("/params-level");
-  });
-
-  it("returns process.cwd() for empty cwd string", () => {
-    const body = Buffer.from(JSON.stringify({ params: { cwd: "" } }));
-    expect(extractCwdFromBody(body)).toBe(process.cwd());
-  });
-
-  it("returns process.cwd() for non-string cwd", () => {
-    const body = Buffer.from(JSON.stringify({ params: { cwd: 42 } }));
-    expect(extractCwdFromBody(body)).toBe(process.cwd());
-  });
-
-  it("returns process.cwd() for invalid JSON", () => {
-    const body = Buffer.from("not json at all");
-    expect(extractCwdFromBody(body)).toBe(process.cwd());
-  });
-
-  it("returns process.cwd() when no cwd field present", () => {
-    const body = Buffer.from(JSON.stringify({ method: "initialize", params: {} }));
-    expect(extractCwdFromBody(body)).toBe(process.cwd());
-  });
-
-  it("returns process.cwd() for empty body", () => {
-    const body = Buffer.from("");
-    expect(extractCwdFromBody(body)).toBe(process.cwd());
   });
 });
