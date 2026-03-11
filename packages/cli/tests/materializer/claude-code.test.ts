@@ -436,17 +436,8 @@ describe("claudeCodeMaterializer", () => {
 
         expect(result.has(".chapter/acp.json")).toBe(true);
         const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
-        expect(acpConfig.port).toBe(3002);
         expect(acpConfig.command).toBe("claude-agent-acp");
-      });
-
-      it("uses agent acp.port when specified", () => {
-        const agent = makeRepoOpsAgent();
-        agent.acp = { port: 4000 };
-        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
-
-        const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
-        expect(acpConfig.port).toBe(4000);
+        expect(acpConfig.port).toBeUndefined();
       });
 
       it("maps claude-code runtime to claude-agent-acp command", () => {

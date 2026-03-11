@@ -153,17 +153,8 @@ describe("mcpAgentMaterializer", () => {
 
         expect(result.has(".chapter/acp.json")).toBe(true);
         const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
-        expect(acpConfig.port).toBe(3002);
         expect(acpConfig.command).toBe("node src/index.js --acp");
-      });
-
-      it("uses agent acp.port when specified", () => {
-        const agent = makeMcpTestAgent();
-        agent.acp = { port: 6000 };
-        const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000", undefined, { acpMode: true });
-
-        const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
-        expect(acpConfig.port).toBe(6000);
+        expect(acpConfig.port).toBeUndefined();
       });
 
       it("includes .chapter/acp.json in result when in ACP mode", () => {

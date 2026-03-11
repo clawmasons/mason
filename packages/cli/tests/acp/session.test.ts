@@ -80,7 +80,7 @@ function makeMockDeps(overrides?: {
 function makeMockChildProcess(): ChildProcess {
   const emitter = new EventEmitter();
   const child = emitter as unknown as ChildProcess;
-  child.pid = 12345;
+  Object.defineProperty(child, "pid", { value: 12345, writable: true });
   child.kill = vi.fn().mockReturnValue(true);
   child.stdin = null;
   child.stdout = null;

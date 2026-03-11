@@ -68,11 +68,10 @@ export const mcpAgentMaterializer: RuntimeMaterializer = {
     // AGENTS.md — agent identity and role documentation
     result.set("AGENTS.md", generateAgentsMd(agent));
 
-    // ACP mode: generate .chapter/acp.json with port and command
+    // ACP mode: generate .chapter/acp.json with command
     if (options?.acpMode) {
-      const acpPort = agent.acp?.port ?? 3002;
       const acpCommand = ACP_RUNTIME_COMMANDS["node"] ?? "node src/index.js --acp";
-      result.set(".chapter/acp.json", generateAcpConfigJson(acpPort, acpCommand));
+      result.set(".chapter/acp.json", generateAcpConfigJson(acpCommand));
     }
 
     return result;

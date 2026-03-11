@@ -8,10 +8,7 @@
     "description": "General-purpose MCP tool-calling agent (no LLM required)",
     "runtimes": ["mcp-agent"],
     "roles": ["@{{projectScope}}/role-chapter-creator"],
-    "credentials": ["TEST_TOKEN", "TEST_LLM_TOKEN"],
-    "acp": {
-      "port": 3002
-    }
+    "credentials": ["TEST_TOKEN", "TEST_LLM_TOKEN"]
   },
   "dependencies": {
     "@clawmasons/mcp-agent": "*"
