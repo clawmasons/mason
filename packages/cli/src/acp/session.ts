@@ -6,14 +6,17 @@
  * The credential service runs in-process on the host. The lifecycle is:
  *
  *   1. `startInfrastructure()` — `docker compose up -d` proxy
- *   2. `startAgent(cwd)` — `docker compose run -d` the agent with /workspace mount
- *   3. `stopAgent()` — stops only the agent container
+ *   2. `startAgentProcess(cwd)` — `docker compose run` (foreground, piped stdio)
+ *      or `startAgent(cwd)` — `docker compose run -d` (legacy detached mode)
+ *   3. `stopAgent()` — stops/kills the agent container
  *   4. `stop()` — `docker compose down` everything
  *
  * PRD refs: REQ-005 (Docker Session Lifecycle, ACP Session CWD Support)
  */
 
 import * as crypto from "node:crypto";
+import * as child_process from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
@@ -35,7 +38,10 @@ export interface AcpSessionConfig {
   agent: string;
   /** Role short name (e.g., "writer") */
   role: string;
-  /** ACP agent port inside the container (default: 3002) */
+  /**
+   * @deprecated No longer used. Port exposure removed in favor of piped stdio.
+   * Kept temporarily for backward compatibility with callers (removed in Change 4).
+   */
   acpPort?: number;
   /** Internal proxy port (default: 3000) */
   proxyPort?: number;
@@ -56,8 +62,6 @@ export interface SessionInfo {
   sessionDir: string;
   /** Path to generated docker-compose.yml */
   composeFile: string;
-  /** ACP port exposed on the host */
-  acpPort: number;
   /** Name of the proxy service in compose */
   proxyServiceName: string;
   /** Name of the agent service in compose */
@@ -90,8 +94,6 @@ export interface AgentSessionInfo {
   sessionDir: string;
   /** Path to the shared docker-compose.yml */
   composeFile: string;
-  /** ACP port exposed on the host */
-  acpPort: number;
   /** Name of the agent service */
   agentServiceName: string;
   /** The project directory mounted as /workspace */
@@ -112,6 +114,12 @@ export interface AcpSessionDeps {
   generateSessionIdFn?: () => string;
   /** Override docker compose check (for testing). */
   checkDockerComposeFn?: () => void;
+  /** Override child_process.spawn (for testing startAgentProcess). */
+  spawnFn?: (
+    command: string,
+    args: string[],
+    options: child_process.SpawnOptions,
+  ) => ChildProcess;
   /** Optional logger for diagnostics. */
   logger?: AcpLogger;
 }
@@ -133,7 +141,6 @@ export function generateAcpComposeYml(opts: {
   logsDir: string;
   proxyToken: string;
   credentialProxyToken: string;
-  acpPort: number;
   proxyPort?: number;
   acpClient?: string;
   acpCommand?: string[];
@@ -147,7 +154,6 @@ export function generateAcpComposeYml(opts: {
     logsDir,
     proxyToken,
     credentialProxyToken,
-    acpPort,
     proxyPort,
     acpClient,
     acpCommand,
@@ -221,9 +227,7 @@ ${proxyEnvLines.join("\n")}${proxyPortsSection}
     depends_on:
       - ${proxyServiceName}
     environment:
-${agentEnvLines.join("\n")}
-    ports:
-      - "${acpPort}:${acpPort}"${commandLine}
+${agentEnvLines.join("\n")}${commandLine}
     init: true
     restart: "no"
     profiles:
@@ -244,6 +248,7 @@ export class AcpSession {
   private infraRunning = false;
   private agentInfo: AgentSessionInfo | null = null;
   private agentRunning = false;
+  private agentChild: ChildProcess | null = null;
 
   constructor(config: AcpSessionConfig, deps?: AcpSessionDeps) {
     this.config = config;
@@ -252,6 +257,7 @@ export class AcpSession {
       execComposeFn: deps?.execComposeFn ?? execComposeCommand,
       generateSessionIdFn: deps?.generateSessionIdFn ?? generateSessionId,
       checkDockerComposeFn: deps?.checkDockerComposeFn ?? checkDockerCompose,
+      spawnFn: deps?.spawnFn ?? child_process.spawn,
       logger: deps?.logger ?? noopLogger,
     };
   }
@@ -266,7 +272,6 @@ export class AcpSession {
     }
 
     const { projectDir, agent, role } = this.config;
-    const acpPort = this.config.acpPort ?? 3002;
 
     // Pre-flight checks
     this.deps.checkDockerComposeFn();
@@ -295,7 +300,6 @@ export class AcpSession {
       logsDir,
       proxyToken,
       credentialProxyToken,
-      acpPort,
       proxyPort: this.config.proxyPort,
       acpClient: this.config.acpClient,
       acpCommand: this.config.acpCommand,
@@ -318,7 +322,6 @@ export class AcpSession {
       sessionId,
       sessionDir,
       composeFile,
-      acpPort,
       proxyServiceName,
       agentServiceName,
     };
@@ -339,7 +342,6 @@ export class AcpSession {
     }
 
     const { projectDir, agent, role } = this.config;
-    const acpPort = this.config.acpPort ?? 3002;
 
     // Pre-flight checks
     this.deps.checkDockerComposeFn();
@@ -368,7 +370,6 @@ export class AcpSession {
       logsDir,
       proxyToken,
       credentialProxyToken,
-      acpPort,
       proxyPort: this.config.proxyPort,
       acpClient: this.config.acpClient,
       acpCommand: this.config.acpCommand,
@@ -420,11 +421,10 @@ export class AcpSession {
       throw new Error("Agent is already running. Call stopAgent() first.");
     }
 
-    const acpPort = this.config.acpPort ?? 3002;
     const agentServiceName = this.infraInfo.agentServiceName;
 
     // Use docker compose run with a volume override for this session's CWD
-    const runArgs = ["run", "-d", "--rm", "--build", "--service-ports", "-v", `${projectDir}:/workspace`, agentServiceName];
+    const runArgs = ["run", "-d", "--rm", "--build", "-v", `${projectDir}:/workspace`, agentServiceName];
     this.deps.logger.log(`[session] docker compose -f ${this.infraInfo.composeFile} ${runArgs.join(" ")}`);
     const exitCode = await this.deps.execComposeFn(
       this.infraInfo.composeFile,
@@ -439,7 +439,6 @@ export class AcpSession {
       sessionId: this.infraInfo.sessionId,
       sessionDir: this.infraInfo.sessionDir,
       composeFile: this.infraInfo.composeFile,
-      acpPort,
       agentServiceName,
       projectDir,
     };
@@ -449,24 +448,85 @@ export class AcpSession {
   }
 
   /**
+   * Start an agent container as a foreground child process with piped stdio.
+   *
+   * Unlike `startAgent()` (which uses `docker compose run -d`), this method
+   * spawns `docker compose run` without `-d` so the child process's
+   * stdin/stdout can be wrapped with `ndJsonStream()` for direct ACP
+   * communication. No port mapping or container ID discovery is needed.
+   *
+   * @param projectDir The project directory to mount as /workspace.
+   * @returns The spawned child process and agent session info.
+   */
+  startAgentProcess(projectDir: string): { child: ChildProcess; agentInfo: AgentSessionInfo } {
+    if (!this.infraRunning || !this.infraInfo) {
+      throw new Error("Infrastructure must be running before starting an agent. Call startInfrastructure() first.");
+    }
+
+    if (this.agentRunning) {
+      throw new Error("Agent is already running. Call stopAgent() first.");
+    }
+
+    const agentServiceName = this.infraInfo.agentServiceName;
+
+    // Spawn docker compose run as a foreground process with piped stdio.
+    // No -d flag: the child process IS the transport.
+    const composeArgs = [
+      "compose", "-f", this.infraInfo.composeFile,
+      "run", "--rm", "--build",
+      "-v", `${projectDir}:/workspace`,
+      agentServiceName,
+    ];
+
+    this.deps.logger.log(`[session] docker ${composeArgs.join(" ")}`);
+
+    const child = this.deps.spawnFn("docker", composeArgs, {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    this.agentInfo = {
+      sessionId: this.infraInfo.sessionId,
+      sessionDir: this.infraInfo.sessionDir,
+      composeFile: this.infraInfo.composeFile,
+      agentServiceName,
+      projectDir,
+    };
+
+    this.agentChild = child;
+    this.agentRunning = true;
+
+    return { child, agentInfo: this.agentInfo };
+  }
+
+  /**
    * Stop only the agent container. Infrastructure remains running.
    * Idempotent — calling when agent is not running is a no-op.
+   *
+   * If a child process exists (from `startAgentProcess()`), it is killed.
+   * Otherwise, the agent service is stopped via compose commands.
    */
   async stopAgent(): Promise<void> {
     if (!this.agentRunning || !this.agentInfo) {
       return;
     }
 
-    // Stop and remove the agent service only
-    this.deps.logger.log(`[session] Stopping agent service ${this.agentInfo.agentServiceName}`);
-    await this.deps.execComposeFn(
-      this.agentInfo.composeFile,
-      ["--profile", "agent", "stop", this.agentInfo.agentServiceName],
-    );
-    await this.deps.execComposeFn(
-      this.agentInfo.composeFile,
-      ["--profile", "agent", "rm", "-f", this.agentInfo.agentServiceName],
-    );
+    // If we have a child process (from startAgentProcess), kill it
+    if (this.agentChild) {
+      this.deps.logger.log(`[session] Killing agent child process`);
+      this.agentChild.kill();
+      this.agentChild = null;
+    } else {
+      // Legacy path: stop via compose commands (from startAgent)
+      this.deps.logger.log(`[session] Stopping agent service ${this.agentInfo.agentServiceName}`);
+      await this.deps.execComposeFn(
+        this.agentInfo.composeFile,
+        ["--profile", "agent", "stop", this.agentInfo.agentServiceName],
+      );
+      await this.deps.execComposeFn(
+        this.agentInfo.composeFile,
+        ["--profile", "agent", "rm", "-f", this.agentInfo.agentServiceName],
+      );
+    }
     this.deps.logger.log("[session] Agent stopped and removed");
 
     this.agentRunning = false;
@@ -478,6 +538,12 @@ export class AcpSession {
    * Idempotent — calling stop when not running is a no-op.
    */
   async stop(): Promise<void> {
+    // Kill child process if one exists (from startAgentProcess)
+    if (this.agentChild) {
+      this.agentChild.kill();
+      this.agentChild = null;
+    }
+
     // Stop infrastructure + agent via compose down
     if (this.infraRunning && this.infraInfo) {
       await this.deps.execComposeFn(this.infraInfo.composeFile, ["--profile", "agent", "down"]);

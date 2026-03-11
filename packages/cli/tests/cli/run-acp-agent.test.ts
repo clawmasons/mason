@@ -128,7 +128,6 @@ function makeMockSession() {
     sessionId: "agent-session-01",
     sessionDir: "/fake/agent/dir",
     composeFile: "/fake/agent-compose.yml",
-    acpPort: 3002,
     agentServiceName: "agent-test-agent-test-role",
     projectDir: "/fake/project",
   };

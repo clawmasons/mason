@@ -86,7 +86,7 @@ Modify `AcpSession` to stop exposing port 3002 in docker-compose and add a new `
 
 **PRD refs:** REQ-SDK-005, REQ-SDK-011
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-11-session-module-sdk/proposal.md) · [design](../../changes/archive/2026-03-11-session-module-sdk/design.md) · [tasks](../../changes/archive/2026-03-11-session-module-sdk/tasks.md)
 
 ---
 
