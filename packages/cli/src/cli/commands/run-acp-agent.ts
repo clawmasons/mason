@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { Readable, Writable } from "node:stream";
 import type { Command } from "commander";
 import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
 import { computeToolFilters } from "@clawmasons/shared";
@@ -7,7 +8,7 @@ import { ACP_RUNTIME_COMMANDS } from "../../materializer/common.js";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
-import { AcpBridge, type AcpBridgeConfig } from "../../acp/bridge.js";
+import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
 import { CredentialService, CredentialWSClient } from "@clawmasons/credential-service";
 import {
   getClawmasonsHome,
@@ -21,18 +22,15 @@ import { initLodge, type LodgeInitOptions, type LodgeInitResult } from "./lodge-
 import { runInit, type InitOptions } from "./init.js";
 import { runBuild } from "./build.js";
 import { createFileLogger, type AcpLogger } from "../../acp/logger.js";
-import { StdioBridge } from "../../acp/stdio-bridge.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
 export interface RunAcpAgentOptions {
   agent?: string;
   role: string;
-  port?: number;
   proxyPort?: number;
   chapter?: string;
   initAgent?: string;
-  transport?: "stdio" | "http";
 }
 
 /**
@@ -45,8 +43,8 @@ export interface RunAcpAgentDeps {
   resolveAgentFn?: (name: string, packages: Map<string, DiscoveredPackage>) => ResolvedAgent;
   /** Override AcpSession construction (for testing). */
   createSessionFn?: (config: AcpSessionConfig, sessionDeps?: AcpSessionDeps) => AcpSession;
-  /** Override AcpBridge construction (for testing). */
-  createBridgeFn?: (config: AcpBridgeConfig) => AcpBridge;
+  /** Override AcpSdkBridge construction (for testing). */
+  createBridgeFn?: (config: AcpSdkBridgeConfig) => AcpSdkBridge;
   /** Override CLAWMASONS_HOME resolution (for testing). */
   getClawmasonsHomeFn?: () => string;
   /** Override chapters.json role lookup (for testing). */
@@ -137,19 +135,13 @@ Bootstrap Flow (--chapter initiate):
   The agent then starts against the bootstrapped chapter directory.
   Use this for zero-setup onboarding with a new lodge.
 
-Transport Modes:
-  --transport stdio  (default) Communicates via stdin/stdout JSON-RPC.
-                     Suitable for editors that spawn the server as a subprocess.
-  --transport http   Listens on --port (default 3001) for HTTP requests.
-                     Use when connecting from a separate client process.
-
-  Logs are always written to <roleDir>/logs/acp.log regardless of
-  transport mode. In stdio mode, stdout is reserved for protocol
-  messages; all diagnostics go to the log file only.
+  Logs are always written to <roleDir>/logs/acp.log. Stdout is
+  reserved for ACP protocol messages; all diagnostics go to the
+  log file only.
 
 ACP Client Configuration Example (Zed / acpx / VS Code):
   Add to your editor's agent_servers config (e.g. Zed settings.json).
-  The default stdio transport works with command-based spawning:
+  The agent communicates via stdio ndjson (ACP protocol):
 
   {
     "agent_servers": {
@@ -172,26 +164,6 @@ ACP Client Configuration Example (Zed / acpx / VS Code):
       }
     }
   }
-
-  For HTTP transport (e.g. remote or URL-based clients):
-
-  {
-    "agent_servers": {
-      "Clawmasons": {
-        "type": "custom",
-        "command": "npx",
-        "args": [
-          "clawmasons",
-          "acp",
-          "--transport", "http",
-          "--role", "<role-name>"
-        ],
-        "env": {
-          "CLAWMASONS_HOME": "~/.clawmasons"
-        }
-      }
-    }
-  }
 `;
 
 // ── Command Registration ──────────────────────────────────────────────
@@ -202,19 +174,15 @@ export function registerRunAcpAgentCommand(program: Command): void {
     .description("Start an ACP-compliant agent endpoint for editor integration")
     .requiredOption("--role <name>", "Role to use for the session")
     .option("--agent <name>", "Agent package name (auto-detected if only one)")
-    .option("--port <number>", "ACP endpoint port for http transport (default: 3001)", "3001")
     .option("--proxy-port <number>", "Internal chapter proxy port (default: 3000)", "3000")
-    .option("--transport <mode>", "Transport mode: stdio (default) or http", "stdio")
     .option("--chapter <name>", "Chapter name (use 'initiate' for full bootstrap flow)")
     .option("--init-agent <name>", "Agent name override for bootstrap (auto-detected if only one)")
     .addHelpText("after", RUN_ACP_AGENT_HELP_EPILOG)
-    .action(async (options: { agent?: string; role: string; port: string; proxyPort: string; transport: string; chapter?: string; initAgent?: string }) => {
+    .action(async (options: { agent?: string; role: string; proxyPort: string; chapter?: string; initAgent?: string }) => {
       await runAcpAgent(process.cwd(), {
         agent: options.agent,
         role: options.role,
-        port: parseInt(options.port, 10),
         proxyPort: parseInt(options.proxyPort, 10),
-        transport: options.transport as "stdio" | "http",
         chapter: options.chapter,
         initAgent: options.initAgent,
       });
@@ -410,7 +378,7 @@ export async function runAcpAgent(
   const discover = deps?.discoverPackagesFn ?? discoverPackages;
   const resolve = deps?.resolveAgentFn ?? resolveAgent;
   const createSession = deps?.createSessionFn ?? ((config: AcpSessionConfig, sessionDeps?: AcpSessionDeps) => new AcpSession(config, sessionDeps));
-  const createBridge = deps?.createBridgeFn ?? ((config: AcpBridgeConfig) => new AcpBridge(config));
+  const createBridge = deps?.createBridgeFn ?? ((config: AcpSdkBridgeConfig) => new AcpSdkBridge(config));
   const getHome = deps?.getClawmasonsHomeFn ?? getClawmasonsHome;
   const findRole = deps?.findRoleEntryByRoleFn ?? findRoleEntryByRole;
   const autoInitRole = deps?.initRoleFn ?? initRole;
@@ -424,20 +392,17 @@ export async function runAcpAgent(
   const readFileSyncDep = deps?.readFileSyncFn;
   const writeFileSyncDep = deps?.writeFileSyncFn;
 
-  const port = options.port ?? 3001;
   const proxyPort = options.proxyPort ?? 3000;
-  const acpAgentPort = 3002;
-  const transport = options.transport ?? "stdio";
 
   // ── Protect stdout from console pollution ────────────────────────────
-  // In stdio mode, stdout is reserved for JSON-RPC messages. Redirect
-  // all console output to stderr immediately (catches bootstrap, init,
-  // build, pack, docker-init, etc.). Once the file logger is ready,
-  // both console.log and console.error are routed to it instead.
+  // Stdout is reserved for ACP ndjson protocol messages. Redirect all
+  // console output to stderr immediately (catches bootstrap, init, build,
+  // pack, docker-init, etc.). Once the file logger is ready, both
+  // console.log and console.error are routed to it instead.
   const origLog = console.log.bind(console);
   const origError = console.error.bind(console);
   const earlyBuffer: unknown[][] = [];
-  if (transport === "stdio" && !deps?.createLoggerFn) {
+  if (!deps?.createLoggerFn) {
     // Buffer all output until the file logger is ready.
     const noop = (...args: unknown[]) => { earlyBuffer.push(args); };
     console.log = noop;
@@ -446,13 +411,12 @@ export async function runAcpAgent(
 
   // Logger is created once we know the roleDir (after role resolution).
   let logger: AcpLogger | null = null;
-  let stdioBridge: StdioBridge | null = null;
 
   // Resolve effective rootDir based on --chapter flag
   let effectiveRootDir = rootDir;
 
   let session: AcpSession | null = null;
-  let bridge: AcpBridge | null = null;
+  let bridge: AcpSdkBridge | null = null;
   let credentialWsClient: CredentialWSClient | null = null;
   let credentialService: CredentialService | null = null;
 
@@ -463,7 +427,6 @@ export async function runAcpAgent(
     console.error = origError;
     const log = logger ?? { log: origError, error: origError, close: () => {} };
     log.log("\n[clawmasons acp] Shutting down...");
-    try { if (stdioBridge) stdioBridge.stop(); } catch { /* best-effort */ }
     try {
       if (bridge) await bridge.stop();
     } catch { /* best-effort */ }
@@ -546,8 +509,9 @@ export async function runAcpAgent(
     // Skip when a custom logger is injected (e.g. tests) to avoid interfering
     // with test spies.
     if (!deps?.createLoggerFn) {
-      console.log = (...args: unknown[]) => logger!.log(...args);
-      console.error = (...args: unknown[]) => logger!.error(...args);
+      const fileLogger = logger;
+      console.log = (...args: unknown[]) => fileLogger.log(...args);
+      console.error = (...args: unknown[]) => fileLogger.error(...args);
     }
 
     // Ensure .clawmasons is in chapter workspace's .gitignore
@@ -581,7 +545,7 @@ export async function runAcpAgent(
     const runtime = agent.runtimes[0] ?? "node";
     const acpRuntimeCmd = ACP_RUNTIME_COMMANDS[runtime];
     const acpCommand = acpRuntimeCmd
-      ? [...acpRuntimeCmd.split(" ").slice(1), "--port", String(acpAgentPort)]
+      ? [...acpRuntimeCmd.split(" ").slice(1)]
       : undefined;
 
     // Collect all declared credential keys for the agent
@@ -598,7 +562,6 @@ export async function runAcpAgent(
       projectDir: effectiveRootDir,
       agent: agent.slug,
       role: options.role,
-      acpPort: acpAgentPort,
       proxyPort,
       acpCommand,
       credentialKeys: [...declaredCredentialKeys],
@@ -644,92 +607,48 @@ export async function runAcpAgent(
     credentialService = { close: credServiceHandle.close } as CredentialService;
     logger.log("[clawmasons acp] Credential service connected to proxy.");
 
-    // ── Step 6: Start ACP bridge endpoint ──────────────────────────────
-    // In stdio mode, the HTTP bridge runs on a random internal port.
-    // In http mode, it runs on the user-specified --port.
-    const bridgePort = transport === "stdio" ? 0 : port;
-    bridge = createBridge({
-      hostPort: bridgePort,
-      containerHost: "localhost",
-      containerPort: acpAgentPort,
-      connectRetries: 30,
-      connectRetryDelayMs: 2000,
-      logger,
-    });
-
-    // ── Step 7: Wire bridge lifecycle events ───────────────────────────
+    // ── Step 6: Create and start ACP SDK bridge ──────────────────────────
     // Capture references for use in closures (avoids non-null assertions)
     const logRef = logger;
     const sessionRef = session;
-    const bridgeRef = bridge;
 
-    bridge.onClientConnect = () => {
-      logRef.log("[clawmasons acp] ACP client connected");
-    };
+    bridge = createBridge({
+      onSessionNew: (cwd: string) => {
+        logRef.log(`[clawmasons acp] session/new received — cwd: "${cwd}"`);
 
-    bridge.onClientDisconnect = () => {
-      logRef.log("[clawmasons acp] ACP client disconnected — stopping agent container...");
-      void (async () => {
-        try {
-          if (session) await session.stopAgent();
-        } catch { /* best-effort */ }
-        if (bridge) bridge.resetForNewSession();
-        logRef.log("[clawmasons acp] Agent stopped. Waiting for next session/new...");
-      })();
-    };
+        // Create .clawmasons/ in the CWD for session state
+        const clawmasonsDir = path.join(cwd, ".clawmasons");
+        mkdirSync(clawmasonsDir, { recursive: true });
 
-    bridge.onAgentError = (error: Error) => {
-      logRef.error(`[clawmasons acp] Agent error: ${error.message}`);
-    };
+        // Ensure .gitignore in the CWD directory
+        ensureGitignore(cwd, ".clawmasons");
 
-    // Wire session/new handler for deferred agent start
-    bridge.onSessionNew = async (cwd: string) => {
-      logRef.log(`[clawmasons acp] session/new received — cwd: "${cwd}"`);
+        // Start agent container with CWD mounted as /workspace
+        logRef.log("[clawmasons acp] Starting agent container...");
+        const { child } = sessionRef.startAgentProcess(cwd);
+        logRef.log("[clawmasons acp] Agent process started.");
 
-      // Create .clawmasons/ in the CWD for session state
-      const clawmasonsDir = path.join(cwd, ".clawmasons");
-      mkdirSync(clawmasonsDir, { recursive: true });
+        return child;
+      },
+      logger,
+    });
 
-      // Ensure .gitignore in the CWD directory
-      ensureGitignore(cwd, ".clawmasons");
-
-      // Start agent container with CWD mounted as /workspace
-      logRef.log("[clawmasons acp] Starting agent container...");
-      const agentInfo = await sessionRef.startAgent(cwd);
-      logRef.log(`[clawmasons acp] Agent started (${agentInfo.sessionId})`);
-
-      // Connect bridge to the agent
-      logRef.log("[clawmasons acp] Connecting bridge to agent...");
-      await bridgeRef.connectToAgent();
-      logRef.log("[clawmasons acp] Bridge connected to agent.");
-    };
-
-    await bridge.start();
-
-    // ── Step 8: Start transport layer ──────────────────────────────────
-    if (transport === "stdio") {
-      // Resolve the actual port the OS assigned to the HTTP bridge
-      const actualPort = bridge.getPort();
-      stdioBridge = new StdioBridge({ httpPort: actualPort, logger });
-      stdioBridge.start();
-      logger.log(`[clawmasons acp] Stdio transport active (internal HTTP on port ${actualPort})`);
-    }
+    // Start bridge with editor-facing streams (process stdin/stdout)
+    const editorInput = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
+    const editorOutput = Writable.toWeb(process.stdout) as WritableStream<Uint8Array>;
+    bridge.start(editorInput, editorOutput);
 
     const chapterInfo = options.chapter ? `\n  Chapter:    ${options.chapter}` : "";
-    const transportInfo = transport === "stdio"
-      ? "  Transport: stdio\n"
-      : `  ACP port:   ${port}\n`;
     logger.log(
-      `\n[clawmasons acp] Ready -- ${transport === "stdio" ? "stdio transport active" : `waiting for ACP client on port ${port}`}\n` +
+      `\n[clawmasons acp] Ready -- stdio transport active\n` +
       `  Agent:      ${agent.name}\n` +
       `  Role:       ${options.role}\n` +
-      transportInfo +
       `  Proxy port: ${proxyPort}${chapterInfo}\n` +
       `  Mode:       deferred (agent starts on session/new)\n`,
     );
 
-    // The process stays alive via the bridge HTTP server.
-    // Shutdown happens via SIGINT/SIGTERM.
+    // Keep process alive until the editor disconnects.
+    await bridge.closed;
 
   } catch (error) {
     // Restore console so error messages reach the terminal
@@ -740,7 +659,6 @@ export async function runAcpAgent(
     log.error(`\n[clawmasons acp] Failed: ${message}\n`);
 
     // Clean up on startup failure
-    try { if (stdioBridge) stdioBridge.stop(); } catch { /* best-effort */ }
     try { if (bridge) await bridge.stop(); } catch { /* best-effort */ }
     try { if (session) await session.stop(); } catch { /* best-effort */ }
     try { log.close(); } catch { /* best-effort */ }
