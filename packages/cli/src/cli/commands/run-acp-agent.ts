@@ -602,7 +602,7 @@ export async function runAcpAgent(
       proxyPort,
       acpCommand,
       credentialKeys: [...declaredCredentialKeys],
-    });
+    }, { logger });
 
     logger.log("[clawmasons acp] Starting infrastructure (proxy)...");
     const infraInfo = await session.startInfrastructure();
@@ -654,6 +654,7 @@ export async function runAcpAgent(
       containerPort: acpAgentPort,
       connectRetries: 30,
       connectRetryDelayMs: 2000,
+      logger,
     });
 
     // ── Step 7: Wire bridge lifecycle events ───────────────────────────

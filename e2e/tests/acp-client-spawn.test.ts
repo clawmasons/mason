@@ -5,9 +5,10 @@
  *   1. Spawn `clawmasons acp --chapter initiate --role chapter-creator`
  *   2. Verify lodge, chapter, and Docker artifacts are created
  *   3. Verify the ACP bridge becomes ready
- *   4. Send session/new to start the agent container
- *   5. Verify the agent responds to MCP tool requests
- *   6. Graceful shutdown
+ *   4. Send initialize (handshake) — get stub response
+ *   5. Send session/new with cwd — triggers agent container start
+ *   6. Verify the agent responds to MCP tool requests
+ *   7. Graceful shutdown
  *
  * Uses the mcp-agent runtime (no LLM token required).
  *
@@ -37,64 +38,6 @@ const CHAPTER_DIR = path.join(LODGE_HOME, "chapters", "initiate");
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function waitForOutput(
-  proc: ChildProcess,
-  target: string,
-  timeoutMs: number,
-  accumulated: { stdout: string; stderr: string },
-): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(
-        new Error(
-          `Timed out waiting for "${target}" after ${timeoutMs}ms.\n` +
-            `stdout:\n${accumulated.stdout}\n` +
-            `stderr:\n${accumulated.stderr}`,
-        ),
-      );
-    }, timeoutMs);
-
-    const check = () => {
-      const combined = accumulated.stdout + accumulated.stderr;
-      if (combined.includes(target)) {
-        clearTimeout(timer);
-        cleanup();
-        origResolve(combined);
-      }
-    };
-
-    const onStdout = () => check();
-    const onStderr = () => check();
-    const onExit = (code: number | null) => {
-      clearTimeout(timer);
-      cleanup();
-      origReject(
-        new Error(
-          `Process exited with code ${code} while waiting for "${target}".\n` +
-            `stdout:\n${accumulated.stdout}\n` +
-            `stderr:\n${accumulated.stderr}`,
-        ),
-      );
-    };
-
-    const cleanup = () => {
-      proc.stdout?.removeListener("data", onStdout);
-      proc.stderr?.removeListener("data", onStderr);
-      proc.removeListener("exit", onExit);
-    };
-
-    const origResolve = resolve;
-    const origReject = reject;
-
-    proc.stdout?.on("data", onStdout);
-    proc.stderr?.on("data", onStderr);
-    proc.on("exit", onExit);
-
-    // Check what's already accumulated
-    check();
-  });
-}
-
 async function pollHealthEndpoint(
   url: string,
   timeoutMs: number,
@@ -112,6 +55,33 @@ async function pollHealthEndpoint(
   throw new Error(`Health endpoint ${url} did not become ready within ${timeoutMs}ms`);
 }
 
+/**
+ * Poll until the ACP log file contains a target string.
+ * Used to detect readiness when console output goes to the log file.
+ */
+async function pollLogFile(
+  logPath: string,
+  target: string,
+  timeoutMs: number,
+): Promise<string> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const content = fs.readFileSync(logPath, "utf-8");
+      if (content.includes(target)) return content;
+    } catch {
+      // File might not exist yet
+    }
+    await new Promise((r) => setTimeout(r, 1_000));
+  }
+  let lastContent = "";
+  try { lastContent = fs.readFileSync(logPath, "utf-8"); } catch { /* noop */ }
+  throw new Error(
+    `Timed out waiting for "${target}" in ${logPath} after ${timeoutMs}ms.\n` +
+    `Log contents:\n${lastContent}`,
+  );
+}
+
 function assertDefined<T>(value: T | null | undefined, msg: string): T {
   if (value == null) throw new Error(msg);
   return value;
@@ -123,6 +93,7 @@ describe("ACP initiate bootstrap e2e", () => {
   let sessionCwd: string;
   let acpProcess: ChildProcess | null = null;
   const processOutput = { stdout: "", stderr: "" };
+  const acpLogPath = path.join(LODGE_HOME, "initiate", "chapter-creator", "logs", "acp.log");
 
   beforeAll(() => {
     // Clean up Docker containers from a previous (possibly crashed) run
@@ -198,6 +169,7 @@ describe("ACP initiate bootstrap e2e", () => {
         "--chapter", "initiate",
         "--role", "chapter-creator",
         "--init-agent", "@e2e.initiate/agent-mcp",
+        "--transport", "http",
         "--port", String(ACP_BRIDGE_PORT),
         "--proxy-port", String(ACP_PROXY_PORT),
       ],
@@ -222,8 +194,9 @@ describe("ACP initiate bootstrap e2e", () => {
       processOutput.stderr += chunk.toString();
     });
 
-    // Wait for the "Ready" log — means bootstrap + infra start succeeded
-    await waitForOutput(acpProcess, "Ready", READY_TIMEOUT_MS, processOutput);
+    // Wait for bridge readiness via health endpoint.
+    // Console output goes to acp.log in http mode too, so we poll the endpoint.
+    await pollHealthEndpoint(`http://localhost:${ACP_BRIDGE_PORT}/health`, READY_TIMEOUT_MS);
 
     // Verify directory structure created by bootstrap
     // Lodge
@@ -243,18 +216,16 @@ describe("ACP initiate bootstrap e2e", () => {
     expect(fs.existsSync(dockerDir)).toBe(true);
     expect(fs.existsSync(path.join(dockerDir, "proxy", "chapter-creator", "Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(dockerDir, "credential-service", "Dockerfile"))).toBe(true);
-
-    // Verify bridge health endpoint
-    await pollHealthEndpoint(`http://localhost:${ACP_BRIDGE_PORT}/health`, 10_000);
   }, READY_TIMEOUT_MS + 15_000);
 
-  // ── Test 2: Session Lifecycle ──────────────────────────────────────
+  // ── Test 2: ACP Handshake + Session Lifecycle ──────────────────────
 
-  it("session/new triggers agent container start", async () => {
+  it("initialize handshake returns stub, session/new triggers agent start", async () => {
     const proc = assertDefined(acpProcess, "acpProcess must be running");
     expect(proc.killed).toBe(false);
 
-    const resp = await fetch(`http://localhost:${ACP_BRIDGE_PORT}`, {
+    // Step 1: Send ACP initialize — agent not running yet, bridge returns stub
+    const initResp = await fetch(`http://localhost:${ACP_BRIDGE_PORT}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -262,7 +233,6 @@ describe("ACP initiate bootstrap e2e", () => {
         method: "initialize",
         id: 1,
         params: {
-          cwd: sessionCwd,
           protocolVersion: "2025-03-26",
           capabilities: {},
           clientInfo: {
@@ -273,20 +243,40 @@ describe("ACP initiate bootstrap e2e", () => {
       }),
     });
 
-    if (resp.status >= 500) {
-      const body = await resp.text();
-      console.error(`session/new returned ${resp.status}: ${body}`);
+    expect(initResp.status).toBe(200);
+    const initResult = await initResp.json() as Record<string, unknown>;
+    expect(initResult).toHaveProperty("jsonrpc", "2.0");
+    expect(initResult).toHaveProperty("id", 1);
+    expect(initResult).toHaveProperty("result");
+    const result = initResult.result as Record<string, unknown>;
+    expect(result).toHaveProperty("protocolVersion");
+    expect(result).toHaveProperty("serverInfo");
+
+    // Step 2: Send session/new with cwd — triggers agent container start
+    const sessionResp = await fetch(`http://localhost:${ACP_BRIDGE_PORT}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "session/new",
+        id: 2,
+        params: {
+          cwd: sessionCwd,
+          mcpServers: [],
+        },
+      }),
+    });
+
+    if (sessionResp.status >= 500) {
+      const body = await sessionResp.text();
+      console.error(`session/new returned ${sessionResp.status}: ${body}`);
       console.error(`Process stdout so far:\n${processOutput.stdout}`);
       console.error(`Process stderr so far:\n${processOutput.stderr}`);
     }
-    expect(resp.status).toBeLessThan(500);
+    expect(sessionResp.status).toBeLessThan(500);
 
-    await waitForOutput(
-      proc,
-      "Bridge connected to agent",
-      SESSION_START_TIMEOUT_MS,
-      processOutput,
-    );
+    // Wait for the agent to connect by polling the log file
+    await pollLogFile(acpLogPath, "Bridge connected to agent", SESSION_START_TIMEOUT_MS);
 
     // Verify .clawmasons directory was created in the session CWD
     expect(fs.existsSync(path.join(sessionCwd, ".clawmasons"))).toBe(true);

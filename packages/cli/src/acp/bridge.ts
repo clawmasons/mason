@@ -5,9 +5,11 @@
  * a host-side endpoint (where editors connect) and a container-side
  * ACP agent endpoint (inside Docker).
  *
- * Supports deferred agent startup: when `onSessionNew` is set, the bridge
- * intercepts the first POST request, extracts a `cwd` field from the body,
- * and calls the callback to launch the agent container before relaying.
+ * Protocol-aware deferred startup: the bridge queues pre-session
+ * messages (like `initialize`) and only starts the agent container
+ * when `session/new` arrives with the required `cwd` field.
+ * Earlier messages get a stub response; once the agent is up,
+ * subsequent requests are relayed normally.
  *
  * PRD refs: REQ-001 (ACP endpoint), REQ-005 (ACP Session CWD Support),
  *           PRD 7.1 (Architecture), PRD 7.4 (Tool Call Flow)
@@ -20,6 +22,7 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
+import type { AcpLogger } from "./logger.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -38,6 +41,8 @@ export interface AcpBridgeConfig {
   idleTimeoutMs?: number;
   /** Request timeout in ms for relay requests to the agent (default: 30000) */
   requestTimeoutMs?: number;
+  /** Optional logger for diagnostics. */
+  logger?: AcpLogger;
 }
 
 // ── Hop-by-hop headers to strip when relaying ─────────────────────────
@@ -60,6 +65,7 @@ export class AcpBridge {
   private config: Required<
     Pick<AcpBridgeConfig, "hostPort" | "containerHost" | "containerPort" | "connectRetries" | "connectRetryDelayMs" | "idleTimeoutMs" | "requestTimeoutMs">
   >;
+  private logger?: AcpLogger;
   private server: Server | null = null;
   private agentConnected = false;
   private clientSeen = false;
@@ -76,14 +82,12 @@ export class AcpBridge {
   onAgentError?: (error: Error) => void;
 
   /**
-   * Invoked when a session-initiating POST request arrives and the agent
-   * is not yet connected. The bridge buffers the request body, extracts
-   * the `cwd` field (if present), and calls this callback. The callback
-   * should start the agent container and call `connectToAgent()`.
-   * After the callback resolves, the buffered request is relayed.
+   * Invoked when a POST with a `cwd` field arrives (typically `session/new`)
+   * and the agent is not yet connected. The callback should start the agent
+   * container and call `connectToAgent()`.
    *
-   * If not set, the bridge behaves as before (returns 503 when agent
-   * is not connected).
+   * Pre-session messages (like `initialize`) that arrive before `session/new`
+   * receive a stub response so the client can complete the handshake.
    */
   onSessionNew?: (cwd: string) => Promise<void>;
 
@@ -97,6 +101,7 @@ export class AcpBridge {
       idleTimeoutMs: config.idleTimeoutMs ?? 30_000,
       requestTimeoutMs: config.requestTimeoutMs ?? 30_000,
     };
+    this.logger = config.logger;
   }
 
   /**
@@ -142,9 +147,11 @@ export class AcpBridge {
       try {
         await this.healthCheck(containerHost, containerPort);
         this.agentConnected = true;
+        this.logger?.log(`[bridge] Agent connected at ${containerHost}:${containerPort} (attempt ${attempt + 1})`);
         return;
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
+        this.logger?.log(`[bridge] Health check attempt ${attempt + 1}/${connectRetries + 1} failed: ${lastError.message}`);
         if (attempt < connectRetries) {
           await delay(connectRetryDelayMs);
         }
@@ -201,10 +208,13 @@ export class AcpBridge {
       return;
     }
 
+    this.logger?.log(`[bridge] ${req.method} ${url.pathname} (agent=${this.agentConnected ? "connected" : "pending"})`);
+
     // If agent is not connected and we have a session handler, try deferred start
     if (!this.agentConnected && this.onSessionNew && req.method === "POST") {
       // Prevent concurrent session starts
       if (this.sessionPending) {
+        this.logger?.log("[bridge] Rejecting request — session startup already in progress");
         res.writeHead(503, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Session startup in progress" }));
         return;
@@ -233,24 +243,43 @@ export class AcpBridge {
 
   /**
    * Handle a POST request when the agent is not yet connected.
-   * Buffer the body, extract `cwd`, call `onSessionNew`, then relay.
+   *
+   * ACP protocol flow:
+   *   1. Client sends `initialize` (no cwd) — we return a stub response
+   *   2. Client sends `session/new` with required `cwd` — we start the agent
+   *
+   * If the body contains a `cwd` field, we treat it as session-initiating
+   * and call `onSessionNew(cwd)`. Otherwise we return a stub response
+   * so the client can proceed with the handshake.
    */
   private handleDeferredSession(req: IncomingMessage, res: ServerResponse): void {
-    this.sessionPending = true;
     const chunks: Buffer[] = [];
 
     req.on("data", (chunk: Buffer) => chunks.push(chunk));
     req.on("end", () => {
       const body = Buffer.concat(chunks);
-      const cwd = extractCwdFromBody(body);
+      const { cwd, method, id } = parseRequestBody(body);
 
+      this.logger?.log(`[bridge] Deferred request: method=${method ?? "unknown"}, id=${id ?? "null"}, hasCwd=${cwd !== null}`);
+
+      // If no cwd found, this is a pre-session message (e.g., initialize).
+      // Return a stub response so the client can complete the handshake.
+      if (cwd === null) {
+        this.logger?.log(`[bridge] No cwd in request (method=${method}) — returning stub response`);
+        respondWithStub(res, method, id);
+        return;
+      }
+
+      // cwd found — this is the session-initiating message (session/new)
       const sessionNewHandler = this.onSessionNew;
       if (!sessionNewHandler) {
-        this.sessionPending = false;
         res.writeHead(503, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Agent not connected" }));
         return;
       }
+
+      this.sessionPending = true;
+      this.logger?.log(`[bridge] Starting agent for cwd="${cwd}" (triggered by method=${method})`);
 
       void sessionNewHandler(cwd).then(() => {
         this.sessionPending = false;
@@ -262,11 +291,13 @@ export class AcpBridge {
         }
         this.resetIdleTimer();
 
-        // Now relay the buffered request to the agent
+        // Relay the buffered session/new request to the agent
+        this.logger?.log("[bridge] Relaying buffered session request to agent");
         this.relayBufferedToAgent(req, res, body);
       }).catch((err) => {
         this.sessionPending = false;
         const message = err instanceof Error ? err.message : String(err);
+        this.logger?.error(`[bridge] Session startup failed: ${message}`);
         if (!res.headersSent) {
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: `Session startup failed: ${message}` }));
@@ -320,6 +351,7 @@ export class AcpBridge {
           }
         }
 
+        this.logger?.log(`[bridge] Relay response: ${agentRes.statusCode}`);
         clientRes.writeHead(agentRes.statusCode ?? 200, responseHeaders);
         agentRes.pipe(clientRes);
       },
@@ -327,6 +359,7 @@ export class AcpBridge {
 
     agentReq.on("error", (err) => {
       const error = new Error(`Agent relay failed: ${err.message}`);
+      this.logger?.error(`[bridge] ${error.message}`);
       this.onAgentError?.(error);
 
       if (!clientRes.headersSent) {
@@ -372,6 +405,7 @@ export class AcpBridge {
           }
         }
 
+        this.logger?.log(`[bridge] Relay response: ${agentRes.statusCode}`);
         clientRes.writeHead(agentRes.statusCode ?? 200, responseHeaders);
         agentRes.pipe(clientRes);
       },
@@ -379,6 +413,7 @@ export class AcpBridge {
 
     agentReq.on("error", (err) => {
       const error = new Error(`Agent relay failed: ${err.message}`);
+      this.logger?.error(`[bridge] ${error.message}`);
       this.onAgentError?.(error);
 
       if (!clientRes.headersSent) {
@@ -444,29 +479,76 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
- * Attempt to extract a `cwd` field from a JSON request body.
- * Handles both JSON-RPC style (`params.cwd`) and flat (`cwd`) formats.
- * Returns `process.cwd()` if extraction fails or `cwd` is not present.
+ * Parse a JSON request body and extract cwd, method, and id fields.
+ * Returns `cwd: null` if no cwd field is found (not a session-initiating message).
  */
-export function extractCwdFromBody(body: Buffer): string {
+export function parseRequestBody(body: Buffer): { cwd: string | null; method: string | null; id: unknown } {
   try {
     const parsed = JSON.parse(body.toString("utf-8")) as Record<string, unknown>;
+    const method = typeof parsed.method === "string" ? parsed.method : null;
+    const id = parsed.id ?? null;
 
-    // Check params.cwd (JSON-RPC style)
+    // Check params.cwd (JSON-RPC style — session/new sends cwd here)
     if (parsed.params && typeof parsed.params === "object") {
       const params = parsed.params as Record<string, unknown>;
       if (typeof params.cwd === "string" && params.cwd.length > 0) {
-        return params.cwd;
+        return { cwd: params.cwd, method, id };
       }
     }
 
-    // Check top-level cwd
+    // Check top-level cwd (flat format)
     if (typeof parsed.cwd === "string" && parsed.cwd.length > 0) {
-      return parsed.cwd;
+      return { cwd: parsed.cwd, method, id };
     }
+
+    return { cwd: null, method, id };
   } catch {
-    // Not valid JSON — fall through to default
+    return { cwd: null, method: null, id: null };
+  }
+}
+
+/**
+ * Attempt to extract a `cwd` field from a JSON request body.
+ * Handles both JSON-RPC style (`params.cwd`) and flat (`cwd`) formats.
+ * Returns `null` if `cwd` is not present.
+ *
+ * @deprecated Use `parseRequestBody` instead — it returns null when cwd is missing
+ *             rather than falling back to process.cwd().
+ */
+export function extractCwdFromBody(body: Buffer): string {
+  const { cwd } = parseRequestBody(body);
+  return cwd ?? process.cwd();
+}
+
+/**
+ * Return a stub JSON-RPC response for pre-session messages.
+ * For `initialize`, returns a minimal capabilities handshake.
+ * For other methods, returns a JSON-RPC error indicating the session
+ * hasn't started yet.
+ */
+function respondWithStub(res: ServerResponse, method: string | null, id: unknown): void {
+  res.writeHead(200, { "Content-Type": "application/json" });
+
+  if (method === "initialize") {
+    res.end(JSON.stringify({
+      jsonrpc: "2.0",
+      id: id ?? null,
+      result: {
+        protocolVersion: "2025-03-26",
+        capabilities: {},
+        serverInfo: { name: "clawmasons", version: "1.0.0" },
+      },
+    }));
+    return;
   }
 
-  return process.cwd();
+  // For non-initialize pre-session messages, return an error
+  res.end(JSON.stringify({
+    jsonrpc: "2.0",
+    id: id ?? null,
+    error: {
+      code: -32000,
+      message: "Waiting for session/new with cwd — agent not yet started",
+    },
+  }));
 }

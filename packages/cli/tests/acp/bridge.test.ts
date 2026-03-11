@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { createServer, type Server } from "node:http";
-import { AcpBridge, extractCwdFromBody } from "../../src/acp/bridge.js";
+import { AcpBridge, extractCwdFromBody, parseRequestBody } from "../../src/acp/bridge.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -484,12 +484,9 @@ describe("AcpBridge", () => {
       expect(receivedCwd).toBe("/projects/myapp");
     });
 
-    it("falls back to process.cwd() when no cwd in body", async () => {
+    it("returns stub response for initialize (no cwd) without starting agent", async () => {
       const hostPort = nextPort();
       const containerPort = nextPort();
-
-      const agent = await createMockAgent(containerPort);
-      cleanups.push(() => closeServer(agent));
 
       const bridge = new AcpBridge({
         hostPort,
@@ -498,18 +495,62 @@ describe("AcpBridge", () => {
         connectRetries: 0,
       });
 
-      let receivedCwd: string | undefined;
-      bridge.onSessionNew = async (cwd: string) => {
-        receivedCwd = cwd;
-        await bridge.connectToAgent();
+      let sessionNewCalled = false;
+      bridge.onSessionNew = async () => {
+        sessionNewCalled = true;
       };
 
       await bridge.start();
       cleanups.push(() => bridge.stop());
 
-      await httpPost(hostPort, "/", JSON.stringify({ method: "initialize" }));
+      const res = await httpPost(hostPort, "/", JSON.stringify({
+        jsonrpc: "2.0",
+        method: "initialize",
+        id: 1,
+        params: { protocolVersion: "2025-03-26", capabilities: {} },
+      }));
 
-      expect(receivedCwd).toBe(process.cwd());
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.jsonrpc).toBe("2.0");
+      expect(body.id).toBe(1);
+      expect(body.result.protocolVersion).toBe("2025-03-26");
+      expect(body.result.serverInfo.name).toBe("clawmasons");
+      // onSessionNew should NOT have been called
+      expect(sessionNewCalled).toBe(false);
+    });
+
+    it("returns error stub for non-initialize pre-session message without cwd", async () => {
+      const hostPort = nextPort();
+      const containerPort = nextPort();
+
+      const bridge = new AcpBridge({
+        hostPort,
+        containerHost: "localhost",
+        containerPort,
+        connectRetries: 0,
+      });
+
+      bridge.onSessionNew = async () => {
+        // Should not be called
+      };
+
+      await bridge.start();
+      cleanups.push(() => bridge.stop());
+
+      const res = await httpPost(hostPort, "/", JSON.stringify({
+        jsonrpc: "2.0",
+        method: "session/prompt",
+        id: 5,
+        params: { text: "hello" },
+      }));
+
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.jsonrpc).toBe("2.0");
+      expect(body.id).toBe(5);
+      expect(body.error.code).toBe(-32000);
+      expect(body.error.message).toContain("session/new");
     });
 
     it("relays buffered request to agent after onSessionNew resolves", async () => {
@@ -608,10 +649,10 @@ describe("AcpBridge", () => {
       await bridge.start();
       cleanups.push(() => bridge.stop());
 
-      // Send two concurrent requests
+      // Send two concurrent session/new requests (both have cwd)
       const [res1, res2] = await Promise.all([
-        httpPost(hostPort, "/", JSON.stringify({ params: { cwd: "/test1" } })),
-        httpPost(hostPort, "/", JSON.stringify({ params: { cwd: "/test2" } })),
+        httpPost(hostPort, "/", JSON.stringify({ method: "session/new", params: { cwd: "/test1" } })),
+        httpPost(hostPort, "/", JSON.stringify({ method: "session/new", params: { cwd: "/test2" } })),
       ]);
 
       // One should succeed (200) and the other should get 503
@@ -681,7 +722,53 @@ describe("AcpBridge", () => {
   });
 });
 
-// ── extractCwdFromBody ──────────────────────────────────────────────────
+// ── parseRequestBody ────────────────────────────────────────────────────
+
+describe("parseRequestBody", () => {
+  it("extracts cwd and method from JSON-RPC session/new", () => {
+    const body = Buffer.from(JSON.stringify({
+      jsonrpc: "2.0", method: "session/new", id: 2,
+      params: { cwd: "/projects/app", mcpServers: [] },
+    }));
+    const result = parseRequestBody(body);
+    expect(result.cwd).toBe("/projects/app");
+    expect(result.method).toBe("session/new");
+    expect(result.id).toBe(2);
+  });
+
+  it("returns null cwd for initialize (no cwd field)", () => {
+    const body = Buffer.from(JSON.stringify({
+      jsonrpc: "2.0", method: "initialize", id: 1,
+      params: { protocolVersion: "2025-03-26", capabilities: {} },
+    }));
+    const result = parseRequestBody(body);
+    expect(result.cwd).toBeNull();
+    expect(result.method).toBe("initialize");
+    expect(result.id).toBe(1);
+  });
+
+  it("returns null cwd for invalid JSON", () => {
+    const body = Buffer.from("not json");
+    const result = parseRequestBody(body);
+    expect(result.cwd).toBeNull();
+    expect(result.method).toBeNull();
+    expect(result.id).toBeNull();
+  });
+
+  it("extracts top-level cwd", () => {
+    const body = Buffer.from(JSON.stringify({ cwd: "/test" }));
+    const result = parseRequestBody(body);
+    expect(result.cwd).toBe("/test");
+  });
+
+  it("returns null cwd for empty string", () => {
+    const body = Buffer.from(JSON.stringify({ params: { cwd: "" } }));
+    const result = parseRequestBody(body);
+    expect(result.cwd).toBeNull();
+  });
+});
+
+// ── extractCwdFromBody (deprecated) ─────────────────────────────────────
 
 describe("extractCwdFromBody", () => {
   it("extracts cwd from params.cwd (JSON-RPC style)", () => {
