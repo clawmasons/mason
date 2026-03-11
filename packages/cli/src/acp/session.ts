@@ -24,6 +24,7 @@ import {
 } from "../cli/commands/run-agent.js";
 import { checkDockerCompose } from "../cli/commands/docker-utils.js";
 import { resolveRoleMountVolumes, type RoleMount } from "../generator/mount-volumes.js";
+import type { AcpLogger } from "./logger.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -111,6 +112,8 @@ export interface AcpSessionDeps {
   generateSessionIdFn?: () => string;
   /** Override docker compose check (for testing). */
   checkDockerComposeFn?: () => void;
+  /** Optional logger for diagnostics. */
+  logger?: AcpLogger;
 }
 
 // ── Compose Generation ────────────────────────────────────────────────
@@ -244,10 +247,12 @@ export class AcpSession {
 
   constructor(config: AcpSessionConfig, deps?: AcpSessionDeps) {
     this.config = config;
+    const noopLogger: AcpLogger = { log() {}, error() {}, close() {} };
     this.deps = {
       execComposeFn: deps?.execComposeFn ?? execComposeCommand,
       generateSessionIdFn: deps?.generateSessionIdFn ?? generateSessionId,
       checkDockerComposeFn: deps?.checkDockerComposeFn ?? checkDockerCompose,
+      logger: deps?.logger ?? noopLogger,
     };
   }
 
@@ -374,7 +379,9 @@ export class AcpSession {
     fs.writeFileSync(composeFile, composeContent);
 
     // Start only infra services (agent is behind "agent" profile, skipped)
+    this.deps.logger.log(`[session] docker compose -f ${composeFile} up -d`);
     const exitCode = await this.deps.execComposeFn(composeFile, ["up", "-d"]);
+    this.deps.logger.log(`[session] docker compose up exit code: ${exitCode}`);
     if (exitCode !== 0) {
       throw new Error(`Failed to start infrastructure (docker compose exit code ${exitCode})`);
     }
@@ -417,10 +424,13 @@ export class AcpSession {
     const agentServiceName = this.infraInfo.agentServiceName;
 
     // Use docker compose run with a volume override for this session's CWD
+    const runArgs = ["run", "-d", "--rm", "--build", "--service-ports", "-v", `${projectDir}:/workspace`, agentServiceName];
+    this.deps.logger.log(`[session] docker compose -f ${this.infraInfo.composeFile} ${runArgs.join(" ")}`);
     const exitCode = await this.deps.execComposeFn(
       this.infraInfo.composeFile,
-      ["run", "-d", "--rm", "--build", "--service-ports", "-v", `${projectDir}:/workspace`, agentServiceName],
+      runArgs,
     );
+    this.deps.logger.log(`[session] docker compose run exit code: ${exitCode}`);
     if (exitCode !== 0) {
       throw new Error(`Failed to start agent (docker compose exit code ${exitCode})`);
     }
@@ -448,6 +458,7 @@ export class AcpSession {
     }
 
     // Stop and remove the agent service only
+    this.deps.logger.log(`[session] Stopping agent service ${this.agentInfo.agentServiceName}`);
     await this.deps.execComposeFn(
       this.agentInfo.composeFile,
       ["--profile", "agent", "stop", this.agentInfo.agentServiceName],
@@ -456,6 +467,7 @@ export class AcpSession {
       this.agentInfo.composeFile,
       ["--profile", "agent", "rm", "-f", this.agentInfo.agentServiceName],
     );
+    this.deps.logger.log("[session] Agent stopped and removed");
 
     this.agentRunning = false;
     this.agentInfo = null;
