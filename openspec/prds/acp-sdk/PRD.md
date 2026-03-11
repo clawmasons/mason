@@ -73,11 +73,21 @@ The bridge presents an `AgentSideConnection` to the editor and a `ClientSideConn
 
 The container agent uses `AgentSideConnection` to accept ACP messages over stdio (stdin/stdout ndjson). It replaces the current HTTP server (`acp-server.ts`) entirely. The agent implements the `Agent` interface from the SDK with `initialize`, `newSession`, and `prompt` handlers that delegate to the existing `ToolCaller`.
 
-### 4.3 Stream Transport via Docker Exec
+### 4.3 Stream Transport via Docker Compose Run (Piped Stdio)
 
-Instead of exposing a port and making HTTP requests, the bridge connects to the container agent by spawning `docker exec -i <container-id>` with piped stdin/stdout. This creates a bidirectional byte stream that is wrapped with `ndJsonStream()` to produce a `Stream` for `ClientSideConnection`.
+Instead of exposing a port and making HTTP requests, the bridge connects to the container agent by spawning `docker compose run` (without `-d`) as a child process with piped stdin/stdout. This creates a bidirectional byte stream that is wrapped with `ndJsonStream()` to produce a `Stream` for `ClientSideConnection`.
 
-The container agent's entrypoint writes ndjson to stdout and reads from stdin, which `docker exec -i` pipes through.
+The container agent's entrypoint writes ndjson to stdout and reads from stdin. Build output from `--build` goes to stderr and does not corrupt the ndjson stream.
+
+**Why not `docker exec -i`?** The original design proposed `docker compose run -d` followed by `docker exec -i <container-id> <entrypoint>`. This approach has several problems:
+
+1. **Keep-alive command required:** With `-d`, the compose `command` runs immediately. If the command is the agent, it starts with no stdin connected. If the command is a keep-alive (`sleep infinity`), the agent must be started separately via `docker exec`, which means the compose `command` and the actual agent entrypoint diverge.
+2. **Container ID capture complexity:** `docker compose run -d` prints the container ID to stdout, but `execComposeCommand` currently returns only an exit code. Capturing stdout requires interface changes and a fallback discovery path (`docker compose ps --format json`).
+3. **Two processes in container:** `docker exec` starts a new process alongside whatever the compose `command` started, creating confusion about which process is the agent.
+
+The simpler approach — `docker compose run` (no `-d`) with piped stdio — eliminates all three problems. The compose `command` IS the agent entrypoint, the child process handle IS the transport, and no container ID discovery is needed.
+
+**Node.js-to-Web Streams Conversion:** The SDK's `ndJsonStream()` expects Web Streams API types (`WritableStream<Uint8Array>`, `ReadableStream<Uint8Array>`), not Node.js streams. Implementations MUST convert using `Readable.toWeb(child.stdout)` and `Writable.toWeb(child.stdin)` (or the equivalent `process.stdin`/`process.stdout` conversions for the editor-facing side).
 
 ### 4.4 Deferred Startup with SDK
 
