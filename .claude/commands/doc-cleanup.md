@@ -18,3 +18,5 @@ docs/* are served up with fumadocs in a seperate repo, only use plugins availabl
 README.md
 
 DEVELOPMENT.md
+
+Use a clear, instructive, and encouraging tone.
