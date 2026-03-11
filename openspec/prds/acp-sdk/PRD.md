@@ -30,7 +30,7 @@ The `@agentclientprotocol/sdk` provides `AgentSideConnection`, `ClientSideConnec
 ### Technical Goals
 
 - **Protocol compliance:** All ACP message handling SHALL use `@agentclientprotocol/sdk` types and connection classes, ensuring wire-format correctness and forward compatibility.
-- **Transport simplification:** Replace the two-HTTP-hop architecture with direct stream piping. The bridge-to-container link SHALL use `docker exec -i` with piped stdio instead of HTTP.
+- **Transport simplification:** Replace the two-HTTP-hop architecture with direct stream piping. The bridge-to-container link SHALL use `docker compose run` with piped stdio instead of HTTP.
 - **Remove HTTP surface area:** Eliminate the internal HTTP bridge server, the container HTTP server (`acp-server.ts`), port exposure in compose, the `--service-ports` flag, and the `--transport` CLI option entirely.
 - **Preserve deferred startup:** The bridge SHALL continue to defer agent container startup until `session/new` arrives with a `cwd` field.
 
@@ -57,9 +57,9 @@ The `@agentclientprotocol/sdk` provides `AgentSideConnection`, `ClientSideConnec
 The bridge acts as a dual-role ACP participant:
 
 ```
-Editor (Client)  ──stdio/ndjson──>  Bridge  ──docker exec stdio/ndjson──>  Container Agent
-                                  (AgentSideConnection         (AgentSideConnection
-                                   facing the editor,           facing the bridge)
+Editor (Client)  ──stdio/ndjson──>  Bridge  ──docker compose run stdio/ndjson──>  Container Agent
+                                  (AgentSideConnection              (AgentSideConnection
+                                   facing the editor,                facing the bridge)
                                    ClientSideConnection
                                    facing the container)
 ```
@@ -94,8 +94,14 @@ The simpler approach — `docker compose run` (no `-d`) with piped stdio — eli
 The deferred startup pattern changes from HTTP stub responses to SDK-level handling:
 
 1. Editor sends `initialize` over stdio. The bridge's `AgentSideConnection` handles this directly, returning capabilities from local config (no container needed).
-2. Editor sends `session/new` with `cwd`. The bridge intercepts this in its `Agent.newSession` handler, starts the container via `AcpSession.startAgent(cwd)`, establishes the `docker exec` stream to the container, creates a `ClientSideConnection`, forwards `initialize` + `session/new` to the container agent, and returns the response.
+2. Editor sends `session/new` with `cwd`. The bridge intercepts this in its `Agent.newSession` handler, spawns `docker compose run` (no `-d`) with piped stdio via `AcpSession.startAgentProcess(cwd)`, creates a `ClientSideConnection` from the child process streams, forwards `initialize` + `session/new` to the container agent, and returns the response.
 3. Subsequent messages (`prompt`, `cancel`, notifications) are forwarded bidirectionally.
+
+### 4.5 Container Agent Stdout Protection
+
+When the container agent runs in ACP stdio mode, stdout is reserved exclusively for ndjson protocol messages. Any diagnostic output (`console.log`, library logging, etc.) on stdout would corrupt the ndjson stream and break the protocol.
+
+The container agent MUST redirect all non-protocol output to stderr when `--acp` is specified. This mirrors the bridge's existing behavior (see `run-acp-agent.ts` which already redirects `console.log` to a file logger to protect stdout in stdio mode).
 
 ---
 
@@ -131,20 +137,20 @@ Acceptance criteria:
 
 **REQ-SDK-003: Bridge uses ClientSideConnection for container-facing transport**
 
-The bridge SHALL use `ClientSideConnection` to communicate with the container agent. The transport SHALL be a `docker exec -i <container-id>` child process with piped stdin/stdout, wrapped in `ndJsonStream()`.
+The bridge SHALL use `ClientSideConnection` to communicate with the container agent. The transport SHALL be a `docker compose run` (no `-d`) child process with piped stdin/stdout, wrapped in `ndJsonStream()`. Node.js streams MUST be converted to Web Streams via `Readable.toWeb()` / `Writable.toWeb()` before passing to `ndJsonStream()`.
 
 Acceptance criteria:
 
-- GIVEN the bridge has started the agent container
+- GIVEN the bridge has started the agent container via `docker compose run`
 - WHEN the bridge needs to send an ACP message to the container
-- THEN it SHALL use `ClientSideConnection` over a `docker exec -i` stdio stream
+- THEN it SHALL use `ClientSideConnection` over the child process's piped stdio stream
 - AND the container agent SHALL receive and process the message via its `AgentSideConnection`
 
 ---
 
 **REQ-SDK-004: Deferred startup preserved**
 
-The bridge SHALL defer agent container startup until `session/new` arrives. The bridge's `Agent.initialize` handler SHALL respond locally with server info and capabilities. The bridge's `Agent.newSession` handler SHALL trigger container startup, establish the `docker exec` stream, and forward `initialize` + `session/new` to the container.
+The bridge SHALL defer agent container startup until `session/new` arrives. The bridge's `Agent.initialize` handler SHALL respond locally with server info and capabilities. The bridge's `Agent.newSession` handler SHALL trigger container startup, establish the piped stdio stream, and forward `initialize` + `session/new` to the container.
 
 Acceptance criteria:
 
@@ -153,15 +159,15 @@ Acceptance criteria:
 - THEN the bridge SHALL respond with a valid `InitializeResponse` without starting a container
 
 - AND WHEN the editor sends `session/new` with `cwd`
-- THEN the bridge SHALL start the agent container with `cwd` mounted
-- AND establish a `ClientSideConnection` to the container via `docker exec -i`
+- THEN the bridge SHALL start the agent container with `cwd` mounted via `docker compose run` (piped stdio)
+- AND establish a `ClientSideConnection` to the container via the child process streams
 - AND forward `initialize` and `session/new` to the container
 
 ---
 
 **REQ-SDK-005: Remove HTTP port exposure from compose**
 
-The generated `docker-compose.yml` SHALL NOT expose the agent's ACP port to the host. The `ports` section for the ACP port and `--service-ports` flag SHALL be removed from the agent service definition. Communication SHALL occur via `docker exec -i` stdio.
+The generated `docker-compose.yml` SHALL NOT expose the agent's ACP port to the host. The `ports` section for the ACP port and `--service-ports` flag SHALL be removed from the agent service definition. Communication SHALL occur via piped stdio from `docker compose run`.
 
 Acceptance criteria:
 
@@ -240,16 +246,44 @@ Acceptance criteria:
 
 ---
 
-**REQ-SDK-011: Container ID capture from docker compose run**
+**REQ-SDK-011: Session module returns child process for piped stdio**
 
-When using `docker compose run -d`, the session module SHALL capture the container ID from the command's stdout output. This container ID is required for the subsequent `docker exec -i` command. If capture fails, the session SHALL fall back to `docker compose ps --format json` to discover the container.
+The session module SHALL provide a `startAgentProcess(cwd)` method that spawns `docker compose run` (without `-d`) as a child process with piped stdin/stdout/stderr. This replaces the current `startAgent()` + container ID approach. The returned child process handle provides the transport streams for `ClientSideConnection`.
 
 Acceptance criteria:
 
-- GIVEN `docker compose run -d` is executed
-- WHEN the command succeeds
-- THEN the session module SHALL capture the container ID from stdout
-- AND provide it to the bridge for `docker exec -i` usage
+- GIVEN the infrastructure is running
+- WHEN `startAgentProcess(cwd)` is called
+- THEN it SHALL spawn `docker compose run --rm --build -v ${cwd}:/workspace <service>` with piped stdio
+- AND return a child process handle with accessible stdin/stdout streams
+- AND `stopAgent()` SHALL kill the child process to stop the container
+
+---
+
+**REQ-SDK-012: Container agent stdout protection**
+
+The container agent SHALL redirect all diagnostic output (console.log, library logging) to stderr when running in ACP stdio mode (`--acp`). Stdout MUST be reserved exclusively for ACP ndjson protocol messages. Any non-protocol output on stdout corrupts the ndjson stream.
+
+Acceptance criteria:
+
+- GIVEN the container agent is started with `--acp`
+- WHEN any code calls `console.log()` or writes to stdout
+- THEN the output SHALL go to stderr, not stdout
+- AND only ACP ndjson messages SHALL appear on stdout
+
+---
+
+**REQ-SDK-013: Container process crash recovery**
+
+The bridge SHALL detect when the container process exits unexpectedly (child process `exit` or `error` event, or `ClientSideConnection.closed` resolving). When this occurs, the bridge SHALL clean up the `ClientSideConnection` and be ready to start a new container on the next `session/new`.
+
+Acceptance criteria:
+
+- GIVEN the bridge is connected to a running container
+- WHEN the container process crashes or exits
+- THEN the bridge SHALL detect the closure
+- AND clean up the container-facing connection
+- AND remain ready to accept a new `session/new`
 
 ---
 
@@ -274,7 +308,7 @@ Editor ──stdin/stdout (ndjson)──> Bridge AgentSideConnection
                                        │
                                   Bridge ClientSideConnection
                                        │
-                                       └──docker exec -i (ndjson)──> Container AgentSideConnection
+                                       └──docker compose run (piped stdio/ndjson)──> Container AgentSideConnection
 ```
 
 Components:
@@ -283,15 +317,16 @@ Components:
 - **Container agent** (`packages/mcp-agent/src/index.ts` — modified): In ACP mode, creates `AgentSideConnection` with `ndJsonStream(process.stdout, process.stdin)` and implements the `Agent` interface.
 - **Orchestrator** (`packages/cli/src/cli/commands/run-acp-agent.ts` — modified): Creates the bridge, wires lifecycle, starts Docker. No longer creates `StdioBridge` or internal HTTP server.
 
-### 6.3 Docker Exec Stream
+### 6.3 Docker Compose Run Stream
 
-When the bridge needs to connect to a running container agent:
+When the bridge needs to connect to a container agent:
 
-1. `AcpSession.startAgent(cwd)` returns the container ID (captured from `docker compose run -d` output).
-2. The bridge spawns: `docker exec -i <container-id> <agent-entrypoint> --acp`
-3. The child process's stdin/stdout are wrapped: `ndJsonStream(child.stdin, child.stdout)`.
-4. A `ClientSideConnection` is created with this stream.
-5. The bridge sends `initialize` followed by the buffered `session/new` to the container.
+1. The bridge calls `AcpSession.startAgentProcess(cwd)`, which spawns `docker compose run --rm --build -v ${cwd}:/workspace <service>` with piped stdio (no `-d`).
+2. The child process's stdin/stdout are converted to Web Streams and wrapped: `ndJsonStream(Writable.toWeb(child.stdin), Readable.toWeb(child.stdout))`.
+3. A `ClientSideConnection` is created with this stream.
+4. The bridge sends `initialize` followed by the buffered `session/new` to the container.
+5. The child process's stderr is logged (build output, agent diagnostics).
+6. When `stopAgent()` is called, the child process is killed, which stops the container.
 
 ### 6.4 File Impact Summary
 
@@ -299,7 +334,7 @@ When the bridge needs to connect to a running container agent:
 |------|--------|-----------|
 | `packages/cli/src/acp/bridge.ts` | Rewrite | Replace HTTP relay with `AgentSideConnection` + `ClientSideConnection` |
 | `packages/cli/src/acp/stdio-bridge.ts` | Remove | Replaced by SDK's `ndJsonStream` on process stdio |
-| `packages/cli/src/acp/session.ts` | Modify | Remove port exposure from compose, capture container ID, remove `--service-ports` |
+| `packages/cli/src/acp/session.ts` | Modify | Remove port exposure, add `startAgentProcess()`, remove `--service-ports` |
 | `packages/cli/src/acp/logger.ts` | Keep | No changes |
 | `packages/cli/src/acp/matcher.ts` | Keep | No changes |
 | `packages/cli/src/acp/rewriter.ts` | Keep | No changes |
@@ -308,6 +343,9 @@ When the bridge needs to connect to a running container agent:
 | `packages/mcp-agent/src/acp-server.ts` | Remove | Replaced by `AgentSideConnection` in `index.ts` |
 | `packages/mcp-agent/src/index.ts` | Modify | ACP mode uses `AgentSideConnection` with stdin/stdout instead of HTTP server |
 | `e2e/tests/acp-client-spawn.test.ts` | Modify | Use `ClientSideConnection` instead of raw ndjson/fetch |
+| `packages/cli/tests/acp/bridge.test.ts` | Rewrite | Tests HTTP relay; must test SDK bridge |
+| `packages/cli/tests/acp/session.test.ts` | Modify | Update for port removal, new `startAgentProcess()` |
+| `packages/cli/tests/cli/run-acp-agent.test.ts` | Modify | Remove transport/port refs, update bridge wiring |
 
 ### 6.5 New Dependency
 
@@ -317,20 +355,20 @@ When the bridge needs to connect to a running container agent:
 
 ---
 
-## 7. Open Questions
+## 7. Open Questions (Resolved)
 
-**OQ-1: Docker exec entrypoint command**
+**OQ-1: Docker exec entrypoint command** — **RESOLVED: Not applicable.**
 
-When using `docker exec -i <container-id> <command>`, the bridge needs to know the agent's entrypoint command. This is currently defined in the compose file's `command` field. Should the session module extract this from the compose config, or should the bridge use a well-known entrypoint path (e.g., `/usr/local/bin/agent --acp`)?
+By using `docker compose run` (no `-d`) with piped stdio instead of `docker exec`, the compose `command` field IS the agent entrypoint. No separate entrypoint discovery is needed. The compose `command` (e.g., `["node", "src/index.js", "--acp"]`) runs directly with its stdin/stdout piped to the bridge.
 
-**OQ-2: Container ID capture reliability**
+**OQ-2: Container ID capture reliability** — **RESOLVED: Not applicable.**
 
-`docker compose run -d` prints the container ID to stdout. The current `execComposeCommand` helper may not capture this output. The session module may need modification to either: (a) return the container ID from `startAgent()`, or (b) use `docker compose ps --format json` to look up the container after start.
+The `docker compose run` (no `-d`) approach returns a child process handle directly. No container ID capture is needed — the child process IS the transport. `stopAgent()` kills the child process.
 
-**OQ-3: Credential flow timing with docker exec**
+**OQ-3: Credential flow timing with docker exec** — **RESOLVED: Block in `Agent.newSession`.**
 
-Currently, the container agent starts its HTTP server immediately and resolves credentials in the background. With stdio-based ACP, the agent must be ready to receive `initialize` as soon as the `docker exec` stream connects. Does credential resolution need to complete before the agent signals readiness, or can it remain deferred? The SDK's `Agent.newSession` handler is a natural place to block on credential readiness.
+The container agent creates `AgentSideConnection` immediately on startup (stdin/stdout are ready). The `Agent.initialize` handler responds without credentials. The `Agent.newSession` handler blocks on credential resolution before responding. This is a natural fit — the bridge's local `initialize` response doesn't need credentials, and `newSession` is where the agent becomes fully operational.
 
-**OQ-4: Multiple sequential sessions**
+**OQ-4: Multiple sequential sessions** — **RESOLVED: Kill child process, keep editor connection.**
 
-The current bridge supports stop-and-restart of the agent container when the editor disconnects and reconnects. With the SDK's connection lifecycle (`connection.closed`), the bridge needs to support tearing down the `ClientSideConnection`, stopping the container, and creating a new `ClientSideConnection` when a new `session/new` arrives. Does this require recreating the editor-facing `AgentSideConnection` as well, or can it persist across sessions?
+The editor-facing `AgentSideConnection` persists across sessions. When the editor disconnects (or the container crashes), the bridge kills the `docker compose run` child process, tears down the `ClientSideConnection`, and waits for a new `session/new`. On the next `session/new`, a new `docker compose run` child process is spawned with a new `ClientSideConnection`.
