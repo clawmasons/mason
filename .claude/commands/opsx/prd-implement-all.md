@@ -70,9 +70,21 @@ After the sub-agent completes successfully:
 2. Return to the PRD branch: `git checkout <prd-branch> && git pull origin <prd-branch> --ff-only`
 3. Continue to the next unimplemented change (back to step 1).
 
-## Completion
+## Final Testing
 
 When all changes are implemented:
+
+1. Ensure PRD branch is clean
+2. Run linter
+3. Run non-e2e tests.  Fix any problems
+4. Run e2e tests and fix all problems 
+   `cd e2e && npx vitest run --config vitest.config.ts 2>&1`. 
+5. Iterate 20 times until tests work
+6. Create commit and push the test fixes to the PRD branch
+
+## Completion
+
+When final Testing is complete:
 
 1. Report summary: list all changes, their PRs, and merge status.
 2. Tell the user:

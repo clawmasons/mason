@@ -1,7 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { EventEmitter } from "node:events";
+import type { ChildProcess } from "node:child_process";
+import type { SpawnOptions } from "node:child_process";
 import {
   AcpSession,
   generateAcpComposeYml,
@@ -71,6 +74,48 @@ function makeMockDeps(overrides?: {
   };
 }
 
+/**
+ * Create a mock ChildProcess for testing startAgentProcess / stopAgent.
+ */
+function makeMockChildProcess(): ChildProcess {
+  const emitter = new EventEmitter();
+  const child = emitter as unknown as ChildProcess;
+  Object.defineProperty(child, "pid", { value: 12345, writable: true });
+  child.kill = vi.fn().mockReturnValue(true);
+  child.stdin = null;
+  child.stdout = null;
+  child.stderr = null;
+  return child;
+}
+
+function makeMockDepsWithSpawn(overrides?: {
+  upExitCode?: number;
+  downExitCode?: number;
+  sessionId?: string;
+}): {
+  calls: Array<{ composeFile: string; args: string[]; opts?: { interactive?: boolean } }>;
+  spawnCalls: Array<{ command: string; args: string[]; options: SpawnOptions }>;
+  mockChild: ChildProcess;
+  deps: AcpSessionDeps;
+} {
+  const { calls, deps } = makeMockDeps(overrides);
+  const spawnCalls: Array<{ command: string; args: string[]; options: SpawnOptions }> = [];
+  const mockChild = makeMockChildProcess();
+
+  return {
+    calls,
+    spawnCalls,
+    mockChild,
+    deps: {
+      ...deps,
+      spawnFn: (command: string, args: string[], options: SpawnOptions) => {
+        spawnCalls.push({ command, args, options });
+        return mockChild;
+      },
+    },
+  };
+}
+
 // ── generateAcpComposeYml ─────────────────────────────────────────────
 
 describe("generateAcpComposeYml", () => {
@@ -81,7 +126,6 @@ describe("generateAcpComposeYml", () => {
     logsDir: "/projects/my-project/.clawmasons/logs",
     proxyToken: "test-proxy-token",
     credentialProxyToken: "test-cred-token",
-    acpPort: 3002,
   };
 
   it("generates two services: proxy and agent (no credential-service)", () => {
@@ -115,18 +159,12 @@ describe("generateAcpComposeYml", () => {
     expect(agentSection).toContain("init: true");
   });
 
-  it("agent service exposes ACP port", () => {
+  it("agent service does NOT expose any ports", () => {
     const yml = generateAcpComposeYml(defaultOpts);
     const agentSection = yml.split("agent-note-taker-writer:")[1]!;
 
-    expect(agentSection).toContain('"3002:3002"');
-  });
-
-  it("uses custom ACP port", () => {
-    const yml = generateAcpComposeYml({ ...defaultOpts, acpPort: 4444 });
-    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
-
-    expect(agentSection).toContain('"4444:4444"');
+    expect(agentSection).not.toContain("ports:");
+    expect(agentSection).not.toContain("3002");
   });
 
   it("proxy has correct tokens", () => {
@@ -191,7 +229,7 @@ describe("generateAcpComposeYml", () => {
   it("includes acpCommand as command when provided", () => {
     const yml = generateAcpComposeYml({
       ...defaultOpts,
-      acpCommand: ["mcp-agent", "--acp", "--port", "3002"],
+      acpCommand: ["mcp-agent", "--acp"],
     });
     const agentSection = yml.split("agent-note-taker-writer:")[1]!;
 
@@ -277,20 +315,10 @@ describe("AcpSession", () => {
     const info = await session.start();
 
     expect(info.sessionId).toBe("sess0001");
-    expect(info.acpPort).toBe(3002);
     expect(info.proxyServiceName).toBe("proxy-writer");
     expect(info.agentServiceName).toBe("agent-note-taker-writer");
     expect(info.composeFile).toContain("sess0001");
     expect(info.sessionDir).toContain("sess0001");
-  });
-
-  it("start() uses custom ACP port", async () => {
-    const { deps } = makeMockDeps();
-    const session = new AcpSession(makeConfig({ acpPort: 5555 }), deps);
-
-    const info = await session.start();
-
-    expect(info.acpPort).toBe(5555);
   });
 
   it("start() creates session directory and compose file", async () => {
@@ -321,6 +349,18 @@ describe("AcpSession", () => {
     expect(calls[0]!.args).toContain("-d");
   });
 
+  it("start() compose has NO port exposure for agent", async () => {
+    const { deps } = makeMockDeps({ sessionId: "port0001" });
+    const session = new AcpSession(makeConfig(), deps);
+
+    const info = await session.start();
+
+    const content = fs.readFileSync(info.composeFile, "utf-8");
+    const agentSection = content.split("agent-note-taker-writer:")[1]!;
+    expect(agentSection).not.toContain("ports:");
+    expect(agentSection).not.toContain("3002");
+  });
+
   it("start() throws when session is already running", async () => {
     const { deps } = makeMockDeps();
     const session = new AcpSession(makeConfig(), deps);
@@ -347,17 +387,6 @@ describe("AcpSession", () => {
     });
 
     await expect(session.start()).rejects.toThrow("Docker Compose");
-  });
-
-  it("start() compose has ACP port exposed", async () => {
-    const { deps } = makeMockDeps({ sessionId: "port0001" });
-    const session = new AcpSession(makeConfig({ acpPort: 3002 }), deps);
-
-    const info = await session.start();
-
-    const content = fs.readFileSync(info.composeFile, "utf-8");
-    const agentSection = content.split("agent-note-taker-writer:")[1]!;
-    expect(agentSection).toContain('"3002:3002"');
   });
 
   it("stop() calls docker compose down for legacy session", async () => {
@@ -501,7 +530,7 @@ describe("AcpSession", () => {
       await expect(session.startInfrastructure()).rejects.toThrow("Failed to start infrastructure");
     });
 
-    it("startAgent() uses docker compose run with volume override", async () => {
+    it("startAgent() uses docker compose run without --service-ports", async () => {
       const { calls, deps } = makeMockDeps({ sessionId: "infra003" });
       const session = new AcpSession(makeConfig(), deps);
 
@@ -514,13 +543,14 @@ describe("AcpSession", () => {
 
       expect(info.agentServiceName).toBe("agent-note-taker-writer");
       expect(info.projectDir).toBe(agentDir);
-      expect(info.acpPort).toBe(3002);
 
       // Should have 2 calls: infra up, agent run
       expect(calls).toHaveLength(2);
       expect(calls[1]!.args).toEqual([
-        "run", "-d", "--rm", "--build", "--service-ports", "-v", `${agentDir}:/workspace`, "agent-note-taker-writer",
+        "run", "-d", "--rm", "--build", "-v", `${agentDir}:/workspace`, "agent-note-taker-writer",
       ]);
+      // Verify --service-ports is NOT present
+      expect(calls[1]!.args).not.toContain("--service-ports");
     });
 
     it("startAgent() uses the same compose file as infrastructure", async () => {
@@ -660,6 +690,166 @@ describe("AcpSession", () => {
       expect(session.isAgentRunning()).toBe(true);
 
       await session.stopAgent();
+      expect(session.isAgentRunning()).toBe(false);
+    });
+  });
+
+  // ── startAgentProcess ─────────────────────────────────────────────────
+
+  describe("startAgentProcess", () => {
+    it("pre-builds image then spawns docker compose run without -d", async () => {
+      const { calls, spawnCalls, mockChild, deps } = makeMockDepsWithSpawn({ sessionId: "proc001" });
+      const session = new AcpSession(makeConfig(), deps);
+
+      await session.startInfrastructure();
+
+      const agentDir = path.join(tmpDir, "target-project");
+      fs.mkdirSync(agentDir, { recursive: true });
+
+      const result = await session.startAgentProcess(agentDir);
+
+      expect(result.child).toBe(mockChild);
+      expect(result.agentInfo.agentServiceName).toBe("agent-note-taker-writer");
+      expect(result.agentInfo.projectDir).toBe(agentDir);
+
+      // Verify pre-build was called via execComposeFn
+      // calls[0] = infra up, calls[1] = agent build
+      expect(calls).toHaveLength(2);
+      expect(calls[1]!.args).toEqual(["build", "agent-note-taker-writer"]);
+
+      // Verify spawn was called with correct args (no --build)
+      expect(spawnCalls).toHaveLength(1);
+      expect(spawnCalls[0]!.command).toBe("docker");
+      expect(spawnCalls[0]!.args).toContain("compose");
+      expect(spawnCalls[0]!.args).toContain("run");
+      expect(spawnCalls[0]!.args).toContain("--rm");
+      expect(spawnCalls[0]!.args).not.toContain("--build");
+      expect(spawnCalls[0]!.args).toContain("agent-note-taker-writer");
+      expect(spawnCalls[0]!.args).toContain("-v");
+      expect(spawnCalls[0]!.args).toContain(`${agentDir}:/workspace`);
+
+      // Verify NO -d flag (foreground process)
+      expect(spawnCalls[0]!.args).not.toContain("-d");
+
+      // Verify stdio is piped
+      expect(spawnCalls[0]!.options.stdio).toEqual(["pipe", "pipe", "pipe"]);
+    });
+
+    it("includes compose file via -f flag", async () => {
+      const { spawnCalls, deps } = makeMockDepsWithSpawn({ sessionId: "proc002" });
+      const session = new AcpSession(makeConfig(), deps);
+
+      const infraInfo = await session.startInfrastructure();
+
+      const agentDir = path.join(tmpDir, "target-project");
+      fs.mkdirSync(agentDir, { recursive: true });
+
+      await session.startAgentProcess(agentDir);
+
+      expect(spawnCalls[0]!.args).toContain("-f");
+      expect(spawnCalls[0]!.args).toContain(infraInfo.composeFile);
+    });
+
+    it("throws when infrastructure is not running", async () => {
+      const { deps } = makeMockDepsWithSpawn();
+      const session = new AcpSession(makeConfig(), deps);
+
+      await expect(session.startAgentProcess("/some/dir")).rejects.toThrow("Infrastructure must be running");
+    });
+
+    it("throws when agent is already running", async () => {
+      const { deps } = makeMockDepsWithSpawn({ sessionId: "proc003" });
+      const session = new AcpSession(makeConfig(), deps);
+
+      await session.startInfrastructure();
+
+      const agentDir = path.join(tmpDir, "target-project");
+      fs.mkdirSync(agentDir, { recursive: true });
+
+      await session.startAgentProcess(agentDir);
+
+      await expect(session.startAgentProcess(agentDir)).rejects.toThrow("Agent is already running");
+    });
+
+    it("marks agent as running after startAgentProcess", async () => {
+      const { deps } = makeMockDepsWithSpawn({ sessionId: "proc004" });
+      const session = new AcpSession(makeConfig(), deps);
+
+      await session.startInfrastructure();
+
+      const agentDir = path.join(tmpDir, "target-project");
+      fs.mkdirSync(agentDir, { recursive: true });
+
+      expect(session.isAgentRunning()).toBe(false);
+      await session.startAgentProcess(agentDir);
+      expect(session.isAgentRunning()).toBe(true);
+    });
+  });
+
+  // ── stopAgent with child process ──────────────────────────────────────
+
+  describe("stopAgent with child process", () => {
+    it("kills the child process instead of calling compose stop/rm", async () => {
+      const { calls, mockChild, deps } = makeMockDepsWithSpawn({ sessionId: "kill001" });
+      const session = new AcpSession(makeConfig(), deps);
+
+      await session.startInfrastructure();
+
+      const agentDir = path.join(tmpDir, "target-project");
+      fs.mkdirSync(agentDir, { recursive: true });
+
+      await session.startAgentProcess(agentDir);
+      await session.stopAgent();
+
+      // child.kill() should have been called
+      expect(mockChild.kill).toHaveBeenCalledOnce();
+
+      // Compose calls: infra up + agent build (no compose stop/rm for child process)
+      expect(calls).toHaveLength(2);
+
+      expect(session.isAgentRunning()).toBe(false);
+    });
+
+    it("can start a new agent process after stopAgent()", async () => {
+      const { deps } = makeMockDepsWithSpawn({ sessionId: "kill002" });
+      const session = new AcpSession(makeConfig(), deps);
+
+      await session.startInfrastructure();
+
+      const dir1 = path.join(tmpDir, "project-1");
+      fs.mkdirSync(dir1, { recursive: true });
+      await session.startAgentProcess(dir1);
+      await session.stopAgent();
+
+      const dir2 = path.join(tmpDir, "project-2");
+      fs.mkdirSync(dir2, { recursive: true });
+      const result = await session.startAgentProcess(dir2);
+
+      expect(result.agentInfo.projectDir).toBe(dir2);
+      expect(session.isAgentRunning()).toBe(true);
+    });
+
+    it("stop() kills child process and tears down infrastructure", async () => {
+      const { calls, mockChild, deps } = makeMockDepsWithSpawn({ sessionId: "kill003" });
+      const session = new AcpSession(makeConfig(), deps);
+
+      await session.startInfrastructure();
+
+      const agentDir = path.join(tmpDir, "target-project");
+      fs.mkdirSync(agentDir, { recursive: true });
+
+      await session.startAgentProcess(agentDir);
+      await session.stop();
+
+      // child.kill() called
+      expect(mockChild.kill).toHaveBeenCalledOnce();
+
+      // compose calls: infra up + agent build + down
+      expect(calls).toHaveLength(3);
+      expect(calls[1]!.args).toEqual(["build", "agent-note-taker-writer"]);
+      expect(calls[2]!.args).toEqual(["--profile", "agent", "down"]);
+
+      expect(session.isInfrastructureRunning()).toBe(false);
       expect(session.isAgentRunning()).toBe(false);
     });
   });

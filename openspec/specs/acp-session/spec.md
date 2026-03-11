@@ -35,19 +35,14 @@ The agent service in ACP compose SHALL NOT have `stdin_open` or `tty` set, unlik
 - **THEN** it does NOT contain `stdin_open` or `tty`
 - **AND** it DOES contain `init: true`
 
-### Requirement: Agent service exposes ACP port
+### Requirement: Agent service does NOT expose ACP ports
 
-The agent service SHALL expose the ACP agent port to the host for bridge connectivity.
+The agent service SHALL NOT expose any ACP ports to the host. Communication occurs via piped stdio from `docker compose run`, not HTTP.
 
-#### Scenario: Default ACP port
-- **GIVEN** no custom ACP port is configured
+#### Scenario: No ports section for agent
+- **GIVEN** any ACP compose configuration
 - **WHEN** the compose file is generated
-- **THEN** the agent service exposes port 3002 mapped to host port 3002
-
-#### Scenario: Custom ACP port
-- **GIVEN** `acpPort: 4444` is configured
-- **WHEN** the compose file is generated
-- **THEN** the agent service exposes port 4444 mapped to host port 4444
+- **THEN** the agent service does NOT contain a `ports` section
 
 ### Requirement: AcpSession.start() creates and starts a Docker session
 
@@ -56,7 +51,7 @@ The `start()` method SHALL generate a compose file, create a session directory, 
 #### Scenario: Successful start
 - **GIVEN** a valid project directory with Dockerfiles
 - **WHEN** `start()` is called
-- **THEN** it returns a SessionInfo with sessionId, composeFile path, acpPort, and service names
+- **THEN** it returns a SessionInfo with sessionId, composeFile path, and service names
 - **AND** the compose file exists on disk
 - **AND** `docker compose up -d` was invoked
 

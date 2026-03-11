@@ -215,12 +215,11 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
       );
     }
 
-    // ACP mode: generate .chapter/acp.json with port and command
+    // ACP mode: generate .chapter/acp.json with command
     if (options?.acpMode) {
-      const acpPort = agent.acp?.port ?? 3002;
       const primaryRuntime = agent.runtimes[0] ?? "pi-coding-agent";
       const acpCommand = ACP_RUNTIME_COMMANDS[primaryRuntime] ?? primaryRuntime;
-      result.set(".chapter/acp.json", generateAcpConfigJson(acpPort, acpCommand));
+      result.set(".chapter/acp.json", generateAcpConfigJson(acpCommand));
     }
 
     return result;

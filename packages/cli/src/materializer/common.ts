@@ -40,14 +40,11 @@ export const ACP_RUNTIME_COMMANDS: Record<string, string> = {
 /**
  * Generate .chapter/acp.json content for ACP agent mode.
  *
- * Contains the ACP port and command so the container entrypoint
+ * Contains the ACP command so the container entrypoint
  * knows how to start the agent in ACP mode.
  */
-export function generateAcpConfigJson(
-  acpPort: number,
-  acpCommand: string,
-): string {
-  return JSON.stringify({ port: acpPort, command: acpCommand }, null, 2);
+export function generateAcpConfigJson(acpCommand: string): string {
+  return JSON.stringify({ command: acpCommand }, null, 2);
 }
 
 /**

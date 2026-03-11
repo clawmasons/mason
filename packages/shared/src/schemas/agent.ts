@@ -11,10 +11,6 @@ const proxySchema = z.object({
   type: z.enum(["sse", "streamable-http"]).optional(),
 });
 
-const acpSchema = z.object({
-  port: z.number().int().positive().optional().default(3002),
-});
-
 const llmSchema = z.object({
   provider: z.string(),
   model: z.string(),
@@ -31,7 +27,6 @@ export const agentChapterFieldSchema = z.object({
   resources: z.array(resourceSchema).optional().default([]),
   proxy: proxySchema.optional(),
   llm: llmSchema.optional(),
-  acp: acpSchema.optional(),
 });
 
 export type AgentChapterField = z.infer<typeof agentChapterFieldSchema>;
