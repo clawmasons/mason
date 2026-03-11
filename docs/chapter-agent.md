@@ -115,5 +115,5 @@ See [CLI Reference](cli.md) for full options.
 
 - [Role](chapter-role.md) — The permission boundaries an agent uses
 - [Chapter](chapter.md) — The workspace containing agents
-- [Architecture](architecture.mdx) — How agents run at runtime
+- [Architecture](architecture.md) — How agents run at runtime
 - [Security](security.md) — Credential isolation and audit logging

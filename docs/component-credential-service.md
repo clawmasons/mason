@@ -69,5 +69,5 @@ In **ACP mode**, the credential service runs in-process within the CLI, with cre
 
 - [MCP Proxy](component-mcp-proxy.md) — Relays credential requests from agents
 - [Security](security.md) — Full security model including credential isolation
-- [Architecture](architecture.mdx) — How the credential service fits in the runtime
+- [Architecture](architecture.md) — How the credential service fits in the runtime
 - [Agent](chapter-agent.md) — How agents declare credentials

@@ -60,7 +60,7 @@ Each package has a `chapter` field in its `package.json` that declares its confi
 | [Overview](docs/overview.md) | What clawmasons is and why it matters |
 | [Getting Started](docs/get-started.md) | Install and run your first agent |
 | [Core Concepts](docs/concepts.md) | Lodges, chapters, agents, roles, tasks, skills, apps |
-| [Architecture](docs/architecture.mdx) | Runtime architecture with sequence diagrams |
+| [Architecture](docs/architecture.md) | Runtime architecture with sequence diagrams |
 | [CLI Reference](docs/cli.md) | Complete command reference |
 | [Security Model](docs/security.md) | Credentials, permissions, audit logging |
 | [MCP Proxy](docs/component-mcp-proxy.md) | Tool filtering and routing |

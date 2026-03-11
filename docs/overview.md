@@ -5,9 +5,11 @@ description: What is clawmasons and why secure agent packaging matters
 
 # Overview
 
-AI agents are powerful — but deploying them today means handing over broad tool access with no guardrails. Credentials leak through environment variables and Docker inspect. There's no audit trail of what tools were called or what data was accessed. And agent definitions are locked to a single runtime.
+Easily run your AI agents in secure Docker containers.
 
-**Clawmasons Chapter** solves this with npm-native packaging, governance, and runtime portability for AI agents.
+Agents are powerful — but dangerous. They need tools, credentials, and broad system access to be useful. Without guardrails, credentials leak through environment variables and `docker inspect`, there's no audit trail of what tools were called, and agent definitions are locked to a single runtime.
+
+**Clawmasons Chapter** makes it easy to secure your agents with npm-native packaging, governance, and runtime portability.
 
 ## What It Does
 
@@ -39,14 +41,9 @@ Everything is a `package.json`. Agents, roles, tasks, skills, and apps are stand
 
 Run agents in Docker containers for full isolation, or integrate directly with your editor via the Agent Communication Protocol (ACP). Supported editors include Zed, JetBrains, Neovim, and any ACP-compatible client.
 
-## What It Is Not
-
-- **Not an AI model** — Clawmasons orchestrates agents, it doesn't provide the LLM
-- **Not a prompt framework** — It handles packaging, permissions, and runtime; bring your own prompts
-- **Not a cloud platform** — Everything runs locally in Docker containers on your machine
 
 ## Next Steps
 
 - [Getting Started](get-started.md) — Install and run your first agent
 - [Core Concepts](concepts.md) — Understand the mental model
-- [Architecture](architecture.mdx) — How the runtime works
+- [Architecture](architecture.md) — How the runtime works

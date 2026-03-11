@@ -109,4 +109,4 @@ Tokens are generated per session and not reused.
 - [Credential Service](component-credential-service.md) — How credentials are resolved
 - [MCP Proxy](component-mcp-proxy.md) — Runtime enforcement of permissions
 - [Role](chapter-role.md) — Defining permissions and risk levels
-- [Architecture](architecture.mdx) — Full runtime architecture
+- [Architecture](architecture.md) — Full runtime architecture

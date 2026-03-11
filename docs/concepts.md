@@ -71,4 +71,4 @@ The `chapter` field in `package.json` is the single source of truth for each com
 
 - Start with [Agent](chapter-agent.md) to understand the top-level deployable unit
 - Read [Role](chapter-role.md) to understand the permission model
-- See [Architecture](architecture.mdx) for how it all runs at runtime
+- See [Architecture](architecture.md) for how it all runs at runtime

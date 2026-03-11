@@ -118,5 +118,5 @@ All tool calls and credential accesses were logged for audit.
 
 - [Core Concepts](concepts.md) — Understand lodges, chapters, roles, agents, tasks, skills, and apps
 - [CLI Reference](cli.md) — Full command reference
-- [Architecture](architecture.mdx) — Runtime architecture with sequence diagrams
+- [Architecture](architecture.md) — Runtime architecture with sequence diagrams
 - [Security Model](security.md) — How credentials and permissions work

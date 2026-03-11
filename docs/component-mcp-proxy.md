@@ -93,7 +93,7 @@ Additionally:
 
 ## Related
 
-- [Architecture](architecture.mdx) — How the proxy fits in the runtime
+- [Architecture](architecture.md) — How the proxy fits in the runtime
 - [Role](chapter-role.md) — How permissions are defined
 - [Credential Service](component-credential-service.md) — The other side of credential relay
 - [Security](security.md) — Full security model
