@@ -3,7 +3,7 @@
  *
  * Modes:
  *   - REPL (default): Interactive tool-calling interface via stdin/stdout
- *   - ACP (--acp): Listens for incoming ACP connections on a configurable port
+ *   - ACP (--acp): ACP endpoint reading/writing ndjson on stdin/stdout
  *
  * Environment variables:
  *   - TEST_TOKEN       — credential injected by agent-entry (required)
@@ -11,37 +11,30 @@
  *   - MCP_PROXY_TOKEN  — proxy auth token (required for MCP calls)
  *
  * CLI flags:
- *   --acp              — start in ACP agent mode
- *   --port <number>    — ACP server port (default: 3002)
+ *   --acp              — start in ACP agent mode (stdin/stdout ndjson)
  */
 
 import { createInterface } from "node:readline";
+import { Readable, Writable } from "node:stream";
+import { AgentSideConnection, ndJsonStream } from "@agentclientprotocol/sdk";
 import { createMcpClient } from "./mcp-client.js";
-import { startAcpServer } from "./acp-server.js";
+import { createAcpAgentFactory } from "./acp-agent.js";
 import { executeCommand, type ToolCaller, type ToolDefinition } from "./tool-caller.js";
 
 // ── CLI Argument Parsing ──────────────────────────────────────────────
 
 interface CliArgs {
   acpMode: boolean;
-  port: number;
 }
 
 function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = {
     acpMode: false,
-    port: 3002,
   };
 
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--acp") {
       args.acpMode = true;
-    } else if (argv[i] === "--port" && i + 1 < argv.length) {
-      const port = parseInt(argv[i + 1], 10);
-      if (!isNaN(port) && port > 0) {
-        args.port = port;
-      }
-      i++;
     }
   }
 
@@ -229,7 +222,7 @@ export async function main(argv?: string[]): Promise<void> {
       console.error("[mcp-agent] The credential pipeline did not inject TEST_TOKEN.");
       process.exit(1);
     }
-    console.log("[mcp-agent] Connected. TEST_TOKEN received.");
+    console.error("[mcp-agent] Connected. TEST_TOKEN received.");
   }
 
   let caller: ToolCaller | null = null;
@@ -237,7 +230,7 @@ export async function main(argv?: string[]): Promise<void> {
   // connectToProxy retries MCP session establishment
   async function connectToProxy(): Promise<ToolCaller | null> {
     if (!proxyToken) {
-      console.log("[mcp-agent] MCP_PROXY_TOKEN not set. Running in credential-only mode.");
+      console.error("[mcp-agent] MCP_PROXY_TOKEN not set. Running in credential-only mode.");
       return null;
     }
 
@@ -245,12 +238,12 @@ export async function main(argv?: string[]): Promise<void> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const c = await createMcpClient({ proxyUrl, proxyToken });
-        console.log("[mcp-agent] MCP session established.");
+        console.error("[mcp-agent] MCP session established.");
         return c;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (attempt < maxRetries) {
-          console.log(`[mcp-agent] Proxy not ready (attempt ${attempt}/${maxRetries}): ${msg}`);
+          console.error(`[mcp-agent] Proxy not ready (attempt ${attempt}/${maxRetries}): ${msg}`);
           await new Promise((r) => setTimeout(r, 2000));
         } else {
           console.error(`[mcp-agent] WARNING: Could not establish MCP session after ${maxRetries} attempts: ${msg}`);
@@ -261,8 +254,15 @@ export async function main(argv?: string[]): Promise<void> {
     return null;
   }
 
-  // In ACP mode, start the server immediately and resolve credentials + connect to proxy in background
+  // In ACP mode, use AgentSideConnection on stdin/stdout
   if (cliArgs.acpMode) {
+    // REQ-SDK-012: Redirect console.log to stderr to protect stdout for ACP ndjson
+    console.log = (...args: unknown[]) => {
+      console.error(...args);
+    };
+
+    console.error("[mcp-agent] Starting ACP agent on stdin/stdout...");
+
     // Create a deferred caller that forwards to the real caller once connected
     let realCaller: ToolCaller | null = null;
     const deferredCaller: ToolCaller = {
@@ -276,19 +276,18 @@ export async function main(argv?: string[]): Promise<void> {
       },
     };
 
-    console.log(`[mcp-agent] Starting ACP server on port ${cliArgs.port}...`);
-    const server = await startAcpServer({ port: cliArgs.port, caller: deferredCaller });
+    // Session setup: resolve credentials + connect to proxy (called from newSession)
+    let setupDone = false;
+    const onSessionSetup = async (): Promise<void> => {
+      if (setupDone) return;
+      setupDone = true;
 
-    // Resolve credentials and connect to proxy in background
-    // Non-fatal in ACP mode: the ACP server must stay running even if
-    // credential resolution fails, so the bridge can connect.
-    (async () => {
       try {
         await resolveAndVerifyCredentials();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[mcp-agent] Credential resolution failed (non-fatal): ${msg}`);
-        console.error("[mcp-agent] ACP server continues without credentials.");
+        console.error("[mcp-agent] ACP agent continues without credentials.");
       }
       try {
         const c = await connectToProxy();
@@ -297,17 +296,30 @@ export async function main(argv?: string[]): Promise<void> {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[mcp-agent] Proxy connection failed (non-fatal): ${msg}`);
       }
-    })();
+    };
+
+    // Create the ACP stream and connection
+    const output = Writable.toWeb(process.stdout) as WritableStream<Uint8Array>;
+    const input = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
+    const stream = ndJsonStream(output, input);
+
+    const connection = new AgentSideConnection(
+      createAcpAgentFactory({ caller: deferredCaller, onSessionSetup }),
+      stream,
+    );
 
     // Handle graceful shutdown
-    const shutdown = async () => {
-      console.log("\n[mcp-agent] Shutting down ACP server...");
-      await server.close();
+    const shutdown = () => {
+      console.error("\n[mcp-agent] Shutting down ACP agent...");
       process.exit(0);
     };
 
     process.on("SIGTERM", shutdown);
     process.on("SIGINT", shutdown);
+
+    // Keep process alive until connection closes
+    await connection.closed;
+    console.error("[mcp-agent] ACP connection closed.");
   } else {
     // REPL mode: resolve credentials and connect synchronously before starting
     await resolveAndVerifyCredentials();

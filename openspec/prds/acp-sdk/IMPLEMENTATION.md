@@ -57,7 +57,7 @@ Replace `acp-server.ts` (HTTP server on port 3002) with an `AgentSideConnection`
 
 **PRD refs:** REQ-SDK-001, REQ-SDK-008, REQ-SDK-012
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-10-container-agent-sdk/proposal.md) · [design](../../changes/archive/2026-03-10-container-agent-sdk/design.md) · [tasks](../../changes/archive/2026-03-10-container-agent-sdk/tasks.md)
 
 ---
 

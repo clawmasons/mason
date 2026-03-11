@@ -20,7 +20,9 @@
     "typecheck": "tsc --noEmit"
   },
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^0.16.0"
+  },
   "devDependencies": {
     "esbuild": "^0.25.0",
     "tsx": "^4.19.0"
