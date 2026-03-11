@@ -12,9 +12,6 @@
     "llm": {
       "provider": "openrouter",
       "model": "anthropic/claude-sonnet-4"
-    },
-    "acp": {
-      "port": 3002
     }
   },
   "dependencies": {}

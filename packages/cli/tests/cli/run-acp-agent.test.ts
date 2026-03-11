@@ -418,22 +418,6 @@ describe("runAcpAgent", () => {
     expect(sessionConfig?.projectDir).toBe("/fake/root");
   });
 
-  it("does not pass acpPort to session config", async () => {
-    let sessionConfig: AcpSessionConfig | undefined;
-
-    const deps: RunAcpAgentDeps = {
-      ...makeDeps(),
-      createSessionFn: (config: AcpSessionConfig) => {
-        sessionConfig = config;
-        return makeMockSession().session as unknown as AcpSession;
-      },
-    };
-
-    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
-
-    expect(sessionConfig?.acpPort).toBeUndefined();
-  });
-
   it("constructs acpCommand without --port", async () => {
     let sessionConfig: AcpSessionConfig | undefined;
 

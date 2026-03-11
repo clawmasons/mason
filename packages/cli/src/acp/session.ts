@@ -38,11 +38,6 @@ export interface AcpSessionConfig {
   agent: string;
   /** Role short name (e.g., "writer") */
   role: string;
-  /**
-   * @deprecated No longer used. Port exposure removed in favor of piped stdio.
-   * Kept temporarily for backward compatibility with callers (removed in Change 4).
-   */
-  acpPort?: number;
   /** Internal proxy port (default: 3000) */
   proxyPort?: number;
   /** Session credential overrides extracted from ACP client mcpServers */

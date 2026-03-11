@@ -1,7 +1,7 @@
 # ACP SDK Migration — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** Planning
+**Status:** Complete
 **Date:** March 2026
 
 ---
@@ -212,7 +212,7 @@ Final cleanup pass to remove all vestiges of the HTTP relay architecture.
 
 **PRD refs:** All — final verification of complete migration
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-11-cleanup-dead-code-sdk/proposal.md) · [design](../../changes/archive/2026-03-11-cleanup-dead-code-sdk/design.md) · [tasks](../../changes/archive/2026-03-11-cleanup-dead-code-sdk/tasks.md)
 
 ---
 
