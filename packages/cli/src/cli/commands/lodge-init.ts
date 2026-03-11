@@ -115,7 +115,7 @@ export function registerLodgeInitCommand(program: Command): void {
       console.log(
         `\n  Lodge '${result.lodge}' initialized at ${result.lodgeHome}\n` +
           `\n  Next steps:\n` +
-          `    clawmasons acp --chapter initiate --role chapter-creator\n`,
+          `    clawmasons agent --acp --chapter initiate --role chapter-creator\n`,
       );
     });
 }

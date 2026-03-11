@@ -10,6 +10,7 @@ import {
   type RunAcpAgentDeps,
   type BootstrapChapterDeps,
 } from "../../src/cli/commands/run-acp-agent.js";
+import { registerRunAgentCommand } from "../../src/cli/commands/run-agent.js";
 import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
 import type { AcpSessionConfig, InfrastructureInfo, AgentSessionInfo } from "../../src/acp/session.js";
 import type { AcpSdkBridge, AcpSdkBridgeConfig } from "../../src/acp/bridge.js";
@@ -612,7 +613,7 @@ describe("runAcpAgent", () => {
     await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("[clawmasons acp]");
+    expect(logOutput).toContain("[clawmasons agent --acp]");
     expect(logOutput).not.toContain("[chapter acp-proxy]");
   });
 
@@ -700,11 +701,11 @@ describe("runAcpAgent", () => {
 
 // ── Help Text ─────────────────────────────────────────────────────────────
 
-describe("run-acp-agent help text", () => {
+describe("agent --acp help text", () => {
   function getHelpOutput(): string {
     const program = new Command();
-    registerRunAcpAgentCommand(program);
-    const cmd = program.commands.find((c) => c.name() === "acp");
+    registerRunAgentCommand(program);
+    const cmd = program.commands.find((c) => c.name() === "agent");
     expect(cmd).toBeDefined();
     let output = "";
     cmd!.configureOutput({ writeOut: (str: string) => { output += str; } });
@@ -740,7 +741,7 @@ describe("run-acp-agent help text", () => {
     const help = getHelpOutput();
     expect(help).toContain("agent_servers");
     expect(help).toContain("Clawmasons");
-    expect(help).toContain("acp");
+    expect(help).toContain("--acp");
     expect(help).toContain("--role");
     expect(help).toContain("--chapter");
     expect(help).toContain("--init-agent");
@@ -749,11 +750,6 @@ describe("run-acp-agent help text", () => {
   it("does not contain --transport option", () => {
     const help = getHelpOutput();
     expect(help).not.toContain("--transport");
-  });
-
-  it("does not contain --port option", () => {
-    const help = getHelpOutput();
-    expect(help).not.toContain("--port");
   });
 
   it("does not contain HTTP transport references", () => {
@@ -786,26 +782,34 @@ describe("run-acp-agent help text", () => {
   });
 });
 
-// ── registerRunAcpAgentCommand ────────────────────────────────────────
+// ── registerRunAgentCommand (consolidated) ───────────────────────────
 
-describe("registerRunAcpAgentCommand", () => {
-  it("rejects --transport as unknown option", () => {
+describe("registerRunAgentCommand (ACP options)", () => {
+  it("registerRunAcpAgentCommand is a no-op (backward compat)", () => {
+    const program = new Command();
+    registerRunAcpAgentCommand(program);
+    // Should not register any commands
+    const acpCmd = program.commands.find((c) => c.name() === "acp");
+    expect(acpCmd).toBeUndefined();
+  });
+
+  it("rejects --transport as unknown option on agent command", () => {
     const program = new Command();
     program.exitOverride();
-    registerRunAcpAgentCommand(program);
+    registerRunAgentCommand(program);
 
     expect(() => {
-      program.parse(["node", "test", "acp", "--role", "writer", "--transport", "http"]);
+      program.parse(["node", "test", "agent", "--acp", "--role", "writer", "--transport", "http"]);
     }).toThrow();
   });
 
-  it("rejects --port as unknown option", () => {
+  it("rejects --port as unknown option on agent command", () => {
     const program = new Command();
     program.exitOverride();
-    registerRunAcpAgentCommand(program);
+    registerRunAgentCommand(program);
 
     expect(() => {
-      program.parse(["node", "test", "acp", "--role", "writer", "--port", "3001"]);
+      program.parse(["node", "test", "agent", "--acp", "--role", "writer", "--port", "3001"]);
     }).toThrow();
   });
 });

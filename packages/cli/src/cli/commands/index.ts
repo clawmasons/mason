@@ -9,13 +9,12 @@ import { registerPackCommand } from "./pack.js";
 import { registerPermissionsCommand } from "./permissions.js";
 import { registerProxyCommand } from "./proxy.js";
 import { registerRemoveCommand } from "./remove.js";
-import { registerRunAcpAgentCommand } from "./run-acp-agent.js";
 import { registerRunAgentCommand } from "./run-agent.js";
 import { registerValidateCommand } from "./validate.js";
 
 /**
  * Register all chapter workspace subcommands under the `chapter` subcommand group,
- * and register top-level commands (`init`, `agent`, `acp`).
+ * and register top-level commands (`init`, `agent`).
  */
 export function registerCommands(program: Command): void {
   // ── Top-level commands ──────────────────────────────────────────────
@@ -23,11 +22,8 @@ export function registerCommands(program: Command): void {
   // `init` — lodge initialization
   registerLodgeInitCommand(program);
 
-  // `agent` — renamed from `run-agent`
+  // `agent` — interactive mode or ACP mode (via --acp flag)
   registerRunAgentCommand(program);
-
-  // `acp` — renamed from `run-acp-agent`
-  registerRunAcpAgentCommand(program);
 
   // ── `chapter` subcommand group ──────────────────────────────────────
 

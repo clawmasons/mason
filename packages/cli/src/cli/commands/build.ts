@@ -127,14 +127,14 @@ function displayCompletionInstructions(agents: ResolvedAgent[]): void {
     }
 
     console.log("\n  Configure an ACP client:");
-    console.log(`    clawmasons acp --role ${first.roleShort}`);
+    console.log(`    clawmasons agent --acp --role ${first.roleShort}`);
 
     console.log("\n  Example ACP client configuration:");
     console.log("    {");
     console.log('      "mcpServers": {');
     console.log('        "clawmasons": {');
     console.log('          "command": "clawmasons",');
-    console.log(`          "args": ["acp", "--role", "${first.roleShort}"]`);
+    console.log(`          "args": ["agent", "--acp", "--role", "${first.roleShort}"]`);
     console.log("        }");
     console.log("      }");
     console.log("    }");

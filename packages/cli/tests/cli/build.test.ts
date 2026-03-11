@@ -48,9 +48,9 @@ describe("CLI build command", () => {
     expect(topLevelNames).not.toContain("run-agent");
   });
 
-  it("acp IS a registered top-level command", () => {
+  it("acp is NOT a separate top-level command (consolidated into agent --acp)", () => {
     const cmd = program.commands.find((c) => c.name() === "acp");
-    expect(cmd).toBeDefined();
+    expect(cmd).toBeUndefined();
   });
 });
 
@@ -317,7 +317,7 @@ describe("runBuild", () => {
     const logOutput = logSpy.mock.calls.flat().join("\n");
     // Should contain agent instruction
     expect(logOutput).toContain("clawmasons agent");
-    expect(logOutput).toContain("clawmasons acp");
+    expect(logOutput).toContain("clawmasons agent --acp");
     expect(logOutput).toContain("mcpServers");
   });
 });

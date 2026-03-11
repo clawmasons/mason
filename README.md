@@ -71,10 +71,10 @@ Each package has a `chapter` field in its `package.json` that declares its confi
 Integrate with your editor via the Agent Communication Protocol:
 
 ```bash
-clawmasons acp --role writer
+clawmasons agent --acp --role writer
 ```
 
-Works with Zed, JetBrains, Neovim, and any ACP-compatible client. See the [CLI reference](docs/cli.md#clawmasons-acp) for configuration details.
+Works with Zed, JetBrains, Neovim, and any ACP-compatible client. See the [CLI reference](docs/cli.md#clawmasons-agent) for configuration details.
 
 ## Contributing
 

@@ -30,12 +30,9 @@ describe("CLI entry point", () => {
     }
   });
 
-  it("has top-level acp command registered", () => {
+  it("does not have a separate top-level acp command (consolidated into agent --acp)", () => {
     const acpCmd = program.commands.find((cmd) => cmd.name() === "acp");
-    expect(acpCmd).toBeDefined();
-    if (acpCmd) {
-      expect(acpCmd.description()).toContain("ACP");
-    }
+    expect(acpCmd).toBeUndefined();
   });
 
   it("has chapter subcommand group registered", () => {

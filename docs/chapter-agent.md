@@ -106,7 +106,7 @@ External resource references:
 clawmasons agent <slug> <role-name>
 
 # ACP mode for editor integration
-clawmasons acp --role <role-name>
+clawmasons agent --acp --role <role-name>
 ```
 
 See [CLI Reference](cli.md) for full options.

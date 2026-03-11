@@ -94,10 +94,10 @@ Navigate to the project directory where you want the agent to work, then:
 clawmasons agent note-taker writer
 ```
 
-This spins up three Docker containers:
-1. **MCP Proxy** — enforces role-based tool filtering
-2. **Credential Service** — resolves credentials on-demand
-3. **Agent** — runs the agent runtime (Claude Code by default)
+This starts two Docker containers and an in-process credential service:
+1. **MCP Proxy** (Docker) — enforces role-based tool filtering
+2. **Credential Service** (in-process) — resolves credentials on-demand from your host
+3. **Agent** (Docker) — runs the agent runtime (Claude Code by default)
 
 The agent starts interactively, and you can give it tasks through the terminal.
 
@@ -107,7 +107,7 @@ When you ran `clawmasons agent`, the system:
 
 1. Resolved the agent's dependency graph (agent -> role -> tasks/skills/apps)
 2. Started the MCP proxy with the role's permission rules
-3. Launched the credential service for secure secret resolution
+3. Started the credential service in-process for secure secret resolution
 4. Started the agent container, which connected to the proxy
 5. The proxy filtered available tools based on the writer role's permissions
 6. The agent received only the tools it was authorized to use
