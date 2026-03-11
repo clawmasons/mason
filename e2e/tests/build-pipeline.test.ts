@@ -209,7 +209,7 @@ services:
       - "${path.join(workspaceDir, "notes")}:/app/notes"
     environment:
       - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
-    command: ["proxy", "--agent", "@test/agent-test-note-taker", "--transport", "streamable-http"]
+    command: ["chapter", "proxy", "--agent", "@test/agent-test-note-taker", "--transport", "streamable-http"]
     restart: "no"
 `;
       const composeDir = path.join(workspaceDir, "e2e-compose");

@@ -73,7 +73,7 @@ services:
       - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
       - CHAPTER_SESSION_TYPE=acp
       - CHAPTER_ACP_CLIENT=${ACP_CLIENT_NAME}
-    command: ["proxy", "--agent", "@test/agent-test-note-taker", "--transport", "streamable-http"]
+    command: ["chapter", "proxy", "--agent", "@test/agent-test-note-taker", "--transport", "streamable-http"]
     restart: "no"
 `;
     const composeDir = path.join(workspaceDir, "e2e-compose");

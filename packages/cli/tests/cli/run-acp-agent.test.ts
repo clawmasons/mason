@@ -153,7 +153,7 @@ function makeMockSession() {
       agentProjectDir = projectDir;
       return { ...agentInfo, projectDir };
     },
-    startAgentProcess: (projectDir: string): { child: ChildProcess; agentInfo: AgentSessionInfo } => {
+    startAgentProcess: async (projectDir: string): Promise<{ child: ChildProcess; agentInfo: AgentSessionInfo }> => {
       startAgentProcessCalled = true;
       agentProjectDir = projectDir;
       return { child: mockChild, agentInfo: { ...agentInfo, projectDir } };
@@ -457,7 +457,7 @@ describe("runAcpAgent", () => {
       isRunning: () => false,
       startInfrastructure: async () => { throw new Error("Docker compose failed"); },
       startAgent: async () => { throw new Error("should not be called"); },
-      startAgentProcess: () => { throw new Error("should not be called"); },
+      startAgentProcess: async () => { throw new Error("should not be called"); },
       stopAgent: async () => {},
       isInfrastructureRunning: () => false,
       isAgentRunning: () => false,
@@ -637,7 +637,7 @@ describe("runAcpAgent", () => {
 
     // Invoke the onSessionNew callback
     expect(capturedConfig?.onSessionNew).toBeDefined();
-    const child = capturedConfig!.onSessionNew("/projects/myapp");
+    const child = await capturedConfig!.onSessionNew("/projects/myapp");
 
     expect(mockSession.startAgentProcessCalled).toBe(true);
     expect(mockSession.agentProjectDir).toBe("/projects/myapp");

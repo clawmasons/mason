@@ -15,14 +15,13 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
-import { execSync, spawn, type ChildProcess } from "node:child_process";
+import { execSync } from "node:child_process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   copyFixtureWorkspace,
   chapterExec,
   waitForHealth,
-  CHAPTER_BIN,
 } from "./helpers.js";
 
 // ── Shared Setup ──────────────────────────────────────────────────────
@@ -112,7 +111,7 @@ services:
     environment:
       - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
       - CREDENTIAL_PROXY_TOKEN=${CRED_TOKEN}
-    command: ["proxy", "--agent", "@test/agent-mcp-note-taker", "--transport", "streamable-http"]
+    command: ["chapter", "proxy", "--agent", "@test/agent-mcp-note-taker", "--transport", "streamable-http"]
     restart: "no"
 
   credential-service:
@@ -334,9 +333,11 @@ services:
     }, 65_000);
   });
 
-  // ── Suite B: ACP Agent Mode (via acpx) ────────────────────────────
+  // ── Suite B: ACP Agent Mode ──────────────────────────────────────
+  // Removed: The mcp-agent no longer runs an HTTP server on port 3002.
+  // ACP is now tested via ClientSideConnection in acp-client-spawn.test.ts.
 
-  describe("ACP agent mode", () => {
+  describe.skip("ACP agent mode (obsolete — replaced by acp-client-spawn.test.ts)", () => {
     const ACP_PROXY_PORT = 19700;
     const ACP_AGENT_PORT = 19702;
     const ACP_PROXY_TOKEN = crypto.randomBytes(32).toString("hex");
@@ -360,7 +361,7 @@ services:
       - CHAPTER_PROXY_TOKEN=${ACP_PROXY_TOKEN}
       - CREDENTIAL_PROXY_TOKEN=${ACP_CRED_TOKEN}
       - CHAPTER_SESSION_TYPE=acp
-    command: ["proxy", "--agent", "@test/agent-mcp-note-taker", "--transport", "streamable-http"]
+    command: ["chapter", "proxy", "--agent", "@test/agent-mcp-note-taker", "--transport", "streamable-http"]
     restart: "no"
 
   credential-service:

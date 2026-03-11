@@ -153,7 +153,7 @@ describe("mcpAgentMaterializer", () => {
 
         expect(result.has(".chapter/acp.json")).toBe(true);
         const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
-        expect(acpConfig.command).toBe("node src/index.js --acp");
+        expect(acpConfig.command).toBe("mcp-agent --acp");
         expect(acpConfig.port).toBeUndefined();
       });
 

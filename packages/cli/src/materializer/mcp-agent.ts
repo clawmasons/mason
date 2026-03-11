@@ -70,7 +70,7 @@ export const mcpAgentMaterializer: RuntimeMaterializer = {
 
     // ACP mode: generate .chapter/acp.json with command
     if (options?.acpMode) {
-      const acpCommand = ACP_RUNTIME_COMMANDS["node"] ?? "node src/index.js --acp";
+      const acpCommand = ACP_RUNTIME_COMMANDS["mcp-agent"] ?? "mcp-agent --acp";
       result.set(".chapter/acp.json", generateAcpConfigJson(acpCommand));
     }
 

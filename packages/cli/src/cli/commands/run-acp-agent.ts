@@ -418,10 +418,14 @@ export async function runAcpAgent(
   let session: AcpSession | null = null;
   let bridge: AcpSdkBridge | null = null;
   let credentialWsClient: CredentialWSClient | null = null;
+  let shuttingDown = false;
   let credentialService: CredentialService | null = null;
 
   // Graceful shutdown handler
   const shutdown = async () => {
+    shuttingDown = true;
+    // Set exit code immediately so concurrent code paths don't override it.
+    process.exitCode = 0;
     // Restore console so shutdown messages reach the terminal
     console.log = origLog;
     console.error = origError;
@@ -587,7 +591,7 @@ export async function runAcpAgent(
         svc.setSessionOverrides(opts.envCredentials);
       }
       const client = new CredentialWSClient(svc, {
-        maxRetries: 10,
+        maxRetries: 60,
         retryDelayMs: 2000,
       });
       await client.connect(
@@ -613,7 +617,7 @@ export async function runAcpAgent(
     const sessionRef = session;
 
     bridge = createBridge({
-      onSessionNew: (cwd: string) => {
+      onSessionNew: async (cwd: string) => {
         logRef.log(`[clawmasons acp] session/new received — cwd: "${cwd}"`);
 
         // Create .clawmasons/ in the CWD for session state
@@ -625,7 +629,7 @@ export async function runAcpAgent(
 
         // Start agent container with CWD mounted as /workspace
         logRef.log("[clawmasons acp] Starting agent container...");
-        const { child } = sessionRef.startAgentProcess(cwd);
+        const { child } = await sessionRef.startAgentProcess(cwd);
         logRef.log("[clawmasons acp] Agent process started.");
 
         return child;
@@ -651,6 +655,10 @@ export async function runAcpAgent(
     await bridge.closed;
 
   } catch (error) {
+    // If we're shutting down via signal, the bridge.closed rejection is expected.
+    // The shutdown handler already handles cleanup and process.exit(0).
+    if (shuttingDown) return;
+
     // Restore console so error messages reach the terminal
     console.log = origLog;
     console.error = origError;

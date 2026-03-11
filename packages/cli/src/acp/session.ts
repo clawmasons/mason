@@ -453,7 +453,7 @@ export class AcpSession {
    * @param projectDir The project directory to mount as /workspace.
    * @returns The spawned child process and agent session info.
    */
-  startAgentProcess(projectDir: string): { child: ChildProcess; agentInfo: AgentSessionInfo } {
+  async startAgentProcess(projectDir: string): Promise<{ child: ChildProcess; agentInfo: AgentSessionInfo }> {
     if (!this.infraRunning || !this.infraInfo) {
       throw new Error("Infrastructure must be running before starting an agent. Call startInfrastructure() first.");
     }
@@ -464,11 +464,22 @@ export class AcpSession {
 
     const agentServiceName = this.infraInfo.agentServiceName;
 
+    // Pre-build the agent image so build output goes to the logger,
+    // not into the piped ndjson stream used for ACP protocol messages.
+    this.deps.logger.log(`[session] docker compose -f ${this.infraInfo.composeFile} build ${agentServiceName}`);
+    const buildExitCode = await this.deps.execComposeFn(
+      this.infraInfo.composeFile,
+      ["build", agentServiceName],
+    );
+    if (buildExitCode !== 0) {
+      throw new Error(`Failed to build agent image (docker compose build exit code ${buildExitCode})`);
+    }
+
     // Spawn docker compose run as a foreground process with piped stdio.
-    // No -d flag: the child process IS the transport.
+    // No -d flag, no --build: the child process IS the transport.
     const composeArgs = [
       "compose", "-f", this.infraInfo.composeFile,
-      "run", "--rm", "--build",
+      "run", "--rm",
       "-v", `${projectDir}:/workspace`,
       agentServiceName,
     ];

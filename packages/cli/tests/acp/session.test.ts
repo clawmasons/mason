@@ -697,8 +697,8 @@ describe("AcpSession", () => {
   // ── startAgentProcess ─────────────────────────────────────────────────
 
   describe("startAgentProcess", () => {
-    it("spawns docker compose run without -d and returns child process", async () => {
-      const { spawnCalls, mockChild, deps } = makeMockDepsWithSpawn({ sessionId: "proc001" });
+    it("pre-builds image then spawns docker compose run without -d", async () => {
+      const { calls, spawnCalls, mockChild, deps } = makeMockDepsWithSpawn({ sessionId: "proc001" });
       const session = new AcpSession(makeConfig(), deps);
 
       await session.startInfrastructure();
@@ -706,19 +706,24 @@ describe("AcpSession", () => {
       const agentDir = path.join(tmpDir, "target-project");
       fs.mkdirSync(agentDir, { recursive: true });
 
-      const result = session.startAgentProcess(agentDir);
+      const result = await session.startAgentProcess(agentDir);
 
       expect(result.child).toBe(mockChild);
       expect(result.agentInfo.agentServiceName).toBe("agent-note-taker-writer");
       expect(result.agentInfo.projectDir).toBe(agentDir);
 
-      // Verify spawn was called with correct args
+      // Verify pre-build was called via execComposeFn
+      // calls[0] = infra up, calls[1] = agent build
+      expect(calls).toHaveLength(2);
+      expect(calls[1]!.args).toEqual(["build", "agent-note-taker-writer"]);
+
+      // Verify spawn was called with correct args (no --build)
       expect(spawnCalls).toHaveLength(1);
       expect(spawnCalls[0]!.command).toBe("docker");
       expect(spawnCalls[0]!.args).toContain("compose");
       expect(spawnCalls[0]!.args).toContain("run");
       expect(spawnCalls[0]!.args).toContain("--rm");
-      expect(spawnCalls[0]!.args).toContain("--build");
+      expect(spawnCalls[0]!.args).not.toContain("--build");
       expect(spawnCalls[0]!.args).toContain("agent-note-taker-writer");
       expect(spawnCalls[0]!.args).toContain("-v");
       expect(spawnCalls[0]!.args).toContain(`${agentDir}:/workspace`);
@@ -739,17 +744,17 @@ describe("AcpSession", () => {
       const agentDir = path.join(tmpDir, "target-project");
       fs.mkdirSync(agentDir, { recursive: true });
 
-      session.startAgentProcess(agentDir);
+      await session.startAgentProcess(agentDir);
 
       expect(spawnCalls[0]!.args).toContain("-f");
       expect(spawnCalls[0]!.args).toContain(infraInfo.composeFile);
     });
 
-    it("throws when infrastructure is not running", () => {
+    it("throws when infrastructure is not running", async () => {
       const { deps } = makeMockDepsWithSpawn();
       const session = new AcpSession(makeConfig(), deps);
 
-      expect(() => session.startAgentProcess("/some/dir")).toThrow("Infrastructure must be running");
+      await expect(session.startAgentProcess("/some/dir")).rejects.toThrow("Infrastructure must be running");
     });
 
     it("throws when agent is already running", async () => {
@@ -761,9 +766,9 @@ describe("AcpSession", () => {
       const agentDir = path.join(tmpDir, "target-project");
       fs.mkdirSync(agentDir, { recursive: true });
 
-      session.startAgentProcess(agentDir);
+      await session.startAgentProcess(agentDir);
 
-      expect(() => session.startAgentProcess(agentDir)).toThrow("Agent is already running");
+      await expect(session.startAgentProcess(agentDir)).rejects.toThrow("Agent is already running");
     });
 
     it("marks agent as running after startAgentProcess", async () => {
@@ -776,7 +781,7 @@ describe("AcpSession", () => {
       fs.mkdirSync(agentDir, { recursive: true });
 
       expect(session.isAgentRunning()).toBe(false);
-      session.startAgentProcess(agentDir);
+      await session.startAgentProcess(agentDir);
       expect(session.isAgentRunning()).toBe(true);
     });
   });
@@ -793,14 +798,14 @@ describe("AcpSession", () => {
       const agentDir = path.join(tmpDir, "target-project");
       fs.mkdirSync(agentDir, { recursive: true });
 
-      session.startAgentProcess(agentDir);
+      await session.startAgentProcess(agentDir);
       await session.stopAgent();
 
       // child.kill() should have been called
       expect(mockChild.kill).toHaveBeenCalledOnce();
 
-      // No compose stop/rm calls (only infra up = 1 call)
-      expect(calls).toHaveLength(1);
+      // Compose calls: infra up + agent build (no compose stop/rm for child process)
+      expect(calls).toHaveLength(2);
 
       expect(session.isAgentRunning()).toBe(false);
     });
@@ -813,12 +818,12 @@ describe("AcpSession", () => {
 
       const dir1 = path.join(tmpDir, "project-1");
       fs.mkdirSync(dir1, { recursive: true });
-      session.startAgentProcess(dir1);
+      await session.startAgentProcess(dir1);
       await session.stopAgent();
 
       const dir2 = path.join(tmpDir, "project-2");
       fs.mkdirSync(dir2, { recursive: true });
-      const result = session.startAgentProcess(dir2);
+      const result = await session.startAgentProcess(dir2);
 
       expect(result.agentInfo.projectDir).toBe(dir2);
       expect(session.isAgentRunning()).toBe(true);
@@ -833,15 +838,16 @@ describe("AcpSession", () => {
       const agentDir = path.join(tmpDir, "target-project");
       fs.mkdirSync(agentDir, { recursive: true });
 
-      session.startAgentProcess(agentDir);
+      await session.startAgentProcess(agentDir);
       await session.stop();
 
       // child.kill() called
       expect(mockChild.kill).toHaveBeenCalledOnce();
 
-      // compose down called for infrastructure
-      expect(calls).toHaveLength(2); // infra up + down
-      expect(calls[1]!.args).toEqual(["--profile", "agent", "down"]);
+      // compose calls: infra up + agent build + down
+      expect(calls).toHaveLength(3);
+      expect(calls[1]!.args).toEqual(["build", "agent-note-taker-writer"]);
+      expect(calls[2]!.args).toEqual(["--profile", "agent", "down"]);
 
       expect(session.isInfrastructureRunning()).toBe(false);
       expect(session.isAgentRunning()).toBe(false);

@@ -5,7 +5,7 @@
   "description": "Clawmasons Chapter — npm-native packaging, governance, and runtime portability for AI agents",
   "type": "module",
   "scripts": {
-    "build": "tsc -b packages/shared packages/proxy packages/cli",
+    "build": "tsc -b packages/shared packages/proxy packages/cli && npm run build --workspace=packages/mcp-agent",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint packages/*/src/ packages/*/tests/",
