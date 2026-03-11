@@ -35,12 +35,29 @@ export class CredentialWSClient {
    * Resolves when the connection is established.
    * Rejects if the connection fails after all retries.
    */
-  connect(proxyUrl: string, token: string): Promise<void> {
+  async connect(proxyUrl: string, token: string): Promise<void> {
     this.proxyUrl = proxyUrl;
     this.token = token;
     this.closed = false;
     this.retryCount = 0;
-    return this.attemptConnect();
+
+    while (!this.closed) {
+      try {
+        await this.attemptConnect();
+        return; // Connected successfully
+      } catch {
+        this.retryCount++;
+        if (this.retryCount > this.maxRetries) {
+          throw new Error(
+            `Max connection attempts (${this.maxRetries}) reached. Giving up.`,
+          );
+        }
+        console.log(
+          `[credential-service] Reconnecting (attempt ${this.retryCount}/${this.maxRetries})...`,
+        );
+        await this.delay(this.retryDelayMs);
+      }
+    }
   }
 
   /**
@@ -65,6 +82,7 @@ export class CredentialWSClient {
       ws.on("open", () => {
         this.ws = ws;
         this.retryCount = 0;
+        this.setupReconnectHandler(ws);
         resolve();
       });
 
@@ -74,21 +92,19 @@ export class CredentialWSClient {
         });
       });
 
-      ws.on("close", () => {
-        if (!this.closed) {
-          this.handleReconnect().catch((err) => {
-            console.error("[credential-service] Reconnect failed:", err);
-          });
-        }
-      });
-
       ws.on("error", (err: Error) => {
-        if (this.ws === null && this.retryCount === 0) {
-          // Initial connection failure
-          reject(err);
-        }
-        // Subsequent errors trigger close → reconnect
+        reject(err);
       });
+    });
+  }
+
+  private setupReconnectHandler(ws: WebSocket): void {
+    ws.on("close", () => {
+      if (!this.closed) {
+        this.handleReconnect().catch((err) => {
+          console.error("[credential-service] Reconnect failed:", err);
+        });
+      }
     });
   }
 
@@ -118,24 +134,28 @@ export class CredentialWSClient {
   private async handleReconnect(): Promise<void> {
     if (this.closed) return;
 
-    this.retryCount++;
-    if (this.retryCount > this.maxRetries) {
-      console.error(
-        `[credential-service] Max reconnect attempts (${this.maxRetries}) reached. Giving up.`,
+    this.retryCount = 0;
+    while (!this.closed) {
+      this.retryCount++;
+      if (this.retryCount > this.maxRetries) {
+        console.error(
+          `[credential-service] Max reconnect attempts (${this.maxRetries}) reached. Giving up.`,
+        );
+        return;
+      }
+
+      console.log(
+        `[credential-service] Reconnecting (attempt ${this.retryCount}/${this.maxRetries})...`,
       );
-      return;
-    }
 
-    console.log(
-      `[credential-service] Reconnecting (attempt ${this.retryCount}/${this.maxRetries})...`,
-    );
+      await this.delay(this.retryDelayMs);
 
-    await this.delay(this.retryDelayMs);
-
-    try {
-      await this.attemptConnect();
-    } catch {
-      // attemptConnect rejection triggers another reconnect via close handler
+      try {
+        await this.attemptConnect();
+        return; // Reconnected successfully
+      } catch {
+        // Will retry in next iteration
+      }
     }
   }
 

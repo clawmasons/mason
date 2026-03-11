@@ -115,13 +115,10 @@ describe("validateDockerfiles", () => {
   function setupDockerfiles(agent: string, role: string): void {
     const proxyDir = path.join(tmpDir, "proxy", role);
     const agentDir = path.join(tmpDir, "agent", agent, role);
-    const credServiceDir = path.join(tmpDir, "credential-service");
     fs.mkdirSync(proxyDir, { recursive: true });
     fs.mkdirSync(agentDir, { recursive: true });
-    fs.mkdirSync(credServiceDir, { recursive: true });
     fs.writeFileSync(path.join(proxyDir, "Dockerfile"), "FROM node:20\n");
     fs.writeFileSync(path.join(agentDir, "Dockerfile"), "FROM node:20\n");
-    fs.writeFileSync(path.join(credServiceDir, "Dockerfile"), "FROM node:20\n");
   }
 
   it("returns paths when all Dockerfiles exist", () => {
@@ -129,16 +126,12 @@ describe("validateDockerfiles", () => {
     const result = validateDockerfiles(tmpDir, "note-taker", "writer");
     expect(result.proxyDockerfile).toContain("proxy/writer/Dockerfile");
     expect(result.agentDockerfile).toContain("agent/note-taker/writer/Dockerfile");
-    expect(result.credentialServiceDockerfile).toContain("credential-service/Dockerfile");
   });
 
   it("throws when proxy Dockerfile is missing", () => {
     const agentDir = path.join(tmpDir, "agent", "note-taker", "writer");
-    const credServiceDir = path.join(tmpDir, "credential-service");
     fs.mkdirSync(agentDir, { recursive: true });
-    fs.mkdirSync(credServiceDir, { recursive: true });
     fs.writeFileSync(path.join(agentDir, "Dockerfile"), "FROM node:20\n");
-    fs.writeFileSync(path.join(credServiceDir, "Dockerfile"), "FROM node:20\n");
 
     expect(() => validateDockerfiles(tmpDir, "note-taker", "writer")).toThrow(
       "Proxy Dockerfile not found",
@@ -147,27 +140,11 @@ describe("validateDockerfiles", () => {
 
   it("throws when agent Dockerfile is missing", () => {
     const proxyDir = path.join(tmpDir, "proxy", "writer");
-    const credServiceDir = path.join(tmpDir, "credential-service");
     fs.mkdirSync(proxyDir, { recursive: true });
-    fs.mkdirSync(credServiceDir, { recursive: true });
     fs.writeFileSync(path.join(proxyDir, "Dockerfile"), "FROM node:20\n");
-    fs.writeFileSync(path.join(credServiceDir, "Dockerfile"), "FROM node:20\n");
 
     expect(() => validateDockerfiles(tmpDir, "note-taker", "writer")).toThrow(
       "Agent Dockerfile not found",
-    );
-  });
-
-  it("throws when credential service Dockerfile is missing", () => {
-    const proxyDir = path.join(tmpDir, "proxy", "writer");
-    const agentDir = path.join(tmpDir, "agent", "note-taker", "writer");
-    fs.mkdirSync(proxyDir, { recursive: true });
-    fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(proxyDir, "Dockerfile"), "FROM node:20\n");
-    fs.writeFileSync(path.join(agentDir, "Dockerfile"), "FROM node:20\n");
-
-    expect(() => validateDockerfiles(tmpDir, "note-taker", "writer")).toThrow(
-      "Credential service Dockerfile not found",
     );
   });
 });
@@ -876,18 +853,6 @@ describe("runAgent", () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("Agent Dockerfile not found");
-  });
-
-  it("exits 1 when credential service Dockerfile is missing", async () => {
-    // Remove the credential service Dockerfile
-    fs.rmSync(path.join(dockerBuildPath, "credential-service"), { recursive: true });
-
-    const { deps } = makeMockDeps();
-    await runAgent(projectDir, "note-taker", "writer", deps);
-
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("Credential service Dockerfile not found");
   });
 
   it("exits 1 when proxy fails to start", async () => {

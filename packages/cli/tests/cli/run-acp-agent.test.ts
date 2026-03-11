@@ -210,6 +210,10 @@ function makeDeps(overrides?: {
     existsSyncFn: () => false,
     readFileSyncFn: () => "{}",
     writeFileSyncFn: () => {},
+    startCredentialServiceFn: async () => ({
+      disconnect: () => {},
+      close: () => {},
+    }),
   };
 }
 
@@ -1200,8 +1204,8 @@ describe("runAcpAgent env credential flow", () => {
     vi.restoreAllMocks();
   });
 
-  it("passes env credentials to session config when present", async () => {
-    let sessionConfig: AcpSessionConfig | undefined;
+  it("passes env credentials to credential service when present", async () => {
+    let capturedEnvCredentials: Record<string, string> | undefined;
 
     const agent = makeResolvedAgent();
     agent.credentials = ["MY_SECRET"];
@@ -1213,15 +1217,15 @@ describe("runAcpAgent env credential flow", () => {
     try {
       const deps: RunAcpAgentDeps = {
         ...makeDeps({ agent }),
-        createSessionFn: (config: AcpSessionConfig) => {
-          sessionConfig = config;
-          return makeMockSession().session as unknown as AcpSession;
+        startCredentialServiceFn: async (opts) => {
+          capturedEnvCredentials = opts.envCredentials;
+          return { disconnect: () => {}, close: () => {} };
         },
       };
 
       await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
-      expect(sessionConfig?.credentials).toEqual({ MY_SECRET: "from-env" });
+      expect(capturedEnvCredentials).toEqual({ MY_SECRET: "from-env" });
     } finally {
       if (originalEnv === undefined) {
         delete process.env.MY_SECRET;

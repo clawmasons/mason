@@ -208,6 +208,7 @@ describe("ACP initiate bootstrap e2e", () => {
           CLAWMASONS_HOME,
           LODGE,
           TEST_TOKEN: "test-token-e2e",
+          TEST_LLM_TOKEN: "test-llm-token-e2e",
         },
         stdio: ["pipe", "pipe", "pipe"],
       },
@@ -325,7 +326,32 @@ describe("ACP initiate bootstrap e2e", () => {
     expect(output).toMatch(/list_directory|read_file|write_file/);
   }, 90_000);
 
-  // ── Test 4: Graceful Shutdown ──────────────────────────────────────
+  // ── Test 4: Credential Resolution ────────────────────────────────────
+
+  it("agent-entry resolves declared credentials via credential service", async () => {
+    // The mcp-agent calls credential_request MCP tool for each declared
+    // credential (TEST_TOKEN, TEST_LLM_TOKEN) during bootstrap.
+    //
+    // Since the agent runs via `docker compose run`, its logs aren't
+    // accessible via `docker compose logs`. Use `docker logs` with
+    // the container name pattern instead.
+    const containerId = execSync(
+      `docker ps -q --filter "name=agent-mcp-chapter-creator" 2>/dev/null`,
+      { timeout: 5_000 },
+    ).toString().trim();
+
+    expect(containerId).not.toBe("");
+
+    const logs = execSync(
+      `docker logs ${containerId} 2>&1`,
+      { timeout: 10_000 },
+    ).toString();
+
+    expect(logs).toContain("Requesting 2 credential(s)");
+    expect(logs).toContain("All credentials received");
+  }, 15_000);
+
+  // ── Test 5: Graceful Shutdown ──────────────────────────────────────
 
   it("process shuts down gracefully on SIGTERM", async () => {
     const proc = assertDefined(acpProcess, "acpProcess must be running");

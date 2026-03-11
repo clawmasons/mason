@@ -68,10 +68,9 @@ export function validateDockerfiles(
   dockerBuildPath: string,
   agent: string,
   role: string,
-): { proxyDockerfile: string; agentDockerfile: string; credentialServiceDockerfile: string } {
+): { proxyDockerfile: string; agentDockerfile: string } {
   const proxyDockerfile = path.join(dockerBuildPath, "proxy", role, "Dockerfile");
   const agentDockerfile = path.join(dockerBuildPath, "agent", agent, role, "Dockerfile");
-  const credentialServiceDockerfile = path.join(dockerBuildPath, "credential-service", "Dockerfile");
 
   if (!fs.existsSync(proxyDockerfile)) {
     throw new Error(
@@ -85,13 +84,7 @@ export function validateDockerfiles(
     );
   }
 
-  if (!fs.existsSync(credentialServiceDockerfile)) {
-    throw new Error(
-      `Credential service Dockerfile not found: ${credentialServiceDockerfile}\nRun "clawmasons build" in the chapter project to generate Dockerfiles.`,
-    );
-  }
-
-  return { proxyDockerfile, agentDockerfile, credentialServiceDockerfile };
+  return { proxyDockerfile, agentDockerfile };
 }
 
 /**

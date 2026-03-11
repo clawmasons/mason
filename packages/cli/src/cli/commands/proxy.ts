@@ -131,8 +131,18 @@ export async function startProxy(
       ?? agent.proxy?.type
       ?? "sse";
     const authToken = process.env.CHAPTER_PROXY_TOKEN || undefined;
+    const credentialProxyToken = process.env.CREDENTIAL_PROXY_TOKEN || undefined;
     const sessionType = process.env.CHAPTER_SESSION_TYPE || undefined;
     const acpClient = process.env.CHAPTER_ACP_CLIENT || undefined;
+
+    // Parse declared credentials from env (set by ACP session compose)
+    let declaredCredentials: string[] | undefined;
+    const declaredCredentialsEnv = process.env.CHAPTER_DECLARED_CREDENTIALS;
+    if (declaredCredentialsEnv) {
+      try {
+        declaredCredentials = JSON.parse(declaredCredentialsEnv) as string[];
+      } catch { /* ignore parse errors */ }
+    }
 
     server = new ChapterProxyServer({
       port,
@@ -142,9 +152,11 @@ export async function startProxy(
       db,
       agentName: agent.name,
       authToken,
+      credentialProxyToken,
       approvalPatterns: approvalPatterns.length > 0 ? approvalPatterns : undefined,
       resourceRouter,
       promptRouter,
+      declaredCredentials,
       sessionType,
       acpClient,
     });
