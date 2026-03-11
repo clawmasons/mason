@@ -2,10 +2,10 @@
  * ACP Session — Docker Session Orchestration for ACP
  *
  * Manages Docker Compose sessions for ACP mode. All services (proxy,
- * credential-service, agent) live in a single compose file so they share
- * a Docker network. The lifecycle is:
+ * agent) live in a single compose file so they share a Docker network.
+ * The credential service runs in-process on the host. The lifecycle is:
  *
- *   1. `startInfrastructure()` — `docker compose up -d` proxy + credential-service
+ *   1. `startInfrastructure()` — `docker compose up -d` proxy
  *   2. `startAgent(cwd)` — `docker compose run -d` the agent with /workspace mount
  *   3. `stopAgent()` — stops only the agent container
  *   4. `stop()` — `docker compose down` everything
@@ -44,6 +44,8 @@ export interface AcpSessionConfig {
   acpClient?: string;
   /** ACP command args appended to the agent entrypoint (e.g., ["--acp", "--port", "3002"]) */
   acpCommand?: string[];
+  /** Declared credential keys for the agent (passed as AGENT_CREDENTIALS env var) */
+  credentialKeys?: string[];
 }
 
 export interface SessionInfo {
@@ -114,11 +116,11 @@ export interface AcpSessionDeps {
 // ── Compose Generation ────────────────────────────────────────────────
 
 /**
- * Generate a single docker-compose.yml with all services: proxy,
- * credential-service, and agent. All share the same Docker network.
+ * Generate a docker-compose.yml with proxy and agent services.
+ * The credential service runs in-process on the host, not in Docker.
  *
  * The agent service is defined with `profiles: ["agent"]` so that
- * `docker compose up -d` only starts proxy + credential-service.
+ * `docker compose up -d` only starts the proxy.
  * The agent is started later via `docker compose run`.
  */
 export function generateAcpComposeYml(opts: {
@@ -129,10 +131,11 @@ export function generateAcpComposeYml(opts: {
   proxyToken: string;
   credentialProxyToken: string;
   acpPort: number;
-  credentials?: Record<string, string>;
+  proxyPort?: number;
   acpClient?: string;
   acpCommand?: string[];
   roleMounts?: RoleMount[];
+  credentialKeys?: string[];
 }): string {
   const {
     dockerBuildPath,
@@ -142,28 +145,18 @@ export function generateAcpComposeYml(opts: {
     proxyToken,
     credentialProxyToken,
     acpPort,
-    credentials,
+    proxyPort,
     acpClient,
     acpCommand,
     roleMounts,
+    credentialKeys,
   } = opts;
 
   const proxyDockerfile = path.join("proxy", role, "Dockerfile");
   const agentDockerfile = path.join("agent", agent, role, "Dockerfile");
-  const credentialServiceDockerfile = path.join("credential-service", "Dockerfile");
 
   const proxyServiceName = `proxy-${role}`;
   const agentServiceName = `agent-${agent}-${role}`;
-
-  // Build credential-service environment lines
-  const credentialEnvLines = [
-    `      - CREDENTIAL_PROXY_TOKEN=${credentialProxyToken}`,
-    `      - CREDENTIAL_PROXY_URL=ws://${proxyServiceName}:9090`,
-  ];
-  if (credentials && Object.keys(credentials).length > 0) {
-    const overridesJson = JSON.stringify(credentials);
-    credentialEnvLines.push(`      - CREDENTIAL_SESSION_OVERRIDES=${overridesJson}`);
-  }
 
   // Build proxy environment lines (include ACP metadata)
   const proxyEnvLines = [
@@ -174,16 +167,22 @@ export function generateAcpComposeYml(opts: {
   if (acpClient) {
     proxyEnvLines.push(`      - CHAPTER_ACP_CLIENT=${acpClient}`);
   }
+  if (credentialKeys && credentialKeys.length > 0) {
+    proxyEnvLines.push(`      - CHAPTER_DECLARED_CREDENTIALS=${JSON.stringify(credentialKeys)}`);
+  }
+
+  // Build proxy ports (expose to host for in-process credential service WSClient)
+  const proxyPortsSection = proxyPort
+    ? `\n    ports:\n      - "${proxyPort}:9090"`
+    : "";
 
   // Build agent environment lines
   const agentEnvLines = [
     `      - MCP_PROXY_TOKEN=${proxyToken}`,
     `      - MCP_PROXY_URL=http://${proxyServiceName}:9090`,
   ];
-  if (credentials) {
-    for (const [key, value] of Object.entries(credentials)) {
-      agentEnvLines.push(`      - ${key}=${value}`);
-    }
+  if (credentialKeys && credentialKeys.length > 0) {
+    agentEnvLines.push(`      - AGENT_CREDENTIALS=${JSON.stringify(credentialKeys)}`);
   }
 
   // Build agent volume lines (workspace gets overridden at run time)
@@ -209,17 +208,7 @@ services:
     volumes:
       - "${logsDir}:/logs"
     environment:
-${proxyEnvLines.join("\n")}
-    restart: "no"
-
-  credential-service:
-    build:
-      context: "${dockerBuildPath}"
-      dockerfile: "${credentialServiceDockerfile}"
-    environment:
-${credentialEnvLines.join("\n")}
-    depends_on:
-      - ${proxyServiceName}
+${proxyEnvLines.join("\n")}${proxyPortsSection}
     restart: "no"
 
   ${agentServiceName}:
@@ -227,7 +216,7 @@ ${credentialEnvLines.join("\n")}
       context: "${dockerBuildPath}"
       dockerfile: "${agentDockerfile}"${agentVolumesSection}
     depends_on:
-      - credential-service
+      - ${proxyServiceName}
     environment:
 ${agentEnvLines.join("\n")}
     ports:
@@ -302,9 +291,10 @@ export class AcpSession {
       proxyToken,
       credentialProxyToken,
       acpPort,
-      credentials: this.config.credentials,
+      proxyPort: this.config.proxyPort,
       acpClient: this.config.acpClient,
       acpCommand: this.config.acpCommand,
+      credentialKeys: this.config.credentialKeys,
     });
 
     const composeFile = path.join(sessionDir, "docker-compose.yml");
@@ -333,7 +323,7 @@ export class AcpSession {
   }
 
   /**
-   * Start infrastructure services only (proxy + credential-service).
+   * Start infrastructure services only (proxy).
    * These are long-lived and shared across agent sessions.
    * The agent service is in the same compose file but behind a profile,
    * so `up -d` skips it.
@@ -374,9 +364,10 @@ export class AcpSession {
       proxyToken,
       credentialProxyToken,
       acpPort,
-      credentials: this.config.credentials,
+      proxyPort: this.config.proxyPort,
       acpClient: this.config.acpClient,
       acpCommand: this.config.acpCommand,
+      credentialKeys: this.config.credentialKeys,
     });
 
     const composeFile = path.join(sessionDir, "docker-compose.yml");
@@ -428,7 +419,7 @@ export class AcpSession {
     // Use docker compose run with a volume override for this session's CWD
     const exitCode = await this.deps.execComposeFn(
       this.infraInfo.composeFile,
-      ["run", "-d", "--rm", "--service-ports", "-v", `${projectDir}:/workspace`, agentServiceName],
+      ["run", "-d", "--rm", "--build", "--service-ports", "-v", `${projectDir}:/workspace`, agentServiceName],
     );
     if (exitCode !== 0) {
       throw new Error(`Failed to start agent (docker compose exit code ${exitCode})`);

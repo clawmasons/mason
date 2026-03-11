@@ -15,17 +15,12 @@ import type { RunConfig } from "../../src/cli/commands/run-init.js";
 function setupProjectDir(tmpDir: string): { projectDir: string; dockerBuildPath: string } {
   const dockerBuildPath = path.join(tmpDir, "chapter-project", "docker");
 
-  // Create proxy, agent, and credential service Dockerfiles
+  // Create proxy and agent Dockerfiles
   fs.mkdirSync(path.join(dockerBuildPath, "proxy", "writer"), { recursive: true });
   fs.writeFileSync(path.join(dockerBuildPath, "proxy", "writer", "Dockerfile"), "FROM node:22\n");
   fs.mkdirSync(path.join(dockerBuildPath, "agent", "note-taker", "writer"), { recursive: true });
   fs.writeFileSync(
     path.join(dockerBuildPath, "agent", "note-taker", "writer", "Dockerfile"),
-    "FROM node:22\n",
-  );
-  fs.mkdirSync(path.join(dockerBuildPath, "credential-service"), { recursive: true });
-  fs.writeFileSync(
-    path.join(dockerBuildPath, "credential-service", "Dockerfile"),
     "FROM node:22\n",
   );
 
@@ -89,12 +84,12 @@ describe("generateAcpComposeYml", () => {
     acpPort: 3002,
   };
 
-  it("generates three services: proxy, credential-service, and agent", () => {
+  it("generates two services: proxy and agent (no credential-service)", () => {
     const yml = generateAcpComposeYml(defaultOpts);
 
     expect(yml).toContain("proxy-writer:");
-    expect(yml).toContain("credential-service:");
     expect(yml).toContain("agent-note-taker-writer:");
+    expect(yml).not.toContain("credential-service:");
   });
 
   it("agent service has profiles: [agent] so up -d skips it", () => {
@@ -134,38 +129,9 @@ describe("generateAcpComposeYml", () => {
     expect(agentSection).toContain('"4444:4444"');
   });
 
-  it("credential-service gets CREDENTIAL_SESSION_OVERRIDES when credentials provided", () => {
-    const yml = generateAcpComposeYml({
-      ...defaultOpts,
-      credentials: {
-        GITHUB_TOKEN: "ghp_abc123",
-        SLACK_TOKEN: "xoxb-456",
-      },
-    });
-
-    const credSection = yml.split("credential-service:")[1]!.split("agent-note-taker-writer:")[0]!;
-    expect(credSection).toContain("CREDENTIAL_SESSION_OVERRIDES=");
-    expect(credSection).toContain("GITHUB_TOKEN");
-    expect(credSection).toContain("ghp_abc123");
-  });
-
-  it("credential-service has no CREDENTIAL_SESSION_OVERRIDES when no credentials", () => {
-    const yml = generateAcpComposeYml(defaultOpts);
-
-    const credSection = yml.split("credential-service:")[1]!.split("agent-note-taker-writer:")[0]!;
-    expect(credSection).not.toContain("CREDENTIAL_SESSION_OVERRIDES");
-  });
-
-  it("credential-service has no CREDENTIAL_SESSION_OVERRIDES when credentials are empty", () => {
-    const yml = generateAcpComposeYml({ ...defaultOpts, credentials: {} });
-
-    const credSection = yml.split("credential-service:")[1]!.split("agent-note-taker-writer:")[0]!;
-    expect(credSection).not.toContain("CREDENTIAL_SESSION_OVERRIDES");
-  });
-
   it("proxy has correct tokens", () => {
     const yml = generateAcpComposeYml(defaultOpts);
-    const proxySection = yml.split("credential-service:")[0]!;
+    const proxySection = yml.split("agent-note-taker-writer:")[0]!;
 
     expect(proxySection).toContain("CHAPTER_PROXY_TOKEN=test-proxy-token");
     expect(proxySection).toContain("CREDENTIAL_PROXY_TOKEN=test-cred-token");
@@ -173,9 +139,23 @@ describe("generateAcpComposeYml", () => {
 
   it("proxy has CHAPTER_SESSION_TYPE=acp", () => {
     const yml = generateAcpComposeYml(defaultOpts);
-    const proxySection = yml.split("credential-service:")[0]!;
+    const proxySection = yml.split("agent-note-taker-writer:")[0]!;
 
     expect(proxySection).toContain("CHAPTER_SESSION_TYPE=acp");
+  });
+
+  it("proxy exposes port to host when proxyPort is set", () => {
+    const yml = generateAcpComposeYml({ ...defaultOpts, proxyPort: 3000 });
+    const proxySection = yml.split("agent-note-taker-writer:")[0]!;
+
+    expect(proxySection).toContain('"3000:9090"');
+  });
+
+  it("proxy has no port mapping when proxyPort is not set", () => {
+    const yml = generateAcpComposeYml(defaultOpts);
+    const proxySection = yml.split("agent-note-taker-writer:")[0]!;
+
+    expect(proxySection).not.toContain("ports:");
   });
 
   it("agent has MCP_PROXY_TOKEN and MCP_PROXY_URL", () => {
@@ -186,43 +166,24 @@ describe("generateAcpComposeYml", () => {
     expect(agentSection).toContain("MCP_PROXY_URL=http://proxy-writer:9090");
   });
 
-  it("agent gets credentials as env vars when provided", () => {
-    const yml = generateAcpComposeYml({
-      ...defaultOpts,
-      credentials: { TEST_TOKEN: "tok123" },
-    });
-    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
-
-    expect(agentSection).toContain("TEST_TOKEN=tok123");
-  });
-
-  it("credential-service depends on proxy", () => {
-    const yml = generateAcpComposeYml(defaultOpts);
-    const credSection = yml.split("credential-service:")[1]!.split("agent-note-taker-writer:")[0]!;
-
-    expect(credSection).toContain("depends_on:");
-    expect(credSection).toContain("- proxy-writer");
-  });
-
-  it("agent depends on credential-service", () => {
+  it("agent depends on proxy", () => {
     const yml = generateAcpComposeYml(defaultOpts);
     const agentSection = yml.split("agent-note-taker-writer:")[1]!;
 
     expect(agentSection).toContain("depends_on:");
-    expect(agentSection).toContain("- credential-service");
+    expect(agentSection).toContain("- proxy-writer");
   });
 
   it("uses correct Dockerfile paths", () => {
     const yml = generateAcpComposeYml(defaultOpts);
 
     expect(yml).toContain('dockerfile: "proxy/writer/Dockerfile"');
-    expect(yml).toContain('dockerfile: "credential-service/Dockerfile"');
     expect(yml).toContain('dockerfile: "agent/note-taker/writer/Dockerfile"');
   });
 
   it("includes acpClient in proxy env when provided", () => {
     const yml = generateAcpComposeYml({ ...defaultOpts, acpClient: "zed" });
-    const proxySection = yml.split("credential-service:")[0]!;
+    const proxySection = yml.split("agent-note-taker-writer:")[0]!;
 
     expect(proxySection).toContain("CHAPTER_ACP_CLIENT=zed");
   });
@@ -265,7 +226,7 @@ describe("generateAcpComposeYml", () => {
       ],
     });
 
-    const proxySection = yml.split("credential-service:")[0]!;
+    const proxySection = yml.split("agent-note-taker-writer:")[0]!;
     expect(proxySection).not.toContain("/mnt/shared");
   });
 
@@ -343,8 +304,8 @@ describe("AcpSession", () => {
 
     const content = fs.readFileSync(info.composeFile, "utf-8");
     expect(content).toContain("proxy-writer:");
-    expect(content).toContain("credential-service:");
     expect(content).toContain("agent-note-taker-writer:");
+    expect(content).not.toContain("credential-service:");
   });
 
   it("start() starts all services with --profile agent up -d", async () => {
@@ -386,23 +347,6 @@ describe("AcpSession", () => {
     });
 
     await expect(session.start()).rejects.toThrow("Docker Compose");
-  });
-
-  it("start() passes credentials to compose", async () => {
-    const { deps } = makeMockDeps({ sessionId: "cred0001" });
-    const session = new AcpSession(
-      makeConfig({
-        credentials: { GITHUB_TOKEN: "ghp_test", SLACK_TOKEN: "xoxb-test" },
-      }),
-      deps,
-    );
-
-    const info = await session.start();
-
-    const content = fs.readFileSync(info.composeFile, "utf-8");
-    expect(content).toContain("CREDENTIAL_SESSION_OVERRIDES=");
-    expect(content).toContain("GITHUB_TOKEN");
-    expect(content).toContain("ghp_test");
   });
 
   it("start() compose has ACP port exposed", async () => {
@@ -515,7 +459,7 @@ describe("AcpSession", () => {
       expect(info.composeFile).toContain("infra001");
     });
 
-    it("startInfrastructure() creates single compose with all services (agent behind profile)", async () => {
+    it("startInfrastructure() creates compose with proxy and agent (agent behind profile)", async () => {
       const { deps } = makeMockDeps({ sessionId: "infra002" });
       const session = new AcpSession(makeConfig(), deps);
 
@@ -523,8 +467,8 @@ describe("AcpSession", () => {
 
       const content = fs.readFileSync(info.composeFile, "utf-8");
       expect(content).toContain("proxy-writer:");
-      expect(content).toContain("credential-service:");
       expect(content).toContain("agent-note-taker-writer:");
+      expect(content).not.toContain("credential-service:");
       // Agent should be behind a profile
       const agentSection = content.split("agent-note-taker-writer:")[1]!;
       expect(agentSection).toContain("profiles:");
@@ -575,7 +519,7 @@ describe("AcpSession", () => {
       // Should have 2 calls: infra up, agent run
       expect(calls).toHaveLength(2);
       expect(calls[1]!.args).toEqual([
-        "run", "-d", "--rm", "--service-ports", "-v", `${agentDir}:/workspace`, "agent-note-taker-writer",
+        "run", "-d", "--rm", "--build", "--service-ports", "-v", `${agentDir}:/workspace`, "agent-note-taker-writer",
       ]);
     });
 

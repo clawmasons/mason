@@ -8,6 +8,7 @@ import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpBridge, type AcpBridgeConfig } from "../../acp/bridge.js";
+import { CredentialService, CredentialWSClient } from "@clawmasons/credential-service";
 import {
   getClawmasonsHome,
   findRoleEntryByRole,
@@ -86,6 +87,12 @@ export interface RunAcpAgentDeps {
   readFileSyncFn?: (filePath: string, encoding: BufferEncoding) => string;
   /** Override fs.writeFileSync (for testing). */
   writeFileSyncFn?: (filePath: string, data: string) => void;
+  /** Override credential service startup (for testing). */
+  startCredentialServiceFn?: (opts: {
+    proxyPort: number;
+    credentialProxyToken: string;
+    envCredentials: Record<string, string>;
+  }) => Promise<{ disconnect: () => void; close: () => void }>;
 }
 
 // ── Help Text ─────────────────────────────────────────────────────────
@@ -94,7 +101,8 @@ export const RUN_ACP_AGENT_HELP_EPILOG = `
 Session Behavior:
   When an ACP client sends session/new with a "cwd" field, the agent
   container mounts that directory as /workspace. Each session/new starts
-  a fresh agent container; the proxy and credential-service stay running.
+  a fresh agent container; the proxy stays running. The credential
+  service runs in-process on the host.
 
   If no "cwd" is provided in session/new, the current working directory
   of this process is used as the default.
@@ -403,12 +411,20 @@ export async function runAcpAgent(
 
   let session: AcpSession | null = null;
   let bridge: AcpBridge | null = null;
+  let credentialWsClient: CredentialWSClient | null = null;
+  let credentialService: CredentialService | null = null;
 
   // Graceful shutdown handler
   const shutdown = async () => {
     console.log("\n[clawmasons acp] Shutting down...");
     try {
       if (bridge) await bridge.stop();
+    } catch { /* best-effort */ }
+    try {
+      if (credentialWsClient) credentialWsClient.disconnect();
+    } catch { /* best-effort */ }
+    try {
+      if (credentialService) credentialService.close();
     } catch { /* best-effort */ }
     try {
       if (session) await session.stop();
@@ -502,25 +518,73 @@ export async function runAcpAgent(
       ? [...acpRuntimeCmd.split(" ").slice(1), "--port", String(acpAgentPort)]
       : undefined;
 
+    // Collect all declared credential keys for the agent
+    const declaredCredentialKeys = new Set<string>(agent.credentials);
+    for (const role of agent.roles) {
+      for (const app of role.apps) {
+        for (const key of app.credentials) {
+          declaredCredentialKeys.add(key);
+        }
+      }
+    }
+
     session = createSession({
       projectDir: effectiveRootDir,
       agent: agent.slug,
       role: options.role,
       acpPort: acpAgentPort,
       proxyPort,
-      ...(envCredCount > 0 ? { credentials: envCredentials } : {}),
       acpCommand,
+      credentialKeys: [...declaredCredentialKeys],
     });
 
-    console.log("[clawmasons acp] Starting infrastructure (proxy + credential-service)...");
+    console.log("[clawmasons acp] Starting infrastructure (proxy)...");
     const infraInfo = await session.startInfrastructure();
     console.log(`[clawmasons acp] Infrastructure started (${infraInfo.sessionId})`);
+
+    // ── Step 5b: Start credential service in-process ──────────────────
+    console.log("[clawmasons acp] Starting credential service (in-process)...");
+    const startCredService = deps?.startCredentialServiceFn ?? (async (opts: {
+      proxyPort: number;
+      credentialProxyToken: string;
+      envCredentials: Record<string, string>;
+    }) => {
+      const svc = new CredentialService({
+        dbPath: ":memory:",
+        keychainService: "clawmasons",
+      });
+      const credCount = Object.keys(opts.envCredentials).length;
+      if (credCount > 0) {
+        svc.setSessionOverrides(opts.envCredentials);
+      }
+      const client = new CredentialWSClient(svc, {
+        maxRetries: 10,
+        retryDelayMs: 2000,
+      });
+      await client.connect(
+        `ws://localhost:${opts.proxyPort}/ws/credentials`,
+        opts.credentialProxyToken,
+      );
+      return { disconnect: () => client.disconnect(), close: () => svc.close() };
+    });
+
+    const credServiceHandle = await startCredService({
+      proxyPort,
+      credentialProxyToken: infraInfo.credentialProxyToken,
+      envCredentials,
+    });
+    // Store references for shutdown handler
+    credentialWsClient = { disconnect: credServiceHandle.disconnect } as CredentialWSClient;
+    credentialService = { close: credServiceHandle.close } as CredentialService;
+    console.log("[clawmasons acp] Credential service connected to proxy.");
 
     // ── Step 6: Start ACP bridge endpoint ──────────────────────────────
     bridge = createBridge({
       hostPort: port,
       containerHost: "localhost",
       containerPort: acpAgentPort,
+      connectRetries: 30,
+      connectRetryDelayMs: 2000,
     });
 
     // ── Step 7: Wire bridge lifecycle events ───────────────────────────
