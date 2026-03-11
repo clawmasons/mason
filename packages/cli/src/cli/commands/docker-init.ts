@@ -2,8 +2,12 @@ import type { Command } from "commander";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { getAppShortName } from "@clawmasons/shared";
 import type { ResolvedAgent, ResolvedRole } from "@clawmasons/shared";
+
+/** Directory of this source file — fallback resolve root for framework packages. */
+const CLI_DIR = path.dirname(fileURLToPath(import.meta.url));
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
@@ -169,7 +173,8 @@ function copyFrameworkPackages(rootDir: string, dockerDir: string): void {
     const pkgName = queue.shift()!;
     if (toCopy.has(pkgName)) continue;
 
-    const srcDir = resolvePackageDir(pkgName, rootDir);
+    const srcDir = resolvePackageDir(pkgName, rootDir)
+      ?? resolvePackageDir(pkgName, CLI_DIR);
     if (!srcDir) {
       throw new Error(
         `Framework package "${pkgName}" not found in node_modules/. Run "npm install" first.`,
@@ -272,7 +277,8 @@ function copyNestedDependencies(destNodeModules: string, rootDir: string): void 
       for (const dep of Object.keys(pkg.dependencies)) {
         if (copied.has(dep)) continue;
 
-        const srcDir = resolvePackageDir(dep, rootDir);
+        const srcDir = resolvePackageDir(dep, rootDir)
+          ?? resolvePackageDir(dep, CLI_DIR);
         if (!srcDir) continue; // optional peer or already nested
 
         const realSrcDir = fs.realpathSync(srcDir);

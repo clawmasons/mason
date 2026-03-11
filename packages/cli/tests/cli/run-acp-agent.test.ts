@@ -15,6 +15,16 @@ import type { AcpSessionConfig, InfrastructureInfo, AgentSessionInfo } from "../
 import type { AcpBridge, AcpBridgeConfig } from "../../src/acp/bridge.js";
 import type { AcpSession } from "../../src/acp/session.js";
 import type { ChapterEntry } from "../../src/runtime/home.js";
+import type { AcpLogger } from "../../src/acp/logger.js";
+
+/** Mock logger that routes to console.log/error so existing spies capture output. */
+function makeConsoleLogger(): AcpLogger {
+  return {
+    log: (...args: unknown[]) => console.log(...args),
+    error: (...args: unknown[]) => console.error(...args),
+    close: () => {},
+  };
+}
 
 // ── Test Fixtures ────────────────────────────────────────────────────
 
@@ -60,7 +70,7 @@ function makeResolvedAgent(name = "test-agent"): ResolvedAgent {
   };
 }
 
-type MockBridgeType = Pick<AcpBridge, "start" | "connectToAgent" | "stop" | "resetForNewSession"> & {
+type MockBridgeType = Pick<AcpBridge, "start" | "connectToAgent" | "stop" | "resetForNewSession" | "getPort"> & {
   onClientConnect?: (() => void) | undefined;
   onClientDisconnect?: (() => void) | undefined;
   onAgentError?: ((error: Error) => void) | undefined;
@@ -78,6 +88,7 @@ function makeMockBridge() {
     connectToAgent: async () => { connectCalled = true; },
     stop: async () => { stopCalled = true; },
     resetForNewSession: () => { resetCalled = true; },
+    getPort: () => 0,
     onClientConnect: undefined,
     onClientDisconnect: undefined,
     onAgentError: undefined,
@@ -210,6 +221,7 @@ function makeDeps(overrides?: {
     existsSyncFn: () => false,
     readFileSyncFn: () => "{}",
     writeFileSyncFn: () => {},
+    createLoggerFn: () => makeConsoleLogger(),
     startCredentialServiceFn: async () => ({
       disconnect: () => {},
       close: () => {},
@@ -326,7 +338,7 @@ describe("runAcpAgent", () => {
       },
     };
 
-    await runAcpAgent("/fake/root", { role: "test-role", port: 4001 }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role", port: 4001, transport: "http" }, deps);
 
     expect(bridgeConfig?.hostPort).toBe(4001);
     expect(bridgeConfig?.containerPort).toBe(3002);
@@ -357,7 +369,7 @@ describe("runAcpAgent", () => {
   it("logs ready message with port info and deferred mode", async () => {
     const deps = makeDeps();
 
-    await runAcpAgent("/fake/root", { role: "test-role", port: 3001 }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role", port: 3001, transport: "http" }, deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("Ready");
@@ -376,7 +388,7 @@ describe("runAcpAgent", () => {
       },
     };
 
-    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role", transport: "http" }, deps);
 
     expect(bridgeConfig?.hostPort).toBe(3001);
   });
@@ -675,7 +687,7 @@ describe("runAcpAgent", () => {
     const mockSession = makeMockSession();
     const deps = makeDeps({ bridge: mockBridge.bridge, session: mockSession.session });
 
-    await runAcpAgent("/fake/root", { role: "test-role" }, deps);
+    await runAcpAgent("/fake/root", { role: "test-role", transport: "http" }, deps);
 
     // Start an agent first
     await mockBridge.bridge.onSessionNew!("/projects/myapp");
@@ -770,7 +782,8 @@ describe("bootstrapChapter", () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    // bootstrapChapter logs to stderr to avoid corrupting stdio transport
+    logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {

@@ -100,6 +100,16 @@ export class AcpBridge {
   }
 
   /**
+   * Return the actual port the HTTP server is listening on.
+   * Useful when `hostPort` was 0 (OS-assigned).
+   */
+  getPort(): number {
+    const addr = this.server?.address();
+    if (addr && typeof addr === "object") return addr.port;
+    return this.config.hostPort;
+  }
+
+  /**
    * Start the host-side HTTP server that accepts ACP client connections.
    * Requests are proxied to the container agent once `connectToAgent()` succeeds.
    */

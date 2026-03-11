@@ -141,3 +141,4 @@ vite.config.ts.timestamp-*
 # forge generated output
 example/.forge/
 example/.forge-bak/
+.clawmasons
