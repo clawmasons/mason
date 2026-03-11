@@ -29,34 +29,43 @@ clawmasons init [options]
 
 ### `clawmasons agent`
 
-Run a chapter agent interactively against the current project.
+Run a chapter agent interactively, or start an ACP endpoint for editor integration.
 
 ```bash
-clawmasons agent <agent> <role>
+clawmasons agent [agent] [role] [options]
 ```
 
 | Argument | Description |
 |----------|-------------|
-| `<agent>` | Agent slug (e.g., `note-taker`) |
-| `<role>` | Role name (e.g., `writer`) |
-
-This starts the MCP proxy, credential service, and agent containers via Docker Compose, then attaches interactively.
-
-### `clawmasons acp`
-
-Start an ACP-compliant agent endpoint for editor integration.
-
-```bash
-clawmasons acp --role <name> [options]
-```
+| `[agent]` | Agent slug (e.g., `note-taker`). Required for interactive mode, auto-detected in ACP mode. |
+| `[role]` | Role name (e.g., `writer`). Can also be passed via `--role`. |
 
 | Option | Description |
 |--------|-------------|
-| `--role <name>` | **(required)** Role to use for the session |
-| `--agent <name>` | Agent package name (auto-detected if only one) |
+| `--acp` | Start in ACP mode for editor integration (stdio ndjson) |
+| `--role <name>` | Role name (alternative to positional argument) |
+| `--agent <name>` | Agent name (alternative to positional argument, auto-detected in ACP mode) |
 | `--proxy-port <number>` | Internal proxy port (default: `3000`) |
-| `--chapter <name>` | Chapter name (use `initiate` for bootstrap flow) |
-| `--init-agent <name>` | Agent name override for bootstrap |
+| `--chapter <name>` | Chapter name (use `initiate` for bootstrap flow, ACP mode) |
+| `--init-agent <name>` | Agent name override for bootstrap (ACP mode) |
+
+In both modes, the MCP proxy runs in a Docker container and the credential service runs in-process on the host.
+
+**Interactive mode** (default):
+
+```bash
+clawmasons agent note-taker writer
+```
+
+Starts the MCP proxy and agent containers via Docker Compose, then attaches interactively.
+
+**ACP mode** (`--acp`):
+
+```bash
+clawmasons agent --acp --role writer
+```
+
+Starts an ACP-compliant endpoint for editor integration via stdio ndjson.
 
 **ACP client configuration example** (e.g., for Zed settings):
 
@@ -66,7 +75,7 @@ clawmasons acp --role <name> [options]
     "clawmasons": {
       "command": {
         "path": "clawmasons",
-        "args": ["acp", "--role", "writer"]
+        "args": ["agent", "--acp", "--role", "writer"]
       }
     }
   }

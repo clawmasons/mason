@@ -5,7 +5,7 @@ description: How clawmasons orchestrates agent execution at runtime
 
 # Runtime Architecture
 
-Clawmasons uses a three-container model for agent execution: an **MCP Proxy** for tool filtering, a **Credential Service** for secret management, and an **Agent** container running the AI runtime.
+Clawmasons uses a two-container model for agent execution: an **MCP Proxy** for tool filtering and a containerized **Agent** running the AI runtime. The **Credential Service** runs in-process on the host for secure secret management.
 
 ## Container Architecture
 
@@ -13,8 +13,8 @@ Clawmasons uses a three-container model for agent execution: an **MCP Proxy** fo
 graph TB
     CLI["clawmasons agent"]
     CLI -->|docker compose up| Proxy["MCP Proxy<br/>(tool filtering + audit)"]
-    CLI -->|docker compose up| CredSvc["Credential Service<br/>(secret resolution)"]
     CLI -->|docker compose run| Agent["Agent Container<br/>(Claude Code / Pi / MCP)"]
+    CLI -->|in-process| CredSvc["Credential Service<br/>(secret resolution)"]
 
     Agent -->|MCP protocol| Proxy
     Proxy -->|WebSocket| CredSvc
@@ -32,7 +32,7 @@ sequenceDiagram
     participant CLI as clawmasons CLI
     participant DC as Docker Compose
     participant Proxy as MCP Proxy
-    participant CS as Credential Service
+    participant CS as Credential Service (in-process)
     participant AE as Agent Entry
     participant Agent as Agent Runtime
 
@@ -41,8 +41,8 @@ sequenceDiagram
     CLI->>DC: docker compose up proxy (detached)
     DC->>Proxy: Start proxy on port 9090
     Proxy->>Proxy: Connect to upstream MCP apps
-    CLI->>DC: docker compose up credential-service
-    DC->>CS: Start credential service
+    CLI->>CS: Start credential service in-process
+    CS->>Proxy: Connect via WebSocket
     CLI->>DC: docker compose run agent (interactive)
     DC->>AE: Start agent-entry bootstrap
     AE->>Proxy: POST /connect-agent (Bearer token)
@@ -120,7 +120,7 @@ sequenceDiagram
 
 ## ACP Mode Architecture
 
-In ACP (Agent Communication Protocol) mode, clawmasons integrates directly with editors:
+In ACP (Agent Communication Protocol) mode (`clawmasons agent --acp`), clawmasons integrates directly with editors:
 
 ```mermaid
 sequenceDiagram

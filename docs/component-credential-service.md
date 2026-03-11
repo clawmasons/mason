@@ -54,16 +54,20 @@ Every credential request is logged to the SQLite audit database with:
 
 ## Architecture
 
-In **Docker mode**, the credential service runs as a sidecar container alongside the proxy and agent:
+The credential service always runs **in-process** on the host machine, within the `clawmasons agent` CLI process. It connects to the MCP proxy via WebSocket to relay credential requests from the agent container.
 
 ```
-docker-compose.yml:
-  proxy:         → MCP Proxy (port 9090)
-  credential-service: → Credential Service (WebSocket)
-  agent:         → Agent Runtime
+Host Machine:
+  clawmasons agent CLI process
+    ├─ Credential Service (in-memory SQLite)
+    └─ WebSocket client → Proxy /ws/credentials
+
+Docker:
+  proxy:  → MCP Proxy (port 9090, relays credential requests)
+  agent:  → Agent Runtime (requests credentials via proxy)
 ```
 
-In **ACP mode**, the credential service runs in-process within the CLI, with credentials injected from the editor's session configuration.
+In **ACP mode** (`clawmasons agent --acp`), credentials from the editor's session configuration are injected as session overrides, giving them highest resolution priority.
 
 ## Related
 
