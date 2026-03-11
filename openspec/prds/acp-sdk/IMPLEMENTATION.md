@@ -121,7 +121,7 @@ Rewrite `bridge.ts` to use the SDK's dual-connection architecture. Remove `stdio
 
 **PRD refs:** REQ-SDK-002, REQ-SDK-003, REQ-SDK-004, REQ-SDK-009, REQ-SDK-010, REQ-SDK-013
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-11-bridge-rewrite-sdk/proposal.md) · [design](../../changes/archive/2026-03-11-bridge-rewrite-sdk/design.md) · [tasks](../../changes/archive/2026-03-11-bridge-rewrite-sdk/tasks.md)
 
 ---
 
