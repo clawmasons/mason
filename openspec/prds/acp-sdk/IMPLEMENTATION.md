@@ -180,7 +180,7 @@ Rewrite `e2e/tests/acp-client-spawn.test.ts` to use `ClientSideConnection` from 
 
 **PRD refs:** REQ-SDK-007
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-11-e2e-tests-sdk/proposal.md) · [design](../../changes/archive/2026-03-11-e2e-tests-sdk/design.md) · [tasks](../../changes/archive/2026-03-11-e2e-tests-sdk/tasks.md)
 
 ---
 
