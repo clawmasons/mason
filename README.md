@@ -1,171 +1,84 @@
-# chapter
+# Clawmasons Chapter
 
-Clawmasons Chapter — npm-native packaging, governance, and runtime portability for AI agents.
+npm-native packaging, governance, and runtime portability for AI agents.
 
-## Installation
+## Why Clawmasons?
+
+AI agents need tools, but tool access today is ungoverned. Credentials leak via environment variables. There's no audit trail. Agent definitions are locked to a single runtime.
+
+Clawmasons solves this:
+
+- **Credential isolation** — Secrets resolved on-demand, never in env vars or Docker inspect
+- **Role-based tool filtering** — Agents only see tools their role permits
+- **Audit logging** — Every tool call and credential access logged
+- **Runtime portability** — Same definition works on Claude Code, Pi-coding-agent, and more
+- **npm-native** — Everything is a `package.json` with standard npm tooling
+
+## Install
 
 ```bash
 npm install -g @clawmasons/chapter
 ```
 
-This installs the `chapter` CLI globally. The monorepo contains three packages:
-
-- **`@clawmasons/chapter`** — CLI and library (the main install)
-- **`@clawmasons/shared`** — schemas, types, and utilities (internal dependency)
-- **`@clawmasons/proxy`** — MCP proxy server (internal dependency)
-
-## CLI Usage
-
-### Chapter Development
+## Quick Start
 
 ```bash
-# Initialize a new chapter workspace
-chapter init --name acme.platform
+# Initialize a lodge (organizational container)
+clawmasons init
 
-# Add a chapter package dependency
-chapter add @clawmasons/app-github
-
-# Remove a chapter package dependency
-chapter remove @clawmasons/app-github
-
-# List agents and their dependency trees
-chapter list
-
-# Validate an agent's dependency graph and permissions
-chapter validate @acme.platform/agent-note-taker
-
-# Resolve agent graph and generate chapter.lock.json
-chapter build @acme.platform/agent-note-taker
-
-# Display the resolved permission matrix for an agent
-chapter permissions @acme.platform/agent-note-taker
-
-# Start the MCP proxy server for an agent
-chapter proxy --agent @acme.platform/agent-note-taker
-
-# Scaffold Docker build system (Dockerfiles for proxy + agent containers)
-chapter docker-init
-```
-
-### Running Agents
-
-In a project directory where you want to run an agent:
-
-```bash
-# Initialize the project directory for running chapter agents
-chapter run-init
-
-# Run an agent interactively against this project
-chapter run-agent note-taker writer
-```
-
-## Getting Started
-
-### 1. Create a chapter workspace
-
-```bash
-chapter init --name acme.platform
+# Create a chapter workspace with the note-taker template
+clawmasons chapter init --name acme.platform --template note-taker
 cd acme.platform
+
+# Build the agent
+clawmasons chapter build
+
+# Run the agent interactively
+clawmasons agent note-taker writer
 ```
 
-This creates the workspace with directories for `apps/`, `tasks/`, `skills/`, `roles/`, and `agents/`.
+This spins up an MCP proxy (tool filtering), credential service (secret management), and agent container — all governed by the role's permissions.
 
-### 2. Develop your agent
+## How It Works
 
-Add chapter packages, then list and validate:
+Agents are composed from five npm package types:
+
+| Type | Purpose |
+|------|---------|
+| **App** | MCP server providing tools |
+| **Skill** | Knowledge artifacts (prompts, conventions) |
+| **Task** | Unit of work for the agent |
+| **Role** | Permission boundary (tool allow/deny lists) |
+| **Agent** | Deployable unit combining roles + runtime config |
+
+Each package has a `chapter` field in its `package.json` that declares its configuration. Roles define which tools from which apps are accessible, and the MCP proxy enforces this at runtime.
+
+## Documentation
+
+| Doc | Description |
+|-----|-------------|
+| [Overview](docs/overview.md) | What clawmasons is and why it matters |
+| [Getting Started](docs/get-started.md) | Install and run your first agent |
+| [Core Concepts](docs/concepts.md) | Lodges, chapters, agents, roles, tasks, skills, apps |
+| [Architecture](docs/architecture.mdx) | Runtime architecture with sequence diagrams |
+| [CLI Reference](docs/cli.md) | Complete command reference |
+| [Security Model](docs/security.md) | Credentials, permissions, audit logging |
+| [MCP Proxy](docs/component-mcp-proxy.md) | Tool filtering and routing |
+| [Credential Service](docs/component-credential-service.md) | Secure credential resolution |
+
+## Editor Integration (ACP)
+
+Integrate with your editor via the Agent Communication Protocol:
 
 ```bash
-chapter add @clawmasons/app-github
-chapter list
-chapter validate @acme.platform/agent-note-taker
+clawmasons acp --role writer
 ```
 
-### 3. Build and containerize
+Works with Zed, JetBrains, Neovim, and any ACP-compatible client. See the [CLI reference](docs/cli.md#clawmasons-acp) for configuration details.
 
-```bash
-chapter build @acme.platform/agent-note-taker
-chapter docker-init
-```
+## Contributing
 
-`docker-init` generates Dockerfiles under `docker/` for both the MCP proxy and agent containers.
-
-### 4. Run in a project
-
-In the target project directory:
-
-```bash
-chapter run-init
-chapter run-agent note-taker writer
-```
-
-This spins up the proxy and agent containers via Docker Compose, running the agent interactively against your project.
-
-## Project Structure
-
-```
-chapter/
-  packages/
-    cli/       # @clawmasons/chapter — CLI commands and library
-    shared/    # @clawmasons/shared — schemas, types, utilities
-    proxy/     # @clawmasons/proxy — MCP proxy server
-  e2e/         # end-to-end tests
-```
-
-A chapter workspace (created by `chapter init`) has this layout:
-
-```
-<workspace>/
-  apps/            # MCP server packages (type: "app")
-  tasks/           # Task packages (type: "task")
-  skills/          # Skill packages (type: "skill")
-  roles/           # Role packages (type: "role")
-  agents/          # Agent packages (type: "agent")
-  .clawmasons/     # Chapter metadata
-    chapter.json   # Workspace config
-  package.json     # npm workspaces root
-```
-
-## Programmatic API
-
-Chapter exports its core modules for use as a library:
-
-```ts
-import {
-  discoverPackages,
-  resolveAgent,
-  validateAgent,
-  claudeCodeMaterializer,
-} from "@clawmasons/chapter";
-
-// Schemas and types are also available directly
-import {
-  parseChapterField,
-  computeToolFilters,
-  type ResolvedAgent,
-  type ChapterField,
-} from "@clawmasons/shared";
-```
-
-## Development
-
-```bash
-npm install          # install dependencies
-npm run build        # compile TypeScript
-npm run typecheck    # type-check without emitting
-npm run lint         # run ESLint
-npm test             # run tests
-```
-
-### Using a Local Build
-
-```bash
-# Build from source
-npm install && npm run build
-
-# Link globally, then use in a consuming project
-cd packages/cli && npm link
-cd /path/to/project && npm link @clawmasons/chapter
-```
+See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions, project structure, and the programmatic API.
 
 ## License
 
