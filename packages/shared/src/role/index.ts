@@ -25,3 +25,6 @@ export { readPackagedRole, PackageReadError } from "./package-reader.js";
 
 // Adapter
 export { adaptRoleToResolvedAgent, AdapterError } from "./adapter.js";
+
+// Discovery
+export { discoverRoles, resolveRole, RoleDiscoveryError } from "./discovery.js";
