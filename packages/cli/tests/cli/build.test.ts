@@ -316,8 +316,8 @@ describe("runBuild", () => {
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     // Should contain agent instruction
-    expect(logOutput).toContain("clawmasons agent");
-    expect(logOutput).toContain("clawmasons agent --acp");
+    expect(logOutput).toContain("clawmasons run");
+    expect(logOutput).toContain("--acp");
     expect(logOutput).toContain("mcpServers");
   });
 });

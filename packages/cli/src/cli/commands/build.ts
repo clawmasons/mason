@@ -113,28 +113,28 @@ function displayCompletionInstructions(agents: ResolvedAgent[]): void {
 
   const first = examples[0];
   if (first) {
-    console.log("  Run an agent interactively:");
-    console.log(`    clawmasons agent ${first.agentShort} ${first.roleShort}`);
+    console.log("  Run a role:");
+    console.log(`    clawmasons run ${first.agentShort} --role ${first.roleShort}`);
 
     if (examples.length > 1) {
-      console.log("\n  Other agent/role combinations:");
+      console.log("\n  Other combinations:");
       for (let i = 1; i < examples.length; i++) {
         const ex = examples[i];
         if (ex) {
-          console.log(`    clawmasons agent ${ex.agentShort} ${ex.roleShort}`);
+          console.log(`    clawmasons run ${ex.agentShort} --role ${ex.roleShort}`);
         }
       }
     }
 
     console.log("\n  Configure an ACP client:");
-    console.log(`    clawmasons agent --acp --role ${first.roleShort}`);
+    console.log(`    clawmasons run ${first.agentShort} --acp --role ${first.roleShort}`);
 
     console.log("\n  Example ACP client configuration:");
     console.log("    {");
     console.log('      "mcpServers": {');
     console.log('        "clawmasons": {');
     console.log('          "command": "clawmasons",');
-    console.log(`          "args": ["agent", "--acp", "--role", "${first.roleShort}"]`);
+    console.log(`          "args": ["run", "${first.agentShort}", "--acp", "--role", "${first.roleShort}"]`);
     console.log("        }");
     console.log("      }");
     console.log("    }");

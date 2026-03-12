@@ -1,8 +1,6 @@
 import type { Command } from "commander";
-import { discoverPackages } from "../../resolver/discover.js";
-import { resolveAgent } from "../../resolver/resolve.js";
-import type { ResolvedAgent, ResolvedRole } from "@clawmasons/shared";
-import { getAppShortName } from "@clawmasons/shared";
+import { discoverRoles } from "@clawmasons/shared";
+import type { RoleType } from "@clawmasons/shared";
 
 interface ListOptions {
   json?: boolean;
@@ -11,7 +9,7 @@ interface ListOptions {
 export function registerListCommand(program: Command): void {
   program
     .command("list")
-    .description("List agents and their dependency trees")
+    .description("List available roles (local and installed packages)")
     .option("--json", "Output as JSON")
     .action(async (options: ListOptions) => {
       await runList(process.cwd(), options);
@@ -23,76 +21,59 @@ export async function runList(
   options: ListOptions,
 ): Promise<void> {
   try {
-    // 1. Discover all packages
-    const packages = discoverPackages(rootDir);
+    // Discover all roles (local + packaged)
+    const roles = await discoverRoles(rootDir);
 
-    // 2. Find all agent packages
-    const agentNames: string[] = [];
-    for (const [name, pkg] of packages) {
-      if (pkg.chapterField.type === "agent") {
-        agentNames.push(name);
-      }
-    }
-
-    if (agentNames.length === 0) {
-      console.error("No agents found.");
+    if (roles.length === 0) {
+      console.error("No roles found.");
       process.exit(1);
       return;
     }
 
-    // 3. Resolve each agent
-    const agents: ResolvedAgent[] = [];
-    for (const name of agentNames.sort()) {
-      agents.push(resolveAgent(name, packages));
-    }
-
     if (options.json) {
-      console.log(JSON.stringify(agents, null, 2));
+      console.log(JSON.stringify(roles, null, 2));
       return;
     }
 
-    // 4. Print tree for each agent
-    for (let i = 0; i < agents.length; i++) {
-      const agent = agents[i];
-      if (i > 0) console.log("");
-      console.log(`${agent.name}@${agent.version}`);
-      printRoles(agent.roles);
+    // Print role listing
+    console.log("\nAvailable roles:\n");
+    for (const role of roles) {
+      printRole(role);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`\n✘ List failed: ${message}\n`);
+    console.error(`\nList failed: ${message}\n`);
     process.exit(1);
   }
 }
 
-function printRoles(roles: ResolvedRole[]): void {
-  for (let i = 0; i < roles.length; i++) {
-    const role = roles[i];
-    const isLast = i === roles.length - 1;
-    const prefix = isLast ? "└── " : "├── ";
-    const childPrefix = isLast ? "    " : "│   ";
+function printRole(role: RoleType): void {
+  const source = role.source.type === "local"
+    ? `local, ${role.source.path ?? "unknown"}`
+    : `package, ${role.source.packageName ?? "unknown"}`;
 
-    console.log(`${prefix}role: ${getAppShortName(role.name)}@${role.version}`);
+  const version = role.metadata.version ?? "0.0.0";
+  console.log(`  ${role.metadata.name}@${version} (${source})`);
 
-    const children: Array<{ label: string; isLast: boolean }> = [];
-
-    for (const task of role.tasks) {
-      children.push({ label: `task: ${getAppShortName(task.name)}@${task.version}`, isLast: false });
-    }
-    for (const app of role.apps) {
-      children.push({ label: `app: ${getAppShortName(app.name)}@${app.version}`, isLast: false });
-    }
-    for (const skill of role.skills) {
-      children.push({ label: `skill: ${getAppShortName(skill.name)}@${skill.version}`, isLast: false });
-    }
-
-    if (children.length > 0) {
-      children[children.length - 1].isLast = true;
-    }
-
-    for (const child of children) {
-      const cPrefix = child.isLast ? "└── " : "├── ";
-      console.log(`${childPrefix}${cPrefix}${child.label}`);
-    }
+  if (role.metadata.description) {
+    console.log(`    ${role.metadata.description}`);
   }
+
+  const children: string[] = [];
+
+  if (role.tasks.length > 0) {
+    children.push(`tasks: ${role.tasks.map((t) => t.name).join(", ")}`);
+  }
+  if (role.apps.length > 0) {
+    children.push(`apps: ${role.apps.map((a) => a.name).join(", ")}`);
+  }
+  if (role.skills.length > 0) {
+    children.push(`skills: ${role.skills.map((s) => s.name).join(", ")}`);
+  }
+
+  for (const child of children) {
+    console.log(`    ${child}`);
+  }
+
+  console.log("");
 }

@@ -705,7 +705,7 @@ describe("agent --acp help text", () => {
   function getHelpOutput(): string {
     const program = new Command();
     registerRunAgentCommand(program);
-    const cmd = program.commands.find((c) => c.name() === "agent");
+    const cmd = program.commands.find((c) => c.name() === "run");
     expect(cmd).toBeDefined();
     let output = "";
     cmd!.configureOutput({ writeOut: (str: string) => { output += str; } });

@@ -22,15 +22,23 @@ describe("CLI entry point", () => {
     }
   });
 
-  it("has top-level agent command registered", () => {
-    const agentCmd = program.commands.find((cmd) => cmd.name() === "agent");
-    expect(agentCmd).toBeDefined();
-    if (agentCmd) {
-      expect(agentCmd.description()).toContain("agent");
+  it("has top-level run command registered", () => {
+    const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+    expect(runCmd).toBeDefined();
+    if (runCmd) {
+      expect(runCmd.description()).toContain("Run a role");
     }
   });
 
-  it("does not have a separate top-level acp command (consolidated into agent --acp)", () => {
+  it("has hidden agent command for backward compatibility", () => {
+    const agentCmd = program.commands.find((cmd) => cmd.name() === "agent");
+    expect(agentCmd).toBeDefined();
+    if (agentCmd) {
+      expect(agentCmd.description()).toContain("deprecated");
+    }
+  });
+
+  it("does not have a separate top-level acp command (consolidated into run --acp)", () => {
     const acpCmd = program.commands.find((cmd) => cmd.name() === "acp");
     expect(acpCmd).toBeUndefined();
   });
@@ -94,5 +102,34 @@ describe("CLI entry point", () => {
     expect(topLevelNames).not.toContain("build");
     expect(topLevelNames).not.toContain("list");
     expect(topLevelNames).not.toContain("validate");
+  });
+
+  it("run command has --role option", () => {
+    const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+    expect(runCmd).toBeDefined();
+    if (runCmd) {
+      const roleOption = runCmd.options.find((opt) => opt.long === "--role");
+      expect(roleOption).toBeDefined();
+    }
+  });
+
+  it("run command has --acp option", () => {
+    const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+    expect(runCmd).toBeDefined();
+    if (runCmd) {
+      const acpOption = runCmd.options.find((opt) => opt.long === "--acp");
+      expect(acpOption).toBeDefined();
+    }
+  });
+
+  it("run command accepts agent-type positional argument", () => {
+    const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+    expect(runCmd).toBeDefined();
+    if (runCmd) {
+      // Commander stores registered arguments
+      const args = runCmd.registeredArguments ?? [];
+      expect(args.length).toBeGreaterThanOrEqual(1);
+      expect(args[0]?.name()).toBe("agent-type");
+    }
   });
 });
