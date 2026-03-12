@@ -1,7 +1,7 @@
 # Agent Roles — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** In Progress (Changes 1–8 complete)
+**Status:** In Progress (Changes 1–9 complete)
 **Date:** March 2026
 
 ---
@@ -295,7 +295,14 @@ Create a built-in skill that scans a project's existing configuration and propos
 
 **Testable output:** Mason skill is installable. Scanner discovers existing configuration. Proposed ROLE.md parses correctly with the Change 2 parser. Permissions are minimal (least-privilege). `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — Branch: `mason-skill-scanner`
+
+**Artifacts:**
+- Spec: [openspec/specs/mason-skill-scanner/spec.md](../../specs/mason-skill-scanner/spec.md)
+- Archive: [openspec/changes/archive/2026-03-12-mason-skill-scanner/](../../changes/archive/2026-03-12-mason-skill-scanner/)
+  - [proposal.md](../../changes/archive/2026-03-12-mason-skill-scanner/proposal.md)
+  - [design.md](../../changes/archive/2026-03-12-mason-skill-scanner/design.md)
+  - [tasks.md](../../changes/archive/2026-03-12-mason-skill-scanner/tasks.md)
 
 ---
 
