@@ -83,3 +83,14 @@ export {
   resolveRole,
   RoleDiscoveryError,
 } from "./role/index.js";
+
+// Mason module (project scanner, ROLE.md proposer)
+export {
+  scanProject,
+  type ScanResult,
+  type DiscoveredSkill,
+  type DiscoveredCommand,
+  type DiscoveredMcpServer,
+  proposeRoleMd,
+  type ProposeOptions,
+} from "./mason/index.js";
