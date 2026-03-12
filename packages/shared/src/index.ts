@@ -75,4 +75,6 @@ export {
   detectDialect,
   RoleParseError,
   scanBundledResources,
+  readPackagedRole,
+  PackageReadError,
 } from "./role/index.js";

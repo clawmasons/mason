@@ -19,3 +19,6 @@ export {
 
 // Resource Scanner
 export { scanBundledResources } from "./resource-scanner.js";
+
+// Package Reader
+export { readPackagedRole, PackageReadError } from "./package-reader.js";
