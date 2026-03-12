@@ -31,6 +31,7 @@
     "packages/cli/tests/**/*",
     "packages/credential-service/tests/**/*",
     "packages/agent-entry/tests/**/*",
+    "packages/shared/tests/**/*",
     "packages/mcp-agent/tests/**/*"
   ]
 }

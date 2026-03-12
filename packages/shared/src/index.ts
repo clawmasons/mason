@@ -14,6 +14,36 @@ export {
   type ChapterField,
 } from "./schemas/index.js";
 
+// ROLE_TYPES schemas
+export {
+  toolPermissionsSchema,
+  roleMetadataSchema,
+  taskRefSchema,
+  skillRefSchema,
+  appConfigSchema,
+  mountConfigSchema,
+  containerRequirementsSchema,
+  governanceConfigSchema,
+  resourceFileSchema,
+  roleSourceSchema,
+  roleTypeSchema,
+} from "./schemas/index.js";
+
+// ROLE_TYPES types
+export type {
+  RoleType,
+  RoleMetadata,
+  TaskRef,
+  AppConfig,
+  SkillRef,
+  ContainerRequirements,
+  GovernanceConfig,
+  ResourceFile,
+  RoleSource,
+  MountConfig,
+  ToolPermissions,
+} from "./types/role-types.js";
+
 // Resolved types
 export type {
   DiscoveredPackage,
