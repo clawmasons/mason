@@ -1,33 +1,38 @@
 /**
- * E2E Test: Note-Taker Agent on Pi-Coding-Agent with OpenRouter
+ * E2E Test: Role-based build with workspace packages
  *
  * Validates that the chapter CLI can build, validate, list, and generate
- * Docker artifacts for a pi-coding-agent agent with OpenRouter LLM config.
+ * Docker artifacts for roles discovered from the workspace.
  *
  * All setup and generation is done exclusively via `chapter build`.
  * Tests verify CLI output: exit codes, generated files, and command output.
+ *
+ * NOTE: This test replaces the former pi-coding-agent runtime test. With the
+ * role-based pipeline (Changes 1-11), runtime selection happens at run time
+ * (`clawmasons run <agent-type> --role <name>`), not at build time.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
-  E2E_ROOT,
   copyFixtureWorkspace,
   chapterExec,
   chapterExecJson,
 } from "./helpers.js";
 
-describe("note-taker on pi-coding-agent with OpenRouter", () => {
+describe("role-based build with workspace packages", () => {
   let workspaceDir: string;
   let dockerDir: string;
 
   beforeAll(() => {
-    // 1. Create temp workspace from fixtures
-    workspaceDir = copyFixtureWorkspace("build-pi-runtime");
+    // 1. Create temp workspace from fixtures (excludes mcp-test due to wildcard permissions)
+    workspaceDir = copyFixtureWorkspace("build-role", {
+      excludePaths: ["agents/mcp-test", "roles/mcp-test"],
+    });
 
-    // 2. Run chapter build (resolve + pack + docker-init)
-    chapterExec(["chapter", "build", "@test/agent-test-note-taker"], workspaceDir, {
+    // 2. Run chapter build (discovers local ROLE.md, packs workspace packages, docker-init)
+    chapterExec(["chapter", "build"], workspaceDir, {
       timeout: 120_000,
     });
 
@@ -40,7 +45,7 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
     }
   });
 
-  // ── Build Output ─────────────────────────────────────────────────────
+  // -- Build Output -----------------------------------------------------------
 
   describe("build output", () => {
     it("generates chapter.lock.json", () => {
@@ -53,28 +58,24 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
         fs.readFileSync(path.join(workspaceDir, "chapter.lock.json"), "utf-8"),
       );
 
-      expect(lock.lockVersion).toBe(1);
-      expect(lock.agent.name).toBe("@test/agent-test-note-taker");
-      expect(lock.agent.runtimes).toContain("pi-coding-agent");
+      expect(lock.lockVersion).toBe(2);
+      expect(lock.role.name).toBe("test-writer");
     });
 
-    it("lock file contains writer role with dependencies", () => {
+    it("lock file contains tasks from the local role", () => {
       const lock = JSON.parse(
         fs.readFileSync(path.join(workspaceDir, "chapter.lock.json"), "utf-8"),
       );
 
-      expect(lock.roles).toHaveLength(1);
-      const writerRole = lock.roles[0];
-      expect(writerRole.name).toBe("@test/role-writer");
-      expect(writerRole.tasks).toEqual(
+      expect(lock.tasks).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ name: "@test/task-take-notes" }),
+          expect.objectContaining({ name: "take-notes" }),
         ]),
       );
     });
   });
 
-  // ── Docker Init — Proxy ──────────────────────────────────────────────
+  // -- Docker Init — Proxy ----------------------------------------------------
 
   describe("docker-init proxy output", () => {
     it("generates proxy/writer/Dockerfile", () => {
@@ -98,89 +99,48 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
     });
   });
 
-  // ── Docker Init — Agent ──────────────────────────────────────────────
+  // -- Docker Init — Agent ----------------------------------------------------
 
   describe("docker-init agent output", () => {
-    it("generates agent/test-note-taker/writer/Dockerfile", () => {
+    it("generates agent/writer/writer/Dockerfile", () => {
       expect(
         fs.existsSync(
-          path.join(dockerDir, "agent", "test-note-taker", "writer", "Dockerfile"),
+          path.join(dockerDir, "agent", "writer", "writer", "Dockerfile"),
         ),
       ).toBe(true);
     });
 
-    it("agent Dockerfile installs pi-coding-agent runtime", () => {
+    it("agent Dockerfile has correct structure", () => {
       const dockerfile = fs.readFileSync(
         path.join(
-          dockerDir, "agent", "test-note-taker", "writer", "Dockerfile",
+          dockerDir, "agent", "writer", "writer", "Dockerfile",
         ),
         "utf-8",
-      );
-      expect(dockerfile).toContain(
-        "npm install -g @mariozechner/pi-coding-agent",
       );
       expect(dockerfile).toContain("COPY node_modules/");
       expect(dockerfile).not.toContain("npm install --omit=dev");
     });
   });
 
-  // ── Workspace Materialization ────────────────────────────────────────
+  // -- Workspace Materialization ----------------------------------------------
 
   describe("workspace materialization", () => {
     const workspacePath = () =>
-      path.join(dockerDir, "agent", "test-note-taker", "writer", "workspace");
+      path.join(dockerDir, "agent", "writer", "writer", "workspace");
 
     it("generates AGENTS.md", () => {
       expect(fs.existsSync(path.join(workspacePath(), "AGENTS.md"))).toBe(true);
     });
 
-    it("AGENTS.md contains agent identity and role-writer context", () => {
+    it("AGENTS.md contains role identity and permissions", () => {
       const agentsMd = fs.readFileSync(
         path.join(workspacePath(), "AGENTS.md"),
         "utf-8",
       );
 
-      expect(agentsMd).toContain("# Agent:");
-      expect(agentsMd).toContain("managed by chapter");
       expect(agentsMd).toContain("writer");
       expect(agentsMd).toContain("Permitted tools");
       expect(agentsMd).toContain("filesystem");
-    });
-
-    it("generates .pi/settings.json with correct model ID", () => {
-      const settingsPath = path.join(workspacePath(), ".pi", "settings.json");
-      expect(fs.existsSync(settingsPath)).toBe(true);
-
-      const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-      expect(settings.model).toBe("openrouter/anthropic/claude-sonnet-4");
-    });
-
-    it("generates .pi/mcp.json with MCP server config", () => {
-      const mcpJsonPath = path.join(workspacePath(), ".pi", "mcp.json");
-      expect(fs.existsSync(mcpJsonPath)).toBe(true);
-
-      const mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8"));
-      expect(mcpJson.mcpServers.chapter).toBeDefined();
-      expect(mcpJson.mcpServers.chapter.url).toContain("/sse");
-    });
-
-    it("generates .pi/extensions/chapter-mcp/index.ts", () => {
-      const indexTsPath = path.join(
-        workspacePath(), ".pi", "extensions", "chapter-mcp", "index.ts",
-      );
-      expect(fs.existsSync(indexTsPath)).toBe(true);
-    });
-
-    it("extension code registers take-notes command", () => {
-      const indexTs = fs.readFileSync(
-        path.join(
-          workspacePath(), ".pi", "extensions", "chapter-mcp", "index.ts",
-        ),
-        "utf-8",
-      );
-
-      expect(indexTs).toContain("pi.registerCommand(");
-      expect(indexTs).toContain('"take-notes"');
     });
 
     it("generates skills/markdown-conventions/README.md", () => {
@@ -191,39 +151,26 @@ describe("note-taker on pi-coding-agent with OpenRouter", () => {
 
       const content = fs.readFileSync(skillPath, "utf-8");
       expect(content).toContain("markdown-conventions");
-      expect(content).toContain("Markdown formatting conventions");
     });
   });
 
-  // ── Validate & List ──────────────────────────────────────────────────
+  // -- Validate & List --------------------------------------------------------
 
   describe("validate and list", () => {
-    it("chapter validate exits 0", () => {
-      chapterExec(["chapter", "validate", "@test/agent-test-note-taker"], workspaceDir);
+    it("chapter validate exits 0 for the local role", () => {
+      chapterExec(["chapter", "validate", "test-writer"], workspaceDir);
     });
 
-    it("chapter list --json includes the agent", () => {
-      const agents = chapterExecJson<unknown[]>(["chapter", "list", "--json"], workspaceDir);
+    it("chapter list --json includes the local role", () => {
+      const roles = chapterExecJson<unknown[]>(["chapter", "list", "--json"], workspaceDir);
 
-      expect(agents).toEqual(
+      expect(roles).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ name: "@test/agent-test-note-taker" }),
+          expect.objectContaining({
+            metadata: expect.objectContaining({ name: "test-writer" }),
+          }),
         ]),
       );
-    });
-  });
-
-  // ── Infrastructure (gated) ──────────────────────────────────────────
-
-  describe("infrastructure (requires Docker)", () => {
-    it.skip("pi agent can connect to chapter proxy via Docker Compose", () => {
-      // Future: Start docker compose, verify pi connects to MCP proxy
-    });
-  });
-
-  describe("infrastructure (requires OPENROUTER_API_KEY)", () => {
-    it.skip("pi agent can execute a note-taking task", () => {
-      // Future: Start docker compose with OPENROUTER_API_KEY
     });
   });
 });

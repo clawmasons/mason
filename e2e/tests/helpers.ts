@@ -20,7 +20,7 @@ export const CLAWMASONS_BIN = path.join(PROJECT_ROOT, "bin", "clawmasons.js");
 export const CHAPTER_BIN = CLAWMASONS_BIN;
 
 /** Workspace directories to copy from fixtures. */
-const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons"];
+const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons", ".claude"];
 
 /**
  * Recursively copy a directory tree, skipping node_modules and .git.
@@ -124,6 +124,33 @@ export function isDockerAvailable(): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Run a `chapter` CLI command that is expected to fail (non-zero exit code).
+ * Returns { stdout, stderr, exitCode }.
+ */
+export function chapterExecExpectError(
+  args: string[],
+  cwd: string,
+  opts?: { timeout?: number },
+): { stdout: string; stderr: string; exitCode: number } {
+  try {
+    const stdout = execFileSync("node", [CHAPTER_BIN, ...args], {
+      cwd,
+      stdio: "pipe",
+      timeout: opts?.timeout ?? 30_000,
+    }).toString();
+    // If it didn't throw, the command succeeded unexpectedly
+    return { stdout, stderr: "", exitCode: 0 };
+  } catch (err: unknown) {
+    const e = err as { stdout?: Buffer; stderr?: Buffer; status?: number };
+    return {
+      stdout: e.stdout?.toString() ?? "",
+      stderr: e.stderr?.toString() ?? "",
+      exitCode: e.status ?? 1,
+    };
   }
 }
 

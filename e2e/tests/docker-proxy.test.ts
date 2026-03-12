@@ -8,9 +8,6 @@
  *   4. Connect MCP client and verify governed tools
  *   5. Make tool calls through the governed proxy
  *
- * Unit tests for internal ACP modules (matcher, rewriter, warnings, audit)
- * live in packages/cli/tests/acp/ and packages/proxy/tests/hooks/.
- *
  * All setup is done exclusively via `chapter build`.
  * Tests verify CLI output: exit codes, generated files, and running containers.
  */
@@ -28,7 +25,7 @@ import {
   waitForHealth,
 } from "./helpers.js";
 
-// ── Docker Proxy E2E with ACP Session Metadata ───────────────────────
+// -- Docker Proxy E2E with ACP Session Metadata -------------------------------
 
 describe("ACP proxy Docker e2e", () => {
   let workspaceDir: string;
@@ -41,8 +38,7 @@ describe("ACP proxy Docker e2e", () => {
   let composeFile: string;
 
   beforeAll(async () => {
-    // 1. Create temp workspace from fixtures, excluding mcp-test agent/role
-    // (mcp-test uses wildcard "*" permissions which docker-init doesn't support)
+    // 1. Create temp workspace from fixtures, excluding mcp-test
     workspaceDir = copyFixtureWorkspace("docker-proxy", {
       excludePaths: ["agents/mcp-test", "roles/mcp-test"],
     });
@@ -53,7 +49,6 @@ describe("ACP proxy Docker e2e", () => {
     dockerDir = path.join(workspaceDir, "docker");
 
     // Create notes directory required by the filesystem MCP server
-    // The server runs from /app inside the container and expects ./notes
     const notesDir = path.join(workspaceDir, "notes");
     fs.mkdirSync(notesDir, { recursive: true });
 
@@ -73,7 +68,7 @@ services:
       - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
       - CHAPTER_SESSION_TYPE=acp
       - CHAPTER_ACP_CLIENT=${ACP_CLIENT_NAME}
-    command: ["chapter", "proxy", "--agent", "@test/agent-test-note-taker", "--transport", "streamable-http"]
+    command: ["chapter", "proxy", "--role", "@test/role-writer", "--transport", "streamable-http"]
     restart: "no"
 `;
     const composeDir = path.join(workspaceDir, "e2e-compose");
@@ -198,7 +193,7 @@ services:
     );
 
     if (listDirTool) {
-      // Call the tool - this exercises the full governed pipeline
+      // Call the tool -- this exercises the full governed pipeline
       const callResult = await client.callTool({
         name: listDirTool.name,
         arguments: listDirTool.name.includes("list_allowed_directories")
