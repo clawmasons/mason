@@ -22,3 +22,6 @@ export { scanBundledResources } from "./resource-scanner.js";
 
 // Package Reader
 export { readPackagedRole, PackageReadError } from "./package-reader.js";
+
+// Adapter
+export { adaptRoleToResolvedAgent, AdapterError } from "./adapter.js";

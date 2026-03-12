@@ -77,4 +77,6 @@ export {
   scanBundledResources,
   readPackagedRole,
   PackageReadError,
+  adaptRoleToResolvedAgent,
+  AdapterError,
 } from "./role/index.js";
