@@ -4,3 +4,18 @@ export { taskChapterFieldSchema, type TaskChapterField } from "./task.js";
 export { roleChapterFieldSchema, type RoleChapterField } from "./role.js";
 export { agentChapterFieldSchema, type AgentChapterField } from "./agent.js";
 export { parseChapterField, type ChapterField } from "./chapter-field.js";
+
+// ROLE_TYPES schemas
+export {
+  toolPermissionsSchema,
+  roleMetadataSchema,
+  taskRefSchema,
+  skillRefSchema,
+  appConfigSchema,
+  mountConfigSchema,
+  containerRequirementsSchema,
+  governanceConfigSchema,
+  resourceFileSchema,
+  roleSourceSchema,
+  roleTypeSchema,
+} from "./role-types.js";

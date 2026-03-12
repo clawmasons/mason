@@ -1,7 +1,7 @@
 # Agent Roles — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** Not Started
+**Status:** In Progress (Change 1 complete)
 **Date:** March 2026
 
 ---
@@ -57,7 +57,14 @@ Define the generic in-memory type system that all role sources normalize into. T
 
 **Testable output:** Zod schemas validate well-formed ROLE_TYPES objects. Required fields are enforced. Optional fields default correctly. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — Branch: `role-types-core-type-system`
+
+**Artifacts:**
+- Spec: [openspec/specs/role-types-core-type-system/spec.md](../../specs/role-types-core-type-system/spec.md)
+- Archive: [openspec/changes/archive/2026-03-12-role-types-core-type-system/](../../changes/archive/2026-03-12-role-types-core-type-system/)
+  - [proposal.md](../../changes/archive/2026-03-12-role-types-core-type-system/proposal.md)
+  - [design.md](../../changes/archive/2026-03-12-role-types-core-type-system/design.md)
+  - [tasks.md](../../changes/archive/2026-03-12-role-types-core-type-system/tasks.md)
 
 ---
 
