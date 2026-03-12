@@ -27,7 +27,7 @@ export function registerCommands(program: Command): void {
   // `init` — lodge initialization
   registerLodgeInitCommand(program);
 
-  // `run` — run a role on an agent runtime (also registers hidden `agent` alias)
+  // `run` — run a role on an agent runtime
   registerRunCommand(program);
 
   // ── `chapter` subcommand group ──────────────────────────────────────

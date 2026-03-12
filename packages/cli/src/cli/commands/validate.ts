@@ -1,8 +1,5 @@
 import type { Command } from "commander";
 import { resolveRole, RoleDiscoveryError, adaptRoleToResolvedAgent } from "@clawmasons/shared";
-import { discoverPackages } from "../../resolver/discover.js";
-import { resolveAgent } from "../../resolver/resolve.js";
-import { validateAgent } from "../../validator/validate.js";
 import type { ValidationResult } from "../../validator/types.js";
 
 interface ValidateOptions {
@@ -57,7 +54,7 @@ export async function runValidate(
   options: ValidateOptions,
 ): Promise<void> {
   try {
-    // First, try to validate as a role
+    // Validate as a role
     const roleResult = await tryValidateRole(rootDir, name);
     if (roleResult) {
       if (options.json) {
@@ -79,28 +76,8 @@ export async function runValidate(
       return;
     }
 
-    // Fall back to agent-based validation
-    const packages = discoverPackages(rootDir);
-    const agent = resolveAgent(name, packages);
-    const result = validateAgent(agent);
-
-    if (options.json) {
-      console.log(JSON.stringify(result, null, 2));
-    } else if (result.valid) {
-      console.log(`\nAgent "${name}" is valid.\n`);
-      if (result.warnings.length > 0) {
-        for (const w of result.warnings) {
-          console.warn(`  [${w.category}] ${w.message}`);
-        }
-        console.warn("");
-      }
-    } else {
-      console.error(
-        `\nAgent "${name}" has ${result.errors.length} validation error(s):${formatErrors(result)}\n`,
-      );
-    }
-
-    process.exit(result.valid ? 0 : 1);
+    // Role not found
+    throw new RoleDiscoveryError(`Role "${name}" not found. Make sure it exists as a local ROLE.md or installed package.`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 

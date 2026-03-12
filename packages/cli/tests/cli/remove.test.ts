@@ -193,27 +193,28 @@ describe("findDependents", () => {
     expect(dependents[0].name).toBe("@test/task-triage");
   });
 
-  it("detects member roles reference", () => {
+  it("detects role permissions reference to app", () => {
+    writePackage(path.join(tmpDir, "apps", "github"), {
+      name: "@test/app-github",
+      version: "1.0.0",
+      chapter: { type: "app", transport: "stdio", command: "npx", args: [], tools: ["t"], capabilities: ["tools"] },
+    });
+
     writePackage(path.join(tmpDir, "roles", "manager"), {
       name: "@test/role-manager",
       version: "1.0.0",
-      chapter: { type: "role", permissions: {} },
-    });
-
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
-      version: "1.0.0",
       chapter: {
-        type: "agent",        name: "Ops",
-        slug: "ops",        runtimes: ["claude-code"],
-        roles: ["@test/role-manager"],
+        type: "role",
+        permissions: {
+          "@test/app-github": { allow: ["t"], deny: [] },
+        },
       },
     });
 
     const packages = discoverPackages(tmpDir);
-    const dependents = findDependents("@test/role-manager", packages);
+    const dependents = findDependents("@test/app-github", packages);
     expect(dependents).toHaveLength(1);
-    expect(dependents[0].name).toBe("@test/agent-ops");
+    expect(dependents[0].name).toBe("@test/role-manager");
   });
 
   it("returns empty when no dependents exist", () => {

@@ -17,13 +17,13 @@ describe("CLI permissions command", () => {
     }
   });
 
-  it("permissions command accepts a member argument", () => {
+  it("permissions command accepts a role argument", () => {
     const permsCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "permissions");
     expect(permsCmd).toBeDefined();
     if (permsCmd) {
       const args = permsCmd.registeredArguments;
       expect(args).toHaveLength(1);
-      expect(args[0].name()).toBe("agent");
+      expect(args[0].name()).toBe("role");
       expect(args[0].required).toBe(true);
     }
   });
@@ -56,126 +56,41 @@ describe("runPermissions", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function writePackage(dir: string, pkg: Record<string, unknown>): void {
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify(pkg, null, 2));
+  function writeRole(name: string, frontmatterYaml: string, body = "Role instructions."): void {
+    const roleDir = path.join(tmpDir, ".claude", "roles", name);
+    fs.mkdirSync(roleDir, { recursive: true });
+    const content = `---\n${frontmatterYaml}\n---\n\n${body}\n`;
+    fs.writeFileSync(path.join(roleDir, "ROLE.md"), content);
   }
 
-  function setupTwoRoleMember(): void {
-    writePackage(path.join(tmpDir, "apps", "github"), {
-      name: "@test/app-github",
-      version: "1.0.0",
-      chapter: {
-        type: "app",
-        transport: "stdio",
-        command: "npx",
-        args: ["-y", "@modelcontextprotocol/server-github"],
-        tools: ["create_issue", "list_repos", "get_pr", "create_review", "add_label"],
-        capabilities: ["tools"],
-      },
-    });
-
-    writePackage(path.join(tmpDir, "skills", "labeling"), {
-      name: "@test/skill-labeling",
-      version: "1.0.0",
-      chapter: {
-        type: "skill",
-        artifacts: ["./SKILL.md"],
-        description: "Labeling taxonomy",
-      },
-    });
-
-    writePackage(path.join(tmpDir, "tasks", "triage"), {
-      name: "@test/task-triage",
-      version: "1.0.0",
-      chapter: {
-        type: "task",
-        taskType: "subagent",
-        prompt: "./triage.md",
-        requires: {
-          apps: ["@test/app-github"],
-          skills: ["@test/skill-labeling"],
-        },
-      },
-    });
-
-    writePackage(path.join(tmpDir, "tasks", "review"), {
-      name: "@test/task-review",
-      version: "1.0.0",
-      chapter: {
-        type: "task",
-        taskType: "subagent",
-        prompt: "./review.md",
-        requires: {
-          apps: ["@test/app-github"],
-          skills: [],
-        },
-      },
-    });
-
-    // Role 1: issue-manager
-    writePackage(path.join(tmpDir, "roles", "issue-manager"), {
-      name: "@test/role-issue-manager",
-      version: "1.0.0",
-      chapter: {
-        type: "role",
-        tasks: ["@test/task-triage"],
-        skills: ["@test/skill-labeling"],
-        permissions: {
-          "@test/app-github": {
-            allow: ["create_issue", "list_repos", "add_label"],
-            deny: ["get_pr"],
-          },
-        },
-      },
-    });
-
-    // Role 2: pr-reviewer
-    writePackage(path.join(tmpDir, "roles", "pr-reviewer"), {
-      name: "@test/role-pr-reviewer",
-      version: "1.0.0",
-      chapter: {
-        type: "role",
-        tasks: ["@test/task-review"],
-        skills: [],
-        permissions: {
-          "@test/app-github": {
-            allow: ["list_repos", "get_pr", "create_review"],
-            deny: [],
-          },
-        },
-      },
-    });
-
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
-      version: "1.0.0",
-      chapter: {
-        type: "agent",        name: "Ops",
-        slug: "ops",        runtimes: ["claude-code"],
-        roles: ["@test/role-issue-manager", "@test/role-pr-reviewer"],
-      },
-    });
+  function setupRoleWithPermissions(): void {
+    writeRole("issue-manager", `name: issue-manager
+description: "Manages GitHub issues"
+version: "1.0.0"
+mcp_servers:
+  - name: "@test/app-github"
+    transport: stdio
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    tools:
+      allow: ["create_issue", "list_repos", "add_label"]
+      deny: ["get_pr"]`);
   }
 
   it("displays per-role permission breakdown", async () => {
-    setupTwoRoleMember();
-    await runPermissions(tmpDir, "@test/agent-ops", {});
+    setupRoleWithPermissions();
+    await runPermissions(tmpDir, "issue-manager", {});
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    // Per-role sections
     expect(logOutput).toContain("Role: issue-manager");
-    expect(logOutput).toContain("Role: pr-reviewer");
     expect(logOutput).toContain("create_issue");
-    expect(logOutput).toContain("get_pr");
-    expect(logOutput).toContain("create_review");
   });
 
   it("displays deny list when present", async () => {
-    setupTwoRoleMember();
-    await runPermissions(tmpDir, "@test/agent-ops", {});
+    setupRoleWithPermissions();
+    await runPermissions(tmpDir, "issue-manager", {});
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("deny:");
@@ -183,23 +98,19 @@ describe("runPermissions", () => {
   });
 
   it("displays proxy-level toolFilter union", async () => {
-    setupTwoRoleMember();
-    await runPermissions(tmpDir, "@test/agent-ops", {});
+    setupRoleWithPermissions();
+    await runPermissions(tmpDir, "issue-manager", {});
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("Proxy toolFilter");
-
-    // Union should contain tools from both roles
     expect(logOutput).toContain("create_issue");
     expect(logOutput).toContain("list_repos");
     expect(logOutput).toContain("add_label");
-    expect(logOutput).toContain("get_pr");
-    expect(logOutput).toContain("create_review");
   });
 
   it("outputs JSON with --json flag", async () => {
-    setupTwoRoleMember();
-    await runPermissions(tmpDir, "@test/agent-ops", { json: true });
+    setupRoleWithPermissions();
+    await runPermissions(tmpDir, "issue-manager", { json: true });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
 
@@ -207,21 +118,20 @@ describe("runPermissions", () => {
     const parsed = JSON.parse(logOutput);
 
     // Per-role permissions
-    expect(parsed.roles["@test/role-issue-manager"]).toBeDefined();
-    expect(parsed.roles["@test/role-pr-reviewer"]).toBeDefined();
-    expect(parsed.roles["@test/role-issue-manager"]["@test/app-github"].allow).toContain("create_issue");
+    expect(parsed.roles["issue-manager"]).toBeDefined();
+    expect(parsed.roles["issue-manager"]["@test/app-github"].allow).toContain("create_issue");
 
     // Proxy-level toolFilters
     expect(parsed.toolFilters["@test/app-github"]).toBeDefined();
     expect(parsed.toolFilters["@test/app-github"].mode).toBe("allow");
     const unionList = parsed.toolFilters["@test/app-github"].list;
     expect(unionList).toContain("create_issue");
-    expect(unionList).toContain("get_pr");
-    expect(unionList).toContain("create_review");
+    expect(unionList).toContain("list_repos");
+    expect(unionList).toContain("add_label");
   });
 
-  it("exits 1 when member is not found", async () => {
-    await runPermissions(tmpDir, "@test/nonexistent", {});
+  it("exits 1 when role is not found", async () => {
+    await runPermissions(tmpDir, "nonexistent", {});
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");

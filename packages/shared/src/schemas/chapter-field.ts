@@ -3,23 +3,20 @@ import { appChapterFieldSchema, type AppChapterField } from "./app.js";
 import { skillChapterFieldSchema, type SkillChapterField } from "./skill.js";
 import { taskChapterFieldSchema, type TaskChapterField } from "./task.js";
 import { roleChapterFieldSchema, type RoleChapterField } from "./role.js";
-import { agentChapterFieldSchema, type AgentChapterField } from "./agent.js";
 
 export type ChapterField =
   | AppChapterField
   | SkillChapterField
   | TaskChapterField
-  | RoleChapterField
-  | AgentChapterField;
+  | RoleChapterField;
 
-const chapterTypeValues = ["app", "skill", "task", "role", "agent"] as const;
+const chapterTypeValues = ["app", "skill", "task", "role"] as const;
 
 const schemasByType: Record<string, z.ZodType> = {
   app: appChapterFieldSchema,
   skill: skillChapterFieldSchema,
   task: taskChapterFieldSchema,
   role: roleChapterFieldSchema,
-  agent: agentChapterFieldSchema,
 };
 
 export function parseChapterField(input: unknown): z.SafeParseReturnType<unknown, ChapterField> {

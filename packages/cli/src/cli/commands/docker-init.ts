@@ -9,7 +9,7 @@ import type { ResolvedAgent, ResolvedRole } from "@clawmasons/shared";
 /** Directory of this source file — fallback resolve root for framework packages. */
 const CLI_DIR = path.dirname(fileURLToPath(import.meta.url));
 import { discoverPackages } from "../../resolver/discover.js";
-import { resolveAgent } from "../../resolver/resolve.js";
+import { resolveRolePackage } from "../../resolver/resolve.js";
 import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
 import { generateAgentDockerfile } from "../../generator/agent-dockerfile.js";
 import { generateCredentialServiceDockerfile } from "../../generator/credential-service-dockerfile.js";
@@ -488,30 +488,37 @@ export function generateDockerfiles(dockerDir: string): void {
     return;
   }
 
-  // Find all agent and role packages
+  // Find all role packages and build ResolvedAgent wrappers for compatibility
   const agents: ResolvedAgent[] = [];
   const allRoles = new Map<string, ResolvedRole>();
 
   for (const [name, pkg] of packages) {
-    if (pkg.chapterField.type === "agent") {
-      const resolved = resolveAgent(name, packages);
-      agents.push(resolved);
-
-      // Collect roles from resolved agent
-      for (const role of resolved.roles) {
-        if (!allRoles.has(role.name)) {
-          allRoles.set(role.name, role);
-        }
+    if (pkg.chapterField.type === "role") {
+      const resolved = resolveRolePackage(name, packages);
+      if (!allRoles.has(resolved.name)) {
+        allRoles.set(resolved.name, resolved);
       }
+
+      // Build a ResolvedAgent wrapper for each role
+      const agentShortName = getAppShortName(name);
+      agents.push({
+        name,
+        version: resolved.version,
+        agentName: agentShortName,
+        slug: agentShortName,
+        runtimes: ["claude-code"],
+        credentials: [],
+        roles: [resolved],
+      });
     }
   }
 
-  if (agents.length === 0) {
-    console.log("\n  No agent packages found — skipping Dockerfile generation");
+  if (allRoles.size === 0) {
+    console.log("\n  No role packages found — skipping Dockerfile generation");
     return;
   }
 
-  console.log(`\n  Generating Dockerfiles for ${agents.length} agent(s) and ${allRoles.size} role(s)...`);
+  console.log(`\n  Generating Dockerfiles for ${allRoles.size} role(s)...`);
 
   // Generate credential service Dockerfile — one per chapter
   {

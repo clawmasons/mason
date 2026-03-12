@@ -1,11 +1,10 @@
 /**
  * @deprecated This module is a backward-compatibility re-export.
- * The `acp` command has been consolidated into `agent --acp`.
+ * The `acp` command has been consolidated into `run --acp`.
  * All exports now live in `./run-agent.ts`.
  */
 export {
   runAcpAgent,
-  resolveAgentName,
   collectEnvCredentials,
   registerRunAcpAgentCommand,
   bootstrapChapter,
