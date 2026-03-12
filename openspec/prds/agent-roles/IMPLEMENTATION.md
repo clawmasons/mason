@@ -1,7 +1,7 @@
 # Agent Roles — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** In Progress (Changes 1–3 complete)
+**Status:** In Progress (Changes 1–4 complete)
 **Date:** March 2026
 
 ---
@@ -143,7 +143,14 @@ Create a bridge layer that converts a `RoleType` into the existing `ResolvedAgen
 
 **Testable output:** Adapter produces valid `ResolvedAgent` from any `RoleType`. Round-trip from ROLE.md → ROLE_TYPES → ResolvedAgent preserves all fields. Each agent dialect produces correct agent-native field names. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — Branch: `role-to-resolved-agent-adapter`
+
+**Artifacts:**
+- Spec: [openspec/specs/role-to-resolved-agent-adapter/spec.md](../../specs/role-to-resolved-agent-adapter/spec.md)
+- Archive: [openspec/changes/archive/2026-03-12-role-to-resolved-agent-adapter/](../../changes/archive/2026-03-12-role-to-resolved-agent-adapter/)
+  - [proposal.md](../../changes/archive/2026-03-12-role-to-resolved-agent-adapter/proposal.md)
+  - [design.md](../../changes/archive/2026-03-12-role-to-resolved-agent-adapter/design.md)
+  - [tasks.md](../../changes/archive/2026-03-12-role-to-resolved-agent-adapter/tasks.md)
 
 ---
 
