@@ -11,18 +11,104 @@ import {
   resolveRequiredCredentials,
   displayCredentials,
   runAgent,
+  resolveAgentType,
+  isKnownAgentType,
+  getKnownAgentTypeNames,
+  AGENT_TYPE_ALIASES,
 } from "../../src/cli/commands/run-agent.js";
 import type { ChapterEntry } from "../../src/runtime/home.js";
 
 // ── Command Registration ────────────────────────────────────────────────
 
-describe("CLI agent command", () => {
-  it("has the agent command registered at top level", () => {
-    const cmd = program.commands.find((c) => c.name() === "agent");
+describe("CLI run command", () => {
+  it("has the run command registered at top level", () => {
+    const cmd = program.commands.find((c) => c.name() === "run");
     expect(cmd).toBeDefined();
     if (cmd) {
-      expect(cmd.description()).toContain("Run a chapter agent");
+      expect(cmd.description()).toContain("Run a role");
     }
+  });
+
+  it("has hidden agent command for backward compatibility", () => {
+    const cmd = program.commands.find((c) => c.name() === "agent");
+    expect(cmd).toBeDefined();
+  });
+
+  it("run command has --role option", () => {
+    const cmd = program.commands.find((c) => c.name() === "run");
+    expect(cmd).toBeDefined();
+    if (cmd) {
+      const roleOpt = cmd.options.find((o) => o.long === "--role");
+      expect(roleOpt).toBeDefined();
+    }
+  });
+
+  it("run command has --acp option", () => {
+    const cmd = program.commands.find((c) => c.name() === "run");
+    expect(cmd).toBeDefined();
+    if (cmd) {
+      const acpOpt = cmd.options.find((o) => o.long === "--acp");
+      expect(acpOpt).toBeDefined();
+    }
+  });
+});
+
+// ── Agent Type Resolution ────────────────────────────────────────────────
+
+describe("resolveAgentType", () => {
+  it("resolves alias 'claude' to 'claude-code'", () => {
+    expect(resolveAgentType("claude")).toBe("claude-code");
+  });
+
+  it("resolves alias 'pi' to 'pi-coding-agent'", () => {
+    expect(resolveAgentType("pi")).toBe("pi-coding-agent");
+  });
+
+  it("resolves alias 'mcp' to 'mcp-agent'", () => {
+    expect(resolveAgentType("mcp")).toBe("mcp-agent");
+  });
+
+  it("resolves direct agent type 'claude-code'", () => {
+    expect(resolveAgentType("claude-code")).toBe("claude-code");
+  });
+
+  it("returns undefined for unknown agent type", () => {
+    expect(resolveAgentType("unknown-agent")).toBeUndefined();
+  });
+});
+
+describe("isKnownAgentType", () => {
+  it("returns true for aliases", () => {
+    expect(isKnownAgentType("claude")).toBe(true);
+    expect(isKnownAgentType("pi")).toBe(true);
+    expect(isKnownAgentType("mcp")).toBe(true);
+  });
+
+  it("returns true for registered types", () => {
+    expect(isKnownAgentType("claude-code")).toBe(true);
+    expect(isKnownAgentType("pi-coding-agent")).toBe(true);
+  });
+
+  it("returns false for unknown types", () => {
+    expect(isKnownAgentType("unknown")).toBe(false);
+    expect(isKnownAgentType("gpt")).toBe(false);
+  });
+});
+
+describe("getKnownAgentTypeNames", () => {
+  it("includes all aliases and registered types", () => {
+    const names = getKnownAgentTypeNames();
+    expect(names).toContain("claude");
+    expect(names).toContain("claude-code");
+    expect(names).toContain("pi");
+    expect(names).toContain("mcp");
+    expect(names.length).toBeGreaterThan(3);
+  });
+
+  it("returns sorted array", () => {
+    const names = getKnownAgentTypeNames();
+    const sorted = [...names].sort();
+    expect(names).toEqual(sorted);
   });
 });
 

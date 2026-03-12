@@ -18,6 +18,7 @@ import { resolveRoleMountVolumes, type RoleMount } from "../../generator/mount-v
 import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
 import { computeToolFilters } from "@clawmasons/shared";
 import { ACP_RUNTIME_COMMANDS } from "../../materializer/common.js";
+import { getRegisteredAgentTypes } from "../../materializer/role-materializer.js";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
@@ -43,6 +44,55 @@ export interface RunAcpAgentOptions {
  */
 export function generateSessionId(): string {
   return crypto.randomBytes(4).toString("hex");
+}
+
+// ── Agent Type Aliases ────────────────────────────────────────────────
+
+/**
+ * Map user-friendly agent type names to internal materializer registry names.
+ */
+export const AGENT_TYPE_ALIASES: Record<string, string> = {
+  claude: "claude-code",
+  codex: "codex",
+  aider: "aider",
+  pi: "pi-coding-agent",
+  mcp: "mcp-agent",
+};
+
+/**
+ * Resolve a user-provided agent type string to the internal materializer name.
+ * Checks aliases first, then the raw value against registered agent types.
+ *
+ * @returns The resolved agent type, or undefined if not recognized
+ */
+export function resolveAgentType(input: string): string | undefined {
+  // Check alias first
+  const aliased = AGENT_TYPE_ALIASES[input];
+  if (aliased) return aliased;
+
+  // Check if it's a direct registered agent type
+  const registered = getRegisteredAgentTypes();
+  if (registered.includes(input)) return input;
+
+  return undefined;
+}
+
+/**
+ * Check whether a string matches a known agent type (including aliases).
+ */
+export function isKnownAgentType(input: string): boolean {
+  return resolveAgentType(input) !== undefined;
+}
+
+/**
+ * Get a user-friendly list of known agent type names (aliases + registered).
+ */
+export function getKnownAgentTypeNames(): string[] {
+  const names = new Set<string>(Object.keys(AGENT_TYPE_ALIASES));
+  for (const t of getRegisteredAgentTypes()) {
+    names.add(t);
+  }
+  return [...names].sort();
 }
 
 /**
@@ -437,6 +487,14 @@ export async function bootstrapChapter(
 // ── Help Text ─────────────────────────────────────────────────────────
 
 export const RUN_ACP_AGENT_HELP_EPILOG = `
+Command Syntax:
+  clawmasons run <agent-type> --role <name>          # primary form
+  clawmasons <agent-type> --role <name>              # shorthand
+  clawmasons run <agent-type> --role <name> --acp    # ACP mode
+
+Agent Types:
+  claude (claude-code), codex, aider, pi (pi-coding-agent), mcp (mcp-agent)
+
 Session Behavior:
   When an ACP client sends session/new with a "cwd" field, the agent
   container mounts that directory as /workspace. Each session/new starts
@@ -486,11 +544,10 @@ ACP Client Configuration Example (Zed / acpx / VS Code):
         "command": "npx",
         "args": [
           "clawmasons",
-          "agent",
+          "run", "pi",
           "--acp",
           "--chapter", "initiate",
-          "--role", "chapter-creator",
-          "--init-agent", "pi"
+          "--role", "chapter-creator"
         ],
         "env": {
           "CLAWMASONS_HOME": "~/.clawmasons",
@@ -585,10 +642,79 @@ export type RunAcpAgentDeps = RunAgentDeps;
 
 // ── Command Registration ──────────────────────────────────────────────
 
-export function registerRunAgentCommand(program: Command): void {
+/**
+ * Create the action handler for both `run` and the hidden `agent` alias.
+ */
+function createRunAction() {
+  return async (
+    positionalAgentType: string | undefined,
+    options: {
+      acp?: boolean;
+      agentType?: string;
+      role?: string;
+      proxyPort: string;
+      chapter?: string;
+      initAgent?: string;
+    },
+  ) => {
+    const agentTypeInput = positionalAgentType ?? options.agentType;
+    const role = options.role;
+
+    if (!role) {
+      console.error("\n  --role <name> is required.\n  Usage: clawmasons run <agent-type> --role <name>\n");
+      process.exit(1);
+      return;
+    }
+
+    // Resolve agent type (alias or direct)
+    let resolvedAgentType: string | undefined;
+    if (agentTypeInput) {
+      resolvedAgentType = resolveAgentType(agentTypeInput);
+      if (!resolvedAgentType) {
+        const known = getKnownAgentTypeNames().join(", ");
+        console.error(`\n  Unknown agent type "${agentTypeInput}".\n  Available agent types: ${known}\n`);
+        process.exit(1);
+        return;
+      }
+    }
+
+    if (options.acp) {
+      await runAgent(process.cwd(), resolvedAgentType, role, undefined, {
+        acp: true,
+        proxyPort: parseInt(options.proxyPort, 10),
+        chapter: options.chapter,
+        initAgent: options.initAgent,
+      });
+    } else {
+      if (!resolvedAgentType) {
+        console.error("\n  Interactive mode requires an agent type.\n  Usage: clawmasons run <agent-type> --role <name>\n");
+        process.exit(1);
+        return;
+      }
+      await runAgent(process.cwd(), resolvedAgentType, role);
+    }
+  };
+}
+
+export function registerRunCommand(program: Command): void {
+  // Primary `run` command
   program
-    .command("agent")
-    .description("Run a chapter agent interactively, or start an ACP endpoint for editor integration")
+    .command("run")
+    .description("Run a role on the specified agent runtime")
+    .argument("[agent-type]", "Agent runtime type (e.g., claude, codex, aider, pi, mcp)")
+    .option("--acp", "Start in ACP mode for editor integration")
+    .option("--role <name>", "Role name to run (required)")
+    .option("--agent-type <name>", "Agent type (alternative to positional argument)")
+    .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
+    .option("--chapter <name>", "Chapter name (use 'initiate' for full bootstrap flow, ACP mode only)")
+    .option("--init-agent <name>", "Agent name override for bootstrap (ACP mode only)")
+    .addHelpText("after", RUN_ACP_AGENT_HELP_EPILOG)
+    .action(createRunAction());
+
+  // Hidden `agent` command for backward compatibility
+  program
+    .command("agent", { hidden: true })
+    .description("(deprecated) Use 'run' instead")
     .argument("[agent]", "Agent name (e.g., note-taker)")
     .argument("[role]", "Role name (e.g., writer)")
     .option("--acp", "Start in ACP mode for editor integration")
@@ -597,7 +723,6 @@ export function registerRunAgentCommand(program: Command): void {
     .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
     .option("--chapter <name>", "Chapter name (use 'initiate' for full bootstrap flow, ACP mode only)")
     .option("--init-agent <name>", "Agent name override for bootstrap (ACP mode only)")
-    .addHelpText("after", RUN_ACP_AGENT_HELP_EPILOG)
     .action(async (
       positionalAgent: string | undefined,
       positionalRole: string | undefined,
@@ -635,6 +760,13 @@ export function registerRunAgentCommand(program: Command): void {
         await runAgent(process.cwd(), agent, role);
       }
     });
+}
+
+/**
+ * @deprecated Use registerRunCommand instead.
+ */
+export function registerRunAgentCommand(program: Command): void {
+  registerRunCommand(program);
 }
 
 // ── Backward-compat: registerRunAcpAgentCommand ─────────────────────

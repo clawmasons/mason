@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { resolveRole, RoleDiscoveryError, adaptRoleToResolvedAgent } from "@clawmasons/shared";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveAgent } from "../../resolver/resolve.js";
 import { validateAgent } from "../../validator/validate.js";
@@ -6,6 +7,8 @@ import type { ValidationResult } from "../../validator/types.js";
 
 interface ValidateOptions {
   json?: boolean;
+  /** Validate a role definition instead of an agent package */
+  role?: string;
 }
 
 function formatErrors(result: ValidationResult): string {
@@ -31,53 +34,153 @@ function formatErrors(result: ValidationResult): string {
 export function registerValidateCommand(program: Command): void {
   program
     .command("validate")
-    .description("Validate an agent's dependency graph and permissions")
-    .argument("<agent>", "Agent package name to validate")
+    .description("Validate a role definition or agent dependency graph")
+    .argument("[name]", "Role name or agent package name to validate")
+    .option("--role <name>", "Validate a role definition by name")
     .option("--json", "Output validation result as JSON")
-    .action(async (agentName: string, options: ValidateOptions) => {
-      await runValidate(process.cwd(), agentName, options);
+    .action(async (positionalName: string | undefined, options: ValidateOptions) => {
+      const roleName = options.role ?? positionalName;
+      if (!roleName) {
+        console.error("\n  A role or agent name is required.\n  Usage: clawmasons chapter validate <name>\n         clawmasons chapter validate --role <name>\n");
+        process.exit(1);
+        return;
+      }
+
+      // Try role-based validation first
+      await runValidate(process.cwd(), roleName, options);
     });
 }
 
 export async function runValidate(
   rootDir: string,
-  agentName: string,
+  name: string,
   options: ValidateOptions,
 ): Promise<void> {
   try {
-    // Discover packages
+    // First, try to validate as a role
+    const roleResult = await tryValidateRole(rootDir, name);
+    if (roleResult) {
+      if (options.json) {
+        console.log(JSON.stringify(roleResult, null, 2));
+      } else if (roleResult.valid) {
+        console.log(`\nRole "${name}" is valid.\n`);
+        if (roleResult.warnings.length > 0) {
+          for (const w of roleResult.warnings) {
+            console.warn(`  [${w.category}] ${w.message}`);
+          }
+          console.warn("");
+        }
+      } else {
+        console.error(
+          `\nRole "${name}" has ${roleResult.errors.length} validation error(s):${formatErrors(roleResult)}\n`,
+        );
+      }
+      process.exit(roleResult.valid ? 0 : 1);
+      return;
+    }
+
+    // Fall back to agent-based validation
     const packages = discoverPackages(rootDir);
-
-    // Resolve agent graph
-    const agent = resolveAgent(agentName, packages);
-
-    // Validate
+    const agent = resolveAgent(name, packages);
     const result = validateAgent(agent);
 
     if (options.json) {
       console.log(JSON.stringify(result, null, 2));
     } else if (result.valid) {
-      console.log(`\n✔ Agent "${agentName}" is valid.\n`);
+      console.log(`\nAgent "${name}" is valid.\n`);
       if (result.warnings.length > 0) {
         for (const w of result.warnings) {
-          console.warn(`  ⚠ [${w.category}] ${w.message}`);
+          console.warn(`  [${w.category}] ${w.message}`);
         }
         console.warn("");
       }
     } else {
       console.error(
-        `\n✘ Agent "${agentName}" has ${result.errors.length} validation error(s):${formatErrors(result)}\n`,
+        `\nAgent "${name}" has ${result.errors.length} validation error(s):${formatErrors(result)}\n`,
       );
     }
 
     process.exit(result.valid ? 0 : 1);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+
+    // Provide install instructions for package-like references
+    const isPackageRef = name.includes("/") || name.startsWith("@");
+    const installHint = isPackageRef
+      ? `\n  To install: npm install --save-dev ${name}`
+      : "";
+
+    if (error instanceof RoleDiscoveryError || isPackageRef) {
+      if (options.json) {
+        console.log(JSON.stringify({
+          valid: false,
+          errors: [{
+            category: "resolution",
+            message: message + installHint,
+            context: {},
+          }],
+        }, null, 2));
+      } else {
+        console.error(`\nError: ${message}${installHint}\n`);
+      }
+      process.exit(1);
+      return;
+    }
+
     if (options.json) {
       console.log(JSON.stringify({ valid: false, errors: [{ category: "resolution", message, context: {} }] }, null, 2));
     } else {
-      console.error(`\n✘ Validation failed: ${message}\n`);
+      console.error(`\nValidation failed: ${message}\n`);
     }
     process.exit(1);
+  }
+}
+
+/**
+ * Attempt to validate a role definition. Returns a validation result if the
+ * role is found, or null if it's not found as a role (caller should try agent).
+ */
+async function tryValidateRole(
+  rootDir: string,
+  name: string,
+): Promise<ValidationResult | null> {
+  try {
+    const role = await resolveRole(name, rootDir);
+
+    // Validate by doing the adapter round-trip
+    const errors: ValidationResult["errors"] = [];
+    const warnings: ValidationResult["warnings"] = [];
+
+    // Check required fields
+    if (!role.metadata.name) {
+      errors.push({ category: "requirement-coverage", message: "Role name is required", context: {} });
+    }
+    if (!role.metadata.description) {
+      warnings.push({ category: "credential-coverage", message: "Role description is recommended", context: {} });
+    }
+
+    // Try adapter round-trip to detect structural issues
+    try {
+      // Use a default agent type for validation
+      const agentType = role.source.agentDialect ?? "claude-code";
+      adaptRoleToResolvedAgent(role, agentType);
+    } catch (err) {
+      errors.push({
+        category: "app-launch-config",
+        message: `Adapter conversion failed: ${err instanceof Error ? err.message : String(err)}`,
+        context: {},
+      });
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings,
+    };
+  } catch (err) {
+    if (err instanceof RoleDiscoveryError) {
+      return null; // Not found as a role — let caller try agent
+    }
+    throw err;
   }
 }

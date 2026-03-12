@@ -1,7 +1,7 @@
 # Agent Roles — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** In Progress (Changes 1–7 complete)
+**Status:** In Progress (Changes 1–8 complete)
 **Date:** March 2026
 
 ---
@@ -266,7 +266,14 @@ Refactor the CLI to use `clawmasons run <agent-type> --role <name>` as the prima
 
 **Testable output:** CLI parses `run <agent-type> --role <name>` correctly. Startup sequence uses ROLE_TYPES pipeline end-to-end. `chapter list` shows local and packaged roles. Agent package type is removed. Missing packaged role exits with error and install instructions (no auto-install). `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — Branch: `cli-command-refactor`
+
+**Artifacts:**
+- Spec: [openspec/specs/cli-command-refactor/spec.md](../../specs/cli-command-refactor/spec.md)
+- Archive: [openspec/changes/archive/2026-03-12-cli-command-refactor/](../../changes/archive/2026-03-12-cli-command-refactor/)
+  - [proposal.md](../../changes/archive/2026-03-12-cli-command-refactor/proposal.md)
+  - [design.md](../../changes/archive/2026-03-12-cli-command-refactor/design.md)
+  - [tasks.md](../../changes/archive/2026-03-12-cli-command-refactor/tasks.md)
 
 ---
 
