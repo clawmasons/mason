@@ -1,6 +1,6 @@
 # E2E Tests
 
-End-to-end tests for chapter materialization and Docker Compose generation.
+End-to-end tests for role materialization, Docker Compose generation, and the role-based pipeline.
 
 ## Manual Setup & Teardown
 
@@ -27,9 +27,9 @@ To use a custom directory instead of a temp directory:
 E2E_WORKSPACE_DIR=/path/to/workspace npm run setup
 ```
 
-#### Running agents manually
+#### Running roles manually
 
-After `npm run setup`, you can run agents from the built workspace. Pin the workspace to a known path for convenience:
+After `npm run setup`, you can run roles from the built workspace. Pin the workspace to a known path for convenience:
 
 ```bash
 # Build and set up the workspace
@@ -37,31 +37,31 @@ E2E_WORKSPACE_DIR=./tmp/my-test npm run setup
 cd tmp/my-test
 ```
 
-Run the **note-taker** agent with Docker Compose (requires Docker and `OPENROUTER_API_KEY`):
+Run the **note-taker** role with Docker Compose (requires Docker and `OPENROUTER_API_KEY`):
 
 ```bash
 # From the workspace directory
-chapter run-agent test-note-taker writer
+clawmasons run claude --role test-writer
 ```
 
-Run the **mcp-test** agent as an ACP endpoint (no Docker needed):
+Run a role as an ACP endpoint (no Docker needed):
 
 ```bash
 # Start the ACP proxy on port 3001 (proxy on 3000)
-chapter run-acp-agent --role mcp-test
+clawmasons run claude --role mcp-test --acp
 
-# Or specify agent explicitly and custom ports
-chapter run-acp-agent --agent @test/agent-mcp-test --role mcp-test --port 3001 --proxy-port 3000
+# Or specify custom ports
+clawmasons run claude --role mcp-test --acp --port 3001 --proxy-port 3000
 ```
 
 Inspect the built artifacts:
 
 ```bash
-ls docker/                     # Generated Dockerfiles and compose
-cat chapter.lock.json          # Resolved dependency graph
-ls dist/                       # Packed tarballs
-chapter list                   # Show resolved agent tree
-chapter validate               # Validate the workspace
+ls .clawmasons/docker/             # Generated Dockerfiles and compose per role
+cat chapter.lock.json              # Resolved dependency graph
+ls dist/                           # Packed tarballs
+clawmasons chapter list            # Show available roles
+clawmasons chapter validate        # Validate role definitions
 ```
 
 ### Tear down
@@ -80,12 +80,26 @@ npm test
 
 Tests that require Docker or API keys skip gracefully when unavailable.
 
+## Test Suites
+
+| File | Description |
+|------|-------------|
+| `role-workflow.test.ts` | Local role discovery, list, validate, build (ROLE.md pipeline) |
+| `cross-agent-materialization.test.ts` | Claude role parsing, metadata extraction, cross-agent output |
+| `volume-masking.test.ts` | Container ignore paths and volume stacking |
+| `error-paths.test.ts` | Missing roles, malformed ROLE.md, clear error messages |
+| `build-pipeline.test.ts` | Full build pipeline: node_modules, Dockerfiles, MCP connectivity |
+| `build-pi-runtime.test.ts` | Role-based build, lock file, workspace materialization |
+| `docker-proxy.test.ts` | Docker proxy with ACP session metadata |
+| `acp-client-spawn.test.ts` | ACP client bootstrap and spawn |
+| `test-note-taker-mcp.test.ts` | Role-based proxy pipeline for note-taker |
+
 #### Running specific test suites
 
-Run only the pi-runtime build tests (build, Docker, materialization, validation):
+Run only the role workflow tests:
 
 ```bash
-npx vitest run tests/build-pi-runtime.test.ts
+npx vitest run tests/role-workflow.test.ts
 ```
 
 Run only the full build pipeline tests (node_modules, Dockerfiles, MCP connectivity):
@@ -103,6 +117,6 @@ npx vitest run tests/docker-proxy.test.ts
 Run tests matching a name pattern:
 
 ```bash
-npx vitest run -t "note-taker"
+npx vitest run -t "role"
 npx vitest run -t "ACP"
 ```

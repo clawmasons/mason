@@ -1,7 +1,7 @@
 # Agent Roles — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** In Progress (Changes 1–12 complete)
+**Status:** Complete (Changes 1–13 implemented)
 **Date:** March 2026
 
 ---
@@ -428,5 +428,16 @@ Update all user-facing and developer-facing documentation to reflect the role-ce
 
 **Testable output:** All documentation uses current terminology and command syntax. No references to deprecated `agent` package type or `clawmasons agent` command. Quick start examples work as written.
 
-**Not Implemented Yet**
+**Implemented** — Branch: `documentation-updates`
+
+**Artifacts:**
+- Archive: [openspec/changes/archive/2026-03-12-documentation-updates/](../../changes/archive/2026-03-12-documentation-updates/)
+  - [proposal.md](../../changes/archive/2026-03-12-documentation-updates/proposal.md)
+  - [design.md](../../changes/archive/2026-03-12-documentation-updates/design.md)
+  - [tasks.md](../../changes/archive/2026-03-12-documentation-updates/tasks.md)
+
+**Files changed:**
+- Modified: `README.md` — Updated overview, quick start, "How It Works" table, ACP section, command reference
+- Modified: `e2e/README.md` — Updated run examples, added test suite table, role-centric terminology
+- Modified: `DEVELOPMENT.md` — Updated architecture section, package types, programmatic API, added dialect guide
 
