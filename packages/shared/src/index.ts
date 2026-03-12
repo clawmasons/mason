@@ -79,4 +79,7 @@ export {
   PackageReadError,
   adaptRoleToResolvedAgent,
   AdapterError,
+  discoverRoles,
+  resolveRole,
+  RoleDiscoveryError,
 } from "./role/index.js";

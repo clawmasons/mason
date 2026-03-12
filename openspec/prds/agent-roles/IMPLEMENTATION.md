@@ -1,7 +1,7 @@
 # Agent Roles — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** In Progress (Changes 1–4 complete)
+**Status:** In Progress (Changes 1–5 complete)
 **Date:** March 2026
 
 ---
@@ -171,7 +171,14 @@ Find roles from all sources (local ROLE.md files + installed NPM packages), merg
 
 **Testable output:** Discovery finds roles in `.claude/roles/`, `.codex/roles/`, `.aider/roles/`. Package roles from node_modules are included. Local roles shadow same-named package roles. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — Branch: `unified-role-discovery`
+
+**Artifacts:**
+- Spec: [openspec/specs/unified-role-discovery/spec.md](../../specs/unified-role-discovery/spec.md)
+- Archive: [openspec/changes/archive/2026-03-12-unified-role-discovery/](../../changes/archive/2026-03-12-unified-role-discovery/)
+  - [proposal.md](../../changes/archive/2026-03-12-unified-role-discovery/proposal.md)
+  - [design.md](../../changes/archive/2026-03-12-unified-role-discovery/design.md)
+  - [tasks.md](../../changes/archive/2026-03-12-unified-role-discovery/tasks.md)
 
 ---
 
