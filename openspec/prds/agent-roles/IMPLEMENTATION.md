@@ -1,7 +1,7 @@
 # Agent Roles — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** In Progress (Changes 1–2 complete)
+**Status:** In Progress (Changes 1–3 complete)
 **Date:** March 2026
 
 ---
@@ -116,7 +116,14 @@ Load existing NPM role packages (from `node_modules/`) into the same ROLE_TYPES 
 
 **Testable output:** `readPackagedRole` produces valid ROLE_TYPES. Source metadata is `type: 'package'`. Paths resolve correctly from node_modules. Missing ROLE.md in package throws clear error. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — Branch: `read-packaged-role`
+
+**Artifacts:**
+- Spec: [openspec/specs/read-packaged-role/spec.md](../../specs/read-packaged-role/spec.md)
+- Archive: [openspec/changes/archive/2026-03-12-read-packaged-role/](../../changes/archive/2026-03-12-read-packaged-role/)
+  - [proposal.md](../../changes/archive/2026-03-12-read-packaged-role/proposal.md)
+  - [design.md](../../changes/archive/2026-03-12-read-packaged-role/design.md)
+  - [tasks.md](../../changes/archive/2026-03-12-read-packaged-role/tasks.md)
 
 ---
 
