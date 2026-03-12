@@ -5,11 +5,11 @@ description: Secure credential resolution and management for agent sessions
 
 # Credential Service
 
-The **Credential Service** (`@clawmasons/credential-service`) resolves credentials on-demand for agent sessions. It ensures secrets are never exposed through environment variables, Docker inspect, or container filesystems.
+The **Credential Service** (`@clawmasons/credential-service`) resolves credentials on-demand for role sessions. It ensures secrets are never exposed through environment variables, Docker inspect, or container filesystems.
 
 ## How It Works
 
-1. An agent declares the credentials it needs in its `package.json` (`credentials` field)
+1. A role declares the credentials it needs (in `ROLE.md` frontmatter or `package.json`)
 2. At startup, the agent-entry bootstrap requests each credential through the [MCP Proxy](component-mcp-proxy.md)
 3. The proxy relays the request to the credential service via WebSocket
 4. The credential service validates the request and resolves the value
@@ -34,7 +34,7 @@ The first source that provides a value wins.
 ## Access Validation
 
 Before resolving a credential, the service checks:
-- The credential key is declared in the agent's `credentials` array
+- The credential key is declared in the role's `credentials` field
 - The request includes a valid session token
 
 If either check fails, the request is denied and logged.
@@ -54,11 +54,11 @@ Every credential request is logged to the SQLite audit database with:
 
 ## Architecture
 
-The credential service always runs **in-process** on the host machine, within the `clawmasons agent` CLI process. It connects to the MCP proxy via WebSocket to relay credential requests from the agent container.
+The credential service always runs **in-process** on the host machine, within the `clawmasons run` CLI process. It connects to the MCP proxy via WebSocket to relay credential requests from the agent container.
 
 ```
 Host Machine:
-  clawmasons agent CLI process
+  clawmasons run CLI process
     ├─ Credential Service (in-memory SQLite)
     └─ WebSocket client → Proxy /ws/credentials
 
@@ -67,11 +67,11 @@ Docker:
   agent:  → Agent Runtime (requests credentials via proxy)
 ```
 
-In **ACP mode** (`clawmasons agent --acp`), credentials from the editor's session configuration are injected as session overrides, giving them highest resolution priority.
+In **ACP mode** (`clawmasons run <agent-type> --role <name> --acp`), credentials from the editor's session configuration are injected as session overrides, giving them highest resolution priority.
 
 ## Related
 
 - [MCP Proxy](component-mcp-proxy.md) — Relays credential requests from agents
 - [Security](security.md) — Full security model including credential isolation
 - [Architecture](architecture.md) — How the credential service fits in the runtime
-- [Agent](chapter-agent.md) — How agents declare credentials
+- [Role](chapter-role.md) — How roles declare credentials

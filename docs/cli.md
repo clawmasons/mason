@@ -27,34 +27,31 @@ clawmasons init [options]
 | `--lodge-home <path>` | Lodge home directory (overrides `LODGE_HOME` env var) |
 | `--home <path>` | Clawmasons home directory (overrides `CLAWMASONS_HOME` env var) |
 
-### `clawmasons agent`
+### `clawmasons run`
 
-Run a chapter agent interactively, or start an ACP endpoint for editor integration.
+Run a role on the specified agent runtime, either interactively or as an ACP endpoint for editor integration.
 
 ```bash
-clawmasons agent [agent] [role] [options]
+clawmasons run <agent-type> --role <name> [options]
 ```
 
 | Argument | Description |
 |----------|-------------|
-| `[agent]` | Agent slug (e.g., `note-taker`). Required for interactive mode, auto-detected in ACP mode. |
-| `[role]` | Role name (e.g., `writer`). Can also be passed via `--role`. |
+| `<agent-type>` | Agent runtime to use (e.g., `claude`, `codex`, `aider`, `mcp-agent`) |
 
 | Option | Description |
 |--------|-------------|
+| `--role <name>` | **(required)** Role name to run |
 | `--acp` | Start in ACP mode for editor integration (stdio ndjson) |
-| `--role <name>` | Role name (alternative to positional argument) |
-| `--agent <name>` | Agent name (alternative to positional argument, auto-detected in ACP mode) |
 | `--proxy-port <number>` | Internal proxy port (default: `3000`) |
 | `--chapter <name>` | Chapter name (use `initiate` for bootstrap flow, ACP mode) |
-| `--init-agent <name>` | Agent name override for bootstrap (ACP mode) |
 
-In both modes, the MCP proxy runs in a Docker container and the credential service runs in-process on the host.
+**Shorthand**: You can omit `run` — `clawmasons <agent-type> --role <name>` is equivalent.
 
 **Interactive mode** (default):
 
 ```bash
-clawmasons agent note-taker writer
+clawmasons run claude --role writer
 ```
 
 Starts the MCP proxy and agent containers via Docker Compose, then attaches interactively.
@@ -62,7 +59,7 @@ Starts the MCP proxy and agent containers via Docker Compose, then attaches inte
 **ACP mode** (`--acp`):
 
 ```bash
-clawmasons agent --acp --role writer
+clawmasons run claude --role writer --acp
 ```
 
 Starts an ACP-compliant endpoint for editor integration via stdio ndjson.
@@ -75,12 +72,14 @@ Starts an ACP-compliant endpoint for editor integration via stdio ndjson.
     "clawmasons": {
       "command": {
         "path": "clawmasons",
-        "args": ["agent", "--acp", "--role", "writer"]
+        "args": ["run", "claude", "--role", "writer", "--acp"]
       }
     }
   }
 }
 ```
+
+In both modes, the MCP proxy runs in a Docker container and the credential service runs in-process on the host.
 
 ---
 
@@ -103,15 +102,15 @@ clawmasons chapter init --name <lodge>.<chapter> [options]
 
 ### `clawmasons chapter build`
 
-Build chapter workspace: resolve agents, pack packages, and generate Docker artifacts.
+Build chapter workspace: resolve roles, pack packages, and generate Docker artifacts.
 
 ```bash
-clawmasons chapter build [agent] [options]
+clawmasons chapter build [role] [options]
 ```
 
 | Argument | Description |
 |----------|-------------|
-| `[agent]` | Agent package name (auto-detects if only one; builds all if omitted) |
+| `[role]` | Role package name (auto-detects if only one; builds all if omitted) |
 
 | Option | Description |
 |--------|-------------|
@@ -120,7 +119,7 @@ clawmasons chapter build [agent] [options]
 
 ### `clawmasons chapter list`
 
-List agents and their dependency trees.
+List roles and their dependency trees.
 
 ```bash
 clawmasons chapter list [options]
@@ -132,15 +131,15 @@ clawmasons chapter list [options]
 
 ### `clawmasons chapter validate`
 
-Validate an agent's dependency graph and permissions.
+Validate a role's dependency graph and permissions.
 
 ```bash
-clawmasons chapter validate <agent> [options]
+clawmasons chapter validate <role> [options]
 ```
 
 | Argument | Description |
 |----------|-------------|
-| `<agent>` | Agent package name to validate |
+| `<role>` | Role package name to validate |
 
 | Option | Description |
 |--------|-------------|
@@ -148,15 +147,15 @@ clawmasons chapter validate <agent> [options]
 
 ### `clawmasons chapter permissions`
 
-Display the resolved permission matrix and tool filters for an agent.
+Display the resolved permission matrix and tool filters for a role.
 
 ```bash
-clawmasons chapter permissions <agent> [options]
+clawmasons chapter permissions <role> [options]
 ```
 
 | Argument | Description |
 |----------|-------------|
-| `<agent>` | Agent package name |
+| `<role>` | Role package name |
 
 | Option | Description |
 |--------|-------------|
@@ -203,7 +202,6 @@ clawmasons chapter init-role --role <name> [options]
 | Option | Description |
 |--------|-------------|
 | `--role <name>` | **(required)** Role to initialize |
-| `--agent <name>` | Specific agent to include (default: all agents with the role) |
 | `--target-dir <path>` | Override the default role directory location |
 
 ### `clawmasons chapter pack`
@@ -216,7 +214,7 @@ clawmasons chapter pack
 
 ### `clawmasons chapter proxy`
 
-Start the chapter MCP proxy server for an agent.
+Start the chapter MCP proxy server for a role.
 
 ```bash
 clawmasons chapter proxy [options]
@@ -224,10 +222,10 @@ clawmasons chapter proxy [options]
 
 | Option | Description |
 |--------|-------------|
-| `--port <number>` | Port to listen on (default: from agent config or `9090`) |
+| `--port <number>` | Port to listen on (default: from role config or `9090`) |
 | `--startup-timeout <seconds>` | Upstream server startup timeout (default: `60`) |
-| `--agent <name>` | Agent package name (auto-detected if only one) |
-| `--transport <type>` | Transport type: `sse` or `streamable-http` (default: from agent config or `sse`) |
+| `--role <name>` | Role package name (auto-detected if only one) |
+| `--transport <type>` | Transport type: `sse` or `streamable-http` (default: from role config or `sse`) |
 
 ---
 
