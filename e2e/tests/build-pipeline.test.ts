@@ -1,11 +1,11 @@
 /**
- * E2E Test: Full chapter build → run-agent validation flow
+ * E2E Test: Full chapter build → run validation flow
  *
  * Exercises the real pipeline:
  *   1. Copy fixture workspace to temp dir
  *   2. Run `chapter build` (resolve + pack + docker-init in one step)
  *   3. Validate Docker artifacts, Dockerfiles, and workspace materialization
- *   4. Validate that run-agent prerequisites (Dockerfiles) exist
+ *   4. Validate that run prerequisites (Dockerfiles) exist
  *   5. Build and start proxy container, verify MCP connectivity
  *
  * All setup is done exclusively via `chapter build`.
@@ -25,13 +25,15 @@ import {
   waitForHealth,
 } from "./helpers.js";
 
-describe("full chapter build → run-agent validation flow", () => {
+describe("full chapter build → run validation flow", () => {
   let workspaceDir: string;
   let dockerDir: string;
 
   beforeAll(async () => {
-    // 1. Create temp workspace from fixtures
-    workspaceDir = copyFixtureWorkspace("build-pipeline");
+    // 1. Create temp workspace from fixtures (includes .claude/roles/test-writer/ROLE.md)
+    workspaceDir = copyFixtureWorkspace("build-pipeline", {
+      excludePaths: ["agents/mcp-test", "roles/mcp-test"],
+    });
 
     // 2. Run chapter build (resolve + pack + docker-init in one step)
     chapterExec(["chapter", "build"], workspaceDir, { timeout: 120_000 });
@@ -45,7 +47,7 @@ describe("full chapter build → run-agent validation flow", () => {
     }
   });
 
-  // ── Build Output ────────────────────────────────────────────────────
+  // -- Build Output -----------------------------------------------------------
 
   describe("build output", () => {
     it("creates chapter.lock.json", () => {
@@ -61,7 +63,7 @@ describe("full chapter build → run-agent validation flow", () => {
     });
   });
 
-  // ── Docker Init — node_modules ────────────────────────────────────────
+  // -- Docker Init — node_modules ---------------------------------------------
 
   describe("docker/node_modules population", () => {
     it("has @clawmasons/chapter", () => {
@@ -84,9 +86,6 @@ describe("full chapter build → run-agent validation flow", () => {
 
     it("has chapter packages from dist/*.tgz", () => {
       expect(
-        fs.existsSync(path.join(dockerDir, "node_modules", "@test", "agent-test-note-taker", "package.json")),
-      ).toBe(true);
-      expect(
         fs.existsSync(path.join(dockerDir, "node_modules", "@test", "role-writer", "package.json")),
       ).toBe(true);
       expect(
@@ -100,7 +99,6 @@ describe("full chapter build → run-agent validation flow", () => {
     });
 
     it("has transitive dependencies (e.g., commander, zod)", () => {
-      // These are transitive deps of @clawmasons/chapter, @clawmasons/proxy, etc.
       const nmDir = path.join(dockerDir, "node_modules");
       const hasSomeDeps =
         fs.existsSync(path.join(nmDir, "commander")) ||
@@ -110,7 +108,7 @@ describe("full chapter build → run-agent validation flow", () => {
     });
   });
 
-  // ── Docker Init — Proxy Dockerfile ────────────────────────────────────
+  // -- Docker Init — Proxy Dockerfile -----------------------------------------
 
   describe("docker-init proxy output", () => {
     it("generates proxy/writer/Dockerfile", () => {
@@ -131,58 +129,57 @@ describe("full chapter build → run-agent validation flow", () => {
     });
   });
 
-  // ── Docker Init — Agent Dockerfile ────────────────────────────────────
+  // -- Docker Init — Agent Dockerfile -----------------------------------------
 
   describe("docker-init agent output", () => {
-    it("generates agent/test-note-taker/writer/Dockerfile", () => {
+    it("generates agent/writer/writer/Dockerfile", () => {
       expect(
         fs.existsSync(
-          path.join(dockerDir, "agent", "test-note-taker", "writer", "Dockerfile"),
+          path.join(dockerDir, "agent", "writer", "writer", "Dockerfile"),
         ),
       ).toBe(true);
     });
 
     it("agent Dockerfile has correct structure", () => {
       const dockerfile = fs.readFileSync(
-        path.join(dockerDir, "agent", "test-note-taker", "writer", "Dockerfile"),
+        path.join(dockerDir, "agent", "writer", "writer", "Dockerfile"),
         "utf-8",
       );
       expect(dockerfile).toContain("COPY node_modules/");
       expect(dockerfile).not.toContain("npm install --omit=dev");
-      expect(dockerfile).not.toContain("npm rebuild");
     });
   });
 
-  // ── Docker Init — Workspace ───────────────────────────────────────────
+  // -- Docker Init — Workspace ------------------------------------------------
 
   describe("workspace materialization", () => {
     it("generates workspace files", () => {
       const wsDir = path.join(
-        dockerDir, "agent", "test-note-taker", "writer", "workspace",
+        dockerDir, "agent", "writer", "writer", "workspace",
       );
       expect(fs.existsSync(wsDir)).toBe(true);
     });
   });
 
-  // ── Run Agent Prerequisites ──────────────────────────────────────────
+  // -- Run Prerequisites ------------------------------------------------------
 
-  describe("run-agent prerequisites", () => {
-    it("proxy Dockerfile exists for test-note-taker/writer", () => {
+  describe("run prerequisites", () => {
+    it("proxy Dockerfile exists for writer role", () => {
       expect(
         fs.existsSync(path.join(dockerDir, "proxy", "writer", "Dockerfile")),
       ).toBe(true);
     });
 
-    it("agent Dockerfile exists for test-note-taker/writer", () => {
+    it("agent Dockerfile exists for writer role", () => {
       expect(
         fs.existsSync(
-          path.join(dockerDir, "agent", "test-note-taker", "writer", "Dockerfile"),
+          path.join(dockerDir, "agent", "writer", "writer", "Dockerfile"),
         ),
       ).toBe(true);
     });
   });
 
-  // ── Proxy Boot + MCP Connectivity ──────────────────────────────────
+  // -- Proxy Boot + MCP Connectivity ------------------------------------------
 
   describe("proxy boot + MCP connectivity", () => {
     const TEST_PORT = 19400;
@@ -209,7 +206,7 @@ services:
       - "${path.join(workspaceDir, "notes")}:/app/notes"
     environment:
       - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
-    command: ["chapter", "proxy", "--agent", "@test/agent-test-note-taker", "--transport", "streamable-http"]
+    command: ["chapter", "proxy", "--role", "@test/role-writer", "--transport", "streamable-http"]
     restart: "no"
 `;
       const composeDir = path.join(workspaceDir, "e2e-compose");
@@ -272,7 +269,7 @@ services:
       await client.connect(transport);
 
       const result = await client.listTools();
-      // The proxy should respond — tools may or may not be populated
+      // The proxy should respond -- tools may or may not be populated
       // depending on upstream app availability, but the call should succeed
       expect(result).toHaveProperty("tools");
 

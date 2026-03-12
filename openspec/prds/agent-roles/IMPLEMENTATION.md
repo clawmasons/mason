@@ -1,7 +1,7 @@
 # Agent Roles — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** In Progress (Changes 1–10 complete)
+**Status:** In Progress (Changes 1–12 complete)
 **Date:** March 2026
 
 ---
@@ -388,7 +388,25 @@ Update all end-to-end tests to exercise the new role-based pipeline and verify t
 
 **Testable output:** All e2e tests pass. No references to deprecated `agent` command in test code. Coverage includes local roles, packaged roles, cross-agent materialization, volume masking, CLI commands, and error paths. `cd e2e && npx vitest run --config vitest.config.ts` passes.
 
-**Not Implemented Yet**
+**Implemented:** [archived spec](../../changes/archive/2026-03-12-e2e-test-suite-update/)
+
+**Artifacts:**
+- [Proposal](../../changes/archive/2026-03-12-e2e-test-suite-update/proposal.md)
+- [Design](../../changes/archive/2026-03-12-e2e-test-suite-update/design.md)
+- [Tasks](../../changes/archive/2026-03-12-e2e-test-suite-update/tasks.md)
+
+**Files changed:**
+- New: `e2e/fixtures/test-chapter/.claude/roles/test-writer/ROLE.md` — Claude-dialect role fixture
+- New: `e2e/tests/role-workflow.test.ts` — local role discovery, list, validate, build (9 tests)
+- New: `e2e/tests/cross-agent-materialization.test.ts` — Claude role parsing and metadata (8 tests)
+- New: `e2e/tests/volume-masking.test.ts` — container ignore paths (3 tests)
+- New: `e2e/tests/error-paths.test.ts` — missing role, malformed ROLE.md (5 tests)
+- Modified: `e2e/tests/helpers.ts` — added `chapterExecExpectError()`, `.claude` to workspace dirs
+- Modified: `e2e/tests/acp-client-spawn.test.ts` — `"agent"` → `"run"` in spawn args
+- Modified: `e2e/tests/build-pipeline.test.ts` — role-based pipeline, updated Docker paths
+- Modified: `e2e/tests/build-pi-runtime.test.ts` — role-based build, lock file, workspace materialization
+- Modified: `e2e/tests/docker-proxy.test.ts` — role-based proxy, `--role @test/role-writer`
+- Modified: `e2e/tests/test-note-taker-mcp.test.ts` — role-based proxy pipeline
 
 ---
 

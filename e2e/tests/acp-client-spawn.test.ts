@@ -1,11 +1,11 @@
 /**
- * E2E Test: ACP Bootstrap via `clawmasons agent --acp --chapter initiate`
+ * E2E Test: ACP Bootstrap via `clawmasons run --acp --chapter initiate`
  *
  * Tests the full bootstrap flow that an ACP client triggers using the
  * SDK's ClientSideConnection over stdio ndjson — the same protocol path
  * that a real editor would use.
  *
- *   1. Spawn `clawmasons agent --acp --chapter initiate --role chapter-creator`
+ *   1. Spawn `clawmasons run --acp --chapter initiate --role chapter-creator`
  *   2. Verify lodge, chapter, and Docker artifacts are created
  *   3. Verify the ACP handshake via ClientSideConnection.initialize()
  *   4. Send session/new with cwd — triggers agent container start
@@ -152,7 +152,7 @@ describe("ACP initiate bootstrap e2e", () => {
       "node",
       [
         CLAWMASONS_BIN,
-        "agent",
+        "run",
         "--acp",
         "--chapter", "initiate",
         "--role", "chapter-creator",
