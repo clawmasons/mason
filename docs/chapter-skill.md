@@ -46,7 +46,7 @@ The `artifacts` array lists files that are injected into the agent's context at 
 
 How artifacts are delivered depends on the runtime materializer:
 - **Claude Code** — Placed in the `skills/` directory of the agent workspace
-- **Pi-coding-agent** — Included in the agent's context configuration
+- **pi-coding-agent** — Included in the agent's context configuration
 - **MCP Agent** — Available as reference material
 
 ## Use Cases

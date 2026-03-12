@@ -45,7 +45,7 @@ An **agent** is the top-level deployable package in clawmasons. It combines one 
 | Runtime | Description |
 |---------|-------------|
 | `claude-code` | Anthropic's Claude Code agent |
-| `pi-coding-agent` | Multi-provider agent (requires `llm` field) |
+| `pi-coding-agent` | Multi-provider coding agent (requires `llm` field) |
 | `mcp-agent` | Lightweight test runtime (no LLM) |
 
 ### LLM Configuration

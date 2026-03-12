@@ -30,7 +30,7 @@ Every tool call and credential request is logged to a local SQLite database with
 The same agent definition works across multiple runtimes:
 
 - **Claude Code** — Anthropic's coding agent
-- **Pi-coding-agent** — Supports any LLM provider (OpenRouter, Anthropic, OpenAI, Google, Mistral, Groq, xAI, Azure)
+- **pi-coding-agent** — Supports any LLM provider (OpenRouter, Anthropic, OpenAI, Google, Mistral, Groq, xAI, Azure)
 - **MCP Agent** — Lightweight test runtime (no LLM required)
 
 ### npm-Native Packaging
@@ -40,7 +40,6 @@ Everything is a `package.json`. Agents, roles, tasks, skills, and apps are stand
 ### Editor Integration
 
 Run agents in Docker containers for full isolation, or integrate directly with your editor via the Agent Communication Protocol (ACP). Supported editors include Zed, JetBrains, Neovim, and any ACP-compatible client.
-
 
 ## Next Steps
 

@@ -139,9 +139,9 @@ describe("ACP initiate bootstrap e2e", () => {
     } catch { /* best-effort */ }
 
     // Leave CLAWMASONS_HOME for debugging — only clean up session CWD
-    if (sessionCwd && fs.existsSync(sessionCwd)) {
-      fs.rmSync(sessionCwd, { recursive: true, force: true });
-    }
+    //if (sessionCwd && fs.existsSync(sessionCwd)) {
+    //  fs.rmSync(sessionCwd, { recursive: true, force: true });
+    //}
   }, 120_000);
 
   // ── Test 1: Bootstrap and ACP Handshake ────────────────────────────
