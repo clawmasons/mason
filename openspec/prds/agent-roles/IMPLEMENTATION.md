@@ -28,9 +28,12 @@ After:  ROLE.md → ROLE_TYPES → materialize for any agent runtime → run
 | Discovery (Change 5) | Find and merge roles from all sources |
 | Materializer (Change 6) | Accept ROLE_TYPES input via adapter |
 | Docker + Ignore (Change 7) | Role-centric Docker build dirs, volume masking |
-| CLI (Change 8) | `clawmasons <agent-type> --role <name>` |
+| CLI (Change 8) | `clawmasons run <agent-type> --role <name>` |
 | Mason Skill (Change 9) | Scan project, propose ROLE.md |
 | Monorepo Gen (Change 10) | `mason init-repo --role <name>` |
+| Dead Code + Specs (Change 11) | Remove `agent` package type, update all specs |
+| E2E Tests (Change 12) | Update e2e tests for role-based pipeline |
+| Documentation (Change 13) | Update README, e2e README, DEVELOPMENT.md |
 
 ---
 
@@ -171,19 +174,20 @@ Generate role-centric Docker build directories and implement container ignore (v
 
 **PRD refs:** §7.1 (Docker Build Directory), §7.3 (Container Ignore / Volume Masking), §7.4 (MCP Proxy Materialization), §7.5 (Session Directory)
 
-**Summary:** Generate the Docker build directory at `.clawmasons/docker/<role-name>/` with the structure from PRD §7.1: agent subdirectory with Dockerfile + workspace, mcp-proxy subdirectory, and docker-compose.yaml. Implement volume masking for `container.ignore.paths`: directories are masked with named empty volumes, files are masked with read-only bind mounts of a sentinel empty file (`.clawmasons/empty-file`, `chmod 444`). The project tree is mounted read-only. Session directories are created at `.clawmasons/sessions/<session-id>/` with a compose file referencing the role's Docker build dir.
+**Summary:** Generate the Docker build directory at `.clawmasons/docker/<role-name>/` with the structure from PRD §7.1: agent subdirectory with Dockerfile + workspace, mcp-proxy subdirectory, and docker-compose.yaml. Implement volume masking for `container.ignore.paths`: directories are masked with named empty volumes, files are masked with read-only bind mounts of a sentinel empty file (`.clawmasons/empty-file`, `chmod 444`). The project tree is mounted read-only at `/home/mason/workspace/project/`. Volume masking targets only project mount paths — the materialized workspace at `/home/mason/workspace/` is unaffected since it occupies a separate path from the project mount. The proxy Dockerfile uses `node:22-slim` base with all framework packages (`@clawmasons/proxy`, `@clawmasons/shared`, etc.) pre-copied into `docker/node_modules/` by the existing `docker-init` command. The proxy runs as `clawmasons chapter proxy --agent <agentName> --transport streamable-http` and discovers its MCP server configuration from the resolved agent definition at startup (not from a static config file). Tool-level permissions are enforced by the `ToolRouter` using `ToolFilter` rules computed from the role's `apps[].tools.allow` and `apps[].tools.deny` declarations. Session directories are created at `.clawmasons/sessions/<session-id>/` with a self-contained compose file referencing the role's Docker build dir. The session directory must be a fully functional Docker Compose project — users can run `docker compose logs`, `docker compose ps`, `docker compose exec agent sh`, and `docker compose down` directly from the session directory for debugging and operational tasks. All build contexts, volume mounts, and environment variables must be resolvable from the session directory using relative paths.
 
 **Scope:**
 - Modify: Docker generation in `packages/cli/src/materializer/` to use role-centric build directory structure
-- New: volume masking logic — detect directories vs files in ignore list, generate appropriate volume entries
+- New: volume masking logic — detect directories vs files in ignore list, generate appropriate volume entries targeting `/home/mason/workspace/project/` paths only (materialized workspace at `/home/mason/workspace/` remains untouched)
 - New: sentinel file creation (`.clawmasons/empty-file`)
 - New: session directory creation with compose file generation
 - Modify: docker-compose generation to include volume stacking for ignored paths
-- New tests: verify Docker build directory structure, verify volume masking for directories and files, verify sentinel file creation, verify session directory structure
+- Modify: proxy Dockerfile generation to use `@clawmasons/proxy` package from pre-populated `docker/node_modules/` (consistent with existing `docker-init` scaffolding in `packages/cli/src/cli/commands/docker-init.ts`)
+- New tests: verify Docker build directory structure, verify volume masking for directories and files, verify masking only applies to project mount paths, verify sentinel file creation, verify session directory structure, verify session directory is a functional Docker Compose project (all paths resolvable)
 
-**User Story:** As a developer, when I define `container.ignore.paths: ['.clawmasons/', '.claude/', '.env']` in my ROLE.md, the generated docker-compose masks those paths inside the container — directories become empty volumes, files become empty file mounts. My secrets never enter the container.
+**User Story:** As a developer, when I define `container.ignore.paths: ['.clawmasons/', '.claude/', '.env']` in my ROLE.md, the generated docker-compose masks those paths inside the container's project mount at `/home/mason/workspace/project/` — directories become empty volumes, files become empty file mounts. My secrets never enter the container. Meanwhile, the materialized `.claude/` workspace at `/home/mason/workspace/.claude/` (with settings.json, commands, etc.) remains fully accessible to the agent. I can also `cd` into the session directory and run `docker compose logs` or `docker compose exec agent sh` for debugging.
 
-**Testable output:** Docker build directory matches PRD §7.1 structure. Volume masking correctly generates named volumes for directories and bind mounts for files. Sentinel file is created with correct permissions. Session directory is created with valid compose file. `npx tsc --noEmit` compiles. `npx vitest run` passes.
+**Testable output:** Docker build directory matches PRD §7.1 structure. Volume masking correctly generates named volumes for directories and bind mounts for files, targeting project mount paths only. Sentinel file is created with correct permissions. Proxy Dockerfile uses `@clawmasons/proxy` from pre-populated node_modules. Session directory is created with valid, self-contained compose file (all paths resolvable from session dir). `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
 **Not Implemented Yet**
 
@@ -191,25 +195,27 @@ Generate role-centric Docker build directories and implement container ignore (v
 
 ## CHANGE 8: CLI Command Refactor
 
-Refactor the CLI to use `clawmasons <agent-type> --role <name>` as the primary command structure. Remove the `agent` package type.
+Refactor the CLI to use `clawmasons run <agent-type> --role <name>` as the primary command structure. Replace the `agent` command with `run`. Remove the `agent` package type.
 
 **PRD refs:** §8 (Running Roles), §8.1 (Local Role), §8.2 (Packaged Role), §8.3 (Startup Sequence), §9 (CLI Changes), §9.1 (Command Structure), §9.2 (Revised Command Reference), §9.3 (Package Type Changes)
 
-**Summary:** Refactor the CLI so the first argument is an agent type (`claude`, `codex`, `aider`) followed by `--role <name>`. The startup sequence becomes: (1) Load ROLE_TYPES via `resolveRole()` from Change 5. (2) Resolve dependencies. (3) Materialize Docker build directory via `materializeForAgent()` from Change 6. (4) Create session directory. (5) Docker Compose up (proxy). (6) Start credential service. (7) Docker Compose run agent. Remove the `agent` package type — its fields (`runtimes`, `proxy`, `resources`, `credentials`) are now part of the role definition. Update `chapter list` to show roles instead of agents. Add `--acp` flag for ACP server mode.
+**Summary:** Replace the existing `agent` CLI command with a `run` command. The `run` command takes an agent type as a positional argument (`claude`, `codex`, `aider`) followed by `--role <name>`. Additionally, implement shorthand support: if the CLI receives a top-level argument that doesn't match any known command but matches a registered agent type, treat it as `clawmasons run <agent-type> ...` (e.g., `clawmasons claude --role x` → `clawmasons run claude --role x`). The startup sequence becomes: (1) Load ROLE_TYPES via `resolveRole()` from Change 5. (2) Resolve dependencies. (3) Materialize Docker build directory via `materializeForAgent()` from Change 6. (4) Create session directory. (5) Docker Compose up (proxy). (6) Start credential service. (7) Docker Compose run agent. Remove the `agent` package type — its fields (`runtimes`, `proxy`, `resources`, `credentials`) are now part of the role definition. Update `chapter list` to show roles instead of agents. Add `--acp` flag for ACP server mode. When a role reference resolves to an npm package name not found in `node_modules/`, the CLI must exit with a clear error message and install instructions — it must **not** auto-install packages.
 
 **Scope:**
-- Modify: `packages/cli/src/cli/commands/` — refactor agent command to accept `--role` flag
-- Modify: CLI argument parsing to treat first arg as agent type
+- Modify: `packages/cli/src/cli/commands/run-agent.ts` — rename `agent` command to `run`, accept agent type as positional arg and `--role` flag
+- Modify: CLI argument parsing for `clawmasons run <agent-type> --role <name>` and shorthand `clawmasons <agent-type> --role <name>`
+- Add: top-level argument fallback — unknown commands checked against agent type registry before erroring
 - Modify: startup sequence to use ROLE_TYPES pipeline (discover → load → materialize → session → run)
 - Remove: `agent` package type support from schema and resolver
+- Add: clear error message when packaged role not found in node_modules (with install instructions, no auto-install)
 - Modify: `chapter list` to discover and display roles
 - Modify: `chapter build` to materialize Docker dirs for all discovered roles
 - Add: `chapter validate` command for role definition validation
-- New tests: CLI accepts `clawmasons claude --role create-prd`, CLI rejects unknown agent types, `--acp` flag works, `chapter list` shows roles
+- New tests: CLI accepts `clawmasons run claude --role create-prd`, shorthand `clawmasons claude --role create-prd` works equivalently, CLI rejects unknown agent types, `--acp` flag works, `chapter list` shows roles, missing packaged role produces clear error with install instructions
 
-**User Story:** As a developer, I run `clawmasons claude --role create-prd` and the system loads my role, materializes it for Claude Code, and starts the agent session. I no longer need to create agent wrapper packages.
+**User Story:** As a developer, I run `clawmasons run claude --role create-prd` and the system loads my role, materializes it for Claude Code, and starts the agent session. I no longer need to create agent wrapper packages. If I try to run a packaged role I haven't installed, I get a clear error telling me how to install it.
 
-**Testable output:** CLI parses `<agent-type> --role <name>` correctly. Startup sequence uses ROLE_TYPES pipeline end-to-end. `chapter list` shows local and packaged roles. Agent package type is removed. `npx tsc --noEmit` compiles. `npx vitest run` passes.
+**Testable output:** CLI parses `run <agent-type> --role <name>` correctly. Startup sequence uses ROLE_TYPES pipeline end-to-end. `chapter list` shows local and packaged roles. Agent package type is removed. Missing packaged role exits with error and install instructions (no auto-install). `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
 **Not Implemented Yet**
 
@@ -256,3 +262,76 @@ Generate a publishable npm monorepo from a local role definition, enabling distr
 **Testable output:** Generated monorepo matches PRD §11.3 structure. Root package.json has valid workspace config. Each sub-package has valid package.json with correct `chapter.type`. ROLE.md in the generated role package parses correctly. `npm pack --workspaces` succeeds (dry run). `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
 **Not Implemented Yet**
+
+
+---
+
+## CHANGE 11: Dead Code Removal and Spec Cleanup
+
+Remove code, types, and configuration related to the deprecated `agent` package type and update all spec files to reflect the new role-centric architecture.
+
+**PRD refs:** §9.3 (Package Type Changes), §3 (Design Principles — "Roles replace agents as the top-level unit")
+
+**Summary:** With the role-based pipeline fully operational (Changes 1–10), remove all remnants of the old `agent` package type from the codebase. This includes: (1) Remove `agent` from the `chapter.type` enum in package schemas. (2) Remove agent-specific resolver and loader code that is no longer reachable. (3) Remove agent-related CLI scaffolding (e.g., `init-agent` templates, agent-specific validation). (4) Update all `spec.md` files in `openspec/` to reflect the new role-centric terminology — replace references to "agent packages" with "roles", update command examples from `clawmasons agent` to `clawmasons run`, and remove any spec sections describing the deprecated agent workflow. (5) Update README and any developer documentation that references the old agent package type.
+
+**Scope:**
+- Remove: `agent` from `chapter.type` enum in `packages/shared/src/schemas/`
+- Remove: agent package resolver/loader code in `packages/cli/src/` that is no longer used
+- Remove: agent-specific CLI templates and scaffolding
+- Update: all `openspec/**/*.md` spec files — replace agent package references with role references
+- Update: command examples throughout specs from `agent` to `run`
+- New tests: verify `chapter.type = "agent"` is rejected by schema validation, verify no dead imports or references remain
+
+**User Story:** As a developer working on the codebase, I no longer encounter confusing references to the deprecated `agent` package type. All specs, schemas, and code consistently use the role-centric model.
+
+**Testable output:** No references to `chapter.type = "agent"` in schemas or code. All spec files use role-centric terminology. No dead code related to agent packages. `npx tsc --noEmit` compiles. `npx eslint src/ tests/` passes. `npx vitest run` passes.
+
+**Not Implemented Yet**
+
+---
+
+## CHANGE 12: End-to-End Test Suite Update
+
+Update all end-to-end tests to exercise the new role-based pipeline and verify the complete workflow from ROLE.md to running container.
+
+**PRD refs:** §12 (Use Cases — UC-1 through UC-6)
+
+**Summary:** Update the e2e test suite in `e2e/` to cover the new role-based workflow. Tests should exercise: (1) Local role development — create a ROLE.md, run `clawmasons run claude --role <name>`, verify the agent starts with correct configuration. (2) Cross-agent portability — define a role in `.claude/roles/`, materialize for Codex, verify output. (3) Package and share — package a role to npm, install in a test project, run it. (4) Docker containerization — verify Dockerfile generation, volume masking, and session directory structure. (5) CLI commands — `chapter list`, `chapter build`, `chapter validate` with roles. (6) Error paths — missing roles, malformed ROLE.md, missing packaged roles with clear error messages. Remove or update any existing e2e tests that exercise the deprecated `agent` command.
+
+**Scope:**
+- Modify: `e2e/` test files — update all `clawmasons agent` invocations to `clawmasons run`
+- New: e2e tests for local ROLE.md → materialize → run workflow
+- New: e2e tests for cross-agent materialization (Claude role → Codex output)
+- New: e2e tests for volume masking and container ignore
+- New: e2e tests for session directory operability (`docker compose` commands)
+- New: e2e tests for error paths (missing role, malformed ROLE.md, uninstalled package role)
+- Remove: e2e tests that exercise deprecated agent package workflows
+
+**User Story:** As a developer, I run `cd e2e && npx vitest run --config vitest.config.ts` and all tests pass, confirming the complete role-based pipeline works end-to-end — from ROLE.md authoring through Docker materialization to agent startup.
+
+**Testable output:** All e2e tests pass. No references to deprecated `agent` command in test code. Coverage includes local roles, packaged roles, cross-agent materialization, volume masking, CLI commands, and error paths. `cd e2e && npx vitest run --config vitest.config.ts` passes.
+
+**Not Implemented Yet**
+
+---
+
+## CHANGE 13: Documentation Updates
+
+Update all user-facing and developer-facing documentation to reflect the role-centric architecture.
+
+**PRD refs:** All sections (documentation should reflect the complete PRD)
+
+**Summary:** Update the project's documentation to reflect the new role-based workflow: (1) `README.md` — update the project overview, getting started guide, and command examples to use `clawmasons run <agent-type> --role <name>` (and shorthand). Replace "agent" terminology with "role" where referring to the deployable unit. Document the ROLE.md format and local-first workflow. (2) `e2e/README.md` — update test documentation to describe the role-based test scenarios, how to run them, and what they cover. (3) `DEVELOPMENT.md` — update developer setup instructions, architecture overview, and contribution guidelines to reflect the ROLE_TYPES pipeline, dialect registry, and new package structure (no `agent` package type).
+
+**Scope:**
+- Modify: `README.md` — update overview, quick start, command reference, and examples
+- Modify: `e2e/README.md` — update test descriptions and running instructions
+- Modify: `DEVELOPMENT.md` — update architecture docs, package type descriptions, and contributor workflow
+- Verify: all command examples use `clawmasons run` (or shorthand) syntax, no references to deprecated `agent` command
+
+**User Story:** As a new user reading the README, I understand that roles are the primary unit — I create a ROLE.md, run `clawmasons run claude --role <name>`, and I'm up and running. As a contributor reading DEVELOPMENT.md, I understand the ROLE_TYPES pipeline and how to add a new agent dialect.
+
+**Testable output:** All documentation uses current terminology and command syntax. No references to deprecated `agent` package type or `clawmasons agent` command. Quick start examples work as written.
+
+**Not Implemented Yet**
+
