@@ -1,7 +1,7 @@
 # Agent Roles — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** In Progress (Change 1 complete)
+**Status:** In Progress (Changes 1–2 complete)
 **Date:** March 2026
 
 ---
@@ -88,7 +88,14 @@ Also implement the dialect registry: a lookup table mapping `{ directory → dia
 
 **Testable output:** Parser correctly handles Claude, Codex, and Aider dialects. Bundled resources are discovered with correct relative and absolute paths. Malformed YAML is rejected with clear errors. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — Branch: `role-md-parser-dialect-registry`
+
+**Artifacts:**
+- Spec: [openspec/specs/role-md-parser-dialect-registry/spec.md](../../specs/role-md-parser-dialect-registry/spec.md)
+- Archive: [openspec/changes/archive/2026-03-12-role-md-parser-dialect-registry/](../../changes/archive/2026-03-12-role-md-parser-dialect-registry/)
+  - [proposal.md](../../changes/archive/2026-03-12-role-md-parser-dialect-registry/proposal.md)
+  - [design.md](../../changes/archive/2026-03-12-role-md-parser-dialect-registry/design.md)
+  - [tasks.md](../../changes/archive/2026-03-12-role-md-parser-dialect-registry/tasks.md)
 
 ---
 
