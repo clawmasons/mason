@@ -60,3 +60,19 @@ export {
   getAppShortName,
   type ToolFilter,
 } from "./toolfilter.js";
+
+// Role module (dialect registry, parser, resource scanner)
+export {
+  registerDialect,
+  getDialect,
+  getDialectByDirectory,
+  getAllDialects,
+  getKnownDirectories,
+  type DialectEntry,
+  type DialectFieldMapping,
+  readMaterializedRole,
+  parseFrontmatter,
+  detectDialect,
+  RoleParseError,
+  scanBundledResources,
+} from "./role/index.js";
