@@ -1,7 +1,7 @@
 # Agent Roles — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** In Progress (Changes 1–9 complete)
+**Status:** In Progress (Changes 1–10 complete)
 **Date:** March 2026
 
 ---
@@ -324,8 +324,14 @@ Generate a publishable npm monorepo from a local role definition, enabling distr
 
 **Testable output:** Generated monorepo matches PRD §11.3 structure. Root package.json has valid workspace config. Each sub-package has valid package.json with correct `chapter.type`. ROLE.md in the generated role package parses correctly. `npm pack --workspaces` succeeds (dry run). `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — Branch: `monorepo-generation`
 
+**Artifacts:**
+- Spec: [openspec/specs/monorepo-generation/spec.md](../../specs/monorepo-generation/spec.md)
+- Archive: [openspec/changes/archive/2026-03-12-monorepo-generation/](../../changes/archive/2026-03-12-monorepo-generation/)
+  - [proposal.md](../../changes/archive/2026-03-12-monorepo-generation/proposal.md)
+  - [design.md](../../changes/archive/2026-03-12-monorepo-generation/design.md)
+  - [tasks.md](../../changes/archive/2026-03-12-monorepo-generation/tasks.md)
 
 ---
 

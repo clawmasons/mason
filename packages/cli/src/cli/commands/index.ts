@@ -10,6 +10,7 @@ import { registerPermissionsCommand } from "./permissions.js";
 import { registerProxyCommand } from "./proxy.js";
 import { registerRemoveCommand } from "./remove.js";
 import { registerRunCommand, isKnownAgentType } from "./run-agent.js";
+import { registerMasonInitRepoCommand } from "./mason-init-repo.js";
 import { registerValidateCommand } from "./validate.js";
 
 /**
@@ -45,6 +46,14 @@ export function registerCommands(program: Command): void {
   registerAddCommand(chapter);
   registerRemoveCommand(chapter);
   registerProxyCommand(chapter);
+
+  // ── `mason` subcommand group ──────────────────────────────────────────
+
+  const mason = program
+    .command("mason")
+    .description("Mason role management commands");
+
+  registerMasonInitRepoCommand(mason);
 
   // ── Shorthand detection ─────────────────────────────────────────────
   // If the first argument is a known agent type but not a registered command,
