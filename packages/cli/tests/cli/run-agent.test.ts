@@ -29,9 +29,9 @@ describe("CLI run command", () => {
     }
   });
 
-  it("has hidden agent command for backward compatibility", () => {
+  it("does not have a hidden agent command (agent type removed)", () => {
     const cmd = program.commands.find((c) => c.name() === "agent");
-    expect(cmd).toBeDefined();
+    expect(cmd).toBeUndefined();
   });
 
   it("run command has --role option", () => {

@@ -1,7 +1,5 @@
 import type { Command } from "commander";
-import { discoverPackages } from "../../resolver/discover.js";
-import { resolveAgent } from "../../resolver/resolve.js";
-import { computeToolFilters, getAppShortName } from "@clawmasons/shared";
+import { resolveRole, adaptRoleToResolvedAgent, getAppShortName, computeToolFilters } from "@clawmasons/shared";
 
 interface PermissionsOptions {
   json?: boolean;
@@ -15,23 +13,24 @@ interface PermissionsOutput {
 export function registerPermissionsCommand(program: Command): void {
   program
     .command("permissions")
-    .description("Display the resolved permission matrix and toolFilter for an agent")
-    .argument("<agent>", "Agent package name")
+    .description("Display the resolved permission matrix and toolFilter for a role")
+    .argument("<role>", "Role name")
     .option("--json", "Output as JSON")
-    .action(async (agentName: string, options: PermissionsOptions) => {
-      await runPermissions(process.cwd(), agentName, options);
+    .action(async (roleName: string, options: PermissionsOptions) => {
+      await runPermissions(process.cwd(), roleName, options);
     });
 }
 
 export async function runPermissions(
   rootDir: string,
-  agentName: string,
+  roleName: string,
   options: PermissionsOptions,
 ): Promise<void> {
   try {
-    // 1. Discover and resolve
-    const packages = discoverPackages(rootDir);
-    const agent = resolveAgent(agentName, packages);
+    // 1. Resolve role and adapt to ResolvedAgent for compatibility
+    const roleType = await resolveRole(roleName, rootDir);
+    const agentType = roleType.source.agentDialect ?? "claude-code";
+    const agent = adaptRoleToResolvedAgent(roleType, agentType);
 
     // 2. Compute toolFilters
     const toolFilters = computeToolFilters(agent);
@@ -55,7 +54,7 @@ export async function runPermissions(
     }
 
     // 3. Print per-role breakdown
-    console.log(`\nPermissions for agent: ${agentName}\n`);
+    console.log(`\nPermissions for role: ${roleName}\n`);
 
     for (const role of agent.roles) {
       console.log(`  Role: ${getAppShortName(role.name)}`);
@@ -80,7 +79,7 @@ export async function runPermissions(
     console.log("");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`\n✘ Permissions failed: ${message}\n`);
+    console.error(`\n  Permissions failed: ${message}\n`);
     process.exit(1);
   }
 }

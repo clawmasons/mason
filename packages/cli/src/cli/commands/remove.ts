@@ -62,13 +62,6 @@ export function findDependents(
       }
     }
 
-    if (chapter.type === "agent") {
-      // Check roles array
-      if (chapter.roles.includes(targetPkg)) {
-        isDependent = true;
-      }
-    }
-
     if (isDependent) {
       dependents.push(pkg);
     }

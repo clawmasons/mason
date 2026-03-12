@@ -8,8 +8,6 @@ export {
   type TaskChapterField,
   roleChapterFieldSchema,
   type RoleChapterField,
-  agentChapterFieldSchema,
-  type AgentChapterField,
   parseChapterField,
   type ChapterField,
 } from "./schemas/index.js";

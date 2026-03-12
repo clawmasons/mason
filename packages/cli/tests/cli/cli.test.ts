@@ -30,12 +30,9 @@ describe("CLI entry point", () => {
     }
   });
 
-  it("has hidden agent command for backward compatibility", () => {
+  it("does not have a hidden agent command (agent type removed)", () => {
     const agentCmd = program.commands.find((cmd) => cmd.name() === "agent");
-    expect(agentCmd).toBeDefined();
-    if (agentCmd) {
-      expect(agentCmd.description()).toContain("deprecated");
-    }
+    expect(agentCmd).toBeUndefined();
   });
 
   it("does not have a separate top-level acp command (consolidated into run --acp)", () => {

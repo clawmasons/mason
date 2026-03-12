@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { join } from "node:path";
 import { discoverPackages } from "../../resolver/discover.js";
-import { resolveAgent } from "../../resolver/resolve.js";
+import { resolveRolePackage } from "../../resolver/resolve.js";
 import type { ResolvedAgent } from "@clawmasons/shared";
 import { computeToolFilters } from "@clawmasons/shared";
 import {
@@ -23,6 +23,7 @@ interface ProxyOptions {
   port?: string;
   startupTimeout?: string;
   agent?: string;
+  role?: string;
   transport?: string;
 }
 
@@ -31,11 +32,12 @@ interface ProxyOptions {
 export function registerProxyCommand(program: Command): void {
   program
     .command("proxy")
-    .description("Start the chapter MCP proxy server for an agent")
-    .option("--port <number>", "Port to listen on (default: from agent config or 9090)")
+    .description("Start the chapter MCP proxy server for a role")
+    .option("--port <number>", "Port to listen on (default: 9090)")
     .option("--startup-timeout <seconds>", "Upstream server startup timeout in seconds (default: 60)")
-    .option("--agent <name>", "Agent package name (auto-detected if only one agent)")
-    .option("--transport <type>", "Transport type: sse or streamable-http (default: from agent config or sse)")
+    .option("--agent <name>", "Agent package name (for backward compatibility)")
+    .option("--role <name>", "Role package name to proxy for")
+    .option("--transport <type>", "Transport type: sse or streamable-http (default: sse)")
     .action(async (options: ProxyOptions) => {
       await startProxy(process.cwd(), options);
     });
@@ -74,10 +76,21 @@ export async function startProxy(
     console.log("Discovering packages...");
     const packages = discoverPackages(rootDir);
 
-    // ── Step 2: Resolve agent ──────────────────────────────────────────
-    const agentName = resolveAgentName(options.agent, packages);
-    console.log(`Resolving agent "${agentName}"...`);
-    const agent = resolveAgent(agentName, packages);
+    // ── Step 2: Resolve role ───────────────────────────────────────────
+    const roleName = resolveRoleName(options.agent ?? options.role, packages);
+    console.log(`Resolving role "${roleName}"...`);
+    const resolvedRole = resolveRolePackage(roleName, packages);
+
+    // Build a ResolvedAgent wrapper for compatibility with existing proxy infrastructure
+    const agent: ResolvedAgent = {
+      name: roleName,
+      version: resolvedRole.version,
+      agentName: roleName,
+      slug: roleName.replace(/^@[^/]+\//, "").replace(/[^a-z0-9-]/g, "-"),
+      runtimes: ["claude-code"],
+      credentials: [],
+      roles: [resolvedRole],
+    };
 
     // ── Step 3: Compute tool filters ───────────────────────────────────
     const toolFilters = computeToolFilters(agent);
@@ -126,9 +139,8 @@ export async function startProxy(
     // ── Step 9: Start MCP server ───────────────────────────────────────
     const port = options.port
       ? parseInt(options.port, 10)
-      : agent.proxy?.port ?? 9090;
+      : 9090;
     const transport = (options.transport as "sse" | "streamable-http" | undefined)
-      ?? agent.proxy?.type
       ?? "sse";
     const authToken = process.env.CHAPTER_PROXY_TOKEN || undefined;
     const credentialProxyToken = process.env.CREDENTIAL_PROXY_TOKEN || undefined;
@@ -170,7 +182,7 @@ export async function startProxy(
 
     console.log(
       `\nclawmasons proxy ready\n` +
-      `  Agent:     ${agent.name}\n` +
+      `  Role:      ${roleName}\n` +
       `  Port:      ${port}\n` +
       `  Transport: ${transport}\n` +
       `  Tools:     ${toolCount}\n` +
@@ -179,7 +191,7 @@ export async function startProxy(
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`\n✘ Proxy startup failed: ${message}\n`);
+    console.error(`\n  Proxy startup failed: ${message}\n`);
     // Clean up on startup failure
     try { if (upstream) await upstream.shutdown(); } catch { /* best-effort */ }
     try { if (db) db.close(); } catch { /* best-effort */ }
@@ -190,36 +202,38 @@ export async function startProxy(
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /**
- * Resolve the agent name from --agent flag or auto-detect from packages.
+ * Resolve the role name from --role/--agent flag or auto-detect from packages.
  */
-function resolveAgentName(
-  agentFlag: string | undefined,
+function resolveRoleName(
+  roleFlag: string | undefined,
   packages: Map<string, import("@clawmasons/shared").DiscoveredPackage>,
 ): string {
-  if (agentFlag) return agentFlag;
+  if (roleFlag) return roleFlag;
 
-  const agents: string[] = [];
+  const roles: string[] = [];
   for (const [name, pkg] of packages) {
-    if (pkg.chapterField.type === "agent") {
-      agents.push(name);
+    if (pkg.chapterField.type === "role") {
+      roles.push(name);
     }
   }
 
-  if (agents.length === 0) {
+  if (roles.length === 0) {
     throw new Error(
-      "No agent packages found in this workspace. " +
-      "Make sure you're in a chapter workspace root with an agents/ directory.",
+      "No role packages found in this workspace. " +
+      "Use --role <name> to specify a role, or create a ROLE.md in your project.",
     );
   }
 
-  if (agents.length > 1) {
+  if (roles.length > 1) {
     throw new Error(
-      `Multiple agent packages found: ${agents.join(", ")}. ` +
-      "Use --agent <name> to specify which agent to run.",
+      `Multiple role packages found: ${roles.join(", ")}. ` +
+      "Use --role <name> to specify which role to proxy for.",
     );
   }
 
-  return agents[0];
+  // Safe: we checked roles.length === 1 above
+  const [role] = roles;
+  return role as string;
 }
 
 /**

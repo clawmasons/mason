@@ -338,19 +338,6 @@ describe("generateDockerfiles", () => {
       },
     });
 
-    // Agent: note-taker (has both roles)
-    createPackage("@acme.platform", "agent-note-taker", {
-      type: "agent",
-      name: "Note Taker",
-      slug: "note-taker",
-      description: "Note-taking agent",
-      runtimes: ["claude-code"],
-      roles: [
-        "@acme.platform/role-writer",
-        "@acme.platform/role-reviewer",
-      ],
-      proxy: { port: 9090, type: "sse" },
-    });
   }
 
   it("generates proxy Dockerfile for each role", () => {
@@ -362,13 +349,13 @@ describe("generateDockerfiles", () => {
     expect(fs.existsSync(path.join(tmpDir, "proxy", "reviewer", "Dockerfile"))).toBe(true);
   });
 
-  it("generates agent Dockerfile for each agent x role", () => {
+  it("generates agent Dockerfile for each role", () => {
     setupMockNodeModules();
 
     generateDockerfiles(tmpDir);
 
-    expect(fs.existsSync(path.join(tmpDir, "agent", "note-taker", "writer", "Dockerfile"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "agent", "note-taker", "reviewer", "Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "agent", "writer", "writer", "Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "agent", "reviewer", "reviewer", "Dockerfile"))).toBe(true);
   });
 
   it("proxy Dockerfiles contain USER mason", () => {
@@ -393,10 +380,10 @@ describe("generateDockerfiles", () => {
     generateDockerfiles(tmpDir);
 
     const writerDockerfile = fs.readFileSync(
-      path.join(tmpDir, "agent", "note-taker", "writer", "Dockerfile"), "utf-8",
+      path.join(tmpDir, "agent", "writer", "writer", "Dockerfile"), "utf-8",
     );
     const reviewerDockerfile = fs.readFileSync(
-      path.join(tmpDir, "agent", "note-taker", "reviewer", "Dockerfile"), "utf-8",
+      path.join(tmpDir, "agent", "reviewer", "reviewer", "Dockerfile"), "utf-8",
     );
 
     expect(writerDockerfile).toContain("USER mason");
@@ -425,7 +412,7 @@ describe("generateDockerfiles", () => {
     generateDockerfiles(tmpDir);
 
     const dockerfile = fs.readFileSync(
-      path.join(tmpDir, "agent", "note-taker", "writer", "Dockerfile"), "utf-8",
+      path.join(tmpDir, "agent", "writer", "writer", "Dockerfile"), "utf-8",
     );
 
     expect(dockerfile).not.toContain("docker.io");
@@ -434,18 +421,18 @@ describe("generateDockerfiles", () => {
     expect(dockerfile).not.toContain("npm install --omit=dev");
   });
 
-  it("generates materialized workspace for each agent x role", () => {
+  it("generates materialized workspace for each role", () => {
     setupMockNodeModules();
 
     generateDockerfiles(tmpDir);
 
     // Claude-code workspace should have .mcp.json, AGENTS.md, etc.
-    const writerWorkspace = path.join(tmpDir, "agent", "note-taker", "writer", "workspace");
+    const writerWorkspace = path.join(tmpDir, "agent", "writer", "writer", "workspace");
     expect(fs.existsSync(path.join(writerWorkspace, ".mcp.json"))).toBe(true);
     expect(fs.existsSync(path.join(writerWorkspace, "AGENTS.md"))).toBe(true);
     expect(fs.existsSync(path.join(writerWorkspace, ".claude", "settings.json"))).toBe(true);
 
-    const reviewerWorkspace = path.join(tmpDir, "agent", "note-taker", "reviewer", "workspace");
+    const reviewerWorkspace = path.join(tmpDir, "agent", "reviewer", "reviewer", "workspace");
     expect(fs.existsSync(path.join(reviewerWorkspace, ".mcp.json"))).toBe(true);
     expect(fs.existsSync(path.join(reviewerWorkspace, "AGENTS.md"))).toBe(true);
   });
@@ -463,8 +450,8 @@ describe("generateDockerfiles", () => {
     expect(logOutput).toContain("No chapter packages found");
   });
 
-  it("skips Dockerfile generation when no agent packages found", () => {
-    // Only create an app package (no agent)
+  it("skips Dockerfile generation when no role packages found", () => {
+    // Only create an app package (no role)
     createPackage("@acme.platform", "app-github", {
       type: "app",
       transport: "stdio",
@@ -480,7 +467,7 @@ describe("generateDockerfiles", () => {
     expect(fs.existsSync(path.join(tmpDir, "agent"))).toBe(false);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("No agent packages found");
+    expect(logOutput).toContain("No role packages found");
   });
 
   it("logs Dockerfile creation for each proxy and agent file", () => {
@@ -491,8 +478,8 @@ describe("generateDockerfiles", () => {
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("proxy/writer/Dockerfile");
     expect(logOutput).toContain("proxy/reviewer/Dockerfile");
-    expect(logOutput).toContain("agent/note-taker/writer/Dockerfile");
-    expect(logOutput).toContain("agent/note-taker/reviewer/Dockerfile");
+    expect(logOutput).toContain("agent/writer/writer/Dockerfile");
+    expect(logOutput).toContain("agent/reviewer/reviewer/Dockerfile");
   });
 
   it("proxy Dockerfile uses clawmasons proxy entrypoint", () => {
@@ -514,24 +501,14 @@ describe("generateDockerfiles", () => {
     generateDockerfiles(tmpDir);
 
     const dockerfile = fs.readFileSync(
-      path.join(tmpDir, "agent", "note-taker", "writer", "Dockerfile"), "utf-8",
+      path.join(tmpDir, "agent", "writer", "writer", "Dockerfile"), "utf-8",
     );
     // claude-code agent
     expect(dockerfile).toContain('ENTRYPOINT ["claude"]');
   });
 
-  it("handles multiple agents with overlapping roles", () => {
+  it("generates Dockerfiles for all discovered roles", () => {
     setupMockNodeModules();
-
-    // Add a second agent that also has the writer role
-    createPackage("@acme.platform", "agent-researcher", {
-      type: "agent",
-      name: "Researcher",
-      slug: "researcher",
-      description: "Research agent",
-      runtimes: ["claude-code"],
-      roles: ["@acme.platform/role-writer"],
-    });
 
     generateDockerfiles(tmpDir);
 
@@ -539,9 +516,8 @@ describe("generateDockerfiles", () => {
     expect(fs.existsSync(path.join(tmpDir, "proxy", "writer", "Dockerfile"))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, "proxy", "reviewer", "Dockerfile"))).toBe(true);
 
-    // Should have agent Dockerfiles for both agents
-    expect(fs.existsSync(path.join(tmpDir, "agent", "note-taker", "writer", "Dockerfile"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "agent", "note-taker", "reviewer", "Dockerfile"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "agent", "researcher", "writer", "Dockerfile"))).toBe(true);
+    // Should have agent Dockerfiles for each role
+    expect(fs.existsSync(path.join(tmpDir, "agent", "writer", "writer", "Dockerfile"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "agent", "reviewer", "reviewer", "Dockerfile"))).toBe(true);
   });
 });

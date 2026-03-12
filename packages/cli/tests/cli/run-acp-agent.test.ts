@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Command } from "commander";
 import {
   runAcpAgent,
-  resolveAgentName,
   collectEnvCredentials,
   registerRunAcpAgentCommand,
   bootstrapChapter,
@@ -30,7 +29,7 @@ function makeConsoleLogger(): AcpLogger {
 
 // ── Test Fixtures ────────────────────────────────────────────────────
 
-function makeDiscoveredPackage(type: "agent" | "app" | "role"): DiscoveredPackage {
+function makeDiscoveredPackage(type: "app" | "role"): DiscoveredPackage {
   return {
     name: `test-${type}`,
     version: "1.0.0",
@@ -198,7 +197,7 @@ function makeDeps(overrides?: {
   initRoleCalled?: { value: boolean };
 }): RunAcpAgentDeps {
   const packages = overrides?.packages ?? new Map([
-    ["test-agent", makeDiscoveredPackage("agent")],
+    ["test-agent", makeDiscoveredPackage("role")],
   ]);
   const agent = overrides?.agent ?? makeResolvedAgent();
   const mockBridge = overrides?.bridge ?? makeMockBridge().bridge;
@@ -214,7 +213,7 @@ function makeDeps(overrides?: {
 
   return {
     discoverPackagesFn: () => packages,
-    resolveAgentFn: () => agent,
+    resolveAgentFn: async () => agent,
     createBridgeFn: (config: AcpSdkBridgeConfig) => {
       mockBridge._config = config;
       return mockBridge as unknown as AcpSdkBridge;
@@ -276,39 +275,6 @@ function makeBootstrapDeps(overrides?: Partial<BootstrapChapterDeps>): Bootstrap
   };
 }
 
-// ── resolveAgentName ────────────────────────────────────────────────────
-
-describe("resolveAgentName (run-acp-agent)", () => {
-  it("returns agent flag when provided", () => {
-    const packages = new Map<string, DiscoveredPackage>();
-    expect(resolveAgentName("my-agent", packages)).toBe("my-agent");
-  });
-
-  it("auto-detects single agent", () => {
-    const packages = new Map<string, DiscoveredPackage>([
-      ["my-agent", makeDiscoveredPackage("agent")],
-      ["my-app", makeDiscoveredPackage("app")],
-    ]);
-    expect(resolveAgentName(undefined, packages)).toBe("my-agent");
-  });
-
-  it("throws when no agents found", () => {
-    const packages = new Map<string, DiscoveredPackage>([
-      ["my-app", makeDiscoveredPackage("app")],
-    ]);
-    expect(() => resolveAgentName(undefined, packages)).toThrow("No agent packages found");
-  });
-
-  it("throws when multiple agents found without flag", () => {
-    const agent1 = makeDiscoveredPackage("agent");
-    const agent2 = makeDiscoveredPackage("agent");
-    const packages = new Map<string, DiscoveredPackage>([
-      ["agent-1", agent1],
-      ["agent-2", agent2],
-    ]);
-    expect(() => resolveAgentName(undefined, packages)).toThrow("Multiple agent packages");
-  });
-});
 
 // ── runAcpAgent ────────────────────────────────────────────────────────────
 
@@ -327,26 +293,23 @@ describe("runAcpAgent", () => {
     vi.restoreAllMocks();
   });
 
-  it("discovers packages and resolves agent", async () => {
-    let discoveredRoot: string | undefined;
-    let resolvedName: string | undefined;
+  it("resolves agent from role", async () => {
+    let resolvedRole: string | undefined;
+    let resolvedRootDir: string | undefined;
 
     const deps: RunAcpAgentDeps = {
       ...makeDeps(),
-      discoverPackagesFn: (rootDir: string) => {
-        discoveredRoot = rootDir;
-        return new Map([["test-agent", makeDiscoveredPackage("agent")]]);
-      },
-      resolveAgentFn: (name: string) => {
-        resolvedName = name;
+      resolveAgentFn: async (...args) => {
+        resolvedRole = args[0];
+        resolvedRootDir = args[1];
         return makeResolvedAgent();
       },
     };
 
     await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
-    expect(discoveredRoot).toBe("/fake/root");
-    expect(resolvedName).toBe("test-agent");
+    expect(resolvedRole).toBe("test-role");
+    expect(resolvedRootDir).toBe("/fake/root");
   });
 
   it("creates bridge with onSessionNew callback", async () => {
@@ -438,17 +401,15 @@ describe("runAcpAgent", () => {
     expect(sessionConfig?.acpCommand).not.toContain("3002");
   });
 
-  it("exits 1 when no agents found", async () => {
+  it("exits 1 when role resolution fails", async () => {
     const deps: RunAcpAgentDeps = {
       ...makeDeps(),
-      discoverPackagesFn: () => new Map(),
+      resolveAgentFn: async () => { throw new Error("Role not found"); },
     };
 
     await runAcpAgent("/fake/root", { role: "test-role" }, deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
-    const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("No agent packages found");
   });
 
   it("exits 1 when infrastructure fails to start", async () => {
@@ -503,20 +464,20 @@ describe("runAcpAgent", () => {
     expect(logOutput).toContain("infra-session-01");
   });
 
-  it("uses --agent flag for agent name", async () => {
-    let resolvedName: string | undefined;
+  it("uses --agent flag for agent type", async () => {
+    let resolvedAgentType: string | undefined;
 
     const deps: RunAcpAgentDeps = {
       ...makeDeps(),
-      resolveAgentFn: (name: string) => {
-        resolvedName = name;
-        return makeResolvedAgent(name);
+      resolveAgentFn: async (...args) => {
+        resolvedAgentType = args[2];
+        return makeResolvedAgent();
       },
     };
 
     await runAcpAgent("/fake/root", { role: "test-role", agent: "custom-agent" }, deps);
 
-    expect(resolvedName).toBe("custom-agent");
+    expect(resolvedAgentType).toBe("custom-agent");
   });
 
   it("passes proxy port to session config", async () => {
@@ -1000,38 +961,38 @@ describe("runAcpAgent with --chapter", () => {
     expect(runBuildCalled).toBe(true);
   });
 
-  it("uses chapter directory as rootDir for discovery when --chapter initiate", async () => {
-    let discoveredRoot: string | undefined;
+  it("uses chapter directory as rootDir for resolution when --chapter initiate", async () => {
+    let resolvedRootDir: string | undefined;
 
     const deps: RunAcpAgentDeps = {
       ...makeDeps(),
-      discoverPackagesFn: (rootDir: string) => {
-        discoveredRoot = rootDir;
-        return new Map([["test-agent", makeDiscoveredPackage("agent")]]);
+      resolveAgentFn: async (...args) => {
+        resolvedRootDir = args[1];
+        return makeResolvedAgent();
       },
       existsSyncFn: () => false,
     };
 
     await runAcpAgent("/fake/root", { role: "chapter-creator", chapter: "initiate" }, deps);
 
-    expect(discoveredRoot).toBe("/fake/clawmasons-home/testuser/chapters/initiate");
+    expect(resolvedRootDir).toBe("/fake/clawmasons-home/testuser/chapters/initiate");
   });
 
   it("resolves non-initiate chapter to lodge chapters directory", async () => {
-    let discoveredRoot: string | undefined;
+    let resolvedRootDir: string | undefined;
 
     const deps: RunAcpAgentDeps = {
       ...makeDeps(),
-      discoverPackagesFn: (rootDir: string) => {
-        discoveredRoot = rootDir;
-        return new Map([["test-agent", makeDiscoveredPackage("agent")]]);
+      resolveAgentFn: async (...args) => {
+        resolvedRootDir = args[1];
+        return makeResolvedAgent();
       },
       existsSyncFn: () => true, // chapter dir exists
     };
 
     await runAcpAgent("/fake/root", { role: "writer", chapter: "myproject" }, deps);
 
-    expect(discoveredRoot).toBe("/fake/clawmasons-home/testuser/chapters/myproject");
+    expect(resolvedRootDir).toBe("/fake/clawmasons-home/testuser/chapters/myproject");
   });
 
   it("fails when non-initiate chapter directory does not exist", async () => {
@@ -1069,14 +1030,14 @@ describe("runAcpAgent with --chapter", () => {
     expect(initLodgeCalled).toBe(false);
   });
 
-  it("uses --init-agent for agent resolution when specified", async () => {
-    let resolvedName: string | undefined;
+  it("uses default agent type when --init-agent is specified without --agent", async () => {
+    let resolvedAgentType: string | undefined;
 
     const deps: RunAcpAgentDeps = {
       ...makeDeps(),
-      resolveAgentFn: (name: string) => {
-        resolvedName = name;
-        return makeResolvedAgent(name);
+      resolveAgentFn: async (...args) => {
+        resolvedAgentType = args[2];
+        return makeResolvedAgent();
       },
       existsSyncFn: () => false,
     };
@@ -1087,7 +1048,7 @@ describe("runAcpAgent with --chapter", () => {
       initAgent: "custom-init-agent",
     }, deps);
 
-    expect(resolvedName).toBe("custom-init-agent");
+    expect(resolvedAgentType).toBe("claude-code");
   });
 
   it("passes effectiveRootDir to session config when --chapter is used", async () => {

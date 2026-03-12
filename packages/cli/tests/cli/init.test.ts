@@ -433,7 +433,7 @@ describe("chapter init", () => {
       }
     });
 
-    it("generates member package.json that validates against member schema", async () => {
+    it("generates role package.json that validates against role schema", async () => {
       const targetDir = fs.mkdtempSync(
         path.join(os.tmpdir(), "test-chapter-"),
       );
@@ -444,22 +444,18 @@ describe("chapter init", () => {
           { templatesDir, skipNpmInstall: true },
         );
 
-        const memberPkg = JSON.parse(
+        const rolePkg = JSON.parse(
           fs.readFileSync(
-            path.join(targetDir, "agents", "note-taker", "package.json"),
+            path.join(targetDir, "roles", "writer", "package.json"),
             "utf-8",
           ),
         );
 
-        // Verify the chapter field validates against the member schema
-        const result = parseChapterField(memberPkg.chapter);
+        // Verify the chapter field validates against the role schema
+        const result = parseChapterField(rolePkg.chapter);
         expect(result.success).toBe(true);
         if (result.success) {
-          expect(result.data.type).toBe("agent");
-          if (result.data.type === "agent") {
-            expect(result.data.slug).toBe("note-taker");
-            expect(result.data.runtimes).toContain("claude-code");
-          }
+          expect(result.data.type).toBe("role");
         }
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });

@@ -63,11 +63,6 @@ describe("runValidate", () => {
     );
   }
 
-  function writePackage(dir: string, pkg: Record<string, unknown>): void {
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify(pkg, null, 2));
-  }
-
   // ── Role-based validation ──────────────────────────────────────────────
 
   it("validates a local role successfully", async () => {
@@ -109,56 +104,7 @@ describe("runValidate", () => {
     expect(parsed.errors[0].message).toContain("npm install --save-dev @acme/role-create-prd");
   });
 
-  // ── Agent-based validation (backward compat) ──────────────────────────
-
-  it("falls back to agent validation for agent packages", async () => {
-    writePackage(path.join(tmpDir, "apps", "github"), {
-      name: "@test/app-github",
-      version: "1.0.0",
-      chapter: {
-        type: "app",
-        transport: "stdio",
-        command: "npx",
-        args: ["-y", "@modelcontextprotocol/server-github"],
-        tools: ["create_issue", "list_repos"],
-        capabilities: ["tools"],
-      },
-    });
-
-    writePackage(path.join(tmpDir, "roles", "manager"), {
-      name: "@test/role-manager",
-      version: "1.0.0",
-      chapter: {
-        type: "role",
-        permissions: {
-          "@test/app-github": {
-            allow: ["create_issue", "list_repos"],
-            deny: [],
-          },
-        },
-      },
-    });
-
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
-      version: "1.0.0",
-      chapter: {
-        type: "agent",
-        name: "Ops",
-        slug: "ops",
-        runtimes: ["claude-code"],
-        roles: ["@test/role-manager"],
-      },
-    });
-
-    await runValidate(tmpDir, "@test/agent-ops", {});
-
-    expect(exitSpy).toHaveBeenCalledWith(0);
-    const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("valid");
-  });
-
-  it("exits 1 when neither role nor agent is found", async () => {
+  it("exits 1 when role is not found", async () => {
     await runValidate(tmpDir, "nonexistent", {});
 
     expect(exitSpy).toHaveBeenCalledWith(1);

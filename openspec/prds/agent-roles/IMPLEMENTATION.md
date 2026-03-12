@@ -355,7 +355,15 @@ Remove code, types, and configuration related to the deprecated `agent` package 
 
 **Testable output:** No references to `chapter.type = "agent"` in schemas or code. All spec files use role-centric terminology. No dead code related to agent packages. `npx tsc --noEmit` compiles. `npx eslint src/ tests/` passes. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — Branch: `dead-code-removal-spec-cleanup`
+
+**Artifacts:**
+- Archive: [openspec/changes/archive/2026-03-12-dead-code-removal-spec-cleanup/](../../changes/archive/2026-03-12-dead-code-removal-spec-cleanup/)
+  - [proposal.md](../../changes/archive/2026-03-12-dead-code-removal-spec-cleanup/proposal.md)
+  - [design.md](../../changes/archive/2026-03-12-dead-code-removal-spec-cleanup/design.md)
+  - [tasks.md](../../changes/archive/2026-03-12-dead-code-removal-spec-cleanup/tasks.md)
+
+**Note:** Spec file updates (openspec/**/*.md) were deferred — the historical specs retain their original terminology as they document past changes. Code, schemas, tests, and CLI commands are fully updated to role-centric model.
 
 ---
 

@@ -16,11 +16,9 @@ import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import { initRole, type InitRoleOptions, type InitRoleDeps } from "./init-role.js";
 import { resolveRoleMountVolumes, type RoleMount } from "../../generator/mount-volumes.js";
 import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
-import { computeToolFilters } from "@clawmasons/shared";
+import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent } from "@clawmasons/shared";
 import { ACP_RUNTIME_COMMANDS } from "../../materializer/common.js";
 import { getRegisteredAgentTypes } from "../../materializer/role-materializer.js";
-import { discoverPackages } from "../../resolver/discover.js";
-import { resolveAgent } from "../../resolver/resolve.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
 import { CredentialService, CredentialWSClient } from "@clawmasons/credential-service";
@@ -28,6 +26,21 @@ import { initLodge, type LodgeInitOptions, type LodgeInitResult } from "./lodge-
 import { runInit, type InitOptions } from "./init.js";
 import { runBuild } from "./build.js";
 import { createFileLogger, type AcpLogger } from "../../acp/logger.js";
+
+// ── Role-based Agent Resolution ───────────────────────────────────────
+
+/**
+ * Default implementation for resolving a ResolvedAgent from a role name
+ * using the role-based pipeline (ROLE_TYPES → adapter → ResolvedAgent).
+ */
+async function defaultResolveAgentFromRole(
+  roleName: string,
+  rootDir: string,
+  agentType: string,
+): Promise<ResolvedAgent> {
+  const roleType = await resolveRoleByName(roleName, rootDir);
+  return adaptRoleToResolvedAgent(roleType, agentType);
+}
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -347,40 +360,21 @@ export function collectEnvCredentials(
 // ── Agent Name Resolution ─────────────────────────────────────────────
 
 /**
- * Resolve the agent name from --agent flag or auto-detect from discovered packages.
+ * Resolve the agent name from --agent flag.
+ * With the agent package type removed, this function simply validates
+ * that an agent name was provided.
+ *
+ * @deprecated Agent packages are removed. Use role-based resolution instead.
  */
 export function resolveAgentName(
   agentFlag: string | undefined,
-  packages: Map<string, DiscoveredPackage>,
 ): string {
   if (agentFlag) return agentFlag;
 
-  const agents: string[] = [];
-  for (const [name, pkg] of packages) {
-    if (pkg.chapterField.type === "agent") {
-      agents.push(name);
-    }
-  }
-
-  if (agents.length === 0) {
-    throw new Error(
-      "No agent packages found in this workspace. " +
-      "Make sure you're in a chapter workspace root with an agents/ directory.",
-    );
-  }
-
-  if (agents.length > 1) {
-    throw new Error(
-      `Multiple agent packages found: ${agents.join(", ")}. ` +
-      "Use --agent <name> to specify which agent to run.",
-    );
-  }
-
-  const agentName = agents[0];
-  if (!agentName) {
-    throw new Error("Unexpected empty agents array");
-  }
-  return agentName;
+  throw new Error(
+    "An agent name is required. Use --agent <name> to specify which agent to use.\n" +
+    "Note: Agent packages have been replaced by roles. Use 'clawmasons run <agent-type> --role <name>' instead.",
+  );
 }
 
 // ── Chapter Bootstrap ─────────────────────────────────────────────────
@@ -593,8 +587,8 @@ export interface RunAgentDeps {
   ensureGitignoreEntryFn?: (dir: string, pattern: string) => boolean;
   /** Override package discovery (for testing, ACP mode). */
   discoverPackagesFn?: (rootDir: string) => Map<string, DiscoveredPackage>;
-  /** Override agent resolution (for testing, ACP mode). */
-  resolveAgentFn?: (name: string, packages: Map<string, DiscoveredPackage>) => ResolvedAgent;
+  /** Override agent resolution (for testing, ACP mode). Uses role-based resolution. */
+  resolveAgentFn?: (roleName: string, rootDir: string, agentType: string) => Promise<ResolvedAgent>;
   /** Override AcpSession construction (for testing, ACP mode). */
   createSessionFn?: (config: AcpSessionConfig, sessionDeps?: AcpSessionDeps) => AcpSession;
   /** Override AcpSdkBridge construction (for testing, ACP mode). */
@@ -711,55 +705,6 @@ export function registerRunCommand(program: Command): void {
     .addHelpText("after", RUN_ACP_AGENT_HELP_EPILOG)
     .action(createRunAction());
 
-  // Hidden `agent` command for backward compatibility
-  program
-    .command("agent", { hidden: true })
-    .description("(deprecated) Use 'run' instead")
-    .argument("[agent]", "Agent name (e.g., note-taker)")
-    .argument("[role]", "Role name (e.g., writer)")
-    .option("--acp", "Start in ACP mode for editor integration")
-    .option("--role <name>", "Role name (alternative to positional argument)")
-    .option("--agent <name>", "Agent name (alternative to positional argument)")
-    .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
-    .option("--chapter <name>", "Chapter name (use 'initiate' for full bootstrap flow, ACP mode only)")
-    .option("--init-agent <name>", "Agent name override for bootstrap (ACP mode only)")
-    .action(async (
-      positionalAgent: string | undefined,
-      positionalRole: string | undefined,
-      options: {
-        acp?: boolean;
-        agent?: string;
-        role?: string;
-        proxyPort: string;
-        chapter?: string;
-        initAgent?: string;
-      },
-    ) => {
-      // Merge positional and option-based agent/role (positional takes precedence)
-      const agent = positionalAgent ?? options.agent;
-      const role = positionalRole ?? options.role;
-
-      if (options.acp) {
-        // ACP mode requires role
-        if (!role) {
-          console.error("\n  agent --acp requires a role. Use --role <name> or provide it as a positional argument.\n");
-          process.exit(1);
-        }
-        await runAgent(process.cwd(), agent, role, undefined, {
-          acp: true,
-          proxyPort: parseInt(options.proxyPort, 10),
-          chapter: options.chapter,
-          initAgent: options.initAgent,
-        });
-      } else {
-        // Interactive mode requires both agent and role
-        if (!agent || !role) {
-          console.error("\n  Interactive mode requires both agent and role arguments.\n  Usage: clawmasons agent <agent> <role>\n");
-          process.exit(1);
-        }
-        await runAgent(process.cwd(), agent, role);
-      }
-    });
 }
 
 /**
@@ -983,8 +928,7 @@ async function runAgentAcpMode(
   },
   deps?: RunAgentDeps,
 ): Promise<void> {
-  const discover = deps?.discoverPackagesFn ?? discoverPackages;
-  const resolve = deps?.resolveAgentFn ?? resolveAgent;
+  const resolveAgentFromRole = deps?.resolveAgentFn ?? defaultResolveAgentFromRole;
   const createSession = deps?.createSessionFn ?? ((config: AcpSessionConfig, sessionDeps?: AcpSessionDeps) => new AcpSession(config, sessionDeps));
   const createBridge = deps?.createBridgeFn ?? ((config: AcpSdkBridgeConfig) => new AcpSdkBridge(config));
   const getHome = deps?.getClawmasonsHomeFn ?? getClawmasonsHome;
@@ -1112,14 +1056,10 @@ async function runAgentAcpMode(
     // Ensure .clawmasons is in chapter workspace's .gitignore
     ensureGitignore(effectiveRootDir, ".clawmasons");
 
-    // ── Step 2: Discover packages ──────────────────────────────────────
-    logger.log("[clawmasons agent --acp] Discovering packages...");
-    const packages = discover(effectiveRootDir);
-
-    // ── Step 3: Resolve agent ──────────────────────────────────────────
-    const agentName = resolveAgentName(acpOptions?.initAgent ?? agentFlag, packages);
-    logger.log(`[clawmasons agent --acp] Resolving agent "${agentName}"...`);
-    const resolvedAgent = resolve(agentName, packages);
+    // ── Step 2: Resolve agent from role ─────────────────────────────────
+    const effectiveAgentType = agentFlag ?? "claude-code";
+    logger.log(`[clawmasons run --acp] Resolving role "${role}" for agent type "${effectiveAgentType}"...`);
+    const resolvedAgent = await resolveAgentFromRole(role, effectiveRootDir, effectiveAgentType);
 
     // ── Step 4: Compute tool filters ───────────────────────────────────
     const toolFilters = computeToolFilters(resolvedAgent);

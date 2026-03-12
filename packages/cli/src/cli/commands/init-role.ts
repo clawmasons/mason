@@ -1,10 +1,10 @@
 import type { Command } from "commander";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
+import type { DiscoveredPackage, ResolvedAgent, ResolvedRole } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
 import { discoverPackages } from "../../resolver/discover.js";
-import { resolveAgent } from "../../resolver/resolve.js";
+import { resolveRolePackage } from "../../resolver/resolve.js";
 import { readChapterConfig } from "./docker-init.js";
 import {
   getClawmasonsHome,
@@ -28,101 +28,71 @@ export interface InitRoleOptions {
 export interface InitRoleDeps {
   /** Override package discovery (for testing). */
   discoverPackagesFn?: (rootDir: string) => Map<string, DiscoveredPackage>;
-  /** Override agent resolution (for testing). */
-  resolveAgentFn?: (
+  /** Override role resolution (for testing). */
+  resolveRoleFn?: (
     name: string,
     packages: Map<string, DiscoveredPackage>,
-  ) => ResolvedAgent;
+  ) => ResolvedRole;
   /** Override chapter config reading (for testing). */
   readChapterConfigFn?: (rootDir: string) => { chapter: string };
   /** Override CLAWMASONS_HOME resolution (for testing). */
   getClawmasonsHomeFn?: () => string;
 }
 
-// ── Agent Resolution ──────────────────────────────────────────────────
+// ── Role Resolution ──────────────────────────────────────────────────
 
 /**
- * Resolve which agents to include for the given role.
+ * Resolve the role to initialize from discovered packages.
  *
- * If `agentFlag` is provided, validates it exists and has the role.
- * Otherwise, discovers all agents that define the specified role.
- *
- * Returns the resolved agents with their short names.
+ * If `roleName` is provided, validates it exists as a role package.
+ * Returns the resolved role with its short name and a ResolvedAgent wrapper.
  */
-export function resolveAgentsForRole(
+export function resolveRoleForInit(
   roleName: string,
-  agentFlag: string | undefined,
   packages: Map<string, DiscoveredPackage>,
-  resolveAgentFn: (
+  resolveRoleFn: (
     name: string,
     packages: Map<string, DiscoveredPackage>,
-  ) => ResolvedAgent,
-): Array<{ resolved: ResolvedAgent; shortName: string }> {
-  // Collect all agent package names
-  const agentNames: string[] = [];
+  ) => ResolvedRole,
+): { resolved: ResolvedAgent; shortName: string } {
+  // Find the role package
+  const rolePackageNames: string[] = [];
   for (const [name, pkg] of packages) {
-    if (pkg.chapterField.type === "agent") {
-      agentNames.push(name);
+    if (pkg.chapterField.type === "role") {
+      rolePackageNames.push(name);
     }
   }
 
-  if (agentNames.length === 0) {
-    throw new Error(
-      "No agent packages found in this workspace. " +
-        "Make sure you're in a chapter workspace root with an agents/ directory.",
-    );
-  }
-
-  // If --agent is specified, resolve just that one
-  if (agentFlag) {
-    // Find the full package name matching the flag
-    const fullName =
-      agentNames.find((n) => n === agentFlag) ??
-      agentNames.find((n) => getAppShortName(n) === agentFlag);
-
-    if (!fullName) {
-      throw new Error(
-        `Agent "${agentFlag}" not found. Available agents: ${agentNames.join(", ")}`,
-      );
-    }
-
-    const resolved = resolveAgentFn(fullName, packages);
-    const roleShortName = getAppShortName(roleName);
-    const hasRole = resolved.roles.some(
-      (r) => r.name === roleName || getAppShortName(r.name) === roleShortName,
-    );
-
-    if (!hasRole) {
-      throw new Error(
-        `Agent "${fullName}" does not have role "${roleName}".`,
-      );
-    }
-
-    return [{ resolved, shortName: getAppShortName(fullName) }];
-  }
-
-  // Resolve all agents and filter to those with the specified role
+  // Find the matching role
   const roleShortName = getAppShortName(roleName);
-  const matching: Array<{ resolved: ResolvedAgent; shortName: string }> = [];
+  const fullName =
+    rolePackageNames.find((n) => n === roleName) ??
+    rolePackageNames.find((n) => getAppShortName(n) === roleShortName);
 
-  for (const name of agentNames) {
-    const resolved = resolveAgentFn(name, packages);
-    const hasRole = resolved.roles.some(
-      (r) => r.name === roleName || getAppShortName(r.name) === roleShortName,
-    );
-
-    if (hasRole) {
-      matching.push({ resolved, shortName: getAppShortName(name) });
-    }
-  }
-
-  if (matching.length === 0) {
+  if (!fullName) {
+    const available = rolePackageNames.length > 0
+      ? `Available roles: ${rolePackageNames.join(", ")}`
+      : "No role packages found in this workspace.";
     throw new Error(
-      `Role "${roleName}" not found in any agent. Available agents: ${agentNames.join(", ")}`,
+      `Role "${roleName}" not found. ${available}`,
     );
   }
 
-  return matching;
+  const resolved = resolveRoleFn(fullName, packages);
+  const shortName = getAppShortName(fullName);
+
+  // Build a ResolvedAgent wrapper for compatibility
+  const agent: ResolvedAgent = {
+    name: fullName,
+    version: resolved.version,
+    agentName: shortName,
+    slug: shortName,
+    runtimes: ["claude-code"],
+    credentials: [],
+    roles: [resolved],
+  };
+
+  return { resolved: agent, shortName };
 }
 
 // ── Compose Generation ────────────────────────────────────────────────
@@ -217,7 +187,7 @@ export function registerInitRoleCommand(program: Command): void {
     .requiredOption("--role <name>", "Role to initialize")
     .option(
       "--agent <name>",
-      "Specific agent to include (default: all agents with the role)",
+      "Specific agent type to include (for backward compatibility)",
     )
     .option(
       "--target-dir <path>",
@@ -242,7 +212,7 @@ export async function initRole(
   deps?: InitRoleDeps,
 ): Promise<void> {
   const discover = deps?.discoverPackagesFn ?? discoverPackages;
-  const resolve = deps?.resolveAgentFn ?? resolveAgent;
+  const resolve = deps?.resolveRoleFn ?? resolveRolePackage;
   const readConfig = deps?.readChapterConfigFn ?? readChapterConfig;
   const getHome = deps?.getClawmasonsHomeFn ?? getClawmasonsHome;
 
@@ -264,19 +234,17 @@ export async function initRole(
     const home = getHome();
     ensureClawmasonsHome(home);
 
-    // 3. Discover packages and resolve agents for the role
+    // 3. Discover packages and resolve the role
     const packages = discover(rootDir);
     const roleShortName = getAppShortName(options.role);
-    const agentsForRole = resolveAgentsForRole(
+    const { resolved: agentWrapper, shortName } = resolveRoleForInit(
       options.role,
-      options.agent,
       packages,
       resolve,
     );
 
-    const agentShortNames = agentsForRole.map((a) => a.shortName);
     console.log(`  Role: ${roleShortName}`);
-    console.log(`  Agents: ${agentShortNames.join(", ")}`);
+    console.log(`  Agent: ${shortName}`);
 
     // 4. Determine role directory
     const defaultRoleDir = path.join(home, lodge, chapter, roleShortName);
@@ -309,10 +277,10 @@ export async function initRole(
     // 8. Generate docker-compose.yaml
     const composeContent = generateInitRoleComposeYml({
       dockerBuildPath,
-      agents: agentsForRole.map((a) => ({
-        name: a.resolved.name,
-        shortName: a.shortName,
-      })),
+      agents: [{
+        name: agentWrapper.name,
+        shortName,
+      }],
       role: options.role,
       roleShortName,
     });
@@ -329,7 +297,7 @@ export async function initRole(
       dockerBuild: dockerBuildPath,
       roleDir,
       ...(options.targetDir ? { targetDir: path.resolve(options.targetDir) } : {}),
-      agents: agentShortNames,
+      agents: [shortName],
       createdAt: now,
       updatedAt: now,
     };

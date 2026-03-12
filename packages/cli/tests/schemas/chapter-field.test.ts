@@ -56,16 +56,15 @@ describe("parseChapterField", () => {
     }
   });
 
-  it("parses a member by type discrimination", () => {
+  it("rejects deprecated agent type", () => {
     const result = parseChapterField({
-      type: "agent",      name: "Note Taker",
-      slug: "note-taker",      runtimes: ["claude-code"],
+      type: "agent",
+      name: "Note Taker",
+      slug: "note-taker",
+      runtimes: ["claude-code"],
       roles: ["@clawmasons/role-issue-manager"],
     });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.type).toBe("agent");
-    }
+    expect(result.success).toBe(false);
   });
 
   it("fails on unknown type", () => {

@@ -94,14 +94,8 @@ describe("discoverPackages", () => {
         version: "1.0.0",
         chapter: { type: "role", permissions: { "@clawmasons/app-github": { allow: ["t"], deny: [] } } },
       });
-      writePackageJson("agents/ops", {
-        name: "@clawmasons/agent-ops",
-        version: "1.0.0",
-        chapter: { type: "agent", name: "Ops", slug: "ops", runtimes: ["claude-code"], roles: ["@clawmasons/role-manager"] },
-      });
-
       const result = discoverPackages(tmpDir);
-      expect(result.size).toBe(5);
+      expect(result.size).toBe(4);
     });
 
     it("skips directories without package.json", () => {

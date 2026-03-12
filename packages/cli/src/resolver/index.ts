@@ -15,4 +15,4 @@ export {
 } from "./errors.js";
 
 export { discoverPackages } from "./discover.js";
-export { resolveAgent } from "./resolve.js";
+export { resolveRolePackage } from "./resolve.js";

@@ -8,7 +8,7 @@ vi.mock("../../src/resolver/discover.js", () => ({
 }));
 
 vi.mock("../../src/resolver/resolve.js", () => ({
-  resolveAgent: vi.fn(),
+  resolveRolePackage: vi.fn(),
 }));
 
 vi.mock("@clawmasons/shared", async () => {
@@ -90,62 +90,49 @@ describe("chapter proxy command", () => {
 
 import { startProxy } from "../../src/cli/commands/proxy.js";
 import { discoverPackages } from "../../src/resolver/discover.js";
-import { resolveAgent } from "../../src/resolver/resolve.js";
+import { resolveRolePackage } from "../../src/resolver/resolve.js";
 import { computeToolFilters } from "@clawmasons/shared";
 import { UpstreamManager, ChapterProxyServer } from "@clawmasons/proxy";
-import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
+import type { DiscoveredPackage, ResolvedRole } from "@clawmasons/shared";
 
-function makeMember(name: string): ResolvedAgent {
+function makeResolvedRole(name: string): ResolvedRole {
   return {
     name,
     version: "1.0.0",
-        agentName: name.split("/").pop()?.replace("member-", "") ?? name,
-    slug: name.split("/").pop()?.replace("member-", "") ?? name,
-    runtimes: ["claude-code"],
-    credentials: [],
-    roles: [
+    risk: "LOW" as const,
+    permissions: {
+      "@test/app-github": { allow: ["create_pr"], deny: [] },
+    },
+    tasks: [],
+    apps: [
       {
-        name: "@test/role-dev",
+        name: "@test/app-github",
         version: "1.0.0",
-        risk: "LOW" as const,
-        permissions: {
-          "@test/app-github": { allow: ["create_pr"], deny: [] },
-        },
-        tasks: [],
-        apps: [
-          {
-            name: "@test/app-github",
-            version: "1.0.0",
-            transport: "stdio" as const,
-            command: "node",
-            args: ["server.js"],
-            env: { GITHUB_TOKEN: "${GITHUB_TOKEN}" },
-            tools: ["create_pr"],
-            capabilities: ["github"],
-            credentials: [],
-          },
-        ],
-        skills: [],
+        transport: "stdio" as const,
+        command: "node",
+        args: ["server.js"],
+        env: { GITHUB_TOKEN: "${GITHUB_TOKEN}" },
+        tools: ["create_pr"],
+        capabilities: ["github"],
+        credentials: [],
       },
     ],
-    proxy: { port: 9090, type: "sse" },
+    skills: [],
   };
 }
 
-function makePackages(agentName: string): Map<string, DiscoveredPackage> {
+function makeRolePackages(roleName: string): Map<string, DiscoveredPackage> {
   const map = new Map<string, DiscoveredPackage>();
-  map.set(agentName, {
-    name: agentName,
+  map.set(roleName, {
+    name: roleName,
     version: "1.0.0",
     packagePath: "/fake/path",
     chapterField: {
-      type: "agent",
-            name: "Test Member",
-      slug: "test",
-      runtimes: ["claude-code"],
-      roles: ["@test/role-dev"],
-      credentials: [],
-      resources: [],
+      type: "role",
+      risk: "LOW",
+      permissions: {
+        "@test/app-github": { allow: ["create_pr"], deny: [] },
+      },
     },
   });
   return map;
@@ -164,7 +151,7 @@ describe("startProxy", () => {
     process.exit = originalExit;
   });
 
-  it("fails with no members found", async () => {
+  it("fails with no role packages found", async () => {
     vi.mocked(discoverPackages).mockReturnValue(new Map());
 
     await startProxy("/fake/root", {});
@@ -172,19 +159,19 @@ describe("startProxy", () => {
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 
-  it("fails with multiple members and no --agent flag", async () => {
+  it("fails with multiple role packages and no --role flag", async () => {
     const packages = new Map<string, DiscoveredPackage>();
-    packages.set("@test/agent-a", {
-      name: "@test/agent-a",
+    packages.set("@test/role-a", {
+      name: "@test/role-a",
       version: "1.0.0",
       packagePath: "/fake/a",
-      chapterField: { type: "agent", name: "A", slug: "a", runtimes: ["claude-code"], roles: ["@test/role"], credentials: [], resources: [] },
+      chapterField: { type: "role", risk: "LOW", permissions: {} },
     });
-    packages.set("@test/agent-b", {
-      name: "@test/agent-b",
+    packages.set("@test/role-b", {
+      name: "@test/role-b",
       version: "1.0.0",
       packagePath: "/fake/b",
-      chapterField: { type: "agent", name: "B", slug: "b", runtimes: ["claude-code"], roles: ["@test/role"], credentials: [], resources: [] },
+      chapterField: { type: "role", risk: "LOW", permissions: {} },
     });
     vi.mocked(discoverPackages).mockReturnValue(packages);
 
@@ -193,36 +180,36 @@ describe("startProxy", () => {
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 
-  it("auto-detects single member", async () => {
-    const agentName = "@test/agent-note-taker";
-    vi.mocked(discoverPackages).mockReturnValue(makePackages(agentName));
-    vi.mocked(resolveAgent).mockReturnValue(makeMember(agentName));
+  it("auto-detects single role package", async () => {
+    const roleName = "@test/role-dev";
+    vi.mocked(discoverPackages).mockReturnValue(makeRolePackages(roleName));
+    vi.mocked(resolveRolePackage).mockReturnValue(makeResolvedRole(roleName));
     vi.mocked(computeToolFilters).mockReturnValue(new Map());
 
     await startProxy("/fake/root", {});
 
-    expect(resolveAgent).toHaveBeenCalledWith(agentName, expect.any(Map));
+    expect(resolveRolePackage).toHaveBeenCalledWith(roleName, expect.any(Map));
     expect(ChapterProxyServer).toHaveBeenCalled();
   });
 
-  it("uses --agent flag to select member", async () => {
-    const agentName = "@test/agent-specific";
-    vi.mocked(discoverPackages).mockReturnValue(makePackages(agentName));
-    vi.mocked(resolveAgent).mockReturnValue(makeMember(agentName));
+  it("uses --role flag to select role", async () => {
+    const roleName = "@test/role-specific";
+    vi.mocked(discoverPackages).mockReturnValue(makeRolePackages(roleName));
+    vi.mocked(resolveRolePackage).mockReturnValue(makeResolvedRole(roleName));
     vi.mocked(computeToolFilters).mockReturnValue(new Map());
 
-    await startProxy("/fake/root", { agent: agentName });
+    await startProxy("/fake/root", { role: roleName });
 
-    expect(resolveAgent).toHaveBeenCalledWith(agentName, expect.any(Map));
+    expect(resolveRolePackage).toHaveBeenCalledWith(roleName, expect.any(Map));
   });
 
   it("passes --port to server config", async () => {
-    const agentName = "@test/agent-port";
-    vi.mocked(discoverPackages).mockReturnValue(makePackages(agentName));
-    vi.mocked(resolveAgent).mockReturnValue(makeMember(agentName));
+    const roleName = "@test/role-port";
+    vi.mocked(discoverPackages).mockReturnValue(makeRolePackages(roleName));
+    vi.mocked(resolveRolePackage).mockReturnValue(makeResolvedRole(roleName));
     vi.mocked(computeToolFilters).mockReturnValue(new Map());
 
-    await startProxy("/fake/root", { agent: agentName, port: "8080" });
+    await startProxy("/fake/root", { role: roleName, port: "8080" });
 
     expect(ChapterProxyServer).toHaveBeenCalledWith(
       expect.objectContaining({ port: 8080 }),
@@ -230,24 +217,24 @@ describe("startProxy", () => {
   });
 
   it("passes --startup-timeout to upstream initialize", async () => {
-    const agentName = "@test/agent-timeout";
-    vi.mocked(discoverPackages).mockReturnValue(makePackages(agentName));
-    vi.mocked(resolveAgent).mockReturnValue(makeMember(agentName));
+    const roleName = "@test/role-timeout";
+    vi.mocked(discoverPackages).mockReturnValue(makeRolePackages(roleName));
+    vi.mocked(resolveRolePackage).mockReturnValue(makeResolvedRole(roleName));
     vi.mocked(computeToolFilters).mockReturnValue(new Map());
 
-    await startProxy("/fake/root", { agent: agentName, startupTimeout: "30" });
+    await startProxy("/fake/root", { role: roleName, startupTimeout: "30" });
 
     const mockUpstreamInstance = vi.mocked(UpstreamManager).mock.results[0]?.value;
     expect(mockUpstreamInstance.initialize).toHaveBeenCalledWith(30000);
   });
 
   it("creates upstream configs with resolved env vars", async () => {
-    const agentName = "@test/agent-env";
-    vi.mocked(discoverPackages).mockReturnValue(makePackages(agentName));
-    vi.mocked(resolveAgent).mockReturnValue(makeMember(agentName));
+    const roleName = "@test/role-env";
+    vi.mocked(discoverPackages).mockReturnValue(makeRolePackages(roleName));
+    vi.mocked(resolveRolePackage).mockReturnValue(makeResolvedRole(roleName));
     vi.mocked(computeToolFilters).mockReturnValue(new Map());
 
-    await startProxy("/fake/root", { agent: agentName });
+    await startProxy("/fake/root", { role: roleName });
 
     expect(UpstreamManager).toHaveBeenCalledWith(
       expect.arrayContaining([
@@ -260,15 +247,15 @@ describe("startProxy", () => {
   });
 
   it("collects approval patterns from roles", async () => {
-    const agentName = "@test/agent-approval";
-    const member = makeMember(agentName);
-    member.roles[0].constraints = { requireApprovalFor: ["github_delete_*"] };
+    const roleName = "@test/role-approval";
+    const resolved = makeResolvedRole(roleName);
+    resolved.constraints = { requireApprovalFor: ["github_delete_*"] };
 
-    vi.mocked(discoverPackages).mockReturnValue(makePackages(agentName));
-    vi.mocked(resolveAgent).mockReturnValue(member);
+    vi.mocked(discoverPackages).mockReturnValue(makeRolePackages(roleName));
+    vi.mocked(resolveRolePackage).mockReturnValue(resolved);
     vi.mocked(computeToolFilters).mockReturnValue(new Map());
 
-    await startProxy("/fake/root", { agent: agentName });
+    await startProxy("/fake/root", { role: roleName });
 
     expect(ChapterProxyServer).toHaveBeenCalledWith(
       expect.objectContaining({
