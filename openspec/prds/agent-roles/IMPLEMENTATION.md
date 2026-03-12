@@ -1,7 +1,7 @@
 # Agent Roles — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** In Progress (Changes 1–6 complete)
+**Status:** In Progress (Changes 1–7 complete)
 **Date:** March 2026
 
 ---
@@ -27,7 +27,7 @@ After:  ROLE.md → ROLE_TYPES → materialize for any agent runtime → run
 | Adapter (Change 4) | Bridge ROLE_TYPES to existing ResolvedAgent materializers |
 | Discovery (Change 5) | Find and merge roles from all sources |
 | Materializer (Change 6) | Accept ROLE_TYPES input via adapter |
-| Docker + Ignore (Change 7) | Role-centric Docker build dirs, volume masking |
+| Docker + Ignore (Change 7) | Role-centric Docker build dirs, volume masking (**done**) |
 | CLI (Change 8) | `clawmasons run <agent-type> --role <name>` |
 | Mason Skill (Change 9) | Scan project, propose ROLE.md |
 | Monorepo Gen (Change 10) | `mason init-repo --role <name>` |
@@ -231,7 +231,14 @@ Generate role-centric Docker build directories and implement container ignore (v
 
 **Testable output:** Docker build directory matches PRD §7.1 structure. Volume masking correctly generates named volumes for directories and bind mounts for files, targeting project mount paths only. Sentinel file is created with correct permissions. Proxy Dockerfile uses `@clawmasons/proxy` from pre-populated node_modules. Session directory is created with valid, self-contained compose file (all paths resolvable from session dir). `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — Branch: `docker-generation-container-ignore`
+
+**Artifacts:**
+- Spec: [openspec/specs/docker-generation-container-ignore/spec.md](../../specs/docker-generation-container-ignore/spec.md)
+- Archive: [openspec/changes/archive/2026-03-12-docker-generation-container-ignore/](../../changes/archive/2026-03-12-docker-generation-container-ignore/)
+  - [proposal.md](../../changes/archive/2026-03-12-docker-generation-container-ignore/proposal.md)
+  - [design.md](../../changes/archive/2026-03-12-docker-generation-container-ignore/design.md)
+  - [tasks.md](../../changes/archive/2026-03-12-docker-generation-container-ignore/tasks.md)
 
 ---
 

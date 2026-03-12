@@ -13,3 +13,19 @@ export type {
   MaterializationResult,
   MaterializeOptions,
 } from "./types.js";
+export {
+  generateVolumeMasks,
+  sanitizeVolumeName,
+  ensureSentinelFile,
+  generateRoleDockerBuildDir,
+  generateSessionComposeYml,
+  createSessionDirectory,
+} from "./docker-generator.js";
+export type {
+  VolumeMaskEntry,
+  GenerateBuildDirOptions,
+  BuildDirResult,
+  SessionComposeOptions,
+  CreateSessionOptions,
+  SessionResult,
+} from "./docker-generator.js";
