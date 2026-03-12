@@ -43,3 +43,33 @@ The `ComposeServiceDef` type SHALL include fields for a docker-compose service: 
 - **WHEN** `generateComposeService()` is called
 - **THEN** the result SHALL include `build`, `volumes`, `working_dir`, `depends_on`, and `networks` at minimum
 
+### Requirement: materializeForAgent accepts RoleType input
+
+The system SHALL provide a `materializeForAgent(role: RoleType, agentType: string, proxyEndpoint?: string, proxyToken?: string, options?: MaterializeOptions): MaterializationResult` function that accepts a `RoleType` from the ROLE_TYPES pipeline and produces workspace files for the specified agent runtime.
+
+#### Scenario: RoleType is converted to ResolvedAgent via adapter
+- **WHEN** `materializeForAgent()` is called with a valid `RoleType` and registered `agentType`
+- **THEN** it SHALL internally call `adaptRoleToResolvedAgent()` and delegate to the registered `RuntimeMaterializer`
+
+#### Scenario: Default proxy endpoint
+- **WHEN** `materializeForAgent()` is called without a `proxyEndpoint`
+- **THEN** it SHALL default to `"http://mcp-proxy:9090"`
+
+#### Scenario: Unknown agent type throws MaterializerError
+- **WHEN** `materializeForAgent()` is called with an unregistered `agentType`
+- **THEN** it SHALL throw a `MaterializerError` listing the registered agent types
+
+#### Scenario: Output equivalence between old and new pipeline
+- **WHEN** a `RoleType` and its equivalent `ResolvedAgent` are materialized for the same agent type
+- **THEN** the output `MaterializationResult` SHALL be identical
+
+### Requirement: Materializer registry provides agent type lookup
+
+The system SHALL maintain a materializer registry mapping agent type strings to `RuntimeMaterializer` instances, with the following public functions:
+- `getMaterializer(agentType: string): RuntimeMaterializer | undefined` — look up by agent type
+- `getRegisteredAgentTypes(): string[]` — list all registered agent types
+
+#### Scenario: Registry contains built-in materializers
+- **WHEN** `getRegisteredAgentTypes()` is called
+- **THEN** it SHALL return `["claude-code", "pi-coding-agent", "mcp-agent"]`
+

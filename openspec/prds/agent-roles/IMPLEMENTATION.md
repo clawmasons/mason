@@ -1,7 +1,7 @@
 # Agent Roles — Implementation Plan
 
 **PRD:** [PRD.md](./PRD.md)
-**Status:** In Progress (Changes 1–5 complete)
+**Status:** In Progress (Changes 1–6 complete)
 **Date:** March 2026
 
 ---
@@ -199,7 +199,14 @@ Modify existing agent materializers to accept `RoleType` input (via the adapter 
 
 **Testable output:** `materializeForAgent` produces correct Docker workspace from ROLE_TYPES input. Cross-agent materialization works (Claude role → Codex output). Output matches what the old pipeline produces for equivalent input. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
-**Not Implemented Yet**
+**Implemented** — Branch: `materializer-accept-roletype`
+
+**Artifacts:**
+- Spec: [openspec/specs/materializer-interface/spec.md](../../specs/materializer-interface/spec.md)
+- Archive: [openspec/changes/archive/2026-03-12-materializer-accept-roletype/](../../changes/archive/2026-03-12-materializer-accept-roletype/)
+  - [proposal.md](../../changes/archive/2026-03-12-materializer-accept-roletype/proposal.md)
+  - [design.md](../../changes/archive/2026-03-12-materializer-accept-roletype/design.md)
+  - [tasks.md](../../changes/archive/2026-03-12-materializer-accept-roletype/tasks.md)
 
 ---
 
