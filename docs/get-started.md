@@ -117,6 +117,7 @@ All tool calls and credential accesses were logged for audit.
 ## Next Steps
 
 - [Core Concepts](concepts.md) — Understand lodges, chapters, roles, agents, tasks, skills, and apps
+- [Initialization](initialization.md) — How directories and metadata are set up
 - [CLI Reference](cli.md) — Full command reference
 - [Architecture](architecture.md) — Runtime architecture with sequence diagrams
 - [Security Model](security.md) — How credentials and permissions work

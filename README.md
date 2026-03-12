@@ -11,7 +11,7 @@ Clawmasons solves this:
 - **Credential isolation** — Secrets resolved on-demand, never in env vars or Docker inspect
 - **Role-based tool filtering** — Agents only see tools their role permits
 - **Audit logging** — Every tool call and credential access logged
-- **Runtime portability** — Same definition works on Claude Code, Pi-coding-agent, and more
+- **Runtime portability** — Same definition works on Claude Code, pi-coding-agent, and more
 - **npm-native** — Everything is a `package.json` with standard npm tooling
 
 ## Install

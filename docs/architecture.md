@@ -14,10 +14,10 @@ graph TB
     CLI["clawmasons agent"]
     CLI -->|docker compose up| Proxy["MCP Proxy<br/>(tool filtering + audit)"]
     CLI -->|docker compose run| Agent["Agent Container<br/>(Claude Code / Pi / MCP)"]
-    CLI -->|in-process| CredSvc["Credential Service<br/>(secret resolution)"]
+    CLI -.-|in-process| CredSvc["Credential Service<br/>(secret resolution)"]
 
     Agent -->|MCP protocol| Proxy
-    Proxy -->|WebSocket| CredSvc
+    CredSvc -->|WebSocket| Proxy
     Proxy -->|stdio / SSE / HTTP| App1["App: filesystem"]
     Proxy -->|stdio / SSE / HTTP| App2["App: github"]
     Proxy -->|stdio / SSE / HTTP| AppN["App: ..."]
@@ -25,7 +25,7 @@ graph TB
 
 ## Agent Startup Sequence
 
-When you run `clawmasons agent <agent> <role>`, the following sequence executes:
+When you run `clawmasons agent <agent> <role>`, the following sequence executes. See [Initialization](initialization.md) for details on how the `.clawmasons` and chapter directories are set up before this point.
 
 ```mermaid
 sequenceDiagram
@@ -36,7 +36,7 @@ sequenceDiagram
     participant AE as Agent Entry
     participant Agent as Agent Runtime
 
-    CLI->>CLI: Resolve agent dependency graph
+    CLI->>CLI: Initialization
     CLI->>CLI: Generate docker-compose.yml
     CLI->>DC: docker compose up proxy (detached)
     DC->>Proxy: Start proxy on port 9090
@@ -166,6 +166,7 @@ The materializer reads the resolved agent graph and produces everything the runt
 
 ## Related
 
+- [Initialization](initialization.md) — How lodges, chapters, and runtime directories are set up
 - [MCP Proxy](component-mcp-proxy.md) — Detailed proxy documentation
 - [Credential Service](component-credential-service.md) — How credentials are resolved
 - [Security](security.md) — The full security model
