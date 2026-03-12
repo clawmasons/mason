@@ -18,7 +18,42 @@ chapter/
   bin/                    # CLI entry point
   dist/                   # Packed .tgz files (generated)
   docker/                 # Docker artifacts (generated)
+  skills/                 # Built-in skills (e.g., mason)
 ```
+
+## Architecture
+
+### ROLE_TYPES Pipeline
+
+The core architecture follows a transformation pipeline:
+
+```
+ROLE.md (agent-specific dialect)
+    ↓ readMaterializedRole()
+ROLE_TYPES (generic in-memory representation)
+    ↓ materializeForAgent()
+Docker build directory (agent-native workspace)
+```
+
+Key components:
+
+- **Dialect Registry** (`packages/shared/src/role/dialect-registry.ts`) — Maps agent-specific field names (e.g., Claude's `commands`, Codex's `instructions`) to generic ROLE_TYPES names (`tasks`, `apps`, `skills`).
+- **ROLE.md Parser** (`packages/shared/src/role/parser.ts`) — Parses YAML frontmatter + markdown body, normalizes via dialect registry.
+- **Package Reader** (`packages/shared/src/role/package-reader.ts`) — Loads NPM role packages into the same ROLE_TYPES representation.
+- **Role Discovery** (`packages/shared/src/role/discovery.ts`) — Finds roles from all sources (local ROLE.md + installed NPM packages) with local-over-package precedence.
+- **Adapter** (`packages/shared/src/role/adapter.ts`) — Bridges ROLE_TYPES to the existing materializer interface.
+- **Materializer** (`packages/cli/src/materializer/`) — Generates Docker build directories from ROLE_TYPES input.
+
+### Package Types
+
+| Type | `chapter.type` | Purpose |
+|------|---------------|---------|
+| **Role** | `role` | Deployable unit — tasks, tools, permissions, system prompt |
+| **App** | `app` | MCP server providing tools |
+| **Skill** | `skill` | Knowledge artifacts (prompts, conventions) |
+| **Task** | `task` | Unit of work for the agent |
+
+Each package has a `chapter` field in its `package.json` that declares its type and configuration.
 
 ## Setup
 
@@ -52,7 +87,7 @@ npx vitest run --config vitest.config.ts
 npm run teardown     # clean up
 ```
 
-Some tests require API keys and will skip gracefully if unavailable.
+Some tests require API keys and will skip gracefully if unavailable. See [e2e/README.md](e2e/README.md) for details on individual test suites.
 
 ## Verification Checklist
 
@@ -72,18 +107,30 @@ Chapter exports its core modules for use as a library:
 ```ts
 import {
   discoverPackages,
-  resolveAgent,
-  validateAgent,
+  discoverRoles,
+  resolveRole,
+  materializeForAgent,
   claudeCodeMaterializer,
 } from "@clawmasons/chapter";
 
 import {
   parseChapterField,
   computeToolFilters,
-  type ResolvedAgent,
+  readMaterializedRole,
+  readPackagedRole,
+  type RoleType,
   type ChapterField,
 } from "@clawmasons/shared";
 ```
+
+## Adding a New Agent Dialect
+
+To add support for a new agent runtime:
+
+1. Add an entry to the dialect registry in `packages/shared/src/role/dialect-registry.ts` mapping the runtime's directory name and field names.
+2. Implement a materializer in `packages/cli/src/materializer/` that generates the runtime's native workspace format from ROLE_TYPES.
+3. Register the agent type in the CLI's agent type registry.
+4. Add e2e tests exercising the new runtime.
 
 ## License
 
