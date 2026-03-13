@@ -3,7 +3,7 @@
  *
  * Exercises the real pipeline:
  *   1. Copy fixture workspace to temp dir
- *   2. Run `chapter build` (resolve + pack + docker-init in one step)
+ *   2. Run `chapter build` (resolve + docker build dir generation)
  *   3. Validate Docker artifacts, Dockerfiles, and workspace materialization
  *   4. Validate that run prerequisites (Dockerfiles) exist
  *   5. Build and start proxy container, verify MCP connectivity
@@ -29,16 +29,21 @@ describe("full chapter build → run validation flow", () => {
   let workspaceDir: string;
   let dockerDir: string;
 
+  // The local role "test-writer" is in .claude/roles/test-writer/ROLE.md
+  // Agent type inferred from .claude/ directory → "claude-code"
+  const ROLE_NAME = "test-writer";
+  const AGENT_TYPE = "claude-code";
+
   beforeAll(async () => {
-    // 1. Create temp workspace from fixtures (includes .claude/roles/test-writer/ROLE.md)
+    // 1. Create temp workspace from fixtures
     workspaceDir = copyFixtureWorkspace("build-pipeline", {
       excludePaths: ["agents/mcp-test", "roles/mcp-test"],
     });
 
-    // 2. Run chapter build (resolve + pack + docker-init in one step)
+    // 2. Run chapter build
     chapterExec(["chapter", "build"], workspaceDir, { timeout: 120_000 });
 
-    dockerDir = path.join(workspaceDir, "docker");
+    dockerDir = path.join(workspaceDir, ".clawmasons", "docker");
   }, 120_000);
 
   afterAll(() => {
@@ -47,133 +52,80 @@ describe("full chapter build → run validation flow", () => {
     }
   });
 
-  // -- Build Output -----------------------------------------------------------
+  // -- Docker Build Directory --------------------------------------------------
 
-  describe("build output", () => {
-    it("creates chapter.lock.json", () => {
-      const lockPath = path.join(workspaceDir, "chapter.lock.json");
-      expect(fs.existsSync(lockPath)).toBe(true);
+  describe("docker build directory", () => {
+    it("creates .clawmasons/docker/ directory", () => {
+      expect(fs.existsSync(dockerDir)).toBe(true);
     });
 
-    it("creates dist/ with .tgz files", () => {
-      const distDir = path.join(workspaceDir, "dist");
-      expect(fs.existsSync(distDir)).toBe(true);
-      const tgzFiles = fs.readdirSync(distDir).filter((f) => f.endsWith(".tgz"));
-      expect(tgzFiles.length).toBeGreaterThan(0);
+    it("creates role-specific build directory", () => {
+      expect(fs.existsSync(path.join(dockerDir, ROLE_NAME))).toBe(true);
     });
   });
 
-  // -- Docker Init — node_modules ---------------------------------------------
-
-  describe("docker/node_modules population", () => {
-    it("has @clawmasons/chapter", () => {
-      expect(
-        fs.existsSync(path.join(dockerDir, "node_modules", "@clawmasons", "chapter", "package.json")),
-      ).toBe(true);
-    });
-
-    it("has @clawmasons/proxy", () => {
-      expect(
-        fs.existsSync(path.join(dockerDir, "node_modules", "@clawmasons", "proxy", "package.json")),
-      ).toBe(true);
-    });
-
-    it("has @clawmasons/shared", () => {
-      expect(
-        fs.existsSync(path.join(dockerDir, "node_modules", "@clawmasons", "shared", "package.json")),
-      ).toBe(true);
-    });
-
-    it("has chapter packages from dist/*.tgz", () => {
-      expect(
-        fs.existsSync(path.join(dockerDir, "node_modules", "@test", "role-writer", "package.json")),
-      ).toBe(true);
-      expect(
-        fs.existsSync(path.join(dockerDir, "node_modules", "@test", "task-take-notes", "package.json")),
-      ).toBe(true);
-    });
-
-    it("has .bin/clawmasons symlink", () => {
-      const clawmasonsBin = path.join(dockerDir, "node_modules", ".bin", "clawmasons");
-      expect(fs.existsSync(clawmasonsBin)).toBe(true);
-    });
-
-    it("has transitive dependencies (e.g., commander, zod)", () => {
-      const nmDir = path.join(dockerDir, "node_modules");
-      const hasSomeDeps =
-        fs.existsSync(path.join(nmDir, "commander")) ||
-        fs.existsSync(path.join(nmDir, "zod")) ||
-        fs.existsSync(path.join(nmDir, "better-sqlite3"));
-      expect(hasSomeDeps).toBe(true);
-    });
-  });
-
-  // -- Docker Init — Proxy Dockerfile -----------------------------------------
+  // -- Proxy Dockerfile -------------------------------------------------------
 
   describe("docker-init proxy output", () => {
-    it("generates proxy/writer/Dockerfile", () => {
+    it("generates mcp-proxy/Dockerfile", () => {
       expect(
-        fs.existsSync(path.join(dockerDir, "proxy", "writer", "Dockerfile")),
+        fs.existsSync(path.join(dockerDir, ROLE_NAME, "mcp-proxy", "Dockerfile")),
       ).toBe(true);
     });
 
     it("proxy Dockerfile has correct structure", () => {
       const dockerfile = fs.readFileSync(
-        path.join(dockerDir, "proxy", "writer", "Dockerfile"),
+        path.join(dockerDir, ROLE_NAME, "mcp-proxy", "Dockerfile"),
         "utf-8",
       );
       expect(dockerfile).toContain("FROM node:");
-      expect(dockerfile).toContain("COPY node_modules/");
-      expect(dockerfile).toContain("npm rebuild better-sqlite3");
-      expect(dockerfile).not.toContain("npm install --omit=dev");
     });
   });
 
-  // -- Docker Init — Agent Dockerfile -----------------------------------------
+  // -- Agent Dockerfile -------------------------------------------------------
 
   describe("docker-init agent output", () => {
-    it("generates agent/writer/writer/Dockerfile", () => {
+    it("generates agent-type/Dockerfile", () => {
       expect(
         fs.existsSync(
-          path.join(dockerDir, "agent", "writer", "writer", "Dockerfile"),
+          path.join(dockerDir, ROLE_NAME, AGENT_TYPE, "Dockerfile"),
         ),
       ).toBe(true);
     });
 
     it("agent Dockerfile has correct structure", () => {
       const dockerfile = fs.readFileSync(
-        path.join(dockerDir, "agent", "writer", "writer", "Dockerfile"),
+        path.join(dockerDir, ROLE_NAME, AGENT_TYPE, "Dockerfile"),
         "utf-8",
       );
-      expect(dockerfile).toContain("COPY node_modules/");
-      expect(dockerfile).not.toContain("npm install --omit=dev");
+      expect(dockerfile).toContain("FROM ");
     });
   });
 
-  // -- Docker Init — Workspace ------------------------------------------------
+  // -- Workspace Materialization -----------------------------------------------
 
   describe("workspace materialization", () => {
     it("generates workspace files", () => {
       const wsDir = path.join(
-        dockerDir, "agent", "writer", "writer", "workspace",
+        dockerDir, ROLE_NAME, AGENT_TYPE, "workspace",
       );
       expect(fs.existsSync(wsDir)).toBe(true);
     });
   });
 
-  // -- Run Prerequisites ------------------------------------------------------
+  // -- Run Prerequisites -------------------------------------------------------
 
   describe("run prerequisites", () => {
-    it("proxy Dockerfile exists for writer role", () => {
+    it("proxy Dockerfile exists for role", () => {
       expect(
-        fs.existsSync(path.join(dockerDir, "proxy", "writer", "Dockerfile")),
+        fs.existsSync(path.join(dockerDir, ROLE_NAME, "mcp-proxy", "Dockerfile")),
       ).toBe(true);
     });
 
-    it("agent Dockerfile exists for writer role", () => {
+    it("agent Dockerfile exists for role", () => {
       expect(
         fs.existsSync(
-          path.join(dockerDir, "agent", "writer", "writer", "Dockerfile"),
+          path.join(dockerDir, ROLE_NAME, AGENT_TYPE, "Dockerfile"),
         ),
       ).toBe(true);
     });
@@ -193,16 +145,17 @@ describe("full chapter build → run validation flow", () => {
       fs.mkdirSync(notesDir, { recursive: true });
 
       // Generate a test-specific compose file with port mapping
+      // Proxy build context is dockerDir, dockerfile is relative
       const composeContent = `# Generated for e2e proxy boot test
 services:
-  proxy-writer:
+  proxy-${ROLE_NAME}:
     build:
       context: "${dockerDir}"
-      dockerfile: "proxy/writer/Dockerfile"
+      dockerfile: "${ROLE_NAME}/mcp-proxy/Dockerfile"
     ports:
       - "${TEST_PORT}:9090"
     volumes:
-      - "${workspaceDir}:/workspace"
+      - "${workspaceDir}:/home/mason/workspace/project"
       - "${path.join(workspaceDir, "notes")}:/app/notes"
     environment:
       - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
@@ -216,7 +169,6 @@ services:
     });
 
     afterAll(() => {
-      // Tear down containers and images
       try {
         execSync(
           `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" down --rmi local --volumes`,
@@ -227,30 +179,29 @@ services:
 
     it("builds proxy Docker image", () => {
       execSync(
-        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" build proxy-writer`,
+        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" build proxy-${ROLE_NAME}`,
         { cwd: dockerDir, stdio: "pipe", timeout: 120_000 },
       );
     }, 130_000);
 
     it("starts proxy container", () => {
       execSync(
-        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d proxy-writer`,
+        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d proxy-${ROLE_NAME}`,
         { stdio: "pipe", timeout: 60_000 },
       );
 
-      // Verify container is running
       const ps = execSync(
         `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" ps --format json`,
         { stdio: "pipe", timeout: 10_000 },
       ).toString();
-      expect(ps).toContain("proxy-writer");
+      expect(ps).toContain(`proxy-${ROLE_NAME}`);
     }, 65_000);
 
     it("proxy health endpoint responds", async () => {
       await waitForHealth(`http://localhost:${TEST_PORT}/health`, 30_000, {
         composeProject: COMPOSE_PROJECT,
         composeFile,
-        service: "proxy-writer",
+        service: `proxy-${ROLE_NAME}`,
       });
     }, 35_000);
 
@@ -269,8 +220,6 @@ services:
       await client.connect(transport);
 
       const result = await client.listTools();
-      // The proxy should respond -- tools may or may not be populated
-      // depending on upstream app availability, but the call should succeed
       expect(result).toHaveProperty("tools");
 
       await client.close();

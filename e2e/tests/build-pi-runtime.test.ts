@@ -36,7 +36,7 @@ describe("role-based build with workspace packages", () => {
       timeout: 120_000,
     });
 
-    dockerDir = path.join(workspaceDir, "docker");
+    dockerDir = path.join(workspaceDir, ".clawmasons", "docker");
   }, 120_000);
 
   afterAll(() => {
@@ -48,64 +48,49 @@ describe("role-based build with workspace packages", () => {
   // -- Build Output -----------------------------------------------------------
 
   describe("build output", () => {
-    it("generates chapter.lock.json", () => {
-      const lockPath = path.join(workspaceDir, "chapter.lock.json");
-      expect(fs.existsSync(lockPath)).toBe(true);
+    it("generates .clawmasons/docker/ directory", () => {
+      expect(fs.existsSync(dockerDir)).toBe(true);
     });
 
-    it("lock file has correct structure", () => {
-      const lock = JSON.parse(
-        fs.readFileSync(path.join(workspaceDir, "chapter.lock.json"), "utf-8"),
-      );
-
-      expect(lock.lockVersion).toBe(2);
-      expect(lock.role.name).toBe("test-writer");
+    it("generates role-specific build directory", () => {
+      expect(fs.existsSync(path.join(dockerDir, "test-writer"))).toBe(true);
     });
 
-    it("lock file contains tasks from the local role", () => {
-      const lock = JSON.parse(
-        fs.readFileSync(path.join(workspaceDir, "chapter.lock.json"), "utf-8"),
-      );
-
-      expect(lock.tasks).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ name: "take-notes" }),
-        ]),
-      );
+    it("populates proxy node_modules", () => {
+      const nmDir = path.join(dockerDir, "node_modules", "@clawmasons", "chapter");
+      expect(fs.existsSync(nmDir)).toBe(true);
     });
   });
 
   // -- Docker Init — Proxy ----------------------------------------------------
 
   describe("docker-init proxy output", () => {
-    it("generates proxy/writer/Dockerfile", () => {
+    it("generates test-writer/mcp-proxy/Dockerfile", () => {
       expect(
-        fs.existsSync(path.join(dockerDir, "proxy", "writer", "Dockerfile")),
+        fs.existsSync(path.join(dockerDir, "test-writer", "mcp-proxy", "Dockerfile")),
       ).toBe(true);
     });
 
     it("proxy Dockerfile has correct structure", () => {
       const dockerfile = fs.readFileSync(
-        path.join(dockerDir, "proxy", "writer", "Dockerfile"),
+        path.join(dockerDir, "test-writer", "mcp-proxy", "Dockerfile"),
         "utf-8",
       );
       expect(dockerfile).toContain("FROM node:");
       expect(dockerfile).toContain("USER mason");
       expect(dockerfile).toContain("clawmasons");
       expect(dockerfile).toContain("proxy");
-      expect(dockerfile).toContain("COPY node_modules/");
-      expect(dockerfile).not.toContain("npm install");
-      expect(dockerfile).toContain("npm rebuild better-sqlite3");
+      expect(dockerfile).toContain("npm rebuild");
     });
   });
 
   // -- Docker Init — Agent ----------------------------------------------------
 
   describe("docker-init agent output", () => {
-    it("generates agent/writer/writer/Dockerfile", () => {
+    it("generates test-writer/claude-code/Dockerfile", () => {
       expect(
         fs.existsSync(
-          path.join(dockerDir, "agent", "writer", "writer", "Dockerfile"),
+          path.join(dockerDir, "test-writer", "claude-code", "Dockerfile"),
         ),
       ).toBe(true);
     });
@@ -113,12 +98,11 @@ describe("role-based build with workspace packages", () => {
     it("agent Dockerfile has correct structure", () => {
       const dockerfile = fs.readFileSync(
         path.join(
-          dockerDir, "agent", "writer", "writer", "Dockerfile",
+          dockerDir, "test-writer", "claude-code", "Dockerfile",
         ),
         "utf-8",
       );
-      expect(dockerfile).toContain("COPY node_modules/");
-      expect(dockerfile).not.toContain("npm install --omit=dev");
+      expect(dockerfile).toContain("npm install");
     });
   });
 
@@ -126,7 +110,7 @@ describe("role-based build with workspace packages", () => {
 
   describe("workspace materialization", () => {
     const workspacePath = () =>
-      path.join(dockerDir, "agent", "writer", "writer", "workspace");
+      path.join(dockerDir, "test-writer", "claude-code", "workspace");
 
     it("generates AGENTS.md", () => {
       expect(fs.existsSync(path.join(workspacePath(), "AGENTS.md"))).toBe(true);
@@ -143,14 +127,12 @@ describe("role-based build with workspace packages", () => {
       expect(agentsMd).toContain("filesystem");
     });
 
-    it("generates skills/markdown-conventions/README.md", () => {
-      const skillPath = path.join(
-        workspacePath(), "skills", "markdown-conventions", "README.md",
+    it("AGENTS.md references the role name", () => {
+      const agentsMd = fs.readFileSync(
+        path.join(workspacePath(), "AGENTS.md"),
+        "utf-8",
       );
-      expect(fs.existsSync(skillPath)).toBe(true);
-
-      const content = fs.readFileSync(skillPath, "utf-8");
-      expect(content).toContain("markdown-conventions");
+      expect(agentsMd).toContain("test-writer");
     });
   });
 

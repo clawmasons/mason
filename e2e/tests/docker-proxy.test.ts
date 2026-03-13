@@ -46,7 +46,7 @@ describe("ACP proxy Docker e2e", () => {
     // 2. Run chapter build (resolve + pack + docker-init in one step)
     chapterExec(["chapter", "build"], workspaceDir, { timeout: 120_000 });
 
-    dockerDir = path.join(workspaceDir, "docker");
+    dockerDir = path.join(workspaceDir, ".clawmasons", "docker");
 
     // Create notes directory required by the filesystem MCP server
     const notesDir = path.join(workspaceDir, "notes");
@@ -55,14 +55,14 @@ describe("ACP proxy Docker e2e", () => {
     // 3. Generate docker-compose with ACP session env vars
     const composeContent = `# Generated for ACP proxy e2e test
 services:
-  proxy-writer:
+  proxy-test-writer:
     build:
       context: "${dockerDir}"
-      dockerfile: "proxy/writer/Dockerfile"
+      dockerfile: "test-writer/mcp-proxy/Dockerfile"
     ports:
       - "${TEST_PORT}:9090"
     volumes:
-      - "${workspaceDir}:/workspace"
+      - "${workspaceDir}:/home/mason/workspace/project"
       - "${notesDir}:/app/notes"
     environment:
       - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
@@ -94,14 +94,14 @@ services:
 
   it("builds proxy Docker image with ACP config", () => {
     execSync(
-      `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" build proxy-writer`,
+      `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" build proxy-test-writer`,
       { cwd: dockerDir, stdio: "pipe", timeout: 120_000 },
     );
   }, 130_000);
 
   it("starts proxy container with ACP session env vars", () => {
     execSync(
-      `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d proxy-writer`,
+      `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d proxy-test-writer`,
       { stdio: "pipe", timeout: 60_000 },
     );
 
@@ -110,14 +110,14 @@ services:
       `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" ps --format json`,
       { stdio: "pipe", timeout: 10_000 },
     ).toString();
-    expect(ps).toContain("proxy-writer");
+    expect(ps).toContain("proxy-test-writer");
   }, 65_000);
 
   it("proxy health endpoint responds", async () => {
     await waitForHealth(`http://localhost:${TEST_PORT}/health`, 30_000, {
       composeProject: COMPOSE_PROJECT,
       composeFile,
-      service: "proxy-writer",
+      service: "proxy-test-writer",
     });
   }, 35_000);
 
@@ -198,7 +198,7 @@ services:
         name: listDirTool.name,
         arguments: listDirTool.name.includes("list_allowed_directories")
           ? {}
-          : { path: "/workspace" },
+          : { path: "/home/mason/workspace/project" },
       });
 
       expect(callResult).toHaveProperty("content");

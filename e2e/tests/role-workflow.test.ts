@@ -107,48 +107,26 @@ describe("role-based workflow", () => {
       chapterExec(["chapter", "build", "test-writer"], workspaceDir, {
         timeout: 120_000,
       });
-      dockerDir = path.join(workspaceDir, "docker");
+      dockerDir = path.join(workspaceDir, ".clawmasons", "docker");
     }, 120_000);
-
-    it("creates chapter.lock.json", () => {
-      const lockPath = path.join(workspaceDir, "chapter.lock.json");
-      expect(fs.existsSync(lockPath)).toBe(true);
-    });
-
-    it("lock file references the local role", () => {
-      const lock = JSON.parse(
-        fs.readFileSync(
-          path.join(workspaceDir, "chapter.lock.json"),
-          "utf-8",
-        ),
-      );
-      expect(lock.role.name).toBe("test-writer");
-    });
-
-    it("creates dist/ with .tgz files", () => {
-      const distDir = path.join(workspaceDir, "dist");
-      expect(fs.existsSync(distDir)).toBe(true);
-      const tgzFiles = fs
-        .readdirSync(distDir)
-        .filter((f) => f.endsWith(".tgz"));
-      expect(tgzFiles.length).toBeGreaterThan(0);
-    });
 
     it("generates docker directory", () => {
       expect(fs.existsSync(dockerDir)).toBe(true);
     });
 
-    it("has docker/node_modules with framework packages", () => {
+    it("generates role-specific docker build directory", () => {
+      expect(fs.existsSync(path.join(dockerDir, "test-writer"))).toBe(true);
+    });
+
+    it("generates proxy Dockerfile", () => {
       expect(
-        fs.existsSync(
-          path.join(
-            dockerDir,
-            "node_modules",
-            "@clawmasons",
-            "chapter",
-            "package.json",
-          ),
-        ),
+        fs.existsSync(path.join(dockerDir, "test-writer", "mcp-proxy", "Dockerfile")),
+      ).toBe(true);
+    });
+
+    it("generates agent Dockerfile", () => {
+      expect(
+        fs.existsSync(path.join(dockerDir, "test-writer", "claude-code", "Dockerfile")),
       ).toBe(true);
     });
   });

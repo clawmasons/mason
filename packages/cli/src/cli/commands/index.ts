@@ -2,13 +2,10 @@ import { Command, type ParseOptions } from "commander";
 import { registerAddCommand } from "./add.js";
 import { registerBuildCommand } from "./build.js";
 import { registerInitCommand } from "./init.js";
-import { registerInitRoleCommand } from "./init-role.js";
 import { registerListCommand } from "./list.js";
-import { registerLodgeInitCommand } from "./lodge-init.js";
 import { registerPackCommand } from "./pack.js";
 import { registerPermissionsCommand } from "./permissions.js";
 import { registerProxyCommand } from "./proxy.js";
-import { registerRemoveCommand } from "./remove.js";
 import { registerRunCommand, isKnownAgentType } from "./run-agent.js";
 import { registerMasonInitRepoCommand } from "./mason-init-repo.js";
 import { registerValidateCommand } from "./validate.js";
@@ -24,9 +21,6 @@ import { registerValidateCommand } from "./validate.js";
 export function registerCommands(program: Command): void {
   // ── Top-level commands ──────────────────────────────────────────────
 
-  // `init` — lodge initialization
-  registerLodgeInitCommand(program);
-
   // `run` — run a role on an agent runtime
   registerRunCommand(program);
 
@@ -37,14 +31,12 @@ export function registerCommands(program: Command): void {
     .description("Chapter workspace management commands");
 
   registerInitCommand(chapter);
-  registerBuildCommand(chapter);
-  registerInitRoleCommand(chapter);
   registerListCommand(chapter);
   registerValidateCommand(chapter);
   registerPermissionsCommand(chapter);
   registerPackCommand(chapter);
   registerAddCommand(chapter);
-  registerRemoveCommand(chapter);
+  registerBuildCommand(chapter);
   registerProxyCommand(chapter);
 
   // ── `mason` subcommand group ──────────────────────────────────────────

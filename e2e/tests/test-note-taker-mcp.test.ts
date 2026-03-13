@@ -38,7 +38,7 @@ describe("role-based note-taker e2e", () => {
     // Build: resolve + pack + docker-init
     chapterExec(["chapter", "build"], workspaceDir, { timeout: 120_000 });
 
-    dockerDir = path.join(workspaceDir, "docker");
+    dockerDir = path.join(workspaceDir, ".clawmasons", "docker");
 
     // Create notes directory required by the filesystem MCP server
     notesDir = path.join(workspaceDir, "notes");
@@ -57,21 +57,21 @@ describe("role-based note-taker e2e", () => {
     it("generates agent Dockerfile for writer role", () => {
       expect(
         fs.existsSync(
-          path.join(dockerDir, "agent", "writer", "writer", "Dockerfile"),
+          path.join(dockerDir, "test-writer", "claude-code", "Dockerfile"),
         ),
       ).toBe(true);
     });
 
     it("generates workspace for writer role", () => {
       const wsDir = path.join(
-        dockerDir, "agent", "writer", "writer", "workspace",
+        dockerDir, "test-writer", "claude-code", "workspace",
       );
       expect(fs.existsSync(wsDir)).toBe(true);
     });
 
     it("generates proxy Dockerfile for writer role", () => {
       expect(
-        fs.existsSync(path.join(dockerDir, "proxy", "writer", "Dockerfile")),
+        fs.existsSync(path.join(dockerDir, "test-writer", "mcp-proxy", "Dockerfile")),
       ).toBe(true);
     });
   });
@@ -81,36 +81,24 @@ describe("role-based note-taker e2e", () => {
   describe("proxy tool pipeline", () => {
     const PROXY_PORT = 19600;
     const PROXY_TOKEN = crypto.randomBytes(32).toString("hex");
-    const CRED_TOKEN = crypto.randomBytes(32).toString("hex");
     const COMPOSE_PROJECT = `chapter-mcp-e2e-proxy-${Date.now()}`;
     let composeFile: string;
 
     beforeAll(() => {
       const composeContent = `# Generated for note-taker proxy e2e test
 services:
-  proxy-writer:
+  proxy-test-writer:
     build:
       context: "${dockerDir}"
-      dockerfile: "proxy/writer/Dockerfile"
+      dockerfile: "test-writer/mcp-proxy/Dockerfile"
     ports:
       - "${PROXY_PORT}:9090"
     volumes:
-      - "${workspaceDir}:/workspace"
+      - "${workspaceDir}:/home/mason/workspace/project"
       - "${notesDir}:/app/notes"
     environment:
       - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
-      - CREDENTIAL_PROXY_TOKEN=${CRED_TOKEN}
     command: ["chapter", "proxy", "--role", "@test/role-writer", "--transport", "streamable-http"]
-    restart: "no"
-
-  credential-service:
-    build:
-      context: "${dockerDir}"
-      dockerfile: "credential-service/Dockerfile"
-    environment:
-      - CREDENTIAL_PROXY_TOKEN=${CRED_TOKEN}
-    depends_on:
-      - proxy-writer
     restart: "no"
 `;
       const composeDir = path.join(workspaceDir, "e2e-compose-proxy");
@@ -135,9 +123,9 @@ services:
       );
     }, 190_000);
 
-    it("starts proxy and credential service", () => {
+    it("starts proxy service", () => {
       execSync(
-        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d proxy-writer credential-service`,
+        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d proxy-test-writer`,
         { stdio: "pipe", timeout: 60_000 },
       );
 
@@ -145,14 +133,14 @@ services:
         `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" ps --format json`,
         { stdio: "pipe", timeout: 10_000 },
       ).toString();
-      expect(ps).toContain("proxy-writer");
+      expect(ps).toContain("proxy-test-writer");
     }, 65_000);
 
     it("proxy health endpoint responds", async () => {
       await waitForHealth(`http://localhost:${PROXY_PORT}/health`, 30_000, {
         composeProject: COMPOSE_PROJECT,
         composeFile,
-        service: "proxy-writer",
+        service: "proxy-test-writer",
       });
     }, 35_000);
 
@@ -203,7 +191,7 @@ services:
       if (listDirTool) {
         const callResult = await client.callTool({
           name: listDirTool.name,
-          arguments: { path: "/workspace" },
+          arguments: { path: "/home/mason/workspace/project" },
         });
         expect(callResult).toHaveProperty("content");
       }
