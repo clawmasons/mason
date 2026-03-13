@@ -188,6 +188,9 @@ export function generateComposeYml(opts: {
 }): string {
   const { dockerBuildDir, dockerDir, projectDir, agent, role, logsDir, proxyToken, credentialProxyToken, proxyPort = 3000, roleMounts, credentialKeys } = opts;
 
+  // Per-role cache directory for NODE_COMPILE_CACHE and NPM_CONFIG_CACHE
+  const cacheDir = path.join(dockerBuildDir, "mcp-proxy", ".cache");
+
   // Proxy: context is dockerDir (has node_modules), dockerfile is role-specific
   const proxyDockerfile = path.relative(dockerDir, path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"));
   // Agent: context is dockerDir (has node_modules), dockerfile is role/agent-type specific
@@ -211,6 +214,7 @@ services:
     volumes:
       - "${projectDir}:/home/mason/workspace/project"
       - "${logsDir}:/logs"
+      - "${cacheDir}:/app/.cache"
     environment:
       - CHAPTER_PROXY_TOKEN=${proxyToken}
       - CREDENTIAL_PROXY_TOKEN=${credentialProxyToken}
@@ -326,6 +330,9 @@ async function ensureDockerBuild(
 
     // Synthesize inline app/role packages (e.g. mcp_servers from ROLE.md)
     synthesizeRolePackages(roleType, dockerDir);
+
+    // Create per-role cache directory for NODE_COMPILE_CACHE and NPM_CONFIG_CACHE
+    fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy", ".cache"), { recursive: true });
 
     console.log(`  Docker artifacts built at .clawmasons/docker/${roleName}/`);
   }
@@ -1008,8 +1015,10 @@ async function defaultWaitForProxyHealth(url: string, timeoutMs: number): Promis
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
+      console.log("is up?")
       const resp = await fetch(url);
       if (resp.ok) return;
+      console.log("not yet");
     } catch { /* not ready yet */ }
     await new Promise((r) => setTimeout(r, 1_000));
   }

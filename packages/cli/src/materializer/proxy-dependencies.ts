@@ -406,6 +406,41 @@ export function ensureProxyDependencies(
       2,
     ) + "\n",
   );
+
+  // 7. Copy proxy bundle (pre-built by esbuild) for fast Docker boot
+  copyProxyBundle(dockerDir);
+}
+
+/**
+ * Copy the pre-built proxy bundle into the Docker build context.
+ *
+ * The bundle is built by `npm run build:proxy` in @clawmasons/chapter
+ * and lives at `packages/cli/dist/proxy-bundle.js`.  Inside Docker
+ * this replaces the multi-file ESM resolution chain for faster boot.
+ */
+function copyProxyBundle(dockerDir: string): void {
+  const bundleName = "proxy-bundle.cjs";
+  const dest = path.join(dockerDir, bundleName);
+  if (fs.existsSync(dest)) return;
+
+  // The bundle is in the cli package's dist/ directory
+  const bundleSrc = path.resolve(CLI_PACKAGE_ROOT, "dist", bundleName);
+  if (!fs.existsSync(bundleSrc)) {
+    console.warn(
+      `Warning: proxy bundle not found at ${bundleSrc}. ` +
+      "Run 'npm run build:proxy' in @clawmasons/chapter to build it. " +
+      "Falling back to unbundled proxy entrypoint.",
+    );
+    return;
+  }
+
+  fs.cpSync(bundleSrc, dest);
+
+  // Also copy the sourcemap if available
+  const mapSrc = bundleSrc + ".map";
+  if (fs.existsSync(mapSrc)) {
+    fs.cpSync(mapSrc, dest + ".map");
+  }
 }
 
 /**

@@ -401,6 +401,15 @@ describe("generateComposeYml", () => {
     expect(mountLines).toHaveLength(1);
     expect(mountLines[0]).toContain("/home/mason/workspace/project");
   });
+
+  it("mounts per-role cache directory into proxy at /app/.cache", () => {
+    const yml = generateComposeYml(defaultOpts);
+    const proxySection = yml.split("agent-writer:")[0]!;
+
+    expect(proxySection).toContain(
+      `"${defaultOpts.dockerBuildDir}/mcp-proxy/.cache:/app/.cache"`,
+    );
+  });
 });
 
 // ── runAgent (integration) ──────────────────────────────────────────────

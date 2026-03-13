@@ -72,14 +72,21 @@ export async function startProxy(
   process.on("SIGTERM", () => void shutdown());
 
   try {
+    const t0 = performance.now();
+    const elapsed = () => `[+${Math.round(performance.now() - t0)}ms]`;
+    let stepStart = t0;
+    const stepMs = () => { const d = Math.round(performance.now() - stepStart); stepStart = performance.now(); return d; };
+
     // ── Step 1: Discover packages ──────────────────────────────────────
-    console.log("Discovering packages...");
+    console.log(`${elapsed()} Discovering packages...`);
     const packages = discoverPackages(rootDir);
+    console.log(`${elapsed()} Discovered ${packages.size} packages (${stepMs()}ms)`);
 
     // ── Step 2: Resolve role ───────────────────────────────────────────
     const roleName = resolveRoleName(options.agent ?? options.role, packages);
-    console.log(`Resolving role "${roleName}"...`);
+    console.log(`${elapsed()} Resolving role "${roleName}"...`);
     const resolvedRole = resolveRolePackage(roleName, packages);
+    console.log(`${elapsed()} Role resolved (${stepMs()}ms)`);
 
     // Build a ResolvedAgent wrapper for compatibility with existing proxy infrastructure
     const agent: ResolvedAgent = {
@@ -100,9 +107,12 @@ export async function startProxy(
     const loadedEnv = loadEnvFile(envPath);
 
     // ── Step 5: Open SQLite ────────────────────────────────────────────
+    console.log(`${elapsed()} Opening database...`);
+    stepStart = performance.now();
     db = openDatabase();
+    console.log(`${elapsed()} Database opened (${stepMs()}ms)`);
 
-    // ── Step 6: Start upstream MCP clients ─────────────────────────────
+    // ── Step 6: Create upstream manager ──────────────────────────────────
     const projectDir = process.env.PROJECT_DIR;
     const appConfigs = collectApps(agent, loadedEnv, projectDir);
     upstream = new UpstreamManager(appConfigs);
@@ -111,33 +121,12 @@ export async function startProxy(
       ? parseInt(options.startupTimeout, 10) * 1000
       : 60_000;
 
-    console.log(`Connecting to ${appConfigs.length} upstream server(s)...`);
-    await upstream.initialize(timeoutMs);
-
-    // ── Step 7: Build routing tables ───────────────────────────────────
-    const upstreamTools = new Map<string, import("@modelcontextprotocol/sdk/types.js").Tool[]>();
-    const upstreamResources = new Map<string, import("@modelcontextprotocol/sdk/types.js").Resource[]>();
-    const upstreamPrompts = new Map<string, import("@modelcontextprotocol/sdk/types.js").Prompt[]>();
-
-    for (const config of appConfigs) {
-      const [tools, resources, prompts] = await Promise.all([
-        upstream.getTools(config.name),
-        upstream.getResources(config.name).catch(() => []),
-        upstream.getPrompts(config.name).catch(() => []),
-      ]);
-      upstreamTools.set(config.name, tools);
-      upstreamResources.set(config.name, resources);
-      upstreamPrompts.set(config.name, prompts);
-    }
-
-    const router = new ToolRouter(upstreamTools, toolFilters);
-    const resourceRouter = new ResourceRouter(upstreamResources);
-    const promptRouter = new PromptRouter(upstreamPrompts);
-
-    // ── Step 8: Collect approval patterns ──────────────────────────────
+    // ── Step 7: Collect approval patterns ──────────────────────────────
     const approvalPatterns = collectApprovalPatterns(agent);
 
-    // ── Step 9: Start MCP server ───────────────────────────────────────
+    // ── Step 8: Start HTTP server EARLY ────────────────────────────────
+    // Health, connect-agent, and credential_request work immediately.
+    // Tool/resource/prompt calls block on readyGate until upstreams connect.
     const port = options.port
       ? parseInt(options.port, 10)
       : 9090;
@@ -157,32 +146,73 @@ export async function startProxy(
       } catch { /* ignore parse errors */ }
     }
 
+    // Deferred ready gate — resolves once upstreams + routing are ready
+    let resolveReady!: () => void;
+    const readyGate = new Promise<void>((r) => { resolveReady = r; });
+
+    // Start with an empty router; setRouting() will update once upstreams connect
+    const emptyRouter = new ToolRouter(new Map(), new Map());
+
+    console.log(`${elapsed()} Starting HTTP server on port ${port}...`);
+    stepStart = performance.now();
     server = new ChapterProxyServer({
       port,
       transport,
-      router,
+      router: emptyRouter,
       upstream,
       db,
       agentName: agent.name,
       authToken,
       credentialProxyToken,
       approvalPatterns: approvalPatterns.length > 0 ? approvalPatterns : undefined,
-      resourceRouter,
-      promptRouter,
       declaredCredentials,
       sessionType,
       acpClient,
+      readyGate,
     });
 
     await server.start();
+    console.log(`${elapsed()} Server listening (${stepMs()}ms)`);
 
-    // ── Step 10: Ready ─────────────────────────────────────────────────
+    // ── Step 9: Connect upstream MCP servers ─────────────────────────────
+    console.log(`${elapsed()} Connecting to ${appConfigs.length} upstream server(s)...`);
+    stepStart = performance.now();
+    await upstream.initialize(timeoutMs);
+    console.log(`${elapsed()} Upstream connected (${stepMs()}ms)`);
+
+    // ── Step 10: Build routing tables and open the ready gate ───────────
+    console.log(`${elapsed()} Fetching tools/resources/prompts...`);
+    stepStart = performance.now();
+    const upstreamTools = new Map<string, import("@modelcontextprotocol/sdk/types.js").Tool[]>();
+    const upstreamResources = new Map<string, import("@modelcontextprotocol/sdk/types.js").Resource[]>();
+    const upstreamPrompts = new Map<string, import("@modelcontextprotocol/sdk/types.js").Prompt[]>();
+
+    for (const config of appConfigs) {
+      const [tools, resources, prompts] = await Promise.all([
+        upstream.getTools(config.name),
+        upstream.getResources(config.name).catch(() => []),
+        upstream.getPrompts(config.name).catch(() => []),
+      ]);
+      upstreamTools.set(config.name, tools);
+      upstreamResources.set(config.name, resources);
+      upstreamPrompts.set(config.name, prompts);
+    }
+
+    const router = new ToolRouter(upstreamTools, toolFilters);
+    const resourceRouter = new ResourceRouter(upstreamResources);
+    const promptRouter = new PromptRouter(upstreamPrompts);
+    server.setRouting({ router, resourceRouter, promptRouter });
+    resolveReady();
+    console.log(`${elapsed()} Routing tables built (${stepMs()}ms)`);
+
+    // ── Step 11: Ready ─────────────────────────────────────────────────
+    const totalMs = Math.round(performance.now() - t0);
     const toolCount = router.listTools().length;
     const resourceCount = resourceRouter.listResources().length;
     const promptCount = promptRouter.listPrompts().length;
 
     console.log(
-      `\nclawmasons proxy ready\n` +
+      `\nclawmasons proxy ready (${totalMs}ms total)\n` +
       `  Role:      ${roleName}\n` +
       `  Port:      ${port}\n` +
       `  Transport: ${transport}\n` +

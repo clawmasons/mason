@@ -170,6 +170,8 @@ describe("mcp-proxy-agent: agent↔proxy via CLI", () => {
 
     expect(readyOutput).toContain("[mcp-agent]");
 
+    console.log(readyOutput);
+    
     // --- Step 1: List available tools ---
     // Wait for tool names in the output (not just "> " which may arrive first)
     const listOutput = await sendAndWaitFor(

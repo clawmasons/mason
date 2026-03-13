@@ -48,6 +48,7 @@ vi.mock("@clawmasons/proxy", () => ({
   ChapterProxyServer: vi.fn().mockImplementation(() => ({
     start: vi.fn(),
     stop: vi.fn(),
+    setRouting: vi.fn(),
   })),
 }));
 

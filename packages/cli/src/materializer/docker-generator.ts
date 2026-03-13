@@ -420,6 +420,7 @@ services:
     volumes:
       - ${relProjectDir}:${PROJECT_MOUNT_PATH}:ro
       - ${relLogsDir}:/logs
+      - ${path.relative(sessionDir, path.join(dockerBuildDir, "mcp-proxy", ".cache"))}:/app/.cache
     environment:
 ${proxyEnvLines.join("\n")}
     ports:

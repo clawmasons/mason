@@ -417,12 +417,12 @@ describe("generateProxyDockerfile", () => {
     expect(result).toContain("python3 make g++");
   });
 
-  it("uses clawmasons proxy as entrypoint with agent name", () => {
+  it("uses bundled proxy entry point with agent name", () => {
     const agent = makeNoteTakerAgent();
     const result = generateProxyDockerfile(agent.roles[0], agent.name);
 
-    expect(result).toContain('ENTRYPOINT ["node", "node_modules/.bin/clawmasons"]');
-    expect(result).toContain('CMD ["chapter", "proxy", "--agent", "@acme.platform/agent-note-taker", "--transport", "streamable-http"]');
+    expect(result).toContain('ENTRYPOINT ["node", "proxy-bundle.cjs"]');
+    expect(result).toContain('CMD ["--agent", "@acme.platform/agent-note-taker", "--transport", "streamable-http"]');
   });
 
   it("includes role name in header comment", () => {
@@ -461,5 +461,21 @@ describe("generateProxyDockerfile", () => {
 
     expect(writerResult).toContain("role: writer");
     expect(reviewerResult).toContain("role: reviewer");
+  });
+
+  it("sets NODE_COMPILE_CACHE and NPM_CONFIG_CACHE env vars", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+
+    expect(result).toContain("ENV NODE_COMPILE_CACHE=/app/.cache/v8");
+    expect(result).toContain("ENV NPM_CONFIG_CACHE=/app/.cache/npm");
+  });
+
+  it("creates both v8 and npm cache directories", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+
+    expect(result).toContain("/app/.cache/v8");
+    expect(result).toContain("/app/.cache/npm");
   });
 });
