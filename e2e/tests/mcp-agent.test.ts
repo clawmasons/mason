@@ -16,7 +16,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -205,74 +204,39 @@ describe("mcp-agent with claude-native project", () => {
 
   describe("proxy tool pipeline", () => {
     const PROXY_PORT = 19700;
-    const PROXY_TOKEN = crypto.randomBytes(32).toString("hex");
-    const COMPOSE_PROJECT = `chapter-mcp-agent-e2e-${Date.now()}`;
-    let composeFile: string;
+    let proxyInfo: {
+      proxyPort: number;
+      proxyToken: string;
+      composeFile: string;
+      proxyServiceName: string;
+      sessionId: string;
+    };
 
     beforeAll(() => {
       if (!isDockerAvailable()) return;
 
-      const composeContent = `# Generated for mcp-agent proxy e2e test
-services:
-  proxy-writer:
-    build:
-      context: "${dockerDir}"
-      dockerfile: "writer/mcp-proxy/Dockerfile"
-    ports:
-      - "${PROXY_PORT}:9090"
-    volumes:
-      - "${workspaceDir}:/home/mason/workspace/project"
-    environment:
-      - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
-      - PROJECT_DIR=/home/mason/workspace/project
-    command: ["chapter", "proxy", "--role", "writer", "--transport", "streamable-http"]
-    restart: "no"
-`;
-      const composeDir = path.join(workspaceDir, "e2e-compose-proxy");
-      fs.mkdirSync(composeDir, { recursive: true });
-      composeFile = path.join(composeDir, "docker-compose.yml");
-      fs.writeFileSync(composeFile, composeContent);
-    });
+      // Use the CLI to build, generate compose, and start the proxy — just like a user would
+      const output = chapterExec(
+        ["run", "--role", "writer", "--agent-type", "mcp", "--proxy-only", "--proxy-port", String(PROXY_PORT)],
+        workspaceDir,
+        { timeout: 240_000 },
+      );
+      proxyInfo = JSON.parse(output);
+    }, 240_000);
 
     afterAll(() => {
-      if (!isDockerAvailable()) return;
+      if (!isDockerAvailable() || !proxyInfo) return;
       try {
         execSync(
-          `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" down --rmi local --volumes`,
+          `docker compose -f "${proxyInfo.composeFile}" down --rmi local --volumes`,
           { stdio: "pipe", timeout: 60_000 },
         );
       } catch { /* best-effort cleanup */ }
     });
 
-    it("builds Docker images", () => {
-      if (!isDockerAvailable()) return;
-      execSync(
-        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" build`,
-        { cwd: dockerDir, stdio: "pipe", timeout: 180_000 },
-      );
-    }, 190_000);
-
-    it("starts proxy service", () => {
-      if (!isDockerAvailable()) return;
-      execSync(
-        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d proxy-writer`,
-        { stdio: "pipe", timeout: 60_000 },
-      );
-
-      const ps = execSync(
-        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" ps --format json`,
-        { stdio: "pipe", timeout: 10_000 },
-      ).toString();
-      expect(ps).toContain("proxy-writer");
-    }, 65_000);
-
     it("proxy health endpoint responds", async () => {
       if (!isDockerAvailable()) return;
-      await waitForHealth(`http://localhost:${PROXY_PORT}/health`, 30_000, {
-        composeProject: COMPOSE_PROJECT,
-        composeFile,
-        service: "proxy-writer",
-      });
+      await waitForHealth(`http://localhost:${PROXY_PORT}/health`, 30_000);
     }, 35_000);
 
     it("MCP client lists governed filesystem tools", async () => {
@@ -283,7 +247,7 @@ services:
         new URL(`http://localhost:${PROXY_PORT}/mcp`),
         {
           requestInit: {
-            headers: { Authorization: `Bearer ${PROXY_TOKEN}` },
+            headers: { Authorization: `Bearer ${proxyInfo.proxyToken}` },
           },
         },
       );

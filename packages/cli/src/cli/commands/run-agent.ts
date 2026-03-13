@@ -408,6 +408,7 @@ function createRunAction() {
     positionalAgentType: string | undefined,
     options: {
       acp?: boolean;
+      proxyOnly?: boolean;
       agentType?: string;
       role?: string;
       proxyPort: string;
@@ -434,7 +435,9 @@ function createRunAction() {
       }
     }
 
-    if (options.acp) {
+    if (options.proxyOnly) {
+      await runProxyOnly(process.cwd(), resolvedAgentType, role, parseInt(options.proxyPort, 10));
+    } else if (options.acp) {
       await runAgent(process.cwd(), resolvedAgentType, role, undefined, {
         acp: true,
         proxyPort: parseInt(options.proxyPort, 10),
@@ -453,6 +456,7 @@ export function registerRunCommand(program: Command): void {
     .option("--acp", "Start in ACP mode for editor integration")
     .option("--role <name>", "Role name to run (required)")
     .option("--agent-type <name>", "Agent type (alternative to positional argument, overrides inference)")
+    .option("--proxy-only", "Start proxy infrastructure only, output connection info as JSON")
     .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
     .addHelpText("after", RUN_ACP_AGENT_HELP_EPILOG)
     .action(createRunAction());
@@ -637,6 +641,104 @@ async function runAgentInteractiveMode(
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\n  agent failed: ${message}\n`);
     process.exit(1);
+  }
+}
+
+// ── Proxy-Only Mode ───────────────────────────────────────────────────
+
+/**
+ * Start only the proxy infrastructure (no agent, no credential service).
+ * Outputs connection info as JSON to stdout and returns.
+ */
+export async function runProxyOnly(
+  projectDir: string,
+  agentOverride: string | undefined,
+  role: string,
+  proxyPort: number,
+  deps?: RunAgentDeps,
+): Promise<void> {
+  const execCompose = deps?.execComposeFn ?? execComposeCommand;
+  const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
+  const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
+  const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
+
+  // Redirect console.log to stderr so only JSON goes to stdout
+  const origLog = console.log;
+  console.log = (...args: unknown[]) => console.error(...args);
+
+  try {
+  // 1. Pre-flight: check docker compose is available
+  checkDocker();
+
+  // 2. Resolve role from project directory
+  const roleType = await resolveRoleFn(role, projectDir);
+  const roleName = getAppShortName(roleType.metadata.name);
+
+  // 3. Infer or override agent type
+  const agentType = agentOverride ?? inferAgentType(roleType);
+
+  // 4. Ensure docker build artifacts exist (auto-build if missing)
+  const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
+    roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn },
+  );
+
+  // 5. Ensure .clawmasons is in project's .gitignore
+  ensureGitignore(projectDir, ".clawmasons");
+
+  // 6. Generate session ID and create session directory
+  const sessionId = (deps?.generateSessionIdFn ?? generateSessionId)();
+  const sessionDir = path.join(projectDir, ".clawmasons", "sessions", sessionId);
+  const dockerSessionDir = path.join(sessionDir, "docker");
+  fs.mkdirSync(dockerSessionDir, { recursive: true });
+
+  const logsDir = path.join(sessionDir, "logs");
+  fs.mkdirSync(logsDir, { recursive: true });
+
+  // 7. Generate tokens and docker-compose.yml
+  const proxyToken = crypto.randomBytes(32).toString("hex");
+  const credentialProxyToken = crypto.randomBytes(32).toString("hex");
+
+  const composeContent = generateComposeYml({
+    dockerBuildDir,
+    dockerDir,
+    projectDir,
+    agent: agentType,
+    role: roleName,
+    logsDir,
+    proxyToken,
+    credentialProxyToken,
+    proxyPort,
+    roleMounts: roleType.container?.mounts,
+  });
+
+  const composeFile = path.join(dockerSessionDir, "docker-compose.yml");
+  fs.writeFileSync(composeFile, composeContent);
+
+  // 8. Build and start proxy detached
+  const proxyServiceName = `proxy-${roleName}`;
+
+  const buildCode = await execCompose(composeFile, ["build", proxyServiceName]);
+  if (buildCode !== 0) {
+    throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+  }
+
+  const upCode = await execCompose(composeFile, ["up", "-d", proxyServiceName]);
+  if (upCode !== 0) {
+    throw new Error(`Failed to start proxy (exit code ${upCode}).`);
+  }
+
+  // 9. Output connection info as JSON to stdout
+  const info = {
+    proxyPort,
+    proxyToken,
+    composeFile,
+    proxyServiceName,
+    sessionId,
+  };
+  origLog(JSON.stringify(info));
+
+  } finally {
+    console.log = origLog;
   }
 }
 

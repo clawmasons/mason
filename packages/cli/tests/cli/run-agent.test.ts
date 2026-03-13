@@ -9,6 +9,7 @@ import {
   resolveRequiredCredentials,
   displayCredentials,
   runAgent,
+  runProxyOnly,
   resolveAgentType,
   isKnownAgentType,
   getKnownAgentTypeNames,
@@ -793,5 +794,149 @@ describe("runAgent", () => {
     const logsDir = path.join(projectDir, ".clawmasons", "sessions", "logs0001", "logs");
     expect(fs.existsSync(logsDir)).toBe(true);
     expect(fs.statSync(logsDir).isDirectory()).toBe(true);
+  });
+});
+
+// ── runProxyOnly ─────────────────────────────────────────────────────────
+
+describe("runProxyOnly", () => {
+  let tmpDir: string;
+  let projectDir: string;
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  function makeRoleType(overrides?: Partial<RoleType>): RoleType {
+    return {
+      metadata: { name: "role-writer", version: "1.0.0" },
+      source: {
+        agentDialect: "claude-code",
+        agentDir: ".claude",
+        roleDir: path.join(projectDir, ".claude", "roles", "writer"),
+      },
+      skills: [],
+      commands: [],
+      tools: [],
+      apps: [],
+      ...overrides,
+    } as RoleType;
+  }
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-proxy-only-test-"));
+    projectDir = path.join(tmpDir, "my-project");
+    fs.mkdirSync(projectDir, { recursive: true });
+
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Pre-create docker build dirs
+    const dockerDir = path.join(projectDir, ".clawmasons", "docker");
+    const dockerBuildDir = path.join(dockerDir, "writer");
+    fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
+    fs.writeFileSync(path.join(dockerBuildDir, "claude-code", "Dockerfile"), "FROM node:20\n");
+    fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
+    fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeDeps(overrides?: { sessionId?: string; buildExitCode?: number; upExitCode?: number }) {
+    const calls: Array<{ composeFile: string; args: string[] }> = [];
+
+    return {
+      calls,
+      deps: {
+        generateSessionIdFn: () => overrides?.sessionId ?? "proxy001",
+        checkDockerComposeFn: () => {},
+        resolveRoleFn: async () => makeRoleType(),
+        ensureGitignoreEntryFn: () => false,
+        existsSyncFn: (p: string) => fs.existsSync(p),
+        execComposeFn: async (composeFile: string, args: string[]) => {
+          calls.push({ composeFile, args });
+          if (args.includes("build")) return overrides?.buildExitCode ?? 0;
+          if (args.includes("-d")) return overrides?.upExitCode ?? 0;
+          return 0;
+        },
+        startCredentialServiceFn: async () => ({ disconnect: () => {}, close: () => {} }),
+      },
+    };
+  }
+
+  it("builds proxy then starts it detached", async () => {
+    const { calls, deps } = makeDeps();
+
+    await runProxyOnly(projectDir, "claude-code", "writer", 19700, deps);
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.args).toContain("build");
+    expect(calls[0]!.args).toContain("proxy-writer");
+    expect(calls[1]!.args).toContain("up");
+    expect(calls[1]!.args).toContain("-d");
+    expect(calls[1]!.args).toContain("proxy-writer");
+  });
+
+  it("does NOT start agent or credential service", async () => {
+    const { calls, deps } = makeDeps();
+
+    await runProxyOnly(projectDir, "claude-code", "writer", 3000, deps);
+
+    // Only 2 compose calls: build + up (no agent run, no down)
+    expect(calls).toHaveLength(2);
+    const allArgs = calls.flatMap((c) => c.args);
+    expect(allArgs).not.toContain("agent-writer");
+    expect(allArgs).not.toContain("--service-ports");
+  });
+
+  it("outputs JSON with connection info to stdout", async () => {
+    const { deps } = makeDeps({ sessionId: "json0001" });
+
+    await runProxyOnly(projectDir, "claude-code", "writer", 19700, deps);
+
+    // logSpy captures the JSON output (origLog is called once with JSON)
+    const jsonCall = logSpy.mock.calls.find((call) => {
+      try { JSON.parse(call[0] as string); return true; } catch { return false; }
+    });
+    expect(jsonCall).toBeDefined();
+
+    const info = JSON.parse(jsonCall![0] as string);
+    expect(info.proxyPort).toBe(19700);
+    expect(info.proxyToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(info.composeFile).toContain("json0001");
+    expect(info.proxyServiceName).toBe("proxy-writer");
+    expect(info.sessionId).toBe("json0001");
+  });
+
+  it("throws when proxy build fails", async () => {
+    const { deps } = makeDeps({ buildExitCode: 1 });
+
+    await expect(
+      runProxyOnly(projectDir, "claude-code", "writer", 3000, deps),
+    ).rejects.toThrow("Failed to build proxy image");
+  });
+
+  it("throws when proxy start fails", async () => {
+    const { deps } = makeDeps({ upExitCode: 1 });
+
+    await expect(
+      runProxyOnly(projectDir, "claude-code", "writer", 3000, deps),
+    ).rejects.toThrow("Failed to start proxy");
+  });
+
+  it("creates compose file with correct paths", async () => {
+    const { deps } = makeDeps({ sessionId: "path0001" });
+
+    await runProxyOnly(projectDir, "claude-code", "writer", 3000, deps);
+
+    const composeFile = path.join(
+      projectDir, ".clawmasons", "sessions", "path0001", "docker", "docker-compose.yml",
+    );
+    expect(fs.existsSync(composeFile)).toBe(true);
+
+    const content = fs.readFileSync(composeFile, "utf-8");
+    expect(content).toContain("proxy-writer:");
+    expect(content).toContain("agent-writer:");
+    expect(content).toContain(`"${projectDir}:/home/mason/workspace/project"`);
   });
 });
