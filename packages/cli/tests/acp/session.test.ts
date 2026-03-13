@@ -173,6 +173,23 @@ describe("generateAcpComposeYml", () => {
     expect(proxySection).toContain("CHAPTER_SESSION_TYPE=acp");
   });
 
+  it("proxy has PROJECT_DIR env set to project mount path", () => {
+    const yml = generateAcpComposeYml(defaultOpts);
+    const proxySection = yml.split("agent-writer:")[0]!;
+
+    expect(proxySection).toContain("PROJECT_DIR=/home/mason/workspace/project");
+  });
+
+  it("proxy mounts projectDir when provided", () => {
+    const yml = generateAcpComposeYml({
+      ...defaultOpts,
+      projectDir: "/projects/my-project",
+    });
+    const proxySection = yml.split("agent-writer:")[0]!;
+
+    expect(proxySection).toContain('"/projects/my-project:/home/mason/workspace/project"');
+  });
+
   it("proxy exposes port to host when proxyPort is set", () => {
     const yml = generateAcpComposeYml({ ...defaultOpts, proxyPort: 3000 });
     const proxySection = yml.split("agent-writer:")[0]!;

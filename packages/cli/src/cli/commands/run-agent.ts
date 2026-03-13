@@ -208,11 +208,12 @@ services:
       context: "${dockerDir}"
       dockerfile: "${proxyDockerfile}"
     volumes:
-      - "${projectDir}:/home/mason/workspace/project:ro"
+      - "${projectDir}:/home/mason/workspace/project"
       - "${logsDir}:/logs"
     environment:
       - CHAPTER_PROXY_TOKEN=${proxyToken}
       - CREDENTIAL_PROXY_TOKEN=${credentialProxyToken}
+      - PROJECT_DIR=/home/mason/workspace/project
     ports:
       - "${proxyPort}:9090"
     restart: "no"
@@ -572,6 +573,7 @@ async function runAgentInteractiveMode(
       proxyToken,
       credentialProxyToken,
       proxyPort,
+      roleMounts: roleType.container?.mounts,
     });
 
     const composeFile = path.join(dockerSessionDir, "docker-compose.yml");

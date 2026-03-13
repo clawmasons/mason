@@ -222,9 +222,9 @@ services:
       - "${PROXY_PORT}:9090"
     volumes:
       - "${workspaceDir}:/home/mason/workspace/project"
-      - "${notesDir}:/app/notes"
     environment:
       - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
+      - PROJECT_DIR=/home/mason/workspace/project
     command: ["chapter", "proxy", "--role", "writer", "--transport", "streamable-http"]
     restart: "no"
 `;

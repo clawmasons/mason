@@ -103,7 +103,8 @@ export async function startProxy(
     db = openDatabase();
 
     // ── Step 6: Start upstream MCP clients ─────────────────────────────
-    const appConfigs = collectApps(agent, loadedEnv);
+    const projectDir = process.env.PROJECT_DIR;
+    const appConfigs = collectApps(agent, loadedEnv, projectDir);
     upstream = new UpstreamManager(appConfigs);
 
     const timeoutMs = options.startupTimeout
@@ -242,6 +243,7 @@ function resolveRoleName(
 function collectApps(
   agent: ResolvedAgent,
   loadedEnv: Record<string, string>,
+  cwd?: string,
 ): UpstreamAppConfig[] {
   const seen = new Map<string, UpstreamAppConfig>();
 
@@ -257,6 +259,7 @@ function collectApps(
         name: app.name,
         app,
         env: resolvedEnv,
+        cwd,
       });
     }
   }

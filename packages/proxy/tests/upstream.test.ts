@@ -156,6 +156,17 @@ describe("proxy/upstream", () => {
       expect(transport).toHaveProperty("type", "streamableHttp");
     });
 
+    it("passes cwd to StdioClientTransport when provided", () => {
+      const config: UpstreamAppConfig = {
+        name: "github",
+        app: makeStdioApp(),
+        env: { GITHUB_TOKEN: "ghp_test" },
+        cwd: "/home/mason/workspace/project",
+      };
+      const transport = createTransport(config) as unknown as { type: string; params: Record<string, unknown> };
+      expect(transport.params).toHaveProperty("cwd", "/home/mason/workspace/project");
+    });
+
     it("throws for stdio app without command", () => {
       const config: UpstreamAppConfig = {
         name: "broken",

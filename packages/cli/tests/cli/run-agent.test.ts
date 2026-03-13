@@ -284,6 +284,21 @@ describe("generateComposeYml", () => {
     expect(proxySection).toContain("CREDENTIAL_PROXY_TOKEN=cred-token-xyz");
   });
 
+  it("includes PROJECT_DIR in proxy environment", () => {
+    const yml = generateComposeYml(defaultOpts);
+
+    const proxySection = yml.split("agent-writer:")[0]!;
+    expect(proxySection).toContain("PROJECT_DIR=/home/mason/workspace/project");
+  });
+
+  it("proxy project mount is read-write (no :ro)", () => {
+    const yml = generateComposeYml(defaultOpts);
+
+    const proxySection = yml.split("agent-writer:")[0]!;
+    expect(proxySection).toContain(`"${defaultOpts.projectDir}:/home/mason/workspace/project"`);
+    expect(proxySection).not.toContain("/home/mason/workspace/project:ro");
+  });
+
   it("agent depends on proxy directly", () => {
     const yml = generateComposeYml(defaultOpts);
 
