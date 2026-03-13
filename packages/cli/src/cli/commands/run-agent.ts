@@ -16,7 +16,7 @@ import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
 import { CredentialService, CredentialWSClient } from "@clawmasons/credential-service";
 import { createFileLogger, type AcpLogger } from "../../acp/logger.js";
 import { generateRoleDockerBuildDir } from "../../materializer/docker-generator.js";
-import { ensureProxyDependencies } from "../../materializer/proxy-dependencies.js";
+import { ensureProxyDependencies, synthesizeRolePackages } from "../../materializer/proxy-dependencies.js";
 
 // ── Role-based Agent Resolution ───────────────────────────────────────
 
@@ -184,13 +184,14 @@ export function generateComposeYml(opts: {
   credentialProxyToken: string;
   proxyPort?: number;
   roleMounts?: RoleMount[];
+  credentialKeys?: string[];
 }): string {
-  const { dockerBuildDir, dockerDir, projectDir, agent, role, logsDir, proxyToken, credentialProxyToken, proxyPort = 3000, roleMounts } = opts;
+  const { dockerBuildDir, dockerDir, projectDir, agent, role, logsDir, proxyToken, credentialProxyToken, proxyPort = 3000, roleMounts, credentialKeys } = opts;
 
   // Proxy: context is dockerDir (has node_modules), dockerfile is role-specific
   const proxyDockerfile = path.relative(dockerDir, path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"));
-  // Agent: context is the agent-type subdirectory
-  const agentContext = path.join(dockerBuildDir, agent);
+  // Agent: context is dockerDir (has node_modules), dockerfile is role/agent-type specific
+  const agentDockerfile = path.relative(dockerDir, path.join(dockerBuildDir, agent, "Dockerfile"));
 
   const proxyServiceName = `proxy-${role}`;
   const agentServiceName = `agent-${role}`;
@@ -213,22 +214,22 @@ services:
     environment:
       - CHAPTER_PROXY_TOKEN=${proxyToken}
       - CREDENTIAL_PROXY_TOKEN=${credentialProxyToken}
-      - PROJECT_DIR=/home/mason/workspace/project
+      - PROJECT_DIR=/home/mason/workspace/project${credentialKeys && credentialKeys.length > 0 ? `\n      - CHAPTER_DECLARED_CREDENTIALS=${JSON.stringify(credentialKeys)}` : ""}
     ports:
       - "${proxyPort}:9090"
     restart: "no"
 
   ${agentServiceName}:
     build:
-      context: "${agentContext}"
-      dockerfile: Dockerfile
+      context: "${dockerDir}"
+      dockerfile: "${agentDockerfile}"
     volumes:
 ${agentVolumeLines.join("\n")}
     depends_on:
       - ${proxyServiceName}
     environment:
       - MCP_PROXY_TOKEN=${proxyToken}
-      - MCP_PROXY_URL=http://${proxyServiceName}:9090
+      - MCP_PROXY_URL=http://${proxyServiceName}:9090${credentialKeys && credentialKeys.length > 0 ? `\n      - AGENT_CREDENTIALS=${JSON.stringify(credentialKeys)}` : ""}
     stdin_open: true
     tty: true
     init: true
@@ -323,6 +324,9 @@ async function ensureDockerBuild(
     // Populate shared proxy dependencies
     ensureProxyDependencies(dockerDir, projectDir);
 
+    // Synthesize inline app/role packages (e.g. mcp_servers from ROLE.md)
+    synthesizeRolePackages(roleType, dockerDir);
+
     console.log(`  Docker artifacts built at .clawmasons/docker/${roleName}/`);
   }
 
@@ -391,6 +395,8 @@ export interface RunAgentDeps {
     credentialProxyToken: string;
     envCredentials: Record<string, string>;
   }) => Promise<{ disconnect: () => void; close: () => void }>;
+  /** Override proxy health check (for testing). */
+  waitForProxyHealthFn?: (url: string, timeoutMs: number) => Promise<void>;
   /** Override logger creation (for testing, ACP mode). */
   createLoggerFn?: (logDir: string) => AcpLogger;
 }
@@ -443,7 +449,9 @@ function createRunAction() {
         proxyPort: parseInt(options.proxyPort, 10),
       });
     } else {
-      await runAgent(process.cwd(), resolvedAgentType, role);
+      await runAgent(process.cwd(), resolvedAgentType, role, undefined, {
+        proxyPort: parseInt(options.proxyPort, 10),
+      });
     }
   };
 }
@@ -529,6 +537,7 @@ async function runAgentInteractiveMode(
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
   const startCredService = deps?.startCredentialServiceFn ?? defaultStartCredentialService;
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
+  const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
 
   try {
     // 1. Pre-flight: check docker compose is available
@@ -567,6 +576,16 @@ async function runAgentInteractiveMode(
     const proxyToken = crypto.randomBytes(32).toString("hex");
     const credentialProxyToken = crypto.randomBytes(32).toString("hex");
 
+    // Collect declared credential keys from the role
+    const declaredCredentialKeys = [...(roleType.governance?.credentials ?? [])];
+    for (const app of roleType.apps ?? []) {
+      for (const key of app.credentials ?? []) {
+        if (!declaredCredentialKeys.includes(key)) {
+          declaredCredentialKeys.push(key);
+        }
+      }
+    }
+
     const composeContent = generateComposeYml({
       dockerBuildDir,
       dockerDir,
@@ -578,15 +597,26 @@ async function runAgentInteractiveMode(
       credentialProxyToken,
       proxyPort,
       roleMounts: roleType.container?.mounts,
+      credentialKeys: declaredCredentialKeys,
     });
 
     const composeFile = path.join(dockerSessionDir, "docker-compose.yml");
     fs.writeFileSync(composeFile, composeContent);
     console.log(`  Compose: .clawmasons/sessions/${sessionId}/docker/docker-compose.yml`);
 
-    // 8. Start proxy detached
+    // 8. Build and start proxy detached
     const proxyServiceName = `proxy-${roleName}`;
-    console.log(`\n  Starting proxy (${proxyServiceName})...`);
+    console.log(`\n  Building proxy (${proxyServiceName})...`);
+
+    const buildCode = await execCompose(
+      composeFile,
+      ["build", proxyServiceName],
+    );
+    if (buildCode !== 0) {
+      throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+    }
+
+    console.log(`  Starting proxy (${proxyServiceName})...`);
 
     const proxyCode = await execCompose(
       composeFile,
@@ -597,7 +627,16 @@ async function runAgentInteractiveMode(
     }
     console.log(`  Proxy started in background.`);
 
-    // 9. Start credential service in-process
+    // 8b. Wait for proxy health before connecting credential service
+    console.log(`  Waiting for proxy to be ready...`);
+    await waitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
+    console.log(`  Proxy ready.`);
+
+    // 9. Collect env credentials and start credential service in-process
+    const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
+    const resolvedAgent = adaptRoleFn(roleType, agentType);
+    const envCredentials = collectEnvCredentials(resolvedAgent);
+
     console.log(`  Starting credential service (in-process)...`);
 
     let credServiceHandle: { disconnect: () => void; close: () => void } | null = null;
@@ -605,7 +644,7 @@ async function runAgentInteractiveMode(
       credServiceHandle = await startCredService({
         proxyPort,
         credentialProxyToken,
-        envCredentials: {},
+        envCredentials,
       });
       console.log(`  Credential service connected to proxy.`);
     } catch (err) {
@@ -616,9 +655,17 @@ async function runAgentInteractiveMode(
     const agentServiceName = `agent-${roleName}`;
     console.log(`  Starting agent (${agentServiceName})...\n`);
 
+    // When stdin is not a TTY (e.g. piped from a test), pass -T to disable
+    // pseudo-TTY allocation so docker compose run works with piped stdio.
+    const runArgs = ["run", "--rm", "--service-ports"];
+    if (!process.stdin.isTTY) {
+      runArgs.push("-T");
+    }
+    runArgs.push(agentServiceName);
+
     const agentCode = await execCompose(
       composeFile,
-      ["run", "--rm", "--service-ports", agentServiceName],
+      runArgs,
       { interactive: true },
     );
 
@@ -953,6 +1000,20 @@ async function runAgentAcpMode(
     try { log.close(); } catch { /* best-effort */ }
     process.exit(1);
   }
+}
+
+// ── Default proxy health check ─────────────────────────────────────────
+
+async function defaultWaitForProxyHealth(url: string, timeoutMs: number): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const resp = await fetch(url);
+      if (resp.ok) return;
+    } catch { /* not ready yet */ }
+    await new Promise((r) => setTimeout(r, 1_000));
+  }
+  throw new Error(`Proxy health endpoint did not become ready within ${timeoutMs}ms`);
 }
 
 // ── Default credential service startup ────────────────────────────────

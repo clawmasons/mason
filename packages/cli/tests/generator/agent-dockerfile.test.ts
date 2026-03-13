@@ -173,7 +173,7 @@ describe("generateAgentDockerfile", () => {
     const writerRole = agent.roles[0];
     const result = generateAgentDockerfile(agent, writerRole);
 
-    expect(result).toContain("COPY agent/note-taker/writer/workspace/");
+    expect(result).toContain("COPY writer/claude-code/workspace/");
     expect(result).toContain("/home/mason/workspace/");
   });
 
@@ -234,8 +234,8 @@ describe("generateAgentDockerfile", () => {
     const reviewerResult = generateAgentDockerfile(agent, agent.roles[1]);
 
     // They should differ in workspace COPY paths
-    expect(writerResult).toContain("agent/note-taker/writer/workspace/");
-    expect(reviewerResult).toContain("agent/note-taker/reviewer/workspace/");
+    expect(writerResult).toContain("writer/claude-code/workspace/");
+    expect(reviewerResult).toContain("reviewer/claude-code/workspace/");
   });
 
   // ── ACP Mode Tests ────────────────────────────────────────────────────

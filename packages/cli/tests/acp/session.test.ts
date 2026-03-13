@@ -227,9 +227,9 @@ describe("generateAcpComposeYml", () => {
     expect(yml).toContain(`context: "${defaultOpts.dockerDir}"`);
     expect(yml).toContain('dockerfile: "writer/mcp-proxy/Dockerfile"');
 
-    // Agent: context is {dockerBuildDir}/{agent-type}/, dockerfile is Dockerfile
-    expect(yml).toContain(`context: "${defaultOpts.dockerBuildDir}/note-taker"`);
-    expect(yml).toContain("dockerfile: Dockerfile");
+    // Agent: context is dockerDir, dockerfile is relative path
+    expect(yml).toContain(`context: "${defaultOpts.dockerDir}"`);
+    expect(yml).toContain('dockerfile: "writer/note-taker/Dockerfile"');
   });
 
   it("includes acpClient in proxy env when provided", () => {

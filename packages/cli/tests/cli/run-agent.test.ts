@@ -14,7 +14,7 @@ import {
   isKnownAgentType,
   getKnownAgentTypeNames,
 } from "../../src/cli/commands/run-agent.js";
-import type { RoleType } from "@clawmasons/shared";
+import type { RoleType, ResolvedAgent } from "@clawmasons/shared";
 
 // ── Command Registration ────────────────────────────────────────────────
 
@@ -261,9 +261,9 @@ describe("generateComposeYml", () => {
     expect(yml).toContain(`context: "${defaultOpts.dockerDir}"`);
     expect(yml).toContain("mcp-proxy/Dockerfile");
 
-    // Agent: context is dockerBuildDir/agent-type
-    expect(yml).toContain(`context: "${defaultOpts.dockerBuildDir}/claude-code"`);
-    expect(yml).toContain("dockerfile: Dockerfile");
+    // Agent: context is dockerDir, dockerfile is relative path
+    expect(yml).toContain(`context: "${defaultOpts.dockerDir}"`);
+    expect(yml).toContain('dockerfile: "writer/claude-code/Dockerfile"');
 
     // Volumes: project mount uses /home/mason/workspace/project
     expect(yml).toContain(`"${defaultOpts.projectDir}:/home/mason/workspace/project"`);
@@ -352,7 +352,7 @@ describe("generateComposeYml", () => {
     expect(yml).toContain("proxy-reviewer:");
     expect(yml).toContain("agent-reviewer:");
     expect(yml).toContain(`context: "${defaultOpts.dockerDir}"`);
-    expect(yml).toContain(`context: "/projects/my-project/.clawmasons/docker/reviewer/codex"`);
+    expect(yml).toContain('dockerfile: "reviewer/codex/Dockerfile"');
   });
 
   it("includes role mounts in agent volumes", () => {
@@ -474,11 +474,21 @@ describe("runAgent", () => {
       deps: {
         generateSessionIdFn: () => overrides?.sessionId ?? "abcd1234",
         checkDockerComposeFn: () => {},
+        waitForProxyHealthFn: async () => {},
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         resolveRoleFn: async (_roleName: string, _projectDir: string) => {
           if (overrides?.resolveRoleError) throw overrides.resolveRoleError;
           return overrides?.roleType ?? makeRoleType();
         },
+        adaptRoleFn: () => ({
+          name: "writer",
+          version: "1.0.0",
+          agentName: "writer",
+          slug: "writer",
+          runtimes: ["claude-code"],
+          credentials: [],
+          roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
+        } as ResolvedAgent),
         ensureGitignoreEntryFn: (dir: string, pattern: string) => {
           if (overrides?.gitignoreCalled) {
             overrides.gitignoreCalled.called = true;
@@ -593,8 +603,14 @@ describe("runAgent", () => {
       checkDockerComposeFn: () => {},
       execComposeFn: async () => 0,
       resolveRoleFn: async () => makeRoleType(),
+      adaptRoleFn: () => ({
+        name: "writer", version: "1.0.0", agentName: "writer", slug: "writer",
+        runtimes: ["claude-code"], credentials: [],
+        roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
+      } as ResolvedAgent),
       ensureGitignoreEntryFn: () => false,
       existsSyncFn: (p: string) => fs.existsSync(p),
+      waitForProxyHealthFn: async () => {},
       startCredentialServiceFn: async () => ({ disconnect: () => {}, close: () => {} }),
     };
 
@@ -627,17 +643,21 @@ describe("runAgent", () => {
 
     await runAgent(projectDir, "claude-code", "writer", deps);
 
-    // First call: proxy up -d
-    expect(calls[0]!.args).toContain("up");
-    expect(calls[0]!.args).toContain("-d");
+    // First call: proxy build
+    expect(calls[0]!.args).toContain("build");
     expect(calls[0]!.args).toContain("proxy-writer");
 
-    // Second call: agent run (interactive)
-    expect(calls[1]!.args).toContain("run");
-    expect(calls[1]!.args).toContain("--rm");
-    expect(calls[1]!.args).toContain("--service-ports");
-    expect(calls[1]!.args).toContain("agent-writer");
-    expect(calls[1]!.opts?.interactive).toBe(true);
+    // Second call: proxy up -d
+    expect(calls[1]!.args).toContain("up");
+    expect(calls[1]!.args).toContain("-d");
+    expect(calls[1]!.args).toContain("proxy-writer");
+
+    // Third call: agent run (interactive)
+    expect(calls[2]!.args).toContain("run");
+    expect(calls[2]!.args).toContain("--rm");
+    expect(calls[2]!.args).toContain("--service-ports");
+    expect(calls[2]!.args).toContain("agent-writer");
+    expect(calls[2]!.opts?.interactive).toBe(true);
   });
 
   it("tears down all services after agent exits", async () => {
@@ -645,8 +665,8 @@ describe("runAgent", () => {
 
     await runAgent(projectDir, "claude-code", "writer", deps);
 
-    // Third call should be docker compose down (proxy up, agent run, down)
-    expect(calls[2]!.args).toContain("down");
+    // Fourth call should be docker compose down (build, up, agent run, down)
+    expect(calls[3]!.args).toContain("down");
   });
 
   it("retains session directory after exit", async () => {
@@ -669,9 +689,8 @@ describe("runAgent", () => {
     const content = fs.readFileSync(composeFile, "utf-8");
 
     const dockerDir = path.join(projectDir, ".clawmasons", "docker");
-    const dockerBuildDir = path.join(dockerDir, "writer");
     expect(content).toContain(`context: "${dockerDir}"`);
-    expect(content).toContain(`context: "${dockerBuildDir}/claude-code"`);
+    expect(content).toContain('dockerfile: "writer/claude-code/Dockerfile"');
   });
 
   it("compose file has CREDENTIAL_PROXY_TOKEN in proxy", async () => {

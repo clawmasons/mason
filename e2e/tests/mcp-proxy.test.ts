@@ -1,5 +1,5 @@
 /**
- * E2E Test: MCP Agent with Claude-Native Project
+ * E2E Test: MCP Proxy with Claude-Native Project
  *
  * Exercises the full role-based pipeline using a native .claude format project:
  *   1. Copy claude-test-project fixture (inline mcp_servers, .claude/ commands/skills)
@@ -27,7 +27,7 @@ import {
   waitForHealth,
 } from "./helpers.js";
 
-describe("mcp-agent with claude-native project", () => {
+describe("mcp-proxy with claude-native project", () => {
   let workspaceDir: string;
   let dockerDir: string;
   let notesDir: string;

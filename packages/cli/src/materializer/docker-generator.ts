@@ -266,8 +266,8 @@ services:
 
   agent-${roleName}:
     build:
-      context: .
-      dockerfile: ${agentType}/Dockerfile
+      context: ..
+      dockerfile: ${roleName}/${agentType}/Dockerfile
     depends_on:
       - proxy-${roleName}
     environment:
@@ -428,8 +428,8 @@ ${proxyEnvLines.join("\n")}
 
   ${agentServiceName}:
     build:
-      context: ${relBuildDir}/${agentType}
-      dockerfile: Dockerfile
+      context: ${relDockerDir}
+      dockerfile: ${path.relative(dockerDir, path.join(dockerBuildDir, agentType, "Dockerfile"))}
     volumes:
 ${agentVolumeLines.join("\n")}
     depends_on:

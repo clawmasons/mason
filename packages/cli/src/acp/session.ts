@@ -200,9 +200,9 @@ export function generateAcpComposeYml(opts: {
   // dockerfile is the role-specific mcp-proxy/Dockerfile.
   const proxyDockerfile = path.relative(dockerDir, path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"));
 
-  // Agent: context is the role-specific {agent-type}/ directory,
-  // dockerfile is just "Dockerfile" inside that context.
-  const agentContext = path.join(dockerBuildDir, agent);
+  // Agent: context is the shared dockerDir (has node_modules),
+  // dockerfile is the role-specific {agent-type}/Dockerfile.
+  const agentDockerfile = path.relative(dockerDir, path.join(dockerBuildDir, agent, "Dockerfile"));
 
   const proxyServiceName = `proxy-${role}`;
   const agentServiceName = `agent-${role}`;
@@ -269,8 +269,8 @@ ${proxyEnvLines.join("\n")}${proxyPortsSection}
 
   ${agentServiceName}:
     build:
-      context: "${agentContext}"
-      dockerfile: Dockerfile${agentVolumesSection}
+      context: "${dockerDir}"
+      dockerfile: "${agentDockerfile}"${agentVolumesSection}
     depends_on:
       - ${proxyServiceName}
     environment:
