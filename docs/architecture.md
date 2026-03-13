@@ -11,9 +11,9 @@ Clawmasons uses a two-container model for agent execution: an **MCP Proxy** for 
 
 ```mermaid
 graph TB
-    CLI["clawmasons agent"]
+    CLI["clawmasons run"]
     CLI -->|docker compose up| Proxy["MCP Proxy<br/>(tool filtering + audit)"]
-    CLI -->|docker compose run| Agent["Agent Container<br/>(Claude Code / Pi / MCP)"]
+    CLI -->|docker compose run| Agent["Agent Container<br/>(Claude Code / Codex / Aider)"]
     CLI -.-|in-process| CredSvc["Credential Service<br/>(secret resolution)"]
 
     Agent -->|MCP protocol| Proxy
@@ -23,9 +23,9 @@ graph TB
     Proxy -->|stdio / SSE / HTTP| AppN["App: ..."]
 ```
 
-## Agent Startup Sequence
+## Role Startup Sequence
 
-When you run `clawmasons agent <agent> <role>`, the following sequence executes. See [Initialization](initialization.md) for details on how the `.clawmasons` and chapter directories are set up before this point.
+When you run `clawmasons run <agent-type> --role <name>`, the following sequence executes. See [Initialization](initialization.md) for details on how the `.clawmasons` and chapter directories are set up before this point.
 
 ```mermaid
 sequenceDiagram
@@ -104,7 +104,7 @@ sequenceDiagram
     Proxy->>Proxy: Validate session token
     Proxy->>CS: Forward request via WebSocket
 
-    CS->>CS: Check credential is declared by agent
+    CS->>CS: Check credential is declared by role
 
     alt Not declared
         CS->>Audit: Log DENIED (undeclared)
@@ -120,7 +120,7 @@ sequenceDiagram
 
 ## ACP Mode Architecture
 
-In ACP (Agent Communication Protocol) mode (`clawmasons agent --acp`), clawmasons integrates directly with editors:
+In ACP (Agent Communication Protocol) mode (`clawmasons run <agent-type> --role <name> --acp`), clawmasons integrates directly with editors:
 
 ```mermaid
 sequenceDiagram
@@ -154,15 +154,16 @@ sequenceDiagram
 
 ## Materializer Pattern
 
-The same agent definition is translated into runtime-specific configurations:
+The same role definition is translated into runtime-specific configurations via the ROLE_TYPES pipeline and dialect registry:
 
 | Runtime | Generated Artifacts |
 |---------|-------------------|
 | **Claude Code** | `.claude/` directory, `AGENTS.md`, `settings.json`, slash commands, skill files, Dockerfile |
-| **Pi-coding-agent** | `.pi/settings.json`, MCP extension config, task registration, Dockerfile |
+| **Codex** | Codex-native configuration, instruction files, Dockerfile |
+| **Aider** | Aider-native configuration, convention files, Dockerfile |
 | **MCP Agent** | Minimal config for testing (no LLM required) |
 
-The materializer reads the resolved agent graph and produces everything the runtime needs, including Dockerfiles, configuration files, and mounted skill/prompt content.
+The materializer reads the resolved role graph (ROLE_TYPES representation) and produces everything the runtime needs, including Dockerfiles, configuration files, and mounted skill/prompt content.
 
 ## Related
 

@@ -972,3 +972,160 @@ describe("ChapterProxyServer (prompts)", () => {
     expect(result.prompts[0]!.name).toBe("slack_standup");
   });
 });
+
+// ── Ready Gate Tests ─────────────────────────────────────────────────
+
+describe("ChapterProxyServer (readyGate)", () => {
+  let server: ChapterProxyServer;
+  let client: Client;
+
+  afterEach(async () => {
+    try { await client?.close(); } catch { /* */ }
+    try { await server?.stop(); } catch { /* */ }
+  });
+
+  it("health endpoint works before readyGate resolves", async () => {
+    const port = getPort();
+    let resolveReady!: () => void;
+    const readyGate = new Promise<void>((r) => { resolveReady = r; });
+
+    const router = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream, readyGate });
+    await server.start();
+
+    // Health should respond immediately
+    const resp = await fetch(`http://localhost:${port}/health`);
+    expect(resp.status).toBe(200);
+    expect(await resp.text()).toBe("ok");
+
+    resolveReady();
+  });
+
+  it("listTools returns only credential_request before readyGate, full list after", async () => {
+    const port = getPort();
+    let resolveReady!: () => void;
+    const readyGate = new Promise<void>((r) => { resolveReady = r; });
+
+    const tools = [makeTool("github_create_pr")];
+    const router = createMockRouter(tools, new Map());
+    const upstream = createMockUpstream();
+
+    server = new ChapterProxyServer({
+      port, transport: "streamable-http", router, upstream, readyGate,
+      credentialProxyToken: "test-cred-token",
+    });
+    await server.start();
+
+    client = await connectClient(port, "streamable-http");
+
+    // Before gate resolves: listTools should return immediately with only credential_request
+    const earlyResult = await client.listTools();
+    expect(earlyResult.tools).toHaveLength(1);
+    expect(earlyResult.tools[0]!.name).toBe("credential_request");
+
+    // Resolve gate and let microtask queue flush
+    resolveReady();
+    await new Promise((r) => setTimeout(r, 10));
+
+    // After gate resolves: listTools should return the full tool list
+    const fullResult = await client.listTools();
+    expect(fullResult.tools.length).toBeGreaterThanOrEqual(2);
+    const names = fullResult.tools.map((t) => t.name);
+    expect(names).toContain("github_create_pr");
+    expect(names).toContain("credential_request");
+  });
+
+  it("listTools returns full tool list after readyGate resolves", async () => {
+    const port = getPort();
+    let resolveReady!: () => void;
+    const readyGate = new Promise<void>((r) => { resolveReady = r; });
+
+    const tools = [makeTool("github_create_pr"), makeTool("slack_send")];
+    const router = createMockRouter(tools, new Map());
+    const upstream = createMockUpstream();
+
+    server = new ChapterProxyServer({
+      port, transport: "streamable-http", router, upstream, readyGate,
+      credentialProxyToken: "test-cred-token",
+    });
+    await server.start();
+
+    // Resolve the gate before connecting
+    resolveReady();
+    // Let microtask queue flush
+    await new Promise((r) => setTimeout(r, 10));
+
+    client = await connectClient(port, "streamable-http");
+    const result = await client.listTools();
+
+    // After ready: upstream tools + credential_request
+    expect(result.tools).toHaveLength(3);
+    const names = result.tools.map((t) => t.name);
+    expect(names).toContain("github_create_pr");
+    expect(names).toContain("slack_send");
+    expect(names).toContain("credential_request");
+  });
+
+  it("callTool for upstream tools blocks until readyGate resolves", async () => {
+    const port = getPort();
+    let resolveReady!: () => void;
+    const readyGate = new Promise<void>((r) => { resolveReady = r; });
+
+    const route = makeRouteEntry("@clawmasons/app-github", "github", "create_pr");
+    const routes = new Map([["github_create_pr", route]]);
+    const router = createMockRouter([route.tool], routes);
+    const upstream = createMockUpstream({ content: [{ type: "text", text: "PR created" }] });
+
+    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream, readyGate });
+    await server.start();
+
+    client = await connectClient(port, "streamable-http");
+
+    // Start the tool call — it should block on readyGate
+    let resolved = false;
+    const callPromise = client.callTool({ name: "github_create_pr", arguments: {} }).then((r) => {
+      resolved = true;
+      return r;
+    });
+
+    // Give it a tick — should still be pending
+    await new Promise((r) => setTimeout(r, 50));
+    expect(resolved).toBe(false);
+
+    // Now resolve the gate
+    resolveReady();
+    const result = await callPromise;
+    expect(resolved).toBe(true);
+    expect((upstream as unknown as { callTool: ReturnType<typeof vi.fn> }).callTool).toHaveBeenCalled();
+    expect(result.content).toEqual([{ type: "text", text: "PR created" }]);
+  });
+
+  it("setRouting updates router after construction", async () => {
+    const port = getPort();
+    let resolveReady!: () => void;
+    const readyGate = new Promise<void>((r) => { resolveReady = r; });
+
+    // Start with empty router
+    const emptyRouter = createMockRouter([], new Map());
+    const upstream = createMockUpstream();
+
+    server = new ChapterProxyServer({ port, transport: "streamable-http", router: emptyRouter, upstream, readyGate });
+    await server.start();
+
+    // Update routing and resolve gate
+    const tools = [makeTool("github_create_pr")];
+    const fullRouter = createMockRouter(tools, new Map());
+    server.setRouting({ router: fullRouter });
+    resolveReady();
+    await new Promise((r) => setTimeout(r, 10));
+
+    client = await connectClient(port, "streamable-http");
+    const result = await client.listTools();
+
+    // Should use the updated router
+    expect(result.tools).toHaveLength(1);
+    expect(result.tools[0]!.name).toBe("github_create_pr");
+  });
+});

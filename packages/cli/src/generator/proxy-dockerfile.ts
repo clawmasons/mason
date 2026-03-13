@@ -29,10 +29,18 @@ FROM node:22-slim
 
 WORKDIR /app
 
+# Cache V8-compiled bytecode across container restarts
+ENV NODE_COMPILE_CACHE=/app/.cache/v8
+# Direct npm/npx package cache into the persistent .cache volume
+ENV NPM_CONFIG_CACHE=/app/.cache/npm
+
 # Install build tools for native addons (e.g., better-sqlite3)
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
-# Copy pre-populated node_modules (all deps resolved by docker-init)
+# Copy esbuild-bundled proxy entry point (single file, fast boot)
+COPY proxy-bundle.cjs ./
+
+# Copy pre-populated node_modules (native addons + package.json for discovery)
 COPY package.json ./
 COPY node_modules/ ./node_modules/
 
@@ -41,12 +49,12 @@ RUN npm rebuild better-sqlite3
 
 # Create mason user and set up directories
 RUN groupadd -r mason && useradd -r -g mason -m mason \\
-    && mkdir -p /home/mason/data /logs \\
+    && mkdir -p /home/mason/data /logs /app/.cache/v8 /app/.cache/npm \\
     && chown -R mason:mason /app /home/mason/data /logs
 
 USER mason
 
-ENTRYPOINT ["node", "node_modules/.bin/clawmasons"]
-CMD ["chapter", "proxy", "--agent", "${agentName}", "--transport", "streamable-http"]
+ENTRYPOINT ["node", "proxy-bundle.cjs"]
+CMD ["--agent", "${agentName}", "--transport", "streamable-http"]
 `;
 }

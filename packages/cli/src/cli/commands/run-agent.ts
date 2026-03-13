@@ -4,29 +4,49 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { Readable, Writable } from "node:stream";
 import { spawn } from "node:child_process";
-import type { RunConfig } from "./run-init.js";
 import { checkDockerCompose } from "./docker-utils.js";
-import {
-  getClawmasonsHome,
-  findRoleEntryByRole,
-  resolveLodgeVars,
-  type ChapterEntry,
-} from "../../runtime/home.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
-import { initRole, type InitRoleOptions, type InitRoleDeps } from "./init-role.js";
 import { resolveRoleMountVolumes, type RoleMount } from "../../generator/mount-volumes.js";
-import type { DiscoveredPackage, ResolvedAgent } from "@clawmasons/shared";
-import { computeToolFilters } from "@clawmasons/shared";
+import type { ResolvedAgent, RoleType } from "@clawmasons/shared";
+import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName } from "@clawmasons/shared";
 import { ACP_RUNTIME_COMMANDS } from "../../materializer/common.js";
-import { discoverPackages } from "../../resolver/discover.js";
-import { resolveAgent } from "../../resolver/resolve.js";
+import { getRegisteredAgentTypes } from "../../materializer/role-materializer.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
 import { CredentialService, CredentialWSClient } from "@clawmasons/credential-service";
-import { initLodge, type LodgeInitOptions, type LodgeInitResult } from "./lodge-init.js";
-import { runInit, type InitOptions } from "./init.js";
-import { runBuild } from "./build.js";
 import { createFileLogger, type AcpLogger } from "../../acp/logger.js";
+import { generateRoleDockerBuildDir } from "../../materializer/docker-generator.js";
+import { ensureProxyDependencies, synthesizeRolePackages } from "../../materializer/proxy-dependencies.js";
+
+// ── Role-based Agent Resolution ───────────────────────────────────────
+
+/**
+ * Resolve a RoleType from a role name in the project directory.
+ */
+async function defaultResolveRole(
+  roleName: string,
+  projectDir: string,
+): Promise<RoleType> {
+  return resolveRoleByName(roleName, projectDir);
+}
+
+/**
+ * Resolve a ResolvedAgent from a RoleType and agent type.
+ */
+function defaultAdaptRole(
+  roleType: RoleType,
+  agentType: string,
+): ResolvedAgent {
+  return adaptRoleToResolvedAgent(roleType, agentType);
+}
+
+/**
+ * Infer the agent type from a RoleType's source dialect.
+ * Falls back to "claude-code" if not determinable.
+ */
+export function inferAgentType(roleType: RoleType): string {
+  return roleType.source.agentDialect ?? "claude-code";
+}
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -34,8 +54,6 @@ export interface RunAcpAgentOptions {
   agent?: string;
   role: string;
   proxyPort?: number;
-  chapter?: string;
-  initAgent?: string;
 }
 
 /**
@@ -45,70 +63,53 @@ export function generateSessionId(): string {
   return crypto.randomBytes(4).toString("hex");
 }
 
+// ── Agent Type Aliases ────────────────────────────────────────────────
+
 /**
- * Read and validate the run-init `.clawmasons/chapter.json` config
- * from the given project directory.
- *
- * @deprecated Kept for backward compatibility. `runAgent` now reads from
- * CLAWMASONS_HOME/chapters.json instead.
+ * Map user-friendly agent type names to internal materializer registry names.
  */
-export function readRunConfig(projectDir: string): RunConfig {
-  const configPath = path.join(projectDir, ".clawmasons", "chapter.json");
+export const AGENT_TYPE_ALIASES: Record<string, string> = {
+  claude: "claude-code",
+  codex: "codex",
+  aider: "aider",
+  pi: "pi-coding-agent",
+  mcp: "mcp-agent",
+};
 
-  if (!fs.existsSync(configPath)) {
-    throw new Error(
-      `No .clawmasons/chapter.json found. Run "clawmasons run-init" first to initialize the project.`,
-    );
-  }
+/**
+ * Resolve a user-provided agent type string to the internal materializer name.
+ * Checks aliases first, then the raw value against registered agent types.
+ *
+ * @returns The resolved agent type, or undefined if not recognized
+ */
+export function resolveAgentType(input: string): string | undefined {
+  // Check alias first
+  const aliased = AGENT_TYPE_ALIASES[input];
+  if (aliased) return aliased;
 
-  let raw: unknown;
-  try {
-    raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-  } catch {
-    throw new Error(`.clawmasons/chapter.json is not valid JSON.`);
-  }
+  // Check if it's a direct registered agent type
+  const registered = getRegisteredAgentTypes();
+  if (registered.includes(input)) return input;
 
-  if (
-    typeof raw !== "object" ||
-    raw === null ||
-    !("chapter" in raw) ||
-    typeof (raw as RunConfig).chapter !== "string" ||
-    !("docker-build" in raw) ||
-    typeof (raw as RunConfig)["docker-build"] !== "string"
-  ) {
-    throw new Error(
-      `.clawmasons/chapter.json must contain "chapter" and "docker-build" fields. Run "clawmasons run-init" to regenerate.`,
-    );
-  }
-
-  return raw as RunConfig;
+  return undefined;
 }
 
 /**
- * Validate that the docker-build path has the expected Dockerfiles
- * for the given agent and role.
+ * Check whether a string matches a known agent type (including aliases).
  */
-export function validateDockerfiles(
-  dockerBuildPath: string,
-  agent: string,
-  role: string,
-): { proxyDockerfile: string; agentDockerfile: string } {
-  const proxyDockerfile = path.join(dockerBuildPath, "proxy", role, "Dockerfile");
-  const agentDockerfile = path.join(dockerBuildPath, "agent", agent, role, "Dockerfile");
+export function isKnownAgentType(input: string): boolean {
+  return resolveAgentType(input) !== undefined;
+}
 
-  if (!fs.existsSync(proxyDockerfile)) {
-    throw new Error(
-      `Proxy Dockerfile not found: ${proxyDockerfile}\nRun "clawmasons build" in the chapter project to generate Dockerfiles.`,
-    );
+/**
+ * Get a user-friendly list of known agent type names (aliases + registered).
+ */
+export function getKnownAgentTypeNames(): string[] {
+  const names = new Set<string>(Object.keys(AGENT_TYPE_ALIASES));
+  for (const t of getRegisteredAgentTypes()) {
+    names.add(t);
   }
-
-  if (!fs.existsSync(agentDockerfile)) {
-    throw new Error(
-      `Agent Dockerfile not found: ${agentDockerfile}\nRun "clawmasons build" in the chapter project to generate Dockerfiles.`,
-    );
-  }
-
-  return { proxyDockerfile, agentDockerfile };
+  return [...names].sort();
 }
 
 /**
@@ -165,18 +166,16 @@ export function displayCredentials(
 }
 
 /**
- * Generate a docker-compose.yml for a run-agent session.
+ * Generate a docker-compose.yml for a run-agent interactive session.
  *
- * The compose file defines two services:
- * - proxy: built from the proxy Dockerfile, runs detached
- * - agent: built from the agent Dockerfile, runs interactively with stdin, depends on proxy
- *
- * The credential service runs in-process on the host (not in Docker).
- * The project directory is bind-mounted into both proxy and agent containers at /workspace.
- * The agent container receives only MCP_PROXY_TOKEN — no API keys.
+ * Uses the project-local docker build directory layout:
+ *   .clawmasons/docker/{role}/
+ *     {agent-type}/Dockerfile
+ *     mcp-proxy/Dockerfile
  */
 export function generateComposeYml(opts: {
-  dockerBuildPath: string;
+  dockerBuildDir: string;
+  dockerDir: string;
   projectDir: string;
   agent: string;
   role: string;
@@ -185,43 +184,48 @@ export function generateComposeYml(opts: {
   credentialProxyToken: string;
   proxyPort?: number;
   roleMounts?: RoleMount[];
+  credentialKeys?: string[];
 }): string {
-  const { dockerBuildPath, projectDir, agent, role, logsDir, proxyToken, credentialProxyToken, proxyPort = 3000, roleMounts } = opts;
+  const { dockerBuildDir, dockerDir, projectDir, agent, role, logsDir, proxyToken, credentialProxyToken, proxyPort = 3000, roleMounts, credentialKeys } = opts;
 
-  const proxyContext = path.join(dockerBuildPath);
-  const proxyDockerfile = path.join("proxy", role, "Dockerfile");
-  const agentContext = path.join(dockerBuildPath);
-  const agentDockerfile = path.join("agent", agent, role, "Dockerfile");
+  // Per-role cache directory for NODE_COMPILE_CACHE and NPM_CONFIG_CACHE
+  const cacheDir = path.join(dockerBuildDir, "mcp-proxy", ".cache");
+
+  // Proxy: context is dockerDir (has node_modules), dockerfile is role-specific
+  const proxyDockerfile = path.relative(dockerDir, path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"));
+  // Agent: context is dockerDir (has node_modules), dockerfile is role/agent-type specific
+  const agentDockerfile = path.relative(dockerDir, path.join(dockerBuildDir, agent, "Dockerfile"));
 
   const proxyServiceName = `proxy-${role}`;
-  const agentServiceName = `agent-${agent}-${role}`;
+  const agentServiceName = `agent-${role}`;
 
   // Build agent volume lines: workspace mount + role-declared mounts
-  const agentVolumeLines = [`      - "${projectDir}:/workspace"`];
+  const agentVolumeLines = [`      - "${projectDir}:/home/mason/workspace/project"`];
   for (const vol of resolveRoleMountVolumes(roleMounts)) {
     agentVolumeLines.push(`      - "${vol}"`);
   }
 
-  // Use YAML template literal for clarity
   return `# Generated by clawmasons run-agent
 services:
   ${proxyServiceName}:
     build:
-      context: "${proxyContext}"
+      context: "${dockerDir}"
       dockerfile: "${proxyDockerfile}"
     volumes:
-      - "${projectDir}:/workspace"
+      - "${projectDir}:/home/mason/workspace/project"
       - "${logsDir}:/logs"
+      - "${cacheDir}:/app/.cache"
     environment:
       - CHAPTER_PROXY_TOKEN=${proxyToken}
       - CREDENTIAL_PROXY_TOKEN=${credentialProxyToken}
+      - PROJECT_DIR=/home/mason/workspace/project${credentialKeys && credentialKeys.length > 0 ? `\n      - CHAPTER_DECLARED_CREDENTIALS=${JSON.stringify(credentialKeys)}` : ""}
     ports:
       - "${proxyPort}:9090"
     restart: "no"
 
   ${agentServiceName}:
     build:
-      context: "${agentContext}"
+      context: "${dockerDir}"
       dockerfile: "${agentDockerfile}"
     volumes:
 ${agentVolumeLines.join("\n")}
@@ -229,6 +233,7 @@ ${agentVolumeLines.join("\n")}
       - ${proxyServiceName}
     environment:
       - MCP_PROXY_TOKEN=${proxyToken}
+      - MCP_PROXY_URL=http://${proxyServiceName}:9090${credentialKeys && credentialKeys.length > 0 ? `\n      - AGENT_CREDENTIALS=${JSON.stringify(credentialKeys)}` : ""}
     stdin_open: true
     tty: true
     init: true
@@ -260,19 +265,11 @@ export function execComposeCommand(
 /**
  * Collect environment variables from process.env that match the agent's
  * declared credentials (agent-level + app-level across all roles).
- *
- * This enables the ACP client's `env` block to flow credentials through
- * to the credential-service container as session overrides.
- *
- * @param agent - The resolved agent with credential declarations
- * @param env - The environment to read from (defaults to process.env)
- * @returns A record of credential key -> value for all matched env vars
  */
 export function collectEnvCredentials(
   agent: ResolvedAgent,
   env: Record<string, string | undefined> = process.env,
 ): Record<string, string> {
-  // Build the set of all declared credential keys
   const declaredKeys = new Set<string>(agent.credentials);
   for (const role of agent.roles) {
     for (const app of role.apps) {
@@ -282,7 +279,6 @@ export function collectEnvCredentials(
     }
   }
 
-  // Collect matching env vars
   const collected: Record<string, string> = {};
   for (const key of declaredKeys) {
     const value = env[key];
@@ -294,213 +290,80 @@ export function collectEnvCredentials(
   return collected;
 }
 
-// ── Agent Name Resolution ─────────────────────────────────────────────
+// ── Docker Auto-Build ──────────────────────────────────────────────────
 
 /**
- * Resolve the agent name from --agent flag or auto-detect from discovered packages.
+ * Ensure docker build artifacts exist for a role. If not, trigger docker-init.
  */
-export function resolveAgentName(
-  agentFlag: string | undefined,
-  packages: Map<string, DiscoveredPackage>,
-): string {
-  if (agentFlag) return agentFlag;
+async function ensureDockerBuild(
+  roleType: RoleType,
+  agentType: string,
+  projectDir: string,
+  deps?: { existsSyncFn?: (p: string) => boolean },
+): Promise<{ dockerBuildDir: string; dockerDir: string }> {
+  const existsSync = deps?.existsSyncFn ?? fs.existsSync;
+  const roleName = getAppShortName(roleType.metadata.name);
+  const dockerDir = path.join(projectDir, ".clawmasons", "docker");
+  const dockerBuildDir = path.join(dockerDir, roleName);
 
-  const agents: string[] = [];
-  for (const [name, pkg] of packages) {
-    if (pkg.chapterField.type === "agent") {
-      agents.push(name);
+  if (!existsSync(path.join(dockerBuildDir, agentType, "Dockerfile"))) {
+    console.log(`\n  Docker artifacts not found. Building...`);
+
+    // Ensure .clawmasons/.gitignore has docker/ entry
+    const gitignorePath = path.join(projectDir, ".clawmasons", ".gitignore");
+    const gitignoreDir = path.dirname(gitignorePath);
+    fs.mkdirSync(gitignoreDir, { recursive: true });
+    if (!existsSync(gitignorePath) || !fs.readFileSync(gitignorePath, "utf-8").includes("docker/")) {
+      fs.appendFileSync(gitignorePath, "docker/\nsessions/\n");
     }
+
+    // Generate the build directory
+    generateRoleDockerBuildDir({
+      role: roleType,
+      agentType,
+      projectDir,
+      agentName: roleName,
+    });
+
+    // Populate shared proxy dependencies
+    ensureProxyDependencies(dockerDir, projectDir);
+
+    // Synthesize inline app/role packages (e.g. mcp_servers from ROLE.md)
+    synthesizeRolePackages(roleType, dockerDir);
+
+    // Create per-role cache directory for NODE_COMPILE_CACHE and NPM_CONFIG_CACHE
+    fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy", ".cache"), { recursive: true });
+
+    console.log(`  Docker artifacts built at .clawmasons/docker/${roleName}/`);
   }
 
-  if (agents.length === 0) {
-    throw new Error(
-      "No agent packages found in this workspace. " +
-      "Make sure you're in a chapter workspace root with an agents/ directory.",
-    );
-  }
-
-  if (agents.length > 1) {
-    throw new Error(
-      `Multiple agent packages found: ${agents.join(", ")}. ` +
-      "Use --agent <name> to specify which agent to run.",
-    );
-  }
-
-  const agentName = agents[0];
-  if (!agentName) {
-    throw new Error("Unexpected empty agents array");
-  }
-  return agentName;
-}
-
-// ── Chapter Bootstrap ─────────────────────────────────────────────────
-
-/**
- * Dependencies for bootstrapChapter, extracted from RunAgentDeps.
- */
-export interface BootstrapChapterDeps {
-  initLodgeFn: (options: LodgeInitOptions) => LodgeInitResult;
-  runInitFn: (
-    targetDir: string,
-    options: InitOptions,
-    deps?: { templatesDir?: string; skipNpmInstall?: boolean },
-  ) => Promise<void>;
-  runBuildFn: (
-    rootDir: string,
-    agentName: string | undefined,
-    options: Record<string, unknown>,
-  ) => Promise<void>;
-  resolveLodgeVarsFn: (options?: {
-    home?: string;
-    lodge?: string;
-    lodgeHome?: string;
-  }) => { clawmasonsHome: string; lodge: string; lodgeHome: string };
-  existsSyncFn: (filePath: string) => boolean;
-  mkdirSyncFn: (dirPath: string, options?: { recursive?: boolean }) => void;
-  /** Override fs.readFileSync (for testing). */
-  readFileSyncFn?: (filePath: string, encoding: BufferEncoding) => string;
-  /** Override fs.writeFileSync (for testing). */
-  writeFileSyncFn?: (filePath: string, data: string) => void;
-}
-
-/**
- * Bootstrap a chapter workspace. When chapterName is "initiate", runs the
- * full flow: lodge init -> chapter init (with template) -> chapter build.
- * For other chapter names, resolves the chapter directory without bootstrap.
- *
- * Returns the chapter directory to use as rootDir for the ACP session.
- */
-export async function bootstrapChapter(
-  chapterName: string,
-  deps: BootstrapChapterDeps,
-): Promise<string> {
-  // Bootstrap logs go to stderr so they never corrupt stdio JSON-RPC on stdout.
-  const log = (...args: unknown[]) => console.error(...args);
-
-  // 1. Init lodge (idempotent)
-  log("[clawmasons agent] Initializing lodge...");
-  const lodgeResult = deps.initLodgeFn({});
-  const { lodge, lodgeHome } = lodgeResult;
-
-  if (lodgeResult.skipped) {
-    log(`[clawmasons agent] Lodge '${lodge}' already initialized.`);
-  } else {
-    log(`[clawmasons agent] Lodge '${lodge}' initialized at ${lodgeHome}`);
-  }
-
-  // 2. Resolve chapter directory
-  const chapterDir = path.join(lodgeHome, "chapters", chapterName);
-
-  // 3. For "initiate" chapter, run full bootstrap if needed
-  const chapterMarker = path.join(chapterDir, ".clawmasons");
-  if (!deps.existsSyncFn(chapterMarker)) {
-    log(`[clawmasons agent] Bootstrapping '${chapterName}' chapter...`);
-
-    // Create the chapter directory
-    deps.mkdirSyncFn(chapterDir, { recursive: true });
-
-    // Init chapter with template
-    log("[clawmasons agent] Running chapter init...");
-    await deps.runInitFn(
-      chapterDir,
-      { name: `${lodge}.${chapterName}`, template: chapterName },
-      { skipNpmInstall: true },
-    );
-
-    // Build the chapter
-    log("[clawmasons agent] Running chapter build...");
-    await deps.runBuildFn(chapterDir, undefined, {});
-
-    // Write docker-build path into .clawmasons/chapter.json so AcpSession can find it
-    const readFile = deps.readFileSyncFn ?? fs.readFileSync;
-    const writeFile = deps.writeFileSyncFn ?? fs.writeFileSync;
-    const chapterJsonPath = path.join(chapterDir, ".clawmasons", "chapter.json");
-    const dockerBuildPath = path.join(chapterDir, "docker");
-    let chapterJson: Record<string, unknown> = {};
-    try {
-      chapterJson = JSON.parse(readFile(chapterJsonPath, "utf-8")) as Record<string, unknown>;
-    } catch { /* start fresh if missing/invalid */ }
-    chapterJson["docker-build"] = dockerBuildPath;
-    if (!chapterJson["docker-registries"]) {
-      chapterJson["docker-registries"] = ["local"];
-    }
-    writeFile(chapterJsonPath, JSON.stringify(chapterJson, null, 2) + "\n");
-
-    log(`[clawmasons agent] Bootstrap complete for '${chapterName}'.`);
-  } else {
-    log(`[clawmasons agent] Chapter '${chapterName}' already initialized. Skipping bootstrap.`);
-  }
-
-  return chapterDir;
+  return { dockerBuildDir, dockerDir };
 }
 
 // ── Help Text ─────────────────────────────────────────────────────────
 
 export const RUN_ACP_AGENT_HELP_EPILOG = `
+Command Syntax:
+  clawmasons run --role <name>                      # infers agent type from role
+  clawmasons run --role <name> --agent-type claude   # explicit agent type
+  clawmasons run --role <name> --acp                 # ACP mode
+
+Agent Types:
+  claude (claude-code), codex, aider, pi (pi-coding-agent), mcp (mcp-agent)
+
 Session Behavior:
   When an ACP client sends session/new with a "cwd" field, the agent
-  container mounts that directory as /workspace. Each session/new starts
-  a fresh agent container; the proxy stays running. The credential
-  service runs in-process on the host.
-
-  If no "cwd" is provided in session/new, the current working directory
-  of this process is used as the default.
+  container mounts that directory as /home/mason/workspace/project.
+  Each session/new starts a fresh agent container; the proxy stays running.
+  The credential service runs in-process on the host.
 
 Side Effects:
-  - Creates .clawmasons/ in the session's CWD for session logs
+  - Creates .clawmasons/ in the project for docker builds and session state
   - Appends ".clawmasons" to the project's .gitignore if present
-
-Environment:
-  CLAWMASONS_HOME    Base directory for chapter runtime state.
-                     Default: ~/.clawmasons
-  LODGE              Lodge name for multi-tenant setups.
-                     Default: auto-detected from CLAWMASONS_HOME
-  LODGE_HOME         Lodge home directory override.
-                     Default: $CLAWMASONS_HOME/$LODGE
 
   Credential env vars (e.g. OPEN_ROUTER_KEY, ANTHROPIC_API_KEY) are
   passed through to the credential-service when set in the client's
-  env block. The credential-service checks process.env as priority 1
-  (after session overrides).
-
-Bootstrap Flow (--chapter initiate):
-  When --chapter initiate is specified, the CLI runs a full bootstrap:
-    1. Lodge init   — creates ~/.clawmasons/<lodge>/ (idempotent)
-    2. Chapter init — scaffolds the "initiate" chapter from template
-    3. Chapter build — builds the chapter workspace
-  The agent then starts against the bootstrapped chapter directory.
-  Use this for zero-setup onboarding with a new lodge.
-
-  Logs are always written to <roleDir>/logs/acp.log. Stdout is
-  reserved for ACP protocol messages; all diagnostics go to the
-  log file only.
-
-ACP Client Configuration Example (Zed / acpx / VS Code):
-  Add to your editor's agent_servers config (e.g. Zed settings.json).
-  The agent communicates via stdio ndjson (ACP protocol):
-
-  {
-    "agent_servers": {
-      "Clawmasons": {
-        "type": "custom",
-        "command": "npx",
-        "args": [
-          "clawmasons",
-          "agent",
-          "--acp",
-          "--chapter", "initiate",
-          "--role", "chapter-creator",
-          "--init-agent", "pi"
-        ],
-        "env": {
-          "CLAWMASONS_HOME": "~/.clawmasons",
-          "LODGE": "acme",
-          "LODGE_HOME": "~/.clawmasons/acme",
-          "OPEN_ROUTER_KEY": "$OPENROUTER_API_KEY"
-        }
-      }
-    }
-  }
+  env block.
 `;
 
 // ── Deps Interface ────────────────────────────────────────────────────
@@ -519,134 +382,114 @@ export interface RunAgentDeps {
   generateSessionIdFn?: () => string;
   /** Override docker compose check (for testing). */
   checkDockerComposeFn?: () => void;
-  /** Override CLAWMASONS_HOME resolution (for testing). */
-  getClawmasonsHomeFn?: () => string;
-  /** Override chapters.json role lookup (for testing). */
-  findRoleEntryByRoleFn?: (
-    home: string,
-    role: string,
-  ) => ChapterEntry | undefined;
-  /** Override init-role invocation for auto-init (for testing). */
-  initRoleFn?: (
-    rootDir: string,
-    options: InitRoleOptions,
-    deps?: InitRoleDeps,
-  ) => Promise<void>;
   /** Override .gitignore entry management (for testing). */
   ensureGitignoreEntryFn?: (dir: string, pattern: string) => boolean;
-  /** Override package discovery (for testing, ACP mode). */
-  discoverPackagesFn?: (rootDir: string) => Map<string, DiscoveredPackage>;
-  /** Override agent resolution (for testing, ACP mode). */
-  resolveAgentFn?: (name: string, packages: Map<string, DiscoveredPackage>) => ResolvedAgent;
+  /** Override role resolution (for testing). */
+  resolveRoleFn?: (roleName: string, projectDir: string) => Promise<RoleType>;
+  /** Override agent adaptation (for testing). */
+  adaptRoleFn?: (roleType: RoleType, agentType: string) => ResolvedAgent;
   /** Override AcpSession construction (for testing, ACP mode). */
   createSessionFn?: (config: AcpSessionConfig, sessionDeps?: AcpSessionDeps) => AcpSession;
   /** Override AcpSdkBridge construction (for testing, ACP mode). */
   createBridgeFn?: (config: AcpSdkBridgeConfig) => AcpSdkBridge;
   /** Override fs.mkdirSync (for testing). */
   mkdirSyncFn?: (dirPath: string, options?: { recursive?: boolean }) => void;
-  /** Override lodge init for bootstrap (for testing). */
-  initLodgeFn?: (options: LodgeInitOptions) => LodgeInitResult;
-  /** Override chapter init for bootstrap (for testing). */
-  runInitFn?: (
-    targetDir: string,
-    options: InitOptions,
-    deps?: { templatesDir?: string; skipNpmInstall?: boolean },
-  ) => Promise<void>;
-  /** Override chapter build for bootstrap (for testing). */
-  runBuildFn?: (
-    rootDir: string,
-    agentName: string | undefined,
-    options: Record<string, unknown>,
-  ) => Promise<void>;
-  /** Override lodge variable resolution (for testing). */
-  resolveLodgeVarsFn?: (options?: {
-    home?: string;
-    lodge?: string;
-    lodgeHome?: string;
-  }) => { clawmasonsHome: string; lodge: string; lodgeHome: string };
   /** Override fs.existsSync (for testing). */
   existsSyncFn?: (filePath: string) => boolean;
-  /** Override fs.readFileSync (for testing). */
-  readFileSyncFn?: (filePath: string, encoding: BufferEncoding) => string;
-  /** Override fs.writeFileSync (for testing). */
-  writeFileSyncFn?: (filePath: string, data: string) => void;
   /** Override credential service startup (for testing). */
   startCredentialServiceFn?: (opts: {
     proxyPort: number;
     credentialProxyToken: string;
     envCredentials: Record<string, string>;
   }) => Promise<{ disconnect: () => void; close: () => void }>;
+  /** Override proxy health check (for testing). */
+  waitForProxyHealthFn?: (url: string, timeoutMs: number) => Promise<void>;
   /** Override logger creation (for testing, ACP mode). */
   createLoggerFn?: (logDir: string) => AcpLogger;
 }
 
-// ── Backward-compat alias ─────────────────────────────────────────────
+// ── Backward-compat aliases ───────────────────────────────────────────
 export type RunAcpAgentDeps = RunAgentDeps;
 
 // ── Command Registration ──────────────────────────────────────────────
 
-export function registerRunAgentCommand(program: Command): void {
-  program
-    .command("agent")
-    .description("Run a chapter agent interactively, or start an ACP endpoint for editor integration")
-    .argument("[agent]", "Agent name (e.g., note-taker)")
-    .argument("[role]", "Role name (e.g., writer)")
-    .option("--acp", "Start in ACP mode for editor integration")
-    .option("--role <name>", "Role name (alternative to positional argument)")
-    .option("--agent <name>", "Agent name (alternative to positional argument)")
-    .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
-    .option("--chapter <name>", "Chapter name (use 'initiate' for full bootstrap flow, ACP mode only)")
-    .option("--init-agent <name>", "Agent name override for bootstrap (ACP mode only)")
-    .addHelpText("after", RUN_ACP_AGENT_HELP_EPILOG)
-    .action(async (
-      positionalAgent: string | undefined,
-      positionalRole: string | undefined,
-      options: {
-        acp?: boolean;
-        agent?: string;
-        role?: string;
-        proxyPort: string;
-        chapter?: string;
-        initAgent?: string;
-      },
-    ) => {
-      // Merge positional and option-based agent/role (positional takes precedence)
-      const agent = positionalAgent ?? options.agent;
-      const role = positionalRole ?? options.role;
+/**
+ * Create the action handler for the `run` command.
+ */
+function createRunAction() {
+  return async (
+    positionalAgentType: string | undefined,
+    options: {
+      acp?: boolean;
+      proxyOnly?: boolean;
+      agentType?: string;
+      role?: string;
+      proxyPort: string;
+    },
+  ) => {
+    const agentTypeInput = positionalAgentType ?? options.agentType;
+    const role = options.role;
 
-      if (options.acp) {
-        // ACP mode requires role
-        if (!role) {
-          console.error("\n  agent --acp requires a role. Use --role <name> or provide it as a positional argument.\n");
-          process.exit(1);
-        }
-        await runAgent(process.cwd(), agent, role, undefined, {
-          acp: true,
-          proxyPort: parseInt(options.proxyPort, 10),
-          chapter: options.chapter,
-          initAgent: options.initAgent,
-        });
-      } else {
-        // Interactive mode requires both agent and role
-        if (!agent || !role) {
-          console.error("\n  Interactive mode requires both agent and role arguments.\n  Usage: clawmasons agent <agent> <role>\n");
-          process.exit(1);
-        }
-        await runAgent(process.cwd(), agent, role);
+    if (!role) {
+      console.error("\n  --role <name> is required.\n  Usage: clawmasons run --role <name> [--agent-type <type>]\n");
+      process.exit(1);
+      return;
+    }
+
+    // Resolve agent type if provided (alias or direct)
+    let resolvedAgentType: string | undefined;
+    if (agentTypeInput) {
+      resolvedAgentType = resolveAgentType(agentTypeInput);
+      if (!resolvedAgentType) {
+        const known = getKnownAgentTypeNames().join(", ");
+        console.error(`\n  Unknown agent type "${agentTypeInput}".\n  Available agent types: ${known}\n`);
+        process.exit(1);
+        return;
       }
-    });
+    }
+
+    if (options.proxyOnly) {
+      await runProxyOnly(process.cwd(), resolvedAgentType, role, parseInt(options.proxyPort, 10));
+    } else if (options.acp) {
+      await runAgent(process.cwd(), resolvedAgentType, role, undefined, {
+        acp: true,
+        proxyPort: parseInt(options.proxyPort, 10),
+      });
+    } else {
+      await runAgent(process.cwd(), resolvedAgentType, role, undefined, {
+        proxyPort: parseInt(options.proxyPort, 10),
+      });
+    }
+  };
 }
 
-// ── Backward-compat: registerRunAcpAgentCommand ─────────────────────
+export function registerRunCommand(program: Command): void {
+  program
+    .command("run")
+    .description("Run a role on the specified agent runtime")
+    .argument("[agent-type]", "Agent runtime type (e.g., claude, codex, aider, pi, mcp)")
+    .option("--acp", "Start in ACP mode for editor integration")
+    .option("--role <name>", "Role name to run (required)")
+    .option("--agent-type <name>", "Agent type (alternative to positional argument, overrides inference)")
+    .option("--proxy-only", "Start proxy infrastructure only, output connection info as JSON")
+    .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
+    .addHelpText("after", RUN_ACP_AGENT_HELP_EPILOG)
+    .action(createRunAction());
+}
 
 /**
- * @deprecated Use registerRunAgentCommand instead. The `acp` command is
- * now consolidated into `agent --acp`.
+ * @deprecated Use registerRunCommand instead.
+ */
+export function registerRunAgentCommand(program: Command): void {
+  registerRunCommand(program);
+}
+
+/**
+ * @deprecated Use registerRunAgentCommand instead.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function registerRunAcpAgentCommand(_program: Command): void {
-  // No-op: the `acp` command is now part of `agent --acp`.
-  // Kept for backward compatibility during transition.
+  // No-op: kept for backward compatibility.
 }
 
 // ── Main Orchestrator ─────────────────────────────────────────────────
@@ -659,19 +502,14 @@ export async function runAgent(
   acpOptions?: {
     acp?: boolean;
     proxyPort?: number;
-    chapter?: string;
-    initAgent?: string;
   },
 ): Promise<void> {
   const isAcpMode = acpOptions?.acp === true;
   const proxyPort = acpOptions?.proxyPort ?? 3000;
 
   if (isAcpMode) {
-    return runAgentAcpMode(projectDir, agent, role, proxyPort, acpOptions, deps);
+    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps);
   } else {
-    if (!agent) {
-      throw new Error("Agent name is required for interactive mode.");
-    }
     return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps);
   }
 }
@@ -689,8 +527,6 @@ export async function runAcpAgent(
   return runAgent(rootDir, options.agent, options.role, deps, {
     acp: true,
     proxyPort: options.proxyPort,
-    chapter: options.chapter,
-    initAgent: options.initAgent,
   });
 }
 
@@ -698,62 +534,47 @@ export async function runAcpAgent(
 
 async function runAgentInteractiveMode(
   projectDir: string,
-  agent: string,
+  agentOverride: string | undefined,
   role: string,
   proxyPort: number,
   deps?: RunAgentDeps,
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
-  const genSessionId = deps?.generateSessionIdFn ?? generateSessionId;
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
-  const getHome = deps?.getClawmasonsHomeFn ?? getClawmasonsHome;
-  const findRole = deps?.findRoleEntryByRoleFn ?? findRoleEntryByRole;
-  const autoInitRole = deps?.initRoleFn ?? initRole;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
   const startCredService = deps?.startCredentialServiceFn ?? defaultStartCredentialService;
+  const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
+  const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
 
   try {
     // 1. Pre-flight: check docker compose is available
     checkDocker();
 
-    // 2. Resolve role from CLAWMASONS_HOME/chapters.json
-    const home = getHome();
-    let entry = findRole(home, role);
+    // 2. Resolve role from project directory
+    const roleType = await resolveRoleFn(role, projectDir);
+    const roleName = getAppShortName(roleType.metadata.name);
 
-    // 3. Auto-init if role not found
-    if (!entry) {
-      console.log(`\n  Role "${role}" not found in chapters.json. Auto-initializing...`);
-      await autoInitRole(projectDir, { role });
+    // 3. Infer or override agent type
+    const agentType = agentOverride ?? inferAgentType(roleType);
 
-      // Re-read after init
-      entry = findRole(home, role);
+    console.log(`\n  Agent: ${agentType}`);
+    console.log(`  Role: ${roleName}`);
 
-      if (!entry) {
-        throw new Error(
-          `Role "${role}" not initialized and auto-init failed. Run "clawmasons chapter init-role --role ${role}" from your chapter workspace.`,
-        );
-      }
-    }
-
-    const dockerBuildPath = entry.dockerBuild;
-    const chapterName = `${entry.lodge}.${entry.chapter}`;
-
-    console.log(`\n  Chapter: ${chapterName}`);
-    console.log(`  Agent: ${agent}`);
-    console.log(`  Role: ${role}`);
-
-    // 4. Validate Dockerfiles exist
-    validateDockerfiles(dockerBuildPath, agent, role);
+    // 4. Ensure docker build artifacts exist (auto-build if missing)
+    const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
+      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn },
+    );
 
     // 5. Ensure .clawmasons is in project's .gitignore
     ensureGitignore(projectDir, ".clawmasons");
 
     // 6. Generate session ID and create session directory
-    const sessionId = genSessionId();
-    const sessionDir = path.join(projectDir, ".clawmasons", "sessions", sessionId, "docker");
-    fs.mkdirSync(sessionDir, { recursive: true });
+    const sessionId = (deps?.generateSessionIdFn ?? generateSessionId)();
+    const sessionDir = path.join(projectDir, ".clawmasons", "sessions", sessionId);
+    const dockerSessionDir = path.join(sessionDir, "docker");
+    fs.mkdirSync(dockerSessionDir, { recursive: true });
 
-    const logsDir = path.join(projectDir, ".clawmasons", "logs");
+    const logsDir = path.join(sessionDir, "logs");
     fs.mkdirSync(logsDir, { recursive: true });
 
     console.log(`  Session: ${sessionId}`);
@@ -762,24 +583,47 @@ async function runAgentInteractiveMode(
     const proxyToken = crypto.randomBytes(32).toString("hex");
     const credentialProxyToken = crypto.randomBytes(32).toString("hex");
 
+    // Collect declared credential keys from the role
+    const declaredCredentialKeys = [...(roleType.governance?.credentials ?? [])];
+    for (const app of roleType.apps ?? []) {
+      for (const key of app.credentials ?? []) {
+        if (!declaredCredentialKeys.includes(key)) {
+          declaredCredentialKeys.push(key);
+        }
+      }
+    }
+
     const composeContent = generateComposeYml({
-      dockerBuildPath,
+      dockerBuildDir,
+      dockerDir,
       projectDir,
-      agent,
-      role,
+      agent: agentType,
+      role: roleName,
       logsDir,
       proxyToken,
       credentialProxyToken,
       proxyPort,
+      roleMounts: roleType.container?.mounts,
+      credentialKeys: declaredCredentialKeys,
     });
 
-    const composeFile = path.join(sessionDir, "docker-compose.yml");
+    const composeFile = path.join(dockerSessionDir, "docker-compose.yml");
     fs.writeFileSync(composeFile, composeContent);
     console.log(`  Compose: .clawmasons/sessions/${sessionId}/docker/docker-compose.yml`);
 
-    // 8. Start proxy detached
-    const proxyServiceName = `proxy-${role}`;
-    console.log(`\n  Starting proxy (${proxyServiceName})...`);
+    // 8. Build and start proxy detached
+    const proxyServiceName = `proxy-${roleName}`;
+    console.log(`\n  Building proxy (${proxyServiceName})...`);
+
+    const buildCode = await execCompose(
+      composeFile,
+      ["build", proxyServiceName],
+    );
+    if (buildCode !== 0) {
+      throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+    }
+
+    console.log(`  Starting proxy (${proxyServiceName})...`);
 
     const proxyCode = await execCompose(
       composeFile,
@@ -790,7 +634,16 @@ async function runAgentInteractiveMode(
     }
     console.log(`  Proxy started in background.`);
 
-    // 9. Start credential service in-process
+    // 8b. Wait for proxy health before connecting credential service
+    console.log(`  Waiting for proxy to be ready...`);
+    await waitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
+    console.log(`  Proxy ready.`);
+
+    // 9. Collect env credentials and start credential service in-process
+    const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
+    const resolvedAgent = adaptRoleFn(roleType, agentType);
+    const envCredentials = collectEnvCredentials(resolvedAgent);
+
     console.log(`  Starting credential service (in-process)...`);
 
     let credServiceHandle: { disconnect: () => void; close: () => void } | null = null;
@@ -798,7 +651,7 @@ async function runAgentInteractiveMode(
       credServiceHandle = await startCredService({
         proxyPort,
         credentialProxyToken,
-        envCredentials: {},
+        envCredentials,
       });
       console.log(`  Credential service connected to proxy.`);
     } catch (err) {
@@ -806,19 +659,26 @@ async function runAgentInteractiveMode(
     }
 
     // 10. Start agent interactively
-    const agentServiceName = `agent-${agent}-${role}`;
+    const agentServiceName = `agent-${roleName}`;
     console.log(`  Starting agent (${agentServiceName})...\n`);
+
+    // When stdin is not a TTY (e.g. piped from a test), pass -T to disable
+    // pseudo-TTY allocation so docker compose run works with piped stdio.
+    const runArgs = ["run", "--rm", "--service-ports"];
+    if (!process.stdin.isTTY) {
+      runArgs.push("-T");
+    }
+    runArgs.push(agentServiceName);
 
     const agentCode = await execCompose(
       composeFile,
-      ["run", "--rm", "--service-ports", agentServiceName],
+      runArgs,
       { interactive: true },
     );
 
     // 11. Tear down all containers on agent exit
     console.log(`\n  Agent exited (code ${agentCode}). Tearing down services...`);
 
-    // Disconnect credential service
     try {
       if (credServiceHandle) {
         credServiceHandle.disconnect();
@@ -838,35 +698,119 @@ async function runAgentInteractiveMode(
   }
 }
 
+// ── Proxy-Only Mode ───────────────────────────────────────────────────
+
+/**
+ * Start only the proxy infrastructure (no agent, no credential service).
+ * Outputs connection info as JSON to stdout and returns.
+ */
+export async function runProxyOnly(
+  projectDir: string,
+  agentOverride: string | undefined,
+  role: string,
+  proxyPort: number,
+  deps?: RunAgentDeps,
+): Promise<void> {
+  const execCompose = deps?.execComposeFn ?? execComposeCommand;
+  const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
+  const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
+  const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
+
+  // Redirect console.log to stderr so only JSON goes to stdout
+  const origLog = console.log;
+  console.log = (...args: unknown[]) => console.error(...args);
+
+  try {
+  // 1. Pre-flight: check docker compose is available
+  checkDocker();
+
+  // 2. Resolve role from project directory
+  const roleType = await resolveRoleFn(role, projectDir);
+  const roleName = getAppShortName(roleType.metadata.name);
+
+  // 3. Infer or override agent type
+  const agentType = agentOverride ?? inferAgentType(roleType);
+
+  // 4. Ensure docker build artifacts exist (auto-build if missing)
+  const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
+    roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn },
+  );
+
+  // 5. Ensure .clawmasons is in project's .gitignore
+  ensureGitignore(projectDir, ".clawmasons");
+
+  // 6. Generate session ID and create session directory
+  const sessionId = (deps?.generateSessionIdFn ?? generateSessionId)();
+  const sessionDir = path.join(projectDir, ".clawmasons", "sessions", sessionId);
+  const dockerSessionDir = path.join(sessionDir, "docker");
+  fs.mkdirSync(dockerSessionDir, { recursive: true });
+
+  const logsDir = path.join(sessionDir, "logs");
+  fs.mkdirSync(logsDir, { recursive: true });
+
+  // 7. Generate tokens and docker-compose.yml
+  const proxyToken = crypto.randomBytes(32).toString("hex");
+  const credentialProxyToken = crypto.randomBytes(32).toString("hex");
+
+  const composeContent = generateComposeYml({
+    dockerBuildDir,
+    dockerDir,
+    projectDir,
+    agent: agentType,
+    role: roleName,
+    logsDir,
+    proxyToken,
+    credentialProxyToken,
+    proxyPort,
+    roleMounts: roleType.container?.mounts,
+  });
+
+  const composeFile = path.join(dockerSessionDir, "docker-compose.yml");
+  fs.writeFileSync(composeFile, composeContent);
+
+  // 8. Build and start proxy detached
+  const proxyServiceName = `proxy-${roleName}`;
+
+  const buildCode = await execCompose(composeFile, ["build", proxyServiceName]);
+  if (buildCode !== 0) {
+    throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+  }
+
+  const upCode = await execCompose(composeFile, ["up", "-d", proxyServiceName]);
+  if (upCode !== 0) {
+    throw new Error(`Failed to start proxy (exit code ${upCode}).`);
+  }
+
+  // 9. Output connection info as JSON to stdout
+  const info = {
+    proxyPort,
+    proxyToken,
+    composeFile,
+    proxyServiceName,
+    sessionId,
+  };
+  origLog(JSON.stringify(info));
+
+  } finally {
+    console.log = origLog;
+  }
+}
+
 // ── ACP Mode ──────────────────────────────────────────────────────────
 
 async function runAgentAcpMode(
-  rootDir: string,
-  agentFlag: string | undefined,
+  projectDir: string,
+  agentOverride: string | undefined,
   role: string,
   proxyPort: number,
-  acpOptions?: {
-    chapter?: string;
-    initAgent?: string;
-  },
   deps?: RunAgentDeps,
 ): Promise<void> {
-  const discover = deps?.discoverPackagesFn ?? discoverPackages;
-  const resolve = deps?.resolveAgentFn ?? resolveAgent;
+  const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
+  const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
   const createSession = deps?.createSessionFn ?? ((config: AcpSessionConfig, sessionDeps?: AcpSessionDeps) => new AcpSession(config, sessionDeps));
   const createBridge = deps?.createBridgeFn ?? ((config: AcpSdkBridgeConfig) => new AcpSdkBridge(config));
-  const getHome = deps?.getClawmasonsHomeFn ?? getClawmasonsHome;
-  const findRole = deps?.findRoleEntryByRoleFn ?? findRoleEntryByRole;
-  const autoInitRole = deps?.initRoleFn ?? initRole;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
   const mkdirSync = deps?.mkdirSyncFn ?? fs.mkdirSync;
-  const initLodgeDep = deps?.initLodgeFn ?? initLodge;
-  const runInitDep = deps?.runInitFn ?? runInit;
-  const runBuildDep = deps?.runBuildFn ?? runBuild;
-  const resolveLodgeVarsDep = deps?.resolveLodgeVarsFn ?? resolveLodgeVars;
-  const existsSyncDep = deps?.existsSyncFn ?? fs.existsSync;
-  const readFileSyncDep = deps?.readFileSyncFn;
-  const writeFileSyncDep = deps?.writeFileSyncFn;
 
   // ── Protect stdout from console pollution ────────────────────────────
   const origLog = console.log.bind(console);
@@ -878,11 +822,7 @@ async function runAgentAcpMode(
     console.error = noop;
   }
 
-  // Logger is created once we know the roleDir (after role resolution).
   let logger: AcpLogger | null = null;
-
-  // Resolve effective rootDir based on --chapter flag
-  let effectiveRootDir = rootDir;
 
   let session: AcpSession | null = null;
   let bridge: AcpSdkBridge | null = null;
@@ -919,53 +859,23 @@ async function runAgentAcpMode(
   process.on("SIGTERM", onSignal);
 
   try {
-    // ── Step 0: Chapter bootstrap (if --chapter specified) ──────────────
-    if (acpOptions?.chapter) {
-      if (acpOptions.chapter === "initiate") {
-        effectiveRootDir = await bootstrapChapter(acpOptions.chapter, {
-          initLodgeFn: initLodgeDep,
-          runInitFn: runInitDep,
-          runBuildFn: runBuildDep,
-          resolveLodgeVarsFn: resolveLodgeVarsDep,
-          existsSyncFn: existsSyncDep,
-          mkdirSyncFn: mkdirSync,
-          readFileSyncFn: readFileSyncDep,
-          writeFileSyncFn: writeFileSyncDep,
-        });
-      } else {
-        const { lodgeHome } = resolveLodgeVarsDep();
-        effectiveRootDir = path.join(lodgeHome, "chapters", acpOptions.chapter);
-        if (!existsSyncDep(effectiveRootDir)) {
-          throw new Error(
-            `Chapter '${acpOptions.chapter}' not found at ${effectiveRootDir}. ` +
-            `Use '--chapter initiate' for automatic bootstrap, or create the chapter manually.`,
-          );
-        }
-        console.log(`[clawmasons agent --acp] Using chapter '${acpOptions.chapter}' at ${effectiveRootDir}`);
-      }
-    }
+    // ── Step 1: Resolve role from project directory ──────────────────
+    const roleType = await resolveRoleFn(role, projectDir);
+    const roleName = getAppShortName(roleType.metadata.name);
 
-    // ── Step 1: Resolve role from CLAWMASONS_HOME ───────────────────────
-    const home = getHome();
-    let entry = findRole(home, role);
+    // ── Step 2: Infer or override agent type ─────────────────────────
+    const agentType = agentOverride ?? inferAgentType(roleType);
 
-    if (!entry) {
-      console.error(`\n[clawmasons agent --acp] Role "${role}" not found in chapters.json. Auto-initializing...`);
-      await autoInitRole(effectiveRootDir, { role });
+    // ── Step 3: Ensure docker build artifacts ────────────────────────
+    const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
+      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn },
+    );
 
-      entry = findRole(home, role);
-
-      if (!entry) {
-        throw new Error(
-          `Role "${role}" not initialized and auto-init failed. Run "clawmasons chapter init-role --role ${role}" from your chapter workspace.`,
-        );
-      }
-    }
-
-    // ── Create file logger from roleDir ──────────────────────────────
-    const logsDir = path.join(entry.roleDir, "logs");
+    // ── Create file logger in session-local logs ─────────────────────
+    const sessionLogsDir = path.join(projectDir, ".clawmasons", "logs");
+    mkdirSync(sessionLogsDir, { recursive: true });
     const makeLogger = deps?.createLoggerFn ?? createFileLogger;
-    logger = makeLogger(logsDir);
+    logger = makeLogger(sessionLogsDir);
 
     // Flush buffered early output to the file logger.
     for (const args of earlyBuffer) { logger.log(...args); }
@@ -977,34 +887,29 @@ async function runAgentAcpMode(
       console.error = (...args: unknown[]) => fileLogger.error(...args);
     }
 
-    // Ensure .clawmasons is in chapter workspace's .gitignore
-    ensureGitignore(effectiveRootDir, ".clawmasons");
+    // Ensure .clawmasons is in project's .gitignore
+    ensureGitignore(projectDir, ".clawmasons");
 
-    // ── Step 2: Discover packages ──────────────────────────────────────
-    logger.log("[clawmasons agent --acp] Discovering packages...");
-    const packages = discover(effectiveRootDir);
+    // ── Step 4: Resolve agent from role ──────────────────────────────
+    logger.log(`[clawmasons run --acp] Resolving role "${role}" for agent type "${agentType}"...`);
+    const resolvedAgent = adaptRoleFn(roleType, agentType);
 
-    // ── Step 3: Resolve agent ──────────────────────────────────────────
-    const agentName = resolveAgentName(acpOptions?.initAgent ?? agentFlag, packages);
-    logger.log(`[clawmasons agent --acp] Resolving agent "${agentName}"...`);
-    const resolvedAgent = resolve(agentName, packages);
-
-    // ── Step 4: Compute tool filters ───────────────────────────────────
+    // ── Step 5: Compute tool filters ─────────────────────────────────
     const toolFilters = computeToolFilters(resolvedAgent);
     const toolCount = Object.keys(toolFilters).length;
 
-    // ── Step 4b: Collect env credentials ─────────────────────────────
+    // ── Step 5b: Collect env credentials ─────────────────────────────
     const envCredentials = collectEnvCredentials(resolvedAgent);
     const envCredCount = Object.keys(envCredentials).length;
 
     logger.log(`[clawmasons agent --acp] Agent: ${resolvedAgent.name}`);
-    logger.log(`[clawmasons agent --acp] Role: ${role}`);
+    logger.log(`[clawmasons agent --acp] Role: ${roleName}`);
     logger.log(`[clawmasons agent --acp] Tool filters: ${toolCount} app(s)`);
     if (envCredCount > 0) {
       logger.log(`[clawmasons agent --acp] Env credentials: ${envCredCount} key(s) from process.env`);
     }
 
-    // ── Step 5: Create session and start infrastructure ────────────────
+    // ── Step 6: Create session and start infrastructure ──────────────
     const runtime = resolvedAgent.runtimes[0] ?? "node";
     const acpRuntimeCmd = ACP_RUNTIME_COMMANDS[runtime];
     const acpCommand = acpRuntimeCmd
@@ -1020,20 +925,24 @@ async function runAgentAcpMode(
       }
     }
 
+    // dtg: investigate whay the credential keys are being passed here, would expect them to be 
+    //.     accessed via the credential service only
     session = createSession({
-      projectDir: effectiveRootDir,
+      projectDir,
       agent: resolvedAgent.slug,
-      role,
+      role: roleName,
       proxyPort,
       acpCommand,
       credentialKeys: [...declaredCredentialKeys],
+      dockerBuildDir,
+      dockerDir,
     }, { logger });
 
     logger.log("[clawmasons agent --acp] Starting infrastructure (proxy)...");
     const infraInfo = await session.startInfrastructure();
     logger.log(`[clawmasons agent --acp] Infrastructure started (${infraInfo.sessionId})`);
 
-    // ── Step 5b: Start credential service in-process ──────────────────
+    // ── Step 6b: Start credential service in-process ─────────────────
     logger.log("[clawmasons agent --acp] Starting credential service (in-process)...");
     const startCredService = deps?.startCredentialServiceFn ?? defaultStartCredentialService;
 
@@ -1046,7 +955,7 @@ async function runAgentAcpMode(
     credentialService = { close: credServiceHandle.close } as CredentialService;
     logger.log("[clawmasons agent --acp] Credential service connected to proxy.");
 
-    // ── Step 6: Create and start ACP SDK bridge ──────────────────────────
+    // ── Step 7: Create and start ACP SDK bridge ──────────────────────
     const logRef = logger;
     const sessionRef = session;
 
@@ -1073,12 +982,11 @@ async function runAgentAcpMode(
     const editorOutput = Writable.toWeb(process.stdout) as WritableStream<Uint8Array>;
     bridge.start(editorInput, editorOutput);
 
-    const chapterInfo = acpOptions?.chapter ? `\n  Chapter:    ${acpOptions.chapter}` : "";
     logger.log(
       `\n[clawmasons agent --acp] Ready -- stdio transport active\n` +
       `  Agent:      ${resolvedAgent.name}\n` +
-      `  Role:       ${role}\n` +
-      `  Proxy port: ${proxyPort}${chapterInfo}\n` +
+      `  Role:       ${roleName}\n` +
+      `  Proxy port: ${proxyPort}\n` +
       `  Mode:       deferred (agent starts on session/new)\n`,
     );
 
@@ -1099,6 +1007,22 @@ async function runAgentAcpMode(
     try { log.close(); } catch { /* best-effort */ }
     process.exit(1);
   }
+}
+
+// ── Default proxy health check ─────────────────────────────────────────
+
+async function defaultWaitForProxyHealth(url: string, timeoutMs: number): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      console.log("is up?")
+      const resp = await fetch(url);
+      if (resp.ok) return;
+      console.log("not yet");
+    } catch { /* not ready yet */ }
+    await new Promise((r) => setTimeout(r, 1_000));
+  }
+  throw new Error(`Proxy health endpoint did not become ready within ${timeoutMs}ms`);
 }
 
 // ── Default credential service startup ────────────────────────────────

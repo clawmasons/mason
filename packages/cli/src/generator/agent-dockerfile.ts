@@ -38,8 +38,9 @@ export function generateAgentDockerfile(
 
   // Workspace files are COPY'd from a pre-generated directory
   // The workspace dir is created by docker-init at:
-  //   docker/agent/<agent-short-name>/<role-short-name>/workspace/
-  const workspaceCopyLine = `COPY agent/${agentShortName}/${roleShortName}/workspace/ /home/mason/workspace/`;
+  //   docker/<role-short-name>/<agent-type>/workspace/
+  // Build context is docker/ (the parent containing node_modules)
+  const workspaceCopyLine = `COPY ${roleShortName}/${primaryRuntime}/workspace/ /home/mason/workspace/`;
 
   const acpMarker = acpMode ? " [ACP mode]" : "";
 

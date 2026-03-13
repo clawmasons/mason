@@ -111,7 +111,7 @@ describe("AcpAgent", () => {
 
       const result = await agent.prompt({
         sessionId,
-        prompt: [{ type: "text", text: "list tools" }],
+        prompt: [{ type: "text", text: "list" }],
       });
 
       expect(result.stopReason).toBe("end_turn");
@@ -124,7 +124,7 @@ describe("AcpAgent", () => {
 
       await agent.prompt({
         sessionId,
-        prompt: [{ type: "text", text: "list tools" }],
+        prompt: [{ type: "text", text: "list" }],
       });
 
       const sessionUpdate = mockConn.sessionUpdate as ReturnType<typeof vi.fn>;
@@ -145,7 +145,7 @@ describe("AcpAgent", () => {
 
       const result = await emptyAgent.prompt({
         sessionId: sessionResult.sessionId,
-        prompt: [{ type: "text", text: "list tools" }],
+        prompt: [{ type: "text", text: "list" }],
       });
 
       expect(result.stopReason).toBe("end_turn");

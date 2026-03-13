@@ -20,7 +20,12 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "build:proxy": "tsx esbuild.proxy.ts",
     "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.0"
   },
   "files": [
     "dist",

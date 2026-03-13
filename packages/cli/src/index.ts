@@ -7,8 +7,6 @@ export {
   type TaskChapterField,
   roleChapterFieldSchema,
   type RoleChapterField,
-  agentChapterFieldSchema,
-  type AgentChapterField,
   parseChapterField,
   type ChapterField,
   type DiscoveredPackage,
@@ -28,7 +26,7 @@ export {
   CircularDependencyError,
   TypeMismatchError,
   discoverPackages,
-  resolveAgent,
+  resolveRolePackage,
 } from "./resolver/index.js";
 
 export {

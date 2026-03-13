@@ -5,24 +5,108 @@ import * as path from "node:path";
 import { program } from "../../src/cli/index.js";
 import {
   generateSessionId,
-  readRunConfig,
-  validateDockerfiles,
   generateComposeYml,
   resolveRequiredCredentials,
   displayCredentials,
   runAgent,
+  runProxyOnly,
+  resolveAgentType,
+  isKnownAgentType,
+  getKnownAgentTypeNames,
 } from "../../src/cli/commands/run-agent.js";
-import type { ChapterEntry } from "../../src/runtime/home.js";
+import type { RoleType, ResolvedAgent } from "@clawmasons/shared";
 
 // ── Command Registration ────────────────────────────────────────────────
 
-describe("CLI agent command", () => {
-  it("has the agent command registered at top level", () => {
-    const cmd = program.commands.find((c) => c.name() === "agent");
+describe("CLI run command", () => {
+  it("has the run command registered at top level", () => {
+    const cmd = program.commands.find((c) => c.name() === "run");
     expect(cmd).toBeDefined();
     if (cmd) {
-      expect(cmd.description()).toContain("Run a chapter agent");
+      expect(cmd.description()).toContain("Run a role");
     }
+  });
+
+  it("does not have a hidden agent command (agent type removed)", () => {
+    const cmd = program.commands.find((c) => c.name() === "agent");
+    expect(cmd).toBeUndefined();
+  });
+
+  it("run command has --role option", () => {
+    const cmd = program.commands.find((c) => c.name() === "run");
+    expect(cmd).toBeDefined();
+    if (cmd) {
+      const roleOpt = cmd.options.find((o) => o.long === "--role");
+      expect(roleOpt).toBeDefined();
+    }
+  });
+
+  it("run command has --acp option", () => {
+    const cmd = program.commands.find((c) => c.name() === "run");
+    expect(cmd).toBeDefined();
+    if (cmd) {
+      const acpOpt = cmd.options.find((o) => o.long === "--acp");
+      expect(acpOpt).toBeDefined();
+    }
+  });
+});
+
+// ── Agent Type Resolution ────────────────────────────────────────────────
+
+describe("resolveAgentType", () => {
+  it("resolves alias 'claude' to 'claude-code'", () => {
+    expect(resolveAgentType("claude")).toBe("claude-code");
+  });
+
+  it("resolves alias 'pi' to 'pi-coding-agent'", () => {
+    expect(resolveAgentType("pi")).toBe("pi-coding-agent");
+  });
+
+  it("resolves alias 'mcp' to 'mcp-agent'", () => {
+    expect(resolveAgentType("mcp")).toBe("mcp-agent");
+  });
+
+  it("resolves direct agent type 'claude-code'", () => {
+    expect(resolveAgentType("claude-code")).toBe("claude-code");
+  });
+
+  it("returns undefined for unknown agent type", () => {
+    expect(resolveAgentType("unknown-agent")).toBeUndefined();
+  });
+});
+
+describe("isKnownAgentType", () => {
+  it("returns true for aliases", () => {
+    expect(isKnownAgentType("claude")).toBe(true);
+    expect(isKnownAgentType("pi")).toBe(true);
+    expect(isKnownAgentType("mcp")).toBe(true);
+  });
+
+  it("returns true for registered types", () => {
+    expect(isKnownAgentType("claude-code")).toBe(true);
+    expect(isKnownAgentType("pi-coding-agent")).toBe(true);
+  });
+
+  it("returns false for unknown types", () => {
+    expect(isKnownAgentType("unknown")).toBe(false);
+    expect(isKnownAgentType("gpt")).toBe(false);
+  });
+});
+
+describe("getKnownAgentTypeNames", () => {
+  it("includes all aliases and registered types", () => {
+    const names = getKnownAgentTypeNames();
+    expect(names).toContain("claude");
+    expect(names).toContain("claude-code");
+    expect(names).toContain("pi");
+    expect(names).toContain("mcp");
+    expect(names.length).toBeGreaterThan(3);
+  });
+
+  it("returns sorted array", () => {
+    const names = getKnownAgentTypeNames();
+    const sorted = [...names].sort();
+    expect(names).toEqual(sorted);
   });
 });
 
@@ -41,111 +125,6 @@ describe("generateSessionId", () => {
     }
     // With 4 bytes of randomness, 100 IDs should all be unique
     expect(ids.size).toBe(100);
-  });
-});
-
-// ── readRunConfig ───────────────────────────────────────────────────────
-
-describe("readRunConfig", () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-run-agent-test-"));
-  });
-
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  function writeConfig(config: Record<string, unknown>): void {
-    const configDir = path.join(tmpDir, ".clawmasons");
-    fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(configDir, "chapter.json"),
-      JSON.stringify(config),
-    );
-  }
-
-  it("reads valid config", () => {
-    writeConfig({
-      chapter: "acme.platform",
-      "docker-registries": ["local"],
-      "docker-build": "/path/to/docker",
-    });
-    const config = readRunConfig(tmpDir);
-    expect(config.chapter).toBe("acme.platform");
-    expect(config["docker-build"]).toBe("/path/to/docker");
-  });
-
-  it("throws when .clawmasons/chapter.json is missing", () => {
-    expect(() => readRunConfig(tmpDir)).toThrow("run-init");
-  });
-
-  it("throws when chapter.json is not valid JSON", () => {
-    const configDir = path.join(tmpDir, ".clawmasons");
-    fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(path.join(configDir, "chapter.json"), "not json");
-    expect(() => readRunConfig(tmpDir)).toThrow("not valid JSON");
-  });
-
-  it("throws when chapter field is missing", () => {
-    writeConfig({ "docker-build": "/path" });
-    expect(() => readRunConfig(tmpDir)).toThrow("chapter");
-  });
-
-  it("throws when docker-build field is missing", () => {
-    writeConfig({ chapter: "acme.platform" });
-    expect(() => readRunConfig(tmpDir)).toThrow("docker-build");
-  });
-});
-
-// ── validateDockerfiles ─────────────────────────────────────────────────
-
-describe("validateDockerfiles", () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-run-agent-test-"));
-  });
-
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  function setupDockerfiles(agent: string, role: string): void {
-    const proxyDir = path.join(tmpDir, "proxy", role);
-    const agentDir = path.join(tmpDir, "agent", agent, role);
-    fs.mkdirSync(proxyDir, { recursive: true });
-    fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(proxyDir, "Dockerfile"), "FROM node:20\n");
-    fs.writeFileSync(path.join(agentDir, "Dockerfile"), "FROM node:20\n");
-  }
-
-  it("returns paths when all Dockerfiles exist", () => {
-    setupDockerfiles("note-taker", "writer");
-    const result = validateDockerfiles(tmpDir, "note-taker", "writer");
-    expect(result.proxyDockerfile).toContain("proxy/writer/Dockerfile");
-    expect(result.agentDockerfile).toContain("agent/note-taker/writer/Dockerfile");
-  });
-
-  it("throws when proxy Dockerfile is missing", () => {
-    const agentDir = path.join(tmpDir, "agent", "note-taker", "writer");
-    fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "Dockerfile"), "FROM node:20\n");
-
-    expect(() => validateDockerfiles(tmpDir, "note-taker", "writer")).toThrow(
-      "Proxy Dockerfile not found",
-    );
-  });
-
-  it("throws when agent Dockerfile is missing", () => {
-    const proxyDir = path.join(tmpDir, "proxy", "writer");
-    fs.mkdirSync(proxyDir, { recursive: true });
-    fs.writeFileSync(path.join(proxyDir, "Dockerfile"), "FROM node:20\n");
-
-    expect(() => validateDockerfiles(tmpDir, "note-taker", "writer")).toThrow(
-      "Agent Dockerfile not found",
-    );
   });
 });
 
@@ -259,11 +238,12 @@ describe("displayCredentials", () => {
 
 describe("generateComposeYml", () => {
   const defaultOpts = {
-    dockerBuildPath: "/chapters/acme/docker",
+    dockerBuildDir: "/projects/my-project/.clawmasons/docker/writer",
+    dockerDir: "/projects/my-project/.clawmasons/docker",
     projectDir: "/projects/my-project",
-    agent: "note-taker",
+    agent: "claude-code",
     role: "writer",
-    logsDir: "/projects/my-project/.clawmasons/logs",
+    logsDir: "/projects/my-project/.clawmasons/sessions/abc123/logs",
     proxyToken: "test-token-abc",
     credentialProxyToken: "cred-token-xyz",
   };
@@ -271,20 +251,22 @@ describe("generateComposeYml", () => {
   it("generates valid compose YAML with correct service names", () => {
     const yml = generateComposeYml(defaultOpts);
 
-    // Service names
+    // Service names (new format: agent-{role}, not agent-{agent}-{role})
     expect(yml).toContain("proxy-writer:");
-    expect(yml).toContain("agent-note-taker-writer:");
+    expect(yml).toContain("agent-writer:");
     // credential-service is no longer a Docker service (runs in-process)
     expect(yml).not.toContain("credential-service:");
 
-    // Build contexts
-    expect(yml).toContain('context: "/chapters/acme/docker"');
-    expect(yml).toContain('dockerfile: "proxy/writer/Dockerfile"');
-    expect(yml).toContain('dockerfile: "agent/note-taker/writer/Dockerfile"');
+    // Proxy: context is dockerDir, dockerfile is relative path to mcp-proxy
+    expect(yml).toContain(`context: "${defaultOpts.dockerDir}"`);
+    expect(yml).toContain("mcp-proxy/Dockerfile");
 
-    // Volumes
-    expect(yml).toContain('"/projects/my-project:/workspace"');
-    expect(yml).toContain('"/projects/my-project/.clawmasons/logs:/logs"');
+    // Agent: context is dockerDir, dockerfile is relative path
+    expect(yml).toContain(`context: "${defaultOpts.dockerDir}"`);
+    expect(yml).toContain('dockerfile: "writer/claude-code/Dockerfile"');
+
+    // Volumes: project mount uses /home/mason/workspace/project
+    expect(yml).toContain(`"${defaultOpts.projectDir}:/home/mason/workspace/project"`);
 
     // Proxy exposes port to host for in-process credential service
     expect(yml).toContain("3000:9090");
@@ -299,15 +281,30 @@ describe("generateComposeYml", () => {
     const yml = generateComposeYml(defaultOpts);
 
     // Proxy should have CREDENTIAL_PROXY_TOKEN
-    const proxySection = yml.split("agent-note-taker-writer:")[0]!;
+    const proxySection = yml.split("agent-writer:")[0]!;
     expect(proxySection).toContain("CREDENTIAL_PROXY_TOKEN=cred-token-xyz");
+  });
+
+  it("includes PROJECT_DIR in proxy environment", () => {
+    const yml = generateComposeYml(defaultOpts);
+
+    const proxySection = yml.split("agent-writer:")[0]!;
+    expect(proxySection).toContain("PROJECT_DIR=/home/mason/workspace/project");
+  });
+
+  it("proxy project mount is read-write (no :ro)", () => {
+    const yml = generateComposeYml(defaultOpts);
+
+    const proxySection = yml.split("agent-writer:")[0]!;
+    expect(proxySection).toContain(`"${defaultOpts.projectDir}:/home/mason/workspace/project"`);
+    expect(proxySection).not.toContain("/home/mason/workspace/project:ro");
   });
 
   it("agent depends on proxy directly", () => {
     const yml = generateComposeYml(defaultOpts);
 
     // Extract agent section
-    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    const agentSection = yml.split("agent-writer:")[1]!;
     expect(agentSection).toContain("depends_on:");
     expect(agentSection).toContain("- proxy-writer");
   });
@@ -316,7 +313,7 @@ describe("generateComposeYml", () => {
     const yml = generateComposeYml(defaultOpts);
 
     // Extract agent section
-    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    const agentSection = yml.split("agent-writer:")[1]!;
 
     // Should have MCP_PROXY_TOKEN
     expect(agentSection).toContain("MCP_PROXY_TOKEN=test-token-abc");
@@ -338,23 +335,24 @@ describe("generateComposeYml", () => {
   it("proxy has CHAPTER_PROXY_TOKEN", () => {
     const yml = generateComposeYml(defaultOpts);
 
-    const proxySection = yml.split("agent-note-taker-writer:")[0]!;
+    const proxySection = yml.split("agent-writer:")[0]!;
     expect(proxySection).toContain("CHAPTER_PROXY_TOKEN=test-token-abc");
   });
 
   it("uses correct Dockerfile paths for different agent/role combos", () => {
     const yml = generateComposeYml({
       ...defaultOpts,
-      agent: "coder",
+      dockerBuildDir: "/projects/my-project/.clawmasons/docker/reviewer",
+      agent: "codex",
       role: "reviewer",
       proxyToken: "token-123",
       credentialProxyToken: "cred-456",
     });
 
     expect(yml).toContain("proxy-reviewer:");
-    expect(yml).toContain("agent-coder-reviewer:");
-    expect(yml).toContain('dockerfile: "proxy/reviewer/Dockerfile"');
-    expect(yml).toContain('dockerfile: "agent/coder/reviewer/Dockerfile"');
+    expect(yml).toContain("agent-reviewer:");
+    expect(yml).toContain(`context: "${defaultOpts.dockerDir}"`);
+    expect(yml).toContain('dockerfile: "reviewer/codex/Dockerfile"');
   });
 
   it("includes role mounts in agent volumes", () => {
@@ -365,9 +363,9 @@ describe("generateComposeYml", () => {
       ],
     });
 
-    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    const agentSection = yml.split("agent-writer:")[1]!;
     expect(agentSection).toContain('"/host/data:/container/data"');
-    expect(agentSection).toContain('"/projects/my-project:/workspace"');
+    expect(agentSection).toContain(`"${defaultOpts.projectDir}:/home/mason/workspace/project"`);
   });
 
   it("appends :ro for readonly role mounts", () => {
@@ -378,7 +376,7 @@ describe("generateComposeYml", () => {
       ],
     });
 
-    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    const agentSection = yml.split("agent-writer:")[1]!;
     expect(agentSection).toContain('"/configs:/etc/app:ro"');
   });
 
@@ -390,18 +388,27 @@ describe("generateComposeYml", () => {
       ],
     });
 
-    const proxySection = yml.split("agent-note-taker-writer:")[0]!;
+    const proxySection = yml.split("agent-writer:")[0]!;
     expect(proxySection).not.toContain("/mnt/data");
   });
 
   it("agent has no extra mounts when roleMounts is undefined", () => {
     const yml = generateComposeYml(defaultOpts);
-    const agentSection = yml.split("agent-note-taker-writer:")[1]!;
+    const agentSection = yml.split("agent-writer:")[1]!;
     const volumeSection = agentSection.split("volumes:")[1]!.split("depends_on:")[0]!;
 
     const mountLines = volumeSection.split("\n").filter((l) => l.includes("- \""));
     expect(mountLines).toHaveLength(1);
-    expect(mountLines[0]).toContain("/workspace");
+    expect(mountLines[0]).toContain("/home/mason/workspace/project");
+  });
+
+  it("mounts per-role cache directory into proxy at /app/.cache", () => {
+    const yml = generateComposeYml(defaultOpts);
+    const proxySection = yml.split("agent-writer:")[0]!;
+
+    expect(proxySection).toContain(
+      `"${defaultOpts.dockerBuildDir}/mcp-proxy/.cache:/app/.cache"`,
+    );
   });
 });
 
@@ -410,45 +417,30 @@ describe("generateComposeYml", () => {
 describe("runAgent", () => {
   let tmpDir: string;
   let projectDir: string;
-  let dockerBuildPath: string;
   let exitSpy: MockInstance;
   let logSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
-  // Default chapter entry returned by findRoleEntryByRoleFn
-  function makeChapterEntry(overrides?: Partial<ChapterEntry>): ChapterEntry {
+  // Minimal RoleType fixture for testing.
+  // metadata.name uses "role-" prefix so getAppShortName strips it → "writer".
+  function makeRoleType(overrides?: Partial<RoleType>): RoleType {
     return {
-      lodge: "acme",
-      chapter: "platform",
-      role: "writer",
-      dockerBuild: dockerBuildPath,
-      roleDir: path.join(tmpDir, "clawmasons-home", "acme", "platform", "writer"),
-      agents: ["note-taker"],
-      createdAt: "2026-03-10T00:00:00Z",
-      updatedAt: "2026-03-10T00:00:00Z",
+      metadata: { name: "role-writer", version: "1.0.0" },
+      source: {
+        agentDialect: "claude-code",
+        agentDir: ".claude",
+        roleDir: path.join(projectDir, ".claude", "roles", "writer"),
+      },
+      skills: [],
+      commands: [],
+      tools: [],
+      apps: [],
       ...overrides,
-    };
+    } as RoleType;
   }
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-run-agent-test-"));
-
-    // Set up a mock chapter project with docker build directory
-    dockerBuildPath = path.join(tmpDir, "chapter-project", "docker");
-
-    // Create proxy and agent Dockerfiles
-    fs.mkdirSync(path.join(dockerBuildPath, "proxy", "writer"), { recursive: true });
-    fs.writeFileSync(
-      path.join(dockerBuildPath, "proxy", "writer", "Dockerfile"),
-      "FROM node:20\n",
-    );
-    fs.mkdirSync(path.join(dockerBuildPath, "agent", "note-taker", "writer"), { recursive: true });
-    fs.writeFileSync(
-      path.join(dockerBuildPath, "agent", "note-taker", "writer", "Dockerfile"),
-      "FROM node:20\n",
-    );
-
-    // Set up the project directory (no .clawmasons/chapter.json needed now)
     projectDir = path.join(tmpDir, "my-project");
     fs.mkdirSync(projectDir, { recursive: true });
 
@@ -468,27 +460,44 @@ describe("runAgent", () => {
     agentExitCode?: number;
     downExitCode?: number;
     sessionId?: string;
-    chapterEntry?: ChapterEntry | null;
-    initRoleCalled?: { called: boolean };
+    roleType?: RoleType;
+    resolveRoleError?: Error;
     gitignoreCalled?: { called: boolean; dir?: string; pattern?: string };
+    dockerBuildExists?: boolean;
   }) {
     const calls: Array<{ composeFile: string; args: string[]; opts?: { interactive?: boolean } }> = [];
-    const entry = overrides?.chapterEntry === null
-      ? undefined
-      : overrides?.chapterEntry ?? makeChapterEntry();
+
+    // Pre-create docker build dir if needed (default: exists)
+    const shouldExist = overrides?.dockerBuildExists ?? true;
+    const dockerDir = path.join(projectDir, ".clawmasons", "docker");
+    const dockerBuildDir = path.join(dockerDir, "writer");
+    if (shouldExist) {
+      fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
+      fs.writeFileSync(path.join(dockerBuildDir, "claude-code", "Dockerfile"), "FROM node:20\n");
+      fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
+      fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
+    }
 
     return {
       calls,
       deps: {
         generateSessionIdFn: () => overrides?.sessionId ?? "abcd1234",
         checkDockerComposeFn: () => {},
-        getClawmasonsHomeFn: () => path.join(tmpDir, "clawmasons-home"),
-        findRoleEntryByRoleFn: () => entry,
-        initRoleFn: async () => {
-          if (overrides?.initRoleCalled) {
-            overrides.initRoleCalled.called = true;
-          }
+        waitForProxyHealthFn: async () => {},
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        resolveRoleFn: async (_roleName: string, _projectDir: string) => {
+          if (overrides?.resolveRoleError) throw overrides.resolveRoleError;
+          return overrides?.roleType ?? makeRoleType();
         },
+        adaptRoleFn: () => ({
+          name: "writer",
+          version: "1.0.0",
+          agentName: "writer",
+          slug: "writer",
+          runtimes: ["claude-code"],
+          credentials: [],
+          roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
+        } as ResolvedAgent),
         ensureGitignoreEntryFn: (dir: string, pattern: string) => {
           if (overrides?.gitignoreCalled) {
             overrides.gitignoreCalled.called = true;
@@ -496,6 +505,9 @@ describe("runAgent", () => {
             overrides.gitignoreCalled.pattern = pattern;
           }
           return false;
+        },
+        existsSyncFn: (filePath: string) => {
+          return fs.existsSync(filePath);
         },
         execComposeFn: async (
           composeFile: string,
@@ -528,52 +540,33 @@ describe("runAgent", () => {
     };
   }
 
-  it("reads role from chapters.json when initialized", async () => {
+  it("resolves role and displays agent info", async () => {
     const { deps } = makeMockDeps({ sessionId: "sess0001" });
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("acme.platform");
-    expect(logOutput).toContain("note-taker");
+    expect(logOutput).toContain("claude-code");
     expect(logOutput).toContain("writer");
   });
 
-  it("auto-invokes init-role when role not found", async () => {
-    const initRoleCalled = { called: false };
-    let callCount = 0;
+  it("exits 1 when role resolution fails", async () => {
+    const { deps } = makeMockDeps({
+      resolveRoleError: new Error("Role 'nonexistent' not found"),
+    });
 
-    const { deps } = makeMockDeps({ initRoleCalled });
-
-    // Override findRoleEntryByRoleFn to return undefined first, then the entry
-    deps.findRoleEntryByRoleFn = () => {
-      callCount++;
-      if (callCount === 1) return undefined; // First call: not found
-      return makeChapterEntry(); // Second call (after auto-init): found
-    };
-
-    await runAgent(projectDir, "note-taker", "writer", deps);
-
-    expect(initRoleCalled.called).toBe(true);
-    const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("Auto-initializing");
-  });
-
-  it("exits 1 when auto-init fails and role still not found", async () => {
-    const { deps } = makeMockDeps({ chapterEntry: null });
-
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "nonexistent", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("agent failed");
-    expect(errorOutput).toContain("init-role");
+    expect(errorOutput).toContain("not found");
   });
 
   it("creates per-project .clawmasons/sessions/<id>/ for session state", async () => {
     const { deps } = makeMockDeps({ sessionId: "sess0001" });
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
     const sessionDir = path.join(projectDir, ".clawmasons", "sessions", "sess0001", "docker");
     expect(fs.existsSync(sessionDir)).toBe(true);
@@ -583,7 +576,7 @@ describe("runAgent", () => {
 
     const content = fs.readFileSync(composeFile, "utf-8");
     expect(content).toContain("proxy-writer:");
-    expect(content).toContain("agent-note-taker-writer:");
+    expect(content).toContain("agent-writer:");
     // credential-service is no longer a Docker service
     expect(content).not.toContain("credential-service:");
   });
@@ -592,50 +585,23 @@ describe("runAgent", () => {
     const gitignoreCalled = { called: false, dir: "", pattern: "" };
     const { deps } = makeMockDeps({ gitignoreCalled });
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
     expect(gitignoreCalled.called).toBe(true);
     expect(gitignoreCalled.dir).toBe(projectDir);
     expect(gitignoreCalled.pattern).toBe(".clawmasons");
   });
 
-  it("uses targetDir from chapters.json when set", async () => {
-    const customDir = path.join(tmpDir, "custom-roles", "writer");
-    const customDockerBuild = path.join(tmpDir, "custom-docker");
-
-    // Create Dockerfiles at custom docker build path
-    fs.mkdirSync(path.join(customDockerBuild, "proxy", "writer"), { recursive: true });
-    fs.writeFileSync(path.join(customDockerBuild, "proxy", "writer", "Dockerfile"), "FROM node:20\n");
-    fs.mkdirSync(path.join(customDockerBuild, "agent", "note-taker", "writer"), { recursive: true });
-    fs.writeFileSync(path.join(customDockerBuild, "agent", "note-taker", "writer", "Dockerfile"), "FROM node:20\n");
-
-    const entry = makeChapterEntry({
-      targetDir: customDir,
-      roleDir: customDir,
-      dockerBuild: customDockerBuild,
-    });
-
-    const { deps } = makeMockDeps({ sessionId: "target01", chapterEntry: entry });
-
-    await runAgent(projectDir, "note-taker", "writer", deps);
-
-    const composeFile = path.join(
-      projectDir, ".clawmasons", "sessions", "target01", "docker", "docker-compose.yml",
-    );
-    const content = fs.readFileSync(composeFile, "utf-8");
-    expect(content).toContain(`context: "${customDockerBuild}"`);
-  });
-
-  it("mounts CWD as /workspace (unchanged behavior)", async () => {
+  it("mounts project dir as /home/mason/workspace/project", async () => {
     const { deps } = makeMockDeps({ sessionId: "mount001" });
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
     const composeFile = path.join(
       projectDir, ".clawmasons", "sessions", "mount001", "docker", "docker-compose.yml",
     );
     const content = fs.readFileSync(composeFile, "utf-8");
-    expect(content).toContain(`"${projectDir}:/workspace"`);
+    expect(content).toContain(`"${projectDir}:/home/mason/workspace/project"`);
   });
 
   it("generates unique session IDs per invocation", async () => {
@@ -645,19 +611,32 @@ describe("runAgent", () => {
     const baseDeps = {
       checkDockerComposeFn: () => {},
       execComposeFn: async () => 0,
-      getClawmasonsHomeFn: () => path.join(tmpDir, "clawmasons-home"),
-      findRoleEntryByRoleFn: () => makeChapterEntry(),
-      initRoleFn: async () => {},
+      resolveRoleFn: async () => makeRoleType(),
+      adaptRoleFn: () => ({
+        name: "writer", version: "1.0.0", agentName: "writer", slug: "writer",
+        runtimes: ["claude-code"], credentials: [],
+        roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
+      } as ResolvedAgent),
       ensureGitignoreEntryFn: () => false,
+      existsSyncFn: (p: string) => fs.existsSync(p),
+      waitForProxyHealthFn: async () => {},
       startCredentialServiceFn: async () => ({ disconnect: () => {}, close: () => {} }),
     };
 
-    await runAgent(projectDir, "note-taker", "writer", {
+    // Pre-create docker build dirs for both runs
+    const dockerDir = path.join(projectDir, ".clawmasons", "docker");
+    const dockerBuildDir = path.join(dockerDir, "writer");
+    fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
+    fs.writeFileSync(path.join(dockerBuildDir, "claude-code", "Dockerfile"), "FROM node:20\n");
+    fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
+    fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
+
+    await runAgent(projectDir, "claude-code", "writer", {
       ...baseDeps,
       generateSessionIdFn: () => ids[callCount++]!,
     });
 
-    await runAgent(projectDir, "note-taker", "writer", {
+    await runAgent(projectDir, "claude-code", "writer", {
       ...baseDeps,
       generateSessionIdFn: () => ids[callCount++]!,
     });
@@ -671,65 +650,69 @@ describe("runAgent", () => {
   it("starts proxy detached, then credential service in-process, then agent interactively", async () => {
     const { calls, deps } = makeMockDeps();
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
-    // First call: proxy up -d
-    expect(calls[0]!.args).toContain("up");
-    expect(calls[0]!.args).toContain("-d");
+    // First call: proxy build
+    expect(calls[0]!.args).toContain("build");
     expect(calls[0]!.args).toContain("proxy-writer");
 
-    // Second call: agent run (interactive) — credential service is in-process, not a Docker call
-    expect(calls[1]!.args).toContain("run");
-    expect(calls[1]!.args).toContain("--rm");
-    expect(calls[1]!.args).toContain("--service-ports");
-    expect(calls[1]!.args).toContain("agent-note-taker-writer");
-    expect(calls[1]!.opts?.interactive).toBe(true);
+    // Second call: proxy up -d
+    expect(calls[1]!.args).toContain("up");
+    expect(calls[1]!.args).toContain("-d");
+    expect(calls[1]!.args).toContain("proxy-writer");
+
+    // Third call: agent run (interactive)
+    expect(calls[2]!.args).toContain("run");
+    expect(calls[2]!.args).toContain("--rm");
+    expect(calls[2]!.args).toContain("--service-ports");
+    expect(calls[2]!.args).toContain("agent-writer");
+    expect(calls[2]!.opts?.interactive).toBe(true);
   });
 
   it("tears down all services after agent exits", async () => {
     const { calls, deps } = makeMockDeps();
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
-    // Third call should be docker compose down (proxy up, agent run, down)
-    expect(calls[2]!.args).toContain("down");
+    // Fourth call should be docker compose down (build, up, agent run, down)
+    expect(calls[3]!.args).toContain("down");
   });
 
   it("retains session directory after exit", async () => {
     const { deps } = makeMockDeps({ sessionId: "keep0001" });
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
     const sessionDir = path.join(projectDir, ".clawmasons", "sessions", "keep0001");
     expect(fs.existsSync(sessionDir)).toBe(true);
   });
 
-  it("compose file references correct Dockerfiles from docker-build path", async () => {
+  it("compose file references correct docker build paths", async () => {
     const { deps } = makeMockDeps({ sessionId: "ref00001" });
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
     const composeFile = path.join(
       projectDir, ".clawmasons", "sessions", "ref00001", "docker", "docker-compose.yml",
     );
     const content = fs.readFileSync(composeFile, "utf-8");
 
-    expect(content).toContain(`context: "${dockerBuildPath}"`);
-    expect(content).toContain('dockerfile: "proxy/writer/Dockerfile"');
-    expect(content).toContain('dockerfile: "agent/note-taker/writer/Dockerfile"');
+    const dockerDir = path.join(projectDir, ".clawmasons", "docker");
+    expect(content).toContain(`context: "${dockerDir}"`);
+    expect(content).toContain('dockerfile: "writer/claude-code/Dockerfile"');
   });
 
   it("compose file has CREDENTIAL_PROXY_TOKEN in proxy", async () => {
     const { deps } = makeMockDeps({ sessionId: "tok00001" });
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
     const composeFile = path.join(
       projectDir, ".clawmasons", "sessions", "tok00001", "docker", "docker-compose.yml",
     );
     const content = fs.readFileSync(composeFile, "utf-8");
 
-    // CREDENTIAL_PROXY_TOKEN should appear in proxy (credential service is in-process)
+    // CREDENTIAL_PROXY_TOKEN should appear in proxy
     expect(content).toContain("CREDENTIAL_PROXY_TOKEN=");
 
     // Token should be a 64-char hex string (32 bytes)
@@ -741,13 +724,13 @@ describe("runAgent", () => {
   it("compose file has no API keys in agent environment", async () => {
     const { deps } = makeMockDeps({ sessionId: "nokeys01" });
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
     const composeFile = path.join(
       projectDir, ".clawmasons", "sessions", "nokeys01", "docker", "docker-compose.yml",
     );
     const content = fs.readFileSync(composeFile, "utf-8");
-    const agentSection = content.split("agent-note-taker-writer:")[1]!;
+    const agentSection = content.split("agent-writer:")[1]!;
 
     expect(agentSection).toContain("MCP_PROXY_TOKEN=");
     expect(agentSection).not.toContain("OPENROUTER_API_KEY");
@@ -759,8 +742,8 @@ describe("runAgent", () => {
     const { deps: deps1 } = makeMockDeps({ sessionId: "uniq0001" });
     const { deps: deps2 } = makeMockDeps({ sessionId: "uniq0002" });
 
-    await runAgent(projectDir, "note-taker", "writer", deps1);
-    await runAgent(projectDir, "note-taker", "writer", deps2);
+    await runAgent(projectDir, "claude-code", "writer", deps1);
+    await runAgent(projectDir, "claude-code", "writer", deps2);
 
     const file1 = path.join(
       projectDir, ".clawmasons", "sessions", "uniq0001", "docker", "docker-compose.yml",
@@ -786,11 +769,10 @@ describe("runAgent", () => {
   it("logs session info and completion message", async () => {
     const { deps } = makeMockDeps({ sessionId: "log00001" });
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("acme.platform");
-    expect(logOutput).toContain("note-taker");
+    expect(logOutput).toContain("claude-code");
     expect(logOutput).toContain("writer");
     expect(logOutput).toContain("log00001");
     expect(logOutput).toContain("agent complete");
@@ -804,7 +786,7 @@ describe("runAgent", () => {
       throw new Error("Docker Compose v2 is required");
     };
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -812,34 +794,10 @@ describe("runAgent", () => {
     expect(errorOutput).toContain("Docker Compose");
   });
 
-  it("exits 1 when proxy Dockerfile is missing", async () => {
-    // Remove the proxy Dockerfile
-    fs.rmSync(path.join(dockerBuildPath, "proxy"), { recursive: true });
-
-    const { deps } = makeMockDeps();
-    await runAgent(projectDir, "note-taker", "writer", deps);
-
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("Proxy Dockerfile not found");
-  });
-
-  it("exits 1 when agent Dockerfile is missing", async () => {
-    // Remove the agent Dockerfile
-    fs.rmSync(path.join(dockerBuildPath, "agent"), { recursive: true });
-
-    const { deps } = makeMockDeps();
-    await runAgent(projectDir, "note-taker", "writer", deps);
-
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("Agent Dockerfile not found");
-  });
-
   it("exits 1 when proxy fails to start", async () => {
     const { deps } = makeMockDeps({ proxyExitCode: 1 });
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -849,20 +807,164 @@ describe("runAgent", () => {
   it("exits 1 when credential service fails to start", async () => {
     const { deps } = makeMockDeps({ credServiceExitCode: 1 });
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("Failed to start credential service");
   });
 
-  it("creates logs directory if it does not exist", async () => {
-    const { deps } = makeMockDeps();
+  it("creates logs directory in session directory", async () => {
+    const { deps } = makeMockDeps({ sessionId: "logs0001" });
 
-    await runAgent(projectDir, "note-taker", "writer", deps);
+    await runAgent(projectDir, "claude-code", "writer", deps);
 
-    const logsDir = path.join(projectDir, ".clawmasons", "logs");
+    const logsDir = path.join(projectDir, ".clawmasons", "sessions", "logs0001", "logs");
     expect(fs.existsSync(logsDir)).toBe(true);
     expect(fs.statSync(logsDir).isDirectory()).toBe(true);
+  });
+});
+
+// ── runProxyOnly ─────────────────────────────────────────────────────────
+
+describe("runProxyOnly", () => {
+  let tmpDir: string;
+  let projectDir: string;
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  function makeRoleType(overrides?: Partial<RoleType>): RoleType {
+    return {
+      metadata: { name: "role-writer", version: "1.0.0" },
+      source: {
+        agentDialect: "claude-code",
+        agentDir: ".claude",
+        roleDir: path.join(projectDir, ".claude", "roles", "writer"),
+      },
+      skills: [],
+      commands: [],
+      tools: [],
+      apps: [],
+      ...overrides,
+    } as RoleType;
+  }
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-proxy-only-test-"));
+    projectDir = path.join(tmpDir, "my-project");
+    fs.mkdirSync(projectDir, { recursive: true });
+
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Pre-create docker build dirs
+    const dockerDir = path.join(projectDir, ".clawmasons", "docker");
+    const dockerBuildDir = path.join(dockerDir, "writer");
+    fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
+    fs.writeFileSync(path.join(dockerBuildDir, "claude-code", "Dockerfile"), "FROM node:20\n");
+    fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
+    fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeDeps(overrides?: { sessionId?: string; buildExitCode?: number; upExitCode?: number }) {
+    const calls: Array<{ composeFile: string; args: string[] }> = [];
+
+    return {
+      calls,
+      deps: {
+        generateSessionIdFn: () => overrides?.sessionId ?? "proxy001",
+        checkDockerComposeFn: () => {},
+        resolveRoleFn: async () => makeRoleType(),
+        ensureGitignoreEntryFn: () => false,
+        existsSyncFn: (p: string) => fs.existsSync(p),
+        execComposeFn: async (composeFile: string, args: string[]) => {
+          calls.push({ composeFile, args });
+          if (args.includes("build")) return overrides?.buildExitCode ?? 0;
+          if (args.includes("-d")) return overrides?.upExitCode ?? 0;
+          return 0;
+        },
+        startCredentialServiceFn: async () => ({ disconnect: () => {}, close: () => {} }),
+      },
+    };
+  }
+
+  it("builds proxy then starts it detached", async () => {
+    const { calls, deps } = makeDeps();
+
+    await runProxyOnly(projectDir, "claude-code", "writer", 19700, deps);
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.args).toContain("build");
+    expect(calls[0]!.args).toContain("proxy-writer");
+    expect(calls[1]!.args).toContain("up");
+    expect(calls[1]!.args).toContain("-d");
+    expect(calls[1]!.args).toContain("proxy-writer");
+  });
+
+  it("does NOT start agent or credential service", async () => {
+    const { calls, deps } = makeDeps();
+
+    await runProxyOnly(projectDir, "claude-code", "writer", 3000, deps);
+
+    // Only 2 compose calls: build + up (no agent run, no down)
+    expect(calls).toHaveLength(2);
+    const allArgs = calls.flatMap((c) => c.args);
+    expect(allArgs).not.toContain("agent-writer");
+    expect(allArgs).not.toContain("--service-ports");
+  });
+
+  it("outputs JSON with connection info to stdout", async () => {
+    const { deps } = makeDeps({ sessionId: "json0001" });
+
+    await runProxyOnly(projectDir, "claude-code", "writer", 19700, deps);
+
+    // logSpy captures the JSON output (origLog is called once with JSON)
+    const jsonCall = logSpy.mock.calls.find((call) => {
+      try { JSON.parse(call[0] as string); return true; } catch { return false; }
+    });
+    expect(jsonCall).toBeDefined();
+
+    const info = JSON.parse(jsonCall![0] as string);
+    expect(info.proxyPort).toBe(19700);
+    expect(info.proxyToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(info.composeFile).toContain("json0001");
+    expect(info.proxyServiceName).toBe("proxy-writer");
+    expect(info.sessionId).toBe("json0001");
+  });
+
+  it("throws when proxy build fails", async () => {
+    const { deps } = makeDeps({ buildExitCode: 1 });
+
+    await expect(
+      runProxyOnly(projectDir, "claude-code", "writer", 3000, deps),
+    ).rejects.toThrow("Failed to build proxy image");
+  });
+
+  it("throws when proxy start fails", async () => {
+    const { deps } = makeDeps({ upExitCode: 1 });
+
+    await expect(
+      runProxyOnly(projectDir, "claude-code", "writer", 3000, deps),
+    ).rejects.toThrow("Failed to start proxy");
+  });
+
+  it("creates compose file with correct paths", async () => {
+    const { deps } = makeDeps({ sessionId: "path0001" });
+
+    await runProxyOnly(projectDir, "claude-code", "writer", 3000, deps);
+
+    const composeFile = path.join(
+      projectDir, ".clawmasons", "sessions", "path0001", "docker", "docker-compose.yml",
+    );
+    expect(fs.existsSync(composeFile)).toBe(true);
+
+    const content = fs.readFileSync(composeFile, "utf-8");
+    expect(content).toContain("proxy-writer:");
+    expect(content).toContain("agent-writer:");
+    expect(content).toContain(`"${projectDir}:/home/mason/workspace/project"`);
   });
 });

@@ -49,6 +49,10 @@ export interface ChapterProxyServerConfig {
   sessionType?: string;
   /** ACP client editor name for audit logging (e.g., "zed", "jetbrains"). */
   acpClient?: string;
+  /** Promise that resolves when upstream MCP servers and routing are ready.
+   *  Health + connect-agent + credential_request work immediately;
+   *  tool/resource/prompt handlers await this before processing. */
+  readyGate?: Promise<void>;
 }
 
 // ── credential_request Tool Definition ──────────────────────────────────
@@ -82,6 +86,7 @@ export class ChapterProxyServer {
   private activeTransports: Set<SSEServerTransport | StreamableHTTPServerTransport> = new Set();
   private sessionStore: SessionStore;
   private credentialRelay: CredentialRelay | null = null;
+  private readyGateResolved = false;
 
   constructor(config: ChapterProxyServerConfig) {
     this.config = { ...config, port: config.port ?? DEFAULT_PORT };
@@ -93,6 +98,17 @@ export class ChapterProxyServer {
         requestTimeoutMs: config.credentialRequestTimeoutMs,
       });
     }
+
+    if (config.readyGate) {
+      config.readyGate.then(() => { this.readyGateResolved = true; });
+    } else {
+      this.readyGateResolved = true;
+    }
+  }
+
+  /** Late-bind routing tables after upstream initialization completes. */
+  setRouting(opts: { router: ToolRouter; resourceRouter?: ResourceRouter; promptRouter?: PromptRouter }): void {
+    this.config = { ...this.config, ...opts };
   }
 
   /** Expose the session store for external access (e.g., risk-based limits in CHANGE 5). */
@@ -298,20 +314,34 @@ export class ChapterProxyServer {
   // ── MCP Server Factory ────────────────────────────────────────────
 
   private createMcpServer(): Server {
-    const { router, upstream, db, agentName, approvalPatterns, approvalOptions, resourceRouter, promptRouter } = this.config;
+    // Destructure only stable (non-late-bound) fields.
+    // router, upstream, resourceRouter, promptRouter are accessed via
+    // this.config.* so they pick up values set by setRouting().
+    const { db, agentName, approvalPatterns, approvalOptions } = this.config;
 
-    const capabilities: Record<string, Record<string, never>> = { tools: {} };
-    if (resourceRouter) capabilities.resources = {};
-    if (promptRouter) capabilities.prompts = {};
+    const capabilities: Record<string, Record<string, never>> = {
+      tools: {},
+      resources: {},
+      prompts: {},
+    };
 
     const server = new Server(
       { name: "chapter", version: "0.1.0" },
       { capabilities },
     );
 
-    server.setRequestHandler(ListToolsRequestSchema, () => {
-      const tools = router.listTools();
-      // Include credential_request tool when credential relay is configured
+    // ── Tool Handlers ───────────────────────────────────────────────
+
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
+      // Before upstreams are ready, return only credential_request
+      // so the agent can fetch credentials immediately on boot
+      if (!this.readyGateResolved) {
+        const tools: Tool[] = [];
+        if (this.credentialRelay) tools.push(CREDENTIAL_REQUEST_TOOL);
+        return { tools };
+      }
+
+      const tools = this.config.router.listTools();
       if (this.credentialRelay) {
         tools.push(CREDENTIAL_REQUEST_TOOL);
       }
@@ -321,7 +351,7 @@ export class ChapterProxyServer {
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
 
-      // Handle internal credential_request tool
+      // Handle internal credential_request tool — no readyGate needed
       if (name === "credential_request" && this.credentialRelay) {
         const key = (args as Record<string, unknown> | undefined)?.key as string | undefined;
         const sessionToken = (args as Record<string, unknown> | undefined)?.session_token as string | undefined;
@@ -352,6 +382,10 @@ export class ChapterProxyServer {
         };
       }
 
+      // All other tools require upstreams to be ready
+      if (this.config.readyGate) await this.config.readyGate;
+
+      const { router, upstream } = this.config;
       const route = router.resolve(name);
       if (!route) {
         if (db) {
@@ -438,36 +472,42 @@ export class ChapterProxyServer {
     });
 
     // ── Resource Handlers ──────────────────────────────────────────────
-    if (resourceRouter) {
-      server.setRequestHandler(ListResourcesRequestSchema, () => ({
-        resources: resourceRouter.listResources(),
-      }));
 
-      server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-        const { uri } = request.params;
-        const route = resourceRouter.resolveUri(uri);
-        if (!route) {
-          throw new Error(`Unknown resource: ${uri}`);
-        }
-        return upstream.readResource(route.appName, route.originalUri);
-      });
-    }
+    server.setRequestHandler(ListResourcesRequestSchema, async () => {
+      if (this.config.readyGate) await this.config.readyGate;
+      const { resourceRouter } = this.config;
+      return { resources: resourceRouter ? resourceRouter.listResources() : [] };
+    });
+
+    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      if (this.config.readyGate) await this.config.readyGate;
+      const { resourceRouter, upstream } = this.config;
+      const { uri } = request.params;
+      const route = resourceRouter?.resolveUri(uri);
+      if (!route) {
+        throw new Error(`Unknown resource: ${uri}`);
+      }
+      return upstream.readResource(route.appName, route.originalUri);
+    });
 
     // ── Prompt Handlers ────────────────────────────────────────────────
-    if (promptRouter) {
-      server.setRequestHandler(ListPromptsRequestSchema, () => ({
-        prompts: promptRouter.listPrompts(),
-      }));
 
-      server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-        const { name, arguments: args } = request.params;
-        const route = promptRouter.resolve(name);
-        if (!route) {
-          throw new Error(`Unknown prompt: ${name}`);
-        }
-        return upstream.getPrompt(route.appName, route.originalName, args);
-      });
-    }
+    server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      if (this.config.readyGate) await this.config.readyGate;
+      const { promptRouter } = this.config;
+      return { prompts: promptRouter ? promptRouter.listPrompts() : [] };
+    });
+
+    server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      if (this.config.readyGate) await this.config.readyGate;
+      const { promptRouter, upstream } = this.config;
+      const { name, arguments: args } = request.params;
+      const route = promptRouter?.resolve(name);
+      if (!route) {
+        throw new Error(`Unknown prompt: ${name}`);
+      }
+      return upstream.getPrompt(route.appName, route.originalName, args);
+    });
 
     return server;
   }

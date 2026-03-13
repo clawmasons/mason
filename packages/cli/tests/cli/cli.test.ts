@@ -14,23 +14,25 @@ describe("CLI entry point", () => {
     expect(program.description()).toContain("Clawmasons Chapter");
   });
 
-  it("has top-level init command registered", () => {
+  it("does not have top-level init command (lodge-init removed)", () => {
     const initCmd = program.commands.find((cmd) => cmd.name() === "init");
-    expect(initCmd).toBeDefined();
-    if (initCmd) {
-      expect(initCmd.description()).toContain("lodge");
+    expect(initCmd).toBeUndefined();
+  });
+
+  it("has top-level run command registered", () => {
+    const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+    expect(runCmd).toBeDefined();
+    if (runCmd) {
+      expect(runCmd.description()).toContain("Run a role");
     }
   });
 
-  it("has top-level agent command registered", () => {
+  it("does not have a hidden agent command (agent type removed)", () => {
     const agentCmd = program.commands.find((cmd) => cmd.name() === "agent");
-    expect(agentCmd).toBeDefined();
-    if (agentCmd) {
-      expect(agentCmd.description()).toContain("agent");
-    }
+    expect(agentCmd).toBeUndefined();
   });
 
-  it("does not have a separate top-level acp command (consolidated into agent --acp)", () => {
+  it("does not have a separate top-level acp command (consolidated into run --acp)", () => {
     const acpCmd = program.commands.find((cmd) => cmd.name() === "acp");
     expect(acpCmd).toBeUndefined();
   });
@@ -68,7 +70,7 @@ describe("CLI entry point", () => {
     }
   });
 
-  it("chapter subcommand contains build, list, validate, add, remove", () => {
+  it("chapter subcommand contains build, list, validate, add, permissions, pack, proxy", () => {
     const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
     expect(chapterCmd).toBeDefined();
     if (chapterCmd) {
@@ -77,11 +79,12 @@ describe("CLI entry point", () => {
       expect(subcommandNames).toContain("list");
       expect(subcommandNames).toContain("validate");
       expect(subcommandNames).toContain("add");
-      expect(subcommandNames).toContain("remove");
-      expect(subcommandNames).toContain("init-role");
       expect(subcommandNames).toContain("permissions");
       expect(subcommandNames).toContain("pack");
       expect(subcommandNames).toContain("proxy");
+      // Removed commands: remove, init-role
+      expect(subcommandNames).not.toContain("remove");
+      expect(subcommandNames).not.toContain("init-role");
     }
   });
 
@@ -94,5 +97,34 @@ describe("CLI entry point", () => {
     expect(topLevelNames).not.toContain("build");
     expect(topLevelNames).not.toContain("list");
     expect(topLevelNames).not.toContain("validate");
+  });
+
+  it("run command has --role option", () => {
+    const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+    expect(runCmd).toBeDefined();
+    if (runCmd) {
+      const roleOption = runCmd.options.find((opt) => opt.long === "--role");
+      expect(roleOption).toBeDefined();
+    }
+  });
+
+  it("run command has --acp option", () => {
+    const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+    expect(runCmd).toBeDefined();
+    if (runCmd) {
+      const acpOption = runCmd.options.find((opt) => opt.long === "--acp");
+      expect(acpOption).toBeDefined();
+    }
+  });
+
+  it("run command accepts agent-type positional argument", () => {
+    const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+    expect(runCmd).toBeDefined();
+    if (runCmd) {
+      // Commander stores registered arguments
+      const args = runCmd.registeredArguments ?? [];
+      expect(args.length).toBeGreaterThanOrEqual(1);
+      expect(args[0]?.name()).toBe("agent-type");
+    }
   });
 });

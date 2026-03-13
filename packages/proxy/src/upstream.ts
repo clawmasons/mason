@@ -20,6 +20,8 @@ export interface UpstreamAppConfig {
   name: string;
   app: ResolvedApp;
   env?: Record<string, string>;
+  /** Working directory for stdio transport child processes. */
+  cwd?: string;
 }
 
 // ── UpstreamManager ────────────────────────────────────────────────────
@@ -198,6 +200,7 @@ export function createTransport(
               ...env,
             }
           : undefined,
+        cwd: config.cwd,
       });
     }
     case "sse": {

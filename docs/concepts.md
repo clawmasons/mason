@@ -1,27 +1,26 @@
 ---
 title: Core Concepts
-description: The mental model behind clawmasons agent packaging
+description: The mental model behind clawmasons role packaging
 ---
 
 # Core Concepts
 
-Clawmasons organizes AI agents using a hierarchy of composable npm packages. Each package type serves a specific purpose in the governance model.
+Clawmasons organizes AI agent roles using a hierarchy of composable npm packages. Each package type serves a specific purpose in the governance model.
 
 ## Hierarchy
 
 ```
 Lodge (organizational container)
   └── Chapter (npm workspace)
-        └── Agent (deployable unit)
-              └── Role (permission boundary)
-                    ├── Task (unit of work)
-                    │     ├── App (MCP server / tools)
-                    │     └── Skill (knowledge artifact)
-                    ├── App (direct dependency)
-                    └── Skill (direct dependency)
+        └── Role (deployable unit / permission boundary)
+              ├── Task (unit of work)
+              │     ├── App (MCP server / tools)
+              │     └── Skill (knowledge artifact)
+              ├── App (direct dependency)
+              └── Skill (direct dependency)
 ```
 
-## The Five Package Types
+## The Four Package Types
 
 Every component is a standard npm package with a `chapter` field in its `package.json`:
 
@@ -30,21 +29,44 @@ Every component is a standard npm package with a `chapter` field in its `package
 | [App](chapter-app.md) | MCP server | Provides tools to agents |
 | [Skill](chapter-skill.md) | Knowledge artifact | Provides context and conventions |
 | [Task](chapter-task.md) | Unit of work | Defines what agents do |
-| [Role](chapter-role.md) | Permission boundary | Controls what agents can access |
-| [Agent](chapter-agent.md) | Deployable unit | Combines roles with runtime config |
+| [Role](chapter-role.md) | Deployable unit | Combines tasks, tools, permissions, and system prompt |
 
 ## How They Compose
 
-An **agent** references one or more **roles** as npm dependencies. Each role declares which **tasks**, **skills**, and **apps** it uses, along with **permissions** that gate tool access.
+A **role** declares which **tasks**, **skills**, and **apps** it uses, along with **permissions** that gate tool access.
 
-When an agent runs, the system resolves the full dependency tree, starts the required MCP servers (apps), and configures the proxy to enforce the role's permission rules.
+When a role runs, the system resolves the full dependency tree, starts the required MCP servers (apps), and configures the proxy to enforce the role's permission rules.
+
+A role can be defined as a local `ROLE.md` file:
+
+```yaml
+---
+name: writer
+description: A writing assistant with filesystem access
+commands: ['take-notes']
+skills: ['@acme/skill-markdown-conventions']
+mcp_servers:
+  - name: filesystem
+    tools:
+      allow: ['read_file', 'write_file', 'list_directory']
+credentials: ['GITHUB_TOKEN']
+---
+
+You are a technical writer. Help create clear documentation.
+```
+
+Or as a published npm package with a `chapter` field in `package.json`:
 
 ```json
 {
   "chapter": {
-    "type": "agent",
-    "runtimes": ["claude-code"],
-    "roles": ["@acme/role-writer"]
+    "type": "role",
+    "tasks": ["@acme/task-take-notes"],
+    "permissions": {
+      "@acme/app-filesystem": {
+        "allow": ["read_file", "write_file", "list_directory"]
+      }
+    }
   }
 }
 ```
@@ -67,8 +89,10 @@ The `chapter` field in `package.json` is the single source of truth for each com
 - **Portability** — Packages can be published to any npm registry
 - **Type safety** — All fields are validated with Zod schemas
 
+For local development, roles can also be defined as `ROLE.md` files that bypass npm packaging entirely. See [Role](chapter-role.md) for the ROLE.md format.
+
 ## Next Steps
 
-- Start with [Agent](chapter-agent.md) to understand the top-level deployable unit
-- Read [Role](chapter-role.md) to understand the permission model
-- See [Architecture](architecture.md) for how it all runs at runtime
+- Start with [Role](chapter-role.md) to understand the primary deployable unit
+- Read [Architecture](architecture.md) for how it all runs at runtime
+- See [Getting Started](get-started.md) to run your first role

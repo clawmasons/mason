@@ -19,22 +19,48 @@ import * as child_process from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import {
-  readRunConfig,
-  validateDockerfiles,
-  execComposeCommand,
-  generateSessionId,
-} from "../cli/commands/run-agent.js";
 import { checkDockerCompose } from "../cli/commands/docker-utils.js";
 import { resolveRoleMountVolumes, type RoleMount } from "../generator/mount-volumes.js";
 import type { AcpLogger } from "./logger.js";
 
+// ── Local Utilities ──────────────────────────────────────────────────
+
+/**
+ * Generate a short random session identifier.
+ */
+function generateSessionId(): string {
+  return crypto.randomBytes(4).toString("hex");
+}
+
+/**
+ * Execute a `docker compose` command against a compose file.
+ * Returns the exit code (0 = success).
+ */
+function execComposeCommand(
+  composeFile: string,
+  args: string[],
+  opts?: { interactive?: boolean },
+): Promise<number> {
+  const baseArgs = ["compose", "-f", composeFile, ...args];
+  const stdio = opts?.interactive ? "inherit" as const : "ignore" as const;
+
+  return new Promise((resolve) => {
+    const child = child_process.spawn("docker", baseArgs, { stdio });
+    child.on("close", (code) => resolve(code ?? 0));
+    child.on("error", () => resolve(1));
+  });
+}
+
+// ── Constants ────────────────────────────────────────────────────────
+
+const PROJECT_MOUNT_PATH = "/home/mason/workspace/project";
+
 // ── Types ─────────────────────────────────────────────────────────────
 
 export interface AcpSessionConfig {
-  /** Workspace root directory (chapter workspace, for readRunConfig) */
+  /** Workspace root directory */
   projectDir: string;
-  /** Agent short name (e.g., "note-taker") */
+  /** Agent short name (e.g., "claude-code") */
   agent: string;
   /** Role short name (e.g., "writer") */
   role: string;
@@ -48,6 +74,10 @@ export interface AcpSessionConfig {
   acpCommand?: string[];
   /** Declared credential keys for the agent (passed as AGENT_CREDENTIALS env var) */
   credentialKeys?: string[];
+  /** Role-specific Docker build directory (e.g. {projectDir}/.clawmasons/docker/{role-name}/) */
+  dockerBuildDir: string;
+  /** Shared Docker directory containing node_modules (e.g. {projectDir}/.clawmasons/docker/) */
+  dockerDir: string;
 }
 
 export interface SessionInfo {
@@ -78,8 +108,8 @@ export interface InfrastructureInfo {
   proxyToken: string;
   /** Generated credential proxy token (shared with agent sessions) */
   credentialProxyToken: string;
-  /** Docker build path resolved from chapter workspace */
-  dockerBuildPath: string;
+  /** Role-specific Docker build directory */
+  dockerBuildDir: string;
 }
 
 export interface AgentSessionInfo {
@@ -91,7 +121,7 @@ export interface AgentSessionInfo {
   composeFile: string;
   /** Name of the agent service */
   agentServiceName: string;
-  /** The project directory mounted as /workspace */
+  /** The project directory mounted into the container */
   projectDir: string;
 }
 
@@ -128,9 +158,17 @@ export interface AcpSessionDeps {
  * The agent service is defined with `profiles: ["agent"]` so that
  * `docker compose up -d` only starts the proxy.
  * The agent is started later via `docker compose run`.
+ *
+ * Docker build layout (project-local):
+ *   .clawmasons/docker/              ← dockerDir (shared, has node_modules)
+ *     {role-name}/                   ← dockerBuildDir
+ *       mcp-proxy/Dockerfile
+ *       {agent-type}/Dockerfile
  */
 export function generateAcpComposeYml(opts: {
-  dockerBuildPath: string;
+  dockerBuildDir: string;
+  dockerDir: string;
+  projectDir?: string;
   agent: string;
   role: string;
   logsDir: string;
@@ -143,7 +181,9 @@ export function generateAcpComposeYml(opts: {
   credentialKeys?: string[];
 }): string {
   const {
-    dockerBuildPath,
+    dockerBuildDir,
+    dockerDir,
+    projectDir,
     agent,
     role,
     logsDir,
@@ -156,17 +196,23 @@ export function generateAcpComposeYml(opts: {
     credentialKeys,
   } = opts;
 
-  const proxyDockerfile = path.join("proxy", role, "Dockerfile");
-  const agentDockerfile = path.join("agent", agent, role, "Dockerfile");
+  // Proxy: context is the shared dockerDir (has node_modules),
+  // dockerfile is the role-specific mcp-proxy/Dockerfile.
+  const proxyDockerfile = path.relative(dockerDir, path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"));
+
+  // Agent: context is the shared dockerDir (has node_modules),
+  // dockerfile is the role-specific {agent-type}/Dockerfile.
+  const agentDockerfile = path.relative(dockerDir, path.join(dockerBuildDir, agent, "Dockerfile"));
 
   const proxyServiceName = `proxy-${role}`;
-  const agentServiceName = `agent-${agent}-${role}`;
+  const agentServiceName = `agent-${role}`;
 
   // Build proxy environment lines (include ACP metadata)
   const proxyEnvLines = [
     `      - CHAPTER_PROXY_TOKEN=${proxyToken}`,
     `      - CREDENTIAL_PROXY_TOKEN=${credentialProxyToken}`,
     `      - CHAPTER_SESSION_TYPE=acp`,
+    `      - PROJECT_DIR=${PROJECT_MOUNT_PATH}`,
   ];
   if (acpClient) {
     proxyEnvLines.push(`      - CHAPTER_ACP_CLIENT=${acpClient}`);
@@ -203,21 +249,29 @@ export function generateAcpComposeYml(opts: {
     ? `\n    command: ${JSON.stringify(acpCommand)}`
     : "";
 
+  // Build proxy volume lines
+  const cacheDir = path.join(dockerBuildDir, "mcp-proxy", ".cache");
+  const proxyVolumeLines = [`      - "${logsDir}:/logs"`];
+  if (projectDir) {
+    proxyVolumeLines.push(`      - "${projectDir}:${PROJECT_MOUNT_PATH}"`);
+  }
+  proxyVolumeLines.push(`      - "${cacheDir}:/app/.cache"`);
+
   return `# Generated by chapter acp-session
 services:
   ${proxyServiceName}:
     build:
-      context: "${dockerBuildPath}"
+      context: "${dockerDir}"
       dockerfile: "${proxyDockerfile}"
     volumes:
-      - "${logsDir}:/logs"
+${proxyVolumeLines.join("\n")}
     environment:
 ${proxyEnvLines.join("\n")}${proxyPortsSection}
     restart: "no"
 
   ${agentServiceName}:
     build:
-      context: "${dockerBuildPath}"
+      context: "${dockerDir}"
       dockerfile: "${agentDockerfile}"${agentVolumesSection}
     depends_on:
       - ${proxyServiceName}
@@ -266,21 +320,17 @@ export class AcpSession {
       throw new Error("ACP session is already running");
     }
 
-    const { projectDir, agent, role } = this.config;
+    const { projectDir, agent, role, dockerBuildDir, dockerDir } = this.config;
 
     // Pre-flight checks
     this.deps.checkDockerComposeFn();
-
-    const runConfig = readRunConfig(projectDir);
-    const dockerBuildPath = runConfig["docker-build"];
-    validateDockerfiles(dockerBuildPath, agent, role);
 
     // Generate session directory
     const sessionId = this.deps.generateSessionIdFn();
     const sessionDir = path.join(projectDir, ".clawmasons", "sessions", sessionId, "docker");
     fs.mkdirSync(sessionDir, { recursive: true });
 
-    const logsDir = path.join(projectDir, ".clawmasons", "logs");
+    const logsDir = path.join(sessionDir, "logs");
     fs.mkdirSync(logsDir, { recursive: true });
 
     // Generate tokens
@@ -289,7 +339,9 @@ export class AcpSession {
 
     // Generate compose file
     const composeContent = generateAcpComposeYml({
-      dockerBuildPath,
+      dockerBuildDir,
+      dockerDir,
+      projectDir,
       agent,
       role,
       logsDir,
@@ -311,7 +363,7 @@ export class AcpSession {
     }
 
     const proxyServiceName = `proxy-${role}`;
-    const agentServiceName = `agent-${agent}-${role}`;
+    const agentServiceName = `agent-${role}`;
 
     this.sessionInfo = {
       sessionId,
@@ -336,21 +388,17 @@ export class AcpSession {
       throw new Error("Infrastructure is already running");
     }
 
-    const { projectDir, agent, role } = this.config;
+    const { projectDir, agent, role, dockerBuildDir, dockerDir } = this.config;
 
     // Pre-flight checks
     this.deps.checkDockerComposeFn();
-
-    const runConfig = readRunConfig(projectDir);
-    const dockerBuildPath = runConfig["docker-build"];
-    validateDockerfiles(dockerBuildPath, agent, role);
 
     // Generate session directory
     const sessionId = this.deps.generateSessionIdFn();
     const sessionDir = path.join(projectDir, ".clawmasons", "sessions", sessionId, "docker");
     fs.mkdirSync(sessionDir, { recursive: true });
 
-    const logsDir = path.join(projectDir, ".clawmasons", "logs");
+    const logsDir = path.join(sessionDir, "logs");
     fs.mkdirSync(logsDir, { recursive: true });
 
     // Generate tokens
@@ -359,7 +407,9 @@ export class AcpSession {
 
     // Generate single compose file with all services
     const composeContent = generateAcpComposeYml({
-      dockerBuildPath,
+      dockerBuildDir,
+      dockerDir,
+      projectDir,
       agent,
       role,
       logsDir,
@@ -383,7 +433,7 @@ export class AcpSession {
     }
 
     const proxyServiceName = `proxy-${role}`;
-    const agentServiceName = `agent-${agent}-${role}`;
+    const agentServiceName = `agent-${role}`;
 
     this.infraInfo = {
       sessionId,
@@ -393,7 +443,7 @@ export class AcpSession {
       agentServiceName,
       proxyToken,
       credentialProxyToken,
-      dockerBuildPath,
+      dockerBuildDir,
     };
 
     this.infraRunning = true;
@@ -405,7 +455,7 @@ export class AcpSession {
    * Uses `docker compose run -d` on the agent service from the
    * same compose file, so it shares the network with infra.
    *
-   * @param projectDir The project directory to mount as /workspace.
+   * @param projectDir The project directory to mount into the container.
    */
   async startAgent(projectDir: string): Promise<AgentSessionInfo> {
     if (!this.infraRunning || !this.infraInfo) {
@@ -419,7 +469,7 @@ export class AcpSession {
     const agentServiceName = this.infraInfo.agentServiceName;
 
     // Use docker compose run with a volume override for this session's CWD
-    const runArgs = ["run", "-d", "--rm", "--build", "-v", `${projectDir}:/workspace`, agentServiceName];
+    const runArgs = ["run", "-d", "--rm", "--build", "-v", `${projectDir}:${PROJECT_MOUNT_PATH}`, agentServiceName];
     this.deps.logger.log(`[session] docker compose -f ${this.infraInfo.composeFile} ${runArgs.join(" ")}`);
     const exitCode = await this.deps.execComposeFn(
       this.infraInfo.composeFile,
@@ -450,7 +500,7 @@ export class AcpSession {
    * stdin/stdout can be wrapped with `ndJsonStream()` for direct ACP
    * communication. No port mapping or container ID discovery is needed.
    *
-   * @param projectDir The project directory to mount as /workspace.
+   * @param projectDir The project directory to mount into the container.
    * @returns The spawned child process and agent session info.
    */
   async startAgentProcess(projectDir: string): Promise<{ child: ChildProcess; agentInfo: AgentSessionInfo }> {
@@ -480,7 +530,7 @@ export class AcpSession {
     const composeArgs = [
       "compose", "-f", this.infraInfo.composeFile,
       "run", "--rm",
-      "-v", `${projectDir}:/workspace`,
+      "-v", `${projectDir}:${PROJECT_MOUNT_PATH}`,
       agentServiceName,
     ];
 

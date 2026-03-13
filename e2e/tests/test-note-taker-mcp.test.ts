@@ -1,14 +1,12 @@
 /**
- * E2E Test: MCP Note Taker Agent — Full Pipeline
+ * E2E Test: MCP Note Taker — Full Pipeline
  *
- * Exercises the full agent pipeline without requiring an LLM token:
+ * Exercises the full role-based pipeline without requiring an LLM token:
  *   1. Copy fixture workspace to temp dir
  *   2. Run `chapter build` (resolve + pack + docker-init)
- *   3. Suite A: Start proxy, connect MCP client, call all filesystem tools
- *   4. Suite B: Start agent in ACP mode, exercise tools via acpx
+ *   3. Start proxy, connect MCP client, call all filesystem tools
  *
- * Uses the mcp-note-taker fixture which depends on @clawmasons/mcp-agent
- * (a lightweight tool-calling agent that requires no LLM).
+ * PRD refs: UC-1 (Local Role Development), UC-4 (Docker Containerization)
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -24,9 +22,9 @@ import {
   waitForHealth,
 } from "./helpers.js";
 
-// ── Shared Setup ──────────────────────────────────────────────────────
+// -- Shared Setup -------------------------------------------------------------
 
-describe("mcp-agent note-taker e2e", () => {
+describe("role-based note-taker e2e", () => {
   let workspaceDir: string;
   let dockerDir: string;
   let notesDir: string;
@@ -40,7 +38,7 @@ describe("mcp-agent note-taker e2e", () => {
     // Build: resolve + pack + docker-init
     chapterExec(["chapter", "build"], workspaceDir, { timeout: 120_000 });
 
-    dockerDir = path.join(workspaceDir, "docker");
+    dockerDir = path.join(workspaceDir, ".clawmasons", "docker");
 
     // Create notes directory required by the filesystem MCP server
     notesDir = path.join(workspaceDir, "notes");
@@ -53,92 +51,54 @@ describe("mcp-agent note-taker e2e", () => {
     }
   });
 
-  // ── Build Output Verification ─────────────────────────────────────
+  // -- Build Output Verification ----------------------------------------------
 
   describe("build output", () => {
-    it("generates agent Dockerfile for mcp-note-taker/writer", () => {
+    it("generates agent Dockerfile for writer role", () => {
       expect(
         fs.existsSync(
-          path.join(dockerDir, "agent", "mcp-note-taker", "writer", "Dockerfile"),
+          path.join(dockerDir, "test-writer", "claude-code", "Dockerfile"),
         ),
       ).toBe(true);
     });
 
-    it("agent Dockerfile uses mcp-agent entrypoint", () => {
-      const dockerfile = fs.readFileSync(
-        path.join(dockerDir, "agent", "mcp-note-taker", "writer", "Dockerfile"),
-        "utf-8",
-      );
-      expect(dockerfile).toContain("mcp-agent");
-    });
-
-    it("generates workspace with .mcp.json", () => {
+    it("generates workspace for writer role", () => {
       const wsDir = path.join(
-        dockerDir, "agent", "mcp-note-taker", "writer", "workspace",
+        dockerDir, "test-writer", "claude-code", "workspace",
       );
       expect(fs.existsSync(wsDir)).toBe(true);
-      expect(fs.existsSync(path.join(wsDir, ".mcp.json"))).toBe(true);
     });
 
     it("generates proxy Dockerfile for writer role", () => {
       expect(
-        fs.existsSync(path.join(dockerDir, "proxy", "writer", "Dockerfile")),
+        fs.existsSync(path.join(dockerDir, "test-writer", "mcp-proxy", "Dockerfile")),
       ).toBe(true);
     });
   });
 
-  // ── Suite A: Proxy Tool Pipeline (run-agent equivalent) ───────────
+  // -- Proxy Tool Pipeline ----------------------------------------------------
 
   describe("proxy tool pipeline", () => {
     const PROXY_PORT = 19600;
     const PROXY_TOKEN = crypto.randomBytes(32).toString("hex");
-    const CRED_TOKEN = crypto.randomBytes(32).toString("hex");
     const COMPOSE_PROJECT = `chapter-mcp-e2e-proxy-${Date.now()}`;
     let composeFile: string;
 
     beforeAll(() => {
-      const composeContent = `# Generated for mcp-note-taker proxy e2e test
+      const composeContent = `# Generated for note-taker proxy e2e test
 services:
-  proxy-writer:
+  proxy-test-writer:
     build:
       context: "${dockerDir}"
-      dockerfile: "proxy/writer/Dockerfile"
+      dockerfile: "test-writer/mcp-proxy/Dockerfile"
     ports:
       - "${PROXY_PORT}:9090"
     volumes:
-      - "${workspaceDir}:/workspace"
+      - "${workspaceDir}:/home/mason/workspace/project"
       - "${notesDir}:/app/notes"
     environment:
       - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
-      - CREDENTIAL_PROXY_TOKEN=${CRED_TOKEN}
-    command: ["chapter", "proxy", "--agent", "@test/agent-mcp-note-taker", "--transport", "streamable-http"]
-    restart: "no"
-
-  credential-service:
-    build:
-      context: "${dockerDir}"
-      dockerfile: "credential-service/Dockerfile"
-    environment:
-      - CREDENTIAL_PROXY_TOKEN=${CRED_TOKEN}
-    depends_on:
-      - proxy-writer
-    restart: "no"
-
-  agent-mcp-note-taker-writer:
-    build:
-      context: "${dockerDir}"
-      dockerfile: "agent/mcp-note-taker/writer/Dockerfile"
-    volumes:
-      - "${workspaceDir}:/workspace"
-    depends_on:
-      - credential-service
-    environment:
-      - MCP_PROXY_TOKEN=${PROXY_TOKEN}
-      - MCP_PROXY_URL=http://proxy-writer:9090
-      - TEST_TOKEN=e2e-test-token
-    stdin_open: true
-    tty: true
-    init: true
+    command: ["chapter", "proxy", "--role", "@test/role-writer", "--transport", "streamable-http"]
     restart: "no"
 `;
       const composeDir = path.join(workspaceDir, "e2e-compose-proxy");
@@ -163,9 +123,9 @@ services:
       );
     }, 190_000);
 
-    it("starts proxy and credential service", () => {
+    it("starts proxy service", () => {
       execSync(
-        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d proxy-writer credential-service`,
+        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d proxy-test-writer`,
         { stdio: "pipe", timeout: 60_000 },
       );
 
@@ -173,14 +133,14 @@ services:
         `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" ps --format json`,
         { stdio: "pipe", timeout: 10_000 },
       ).toString();
-      expect(ps).toContain("proxy-writer");
+      expect(ps).toContain("proxy-test-writer");
     }, 65_000);
 
     it("proxy health endpoint responds", async () => {
       await waitForHealth(`http://localhost:${PROXY_PORT}/health`, 30_000, {
         composeProject: COMPOSE_PROJECT,
         composeFile,
-        service: "proxy-writer",
+        service: "proxy-test-writer",
       });
     }, 35_000);
 
@@ -231,7 +191,7 @@ services:
       if (listDirTool) {
         const callResult = await client.callTool({
           name: listDirTool.name,
-          arguments: { path: "/workspace" },
+          arguments: { path: "/home/mason/workspace/project" },
         });
         expect(callResult).toHaveProperty("content");
       }
@@ -262,7 +222,7 @@ services:
           name: writeTool.name,
           arguments: {
             path: "/app/notes/e2e-test-note.md",
-            content: "# E2E Test Note\n\nWritten by mcp-note-taker e2e test.",
+            content: "# E2E Test Note\n\nWritten by note-taker e2e test.",
           },
         });
         expect(writeResult).toHaveProperty("content");
@@ -310,281 +270,6 @@ services:
       }
 
       await client.close();
-    }, 30_000);
-
-    it("starts agent container successfully", async () => {
-      // Start agent in background (REPL mode waits for stdin)
-      execSync(
-        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d agent-mcp-note-taker-writer`,
-        { stdio: "pipe", timeout: 60_000 },
-      );
-
-      // Wait briefly for container to start
-      await new Promise((r) => setTimeout(r, 3000));
-
-      // Check logs to verify mcp-agent started
-      const logs = execSync(
-        `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" logs agent-mcp-note-taker-writer 2>&1`,
-        { stdio: "pipe", timeout: 10_000 },
-      ).toString();
-
-      expect(logs).not.toContain("exec mcp-agent failed");
-      expect(logs).toContain("mcp-agent");
-    }, 65_000);
-  });
-
-  // ── Suite B: ACP Agent Mode ──────────────────────────────────────
-  // Removed: The mcp-agent no longer runs an HTTP server on port 3002.
-  // ACP is now tested via ClientSideConnection in acp-client-spawn.test.ts.
-
-  describe.skip("ACP agent mode (obsolete — replaced by acp-client-spawn.test.ts)", () => {
-    const ACP_PROXY_PORT = 19700;
-    const ACP_AGENT_PORT = 19702;
-    const ACP_PROXY_TOKEN = crypto.randomBytes(32).toString("hex");
-    const ACP_CRED_TOKEN = crypto.randomBytes(32).toString("hex");
-    const ACP_COMPOSE_PROJECT = `chapter-mcp-e2e-acp-${Date.now()}`;
-    let acpComposeFile: string;
-
-    beforeAll(() => {
-      const composeContent = `# Generated for mcp-note-taker ACP e2e test
-services:
-  proxy-writer:
-    build:
-      context: "${dockerDir}"
-      dockerfile: "proxy/writer/Dockerfile"
-    ports:
-      - "${ACP_PROXY_PORT}:9090"
-    volumes:
-      - "${workspaceDir}:/workspace"
-      - "${notesDir}:/app/notes"
-    environment:
-      - CHAPTER_PROXY_TOKEN=${ACP_PROXY_TOKEN}
-      - CREDENTIAL_PROXY_TOKEN=${ACP_CRED_TOKEN}
-      - CHAPTER_SESSION_TYPE=acp
-    command: ["chapter", "proxy", "--agent", "@test/agent-mcp-note-taker", "--transport", "streamable-http"]
-    restart: "no"
-
-  credential-service:
-    build:
-      context: "${dockerDir}"
-      dockerfile: "credential-service/Dockerfile"
-    environment:
-      - CREDENTIAL_PROXY_TOKEN=${ACP_CRED_TOKEN}
-    depends_on:
-      - proxy-writer
-    restart: "no"
-
-  agent-mcp-note-taker-writer:
-    build:
-      context: "${dockerDir}"
-      dockerfile: "agent/mcp-note-taker/writer/Dockerfile"
-    volumes:
-      - "${workspaceDir}:/workspace"
-    depends_on:
-      - credential-service
-    environment:
-      - MCP_PROXY_TOKEN=${ACP_PROXY_TOKEN}
-      - MCP_PROXY_URL=http://proxy-writer:9090
-      - TEST_TOKEN=e2e-test-token
-    ports:
-      - "${ACP_AGENT_PORT}:3002"
-    command: ["--acp"]
-    init: true
-    restart: "no"
-`;
-      const composeDir = path.join(workspaceDir, "e2e-compose-acp");
-      fs.mkdirSync(composeDir, { recursive: true });
-      acpComposeFile = path.join(composeDir, "docker-compose.yml");
-      fs.writeFileSync(acpComposeFile, composeContent);
-    });
-
-    afterAll(() => {
-      try {
-        execSync(
-          `docker compose -p ${ACP_COMPOSE_PROJECT} -f "${acpComposeFile}" down --rmi local --volumes`,
-          { stdio: "pipe", timeout: 60_000 },
-        );
-      } catch { /* best-effort cleanup */ }
-    });
-
-    it("builds ACP Docker images", () => {
-      execSync(
-        `docker compose -p ${ACP_COMPOSE_PROJECT} -f "${acpComposeFile}" build`,
-        { cwd: dockerDir, stdio: "pipe", timeout: 180_000 },
-      );
-    }, 190_000);
-
-    it("starts all ACP services", async () => {
-      execSync(
-        `docker compose -p ${ACP_COMPOSE_PROJECT} -f "${acpComposeFile}" up -d`,
-        { stdio: "pipe", timeout: 60_000 },
-      );
-
-      // Wait for agent to start up (may need to connect to proxy first)
-      await new Promise((r) => setTimeout(r, 5000));
-
-      const ps = execSync(
-        `docker compose -p ${ACP_COMPOSE_PROJECT} -f "${acpComposeFile}" ps -a --format json`,
-        { stdio: "pipe", timeout: 10_000 },
-      ).toString();
-      expect(ps).toContain("proxy-writer");
-
-      // Check agent container status
-      const agentLogs = execSync(
-        `docker compose -p ${ACP_COMPOSE_PROJECT} -f "${acpComposeFile}" logs agent-mcp-note-taker-writer 2>&1`,
-        { stdio: "pipe", timeout: 10_000 },
-      ).toString();
-
-      // If agent failed to start, show diagnostics
-      if (!agentLogs.includes("mcp-agent")) {
-        // Get full ps output for debugging
-        const psAll = execSync(
-          `docker compose -p ${ACP_COMPOSE_PROJECT} -f "${acpComposeFile}" ps -a 2>&1`,
-          { stdio: "pipe", timeout: 10_000 },
-        ).toString();
-        throw new Error(`Agent did not start. ps:\n${psAll}\n\nlogs:\n${agentLogs}`);
-      }
-    }, 65_000);
-
-    it("agent ACP health endpoint responds", async () => {
-      // The mcp-agent ACP server responds to GET / with status JSON
-      await waitForHealth(`http://localhost:${ACP_AGENT_PORT}`, 30_000, {
-        composeProject: ACP_COMPOSE_PROJECT,
-        composeFile: acpComposeFile,
-        service: "agent-mcp-note-taker-writer",
-      });
-    }, 35_000);
-
-    it("agent MCP session is established", async () => {
-      // The ACP server starts immediately but the MCP proxy connection
-      // happens in the background. Poll until tools are available.
-      const maxWait = 45_000;
-      const start = Date.now();
-      let toolsAvailable = false;
-
-      while (Date.now() - start < maxWait) {
-        try {
-          const resp = await fetch(`http://localhost:${ACP_AGENT_PORT}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ command: "list" }),
-          });
-          const result = await resp.json() as { output: string };
-          if (result.output.includes("Available tools:")) {
-            toolsAvailable = true;
-            break;
-          }
-        } catch { /* retry */ }
-        await new Promise((r) => setTimeout(r, 2000));
-      }
-
-      if (!toolsAvailable) {
-        const logs = execSync(
-          `docker compose -p ${ACP_COMPOSE_PROJECT} -f "${acpComposeFile}" logs agent-mcp-note-taker-writer 2>&1`,
-          { stdio: "pipe", timeout: 10_000 },
-        ).toString();
-        throw new Error(`MCP session not established within ${maxWait}ms.\nAgent logs:\n${logs}`);
-      }
-    }, 50_000);
-
-    it("proxy health endpoint responds", async () => {
-      await waitForHealth(`http://localhost:${ACP_PROXY_PORT}/health`, 30_000, {
-        composeProject: ACP_COMPOSE_PROJECT,
-        composeFile: acpComposeFile,
-        service: "proxy-writer",
-      });
-    }, 35_000);
-
-    it("ACP agent lists tools via HTTP POST", async () => {
-      const resp = await fetch(`http://localhost:${ACP_AGENT_PORT}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: "list" }),
-      });
-
-      expect(resp.ok).toBe(true);
-      const result = await resp.json() as { output: string; exit: boolean };
-      expect(result).toHaveProperty("output");
-      expect(result.exit).toBe(false);
-      // The list command should show available tools
-      expect(result.output).toBeTruthy();
-    }, 30_000);
-
-    it("ACP agent calls list_directory via HTTP POST", async () => {
-      // First list tools to get the correct prefixed name
-      const listResp = await fetch(`http://localhost:${ACP_AGENT_PORT}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: "list" }),
-      });
-      const listResult = await listResp.json() as { output: string };
-
-      // Find a list_directory tool name from the output
-      const lines = listResult.output.split("\n");
-      const listDirLine = lines.find((l: string) => l.includes("list_directory"));
-      const toolName = listDirLine?.match(/- (\S+)/)?.[1] ?? "filesystem__list_directory";
-
-      const resp = await fetch(`http://localhost:${ACP_AGENT_PORT}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: `${toolName} {"path": "/workspace"}` }),
-      });
-
-      expect(resp.ok).toBe(true);
-      const result = await resp.json() as { output: string; exit: boolean };
-      expect(result).toHaveProperty("output");
-      expect(result.exit).toBe(false);
-    }, 30_000);
-
-    it("ACP agent calls write_file via HTTP POST", async () => {
-      // List to get tool name
-      const listResp = await fetch(`http://localhost:${ACP_AGENT_PORT}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: "list" }),
-      });
-      const listResult = await listResp.json() as { output: string };
-      const lines = listResult.output.split("\n");
-      const writeLine = lines.find((l: string) => l.includes("write_file"));
-      const toolName = writeLine?.match(/- (\S+)/)?.[1] ?? "filesystem__write_file";
-
-      const resp = await fetch(`http://localhost:${ACP_AGENT_PORT}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          command: `${toolName} {"path": "/app/notes/acp-test-note.md", "content": "# ACP Test\\nWritten via ACP mode."}`,
-        }),
-      });
-
-      expect(resp.ok).toBe(true);
-      const result = await resp.json() as { output: string; exit: boolean };
-      expect(result).toHaveProperty("output");
-      expect(result.exit).toBe(false);
-    }, 30_000);
-
-    it("ACP agent calls read_file via HTTP POST", async () => {
-      const listResp = await fetch(`http://localhost:${ACP_AGENT_PORT}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: "list" }),
-      });
-      const listResult = await listResp.json() as { output: string };
-      const lines = listResult.output.split("\n");
-      const readLine = lines.find((l: string) => l.includes("read_file"));
-      const toolName = readLine?.match(/- (\S+)/)?.[1] ?? "filesystem__read_file";
-
-      const resp = await fetch(`http://localhost:${ACP_AGENT_PORT}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          command: `${toolName} {"path": "/app/notes/acp-test-note.md"}`,
-        }),
-      });
-
-      expect(resp.ok).toBe(true);
-      const result = await resp.json() as { output: string; exit: boolean };
-      expect(result).toHaveProperty("output");
-      expect(result.output).toContain("ACP Test");
     }, 30_000);
   });
 });

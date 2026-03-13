@@ -13,7 +13,7 @@ describe("CLI list command", () => {
     const listCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "list");
     expect(listCmd).toBeDefined();
     if (listCmd) {
-      expect(listCmd.description()).toContain("List");
+      expect(listCmd.description()).toContain("roles");
     }
   });
 
@@ -45,127 +45,49 @@ describe("runList", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function writePackage(dir: string, pkg: Record<string, unknown>): void {
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify(pkg, null, 2));
+  function writeRoleMd(agentDir: string, roleName: string, frontmatter: string, body: string): void {
+    const roleDir = path.join(tmpDir, `.${agentDir}`, "roles", roleName);
+    fs.mkdirSync(roleDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(roleDir, "ROLE.md"),
+      `---\n${frontmatter}\n---\n\n${body}`,
+    );
   }
 
-  function setupValidAgent(): void {
-    writePackage(path.join(tmpDir, "apps", "github"), {
-      name: "@test/app-github",
-      version: "1.0.0",
-      chapter: {
-        type: "app",
-        transport: "stdio",
-        command: "npx",
-        args: ["-y", "@modelcontextprotocol/server-github"],
-        tools: ["create_issue", "list_repos"],
-        capabilities: ["tools"],
-      },
-    });
-
-    writePackage(path.join(tmpDir, "skills", "labeling"), {
-      name: "@test/skill-labeling",
-      version: "1.0.0",
-      chapter: {
-        type: "skill",
-        artifacts: ["./SKILL.md"],
-        description: "Labeling taxonomy",
-      },
-    });
-
-    writePackage(path.join(tmpDir, "tasks", "triage"), {
-      name: "@test/task-triage",
-      version: "1.0.0",
-      chapter: {
-        type: "task",
-        taskType: "subagent",
-        prompt: "./triage.md",
-        requires: {
-          apps: ["@test/app-github"],
-          skills: ["@test/skill-labeling"],
-        },
-      },
-    });
-
-    writePackage(path.join(tmpDir, "roles", "manager"), {
-      name: "@test/role-manager",
-      version: "1.0.0",
-      chapter: {
-        type: "role",
-        tasks: ["@test/task-triage"],
-        skills: ["@test/skill-labeling"],
-        permissions: {
-          "@test/app-github": {
-            allow: ["create_issue", "list_repos"],
-            deny: [],
-          },
-        },
-      },
-    });
-
-    writePackage(path.join(tmpDir, "agents", "ops"), {
-      name: "@test/agent-ops",
-      version: "1.0.0",
-      chapter: {
-        type: "agent",
-        name: "Ops",
-        slug: "ops",
-        runtimes: ["claude-code"],
-        roles: ["@test/role-manager"],
-      },
-    });
-  }
-
-  it("prints tree for a single agent", async () => {
-    setupValidAgent();
-    await runList(tmpDir, {});
-
-    expect(exitSpy).not.toHaveBeenCalledWith(1);
-
-    const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("@test/agent-ops@1.0.0");
-    expect(logOutput).toContain("role: manager@1.0.0");
-    expect(logOutput).toContain("task: triage@1.0.0");
-    expect(logOutput).toContain("app: github@1.0.0");
-    expect(logOutput).toContain("skill: labeling@1.0.0");
-  });
-
-  it("prints trees for multiple agents", async () => {
-    setupValidAgent();
-
-    // Add a second agent
-    writePackage(path.join(tmpDir, "agents", "ops2"), {
-      name: "@test/agent-ops2",
-      version: "2.0.0",
-      chapter: {
-        type: "agent",
-        name: "Ops2",
-        slug: "ops2",
-        runtimes: ["claude-code"],
-        roles: ["@test/role-manager"],
-      },
-    });
+  it("shows roles from local ROLE.md files", async () => {
+    writeRoleMd("claude", "create-prd", `name: create-prd\ndescription: Creates PRDs\ncommands: []\nskills: []`, "You are a PRD author.");
 
     await runList(tmpDir, {});
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
-
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("@test/agent-ops@1.0.0");
-    expect(logOutput).toContain("@test/agent-ops2@2.0.0");
+    expect(logOutput).toContain("create-prd");
+    expect(logOutput).toContain("Creates PRDs");
   });
 
-  it("exits 1 when no agents are found", async () => {
+  it("shows multiple roles from different agent directories", async () => {
+    writeRoleMd("claude", "create-prd", `name: create-prd\ndescription: Creates PRDs\ncommands: []\nskills: []`, "PRD author.");
+    writeRoleMd("codex", "code-review", `name: code-review\ndescription: Reviews code\ninstructions: []\nskills: []`, "Code reviewer.");
+
+    await runList(tmpDir, {});
+
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("create-prd");
+    expect(logOutput).toContain("code-review");
+  });
+
+  it("exits 1 when no roles are found", async () => {
     await runList(tmpDir, {});
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("No agents found");
+    expect(errorOutput).toContain("No roles found");
   });
 
   it("outputs JSON array with --json flag", async () => {
-    setupValidAgent();
+    writeRoleMd("claude", "create-prd", `name: create-prd\ndescription: Creates PRDs\ncommands: []\nskills: []`, "You are a PRD author.");
+
     await runList(tmpDir, { json: true });
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
@@ -174,7 +96,15 @@ describe("runList", () => {
     const parsed = JSON.parse(logOutput);
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed).toHaveLength(1);
-    expect(parsed[0].name).toBe("@test/agent-ops");
-    expect(parsed[0].roles).toHaveLength(1);
+    expect(parsed[0].metadata.name).toBe("create-prd");
+  });
+
+  it("shows source type for local roles", async () => {
+    writeRoleMd("claude", "create-prd", `name: create-prd\ndescription: Creates PRDs\ncommands: []\nskills: []`, "PRD author.");
+
+    await runList(tmpDir, {});
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("local");
   });
 });

@@ -1,0 +1,188 @@
+/**
+ * RoleType-to-ResolvedAgent Adapter
+ *
+ * Converts a RoleType (ROLE_TYPES pipeline) into the existing ResolvedAgent
+ * shape that materializers already accept. This is the key migration bridge:
+ * it lets the new role-based pipeline feed into existing materializers without
+ * rewriting them.
+ *
+ * The adapter is stateless — it performs a pure data transformation with no
+ * side effects or I/O.
+ */
+
+import type {
+  RoleType,
+  AppConfig,
+  TaskRef,
+  SkillRef,
+} from "../types/role-types.js";
+import type {
+  ResolvedAgent,
+  ResolvedRole,
+  ResolvedTask,
+  ResolvedApp,
+  ResolvedSkill,
+} from "../types.js";
+import { getDialect } from "./dialect-registry.js";
+
+/**
+ * Error thrown when the adapter cannot convert a RoleType.
+ */
+export class AdapterError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AdapterError";
+  }
+}
+
+/**
+ * Convert a RoleType into a ResolvedAgent that existing materializers accept.
+ *
+ * @param role - A validated RoleType from the ROLE_TYPES pipeline
+ * @param agentType - The target agent dialect name (e.g., "claude-code", "codex", "aider")
+ * @returns A ResolvedAgent suitable for passing to any RuntimeMaterializer
+ * @throws AdapterError if agentType does not match a registered dialect
+ */
+export function adaptRoleToResolvedAgent(
+  role: RoleType,
+  agentType: string,
+): ResolvedAgent {
+  // Validate agent type against dialect registry
+  const dialect = getDialect(agentType);
+  if (!dialect) {
+    throw new AdapterError(
+      `Unknown agent type "${agentType}". Must be a registered dialect (e.g., "claude-code", "codex", "aider", "mcp-agent").`,
+    );
+  }
+
+  const name = role.metadata.name;
+  const version = role.metadata.version ?? "0.0.0";
+
+  // Build the single ResolvedRole from the RoleType
+  const resolvedRole = buildResolvedRole(role, version);
+
+  // Build the top-level ResolvedAgent
+  const agent: ResolvedAgent = {
+    name,
+    version,
+    agentName: name,
+    slug: name,
+    description: role.metadata.description,
+    runtimes: [agentType],
+    credentials: [...(role.governance.credentials ?? [])],
+    roles: [resolvedRole],
+    proxy: {
+      port: 9090,
+      type: "streamable-http",
+    },
+  };
+
+  return agent;
+}
+
+// ---------------------------------------------------------------------------
+// Internal mapping functions
+// ---------------------------------------------------------------------------
+
+function buildResolvedRole(role: RoleType, version: string): ResolvedRole {
+  const permissions = aggregatePermissions(role.apps);
+  const tasks = role.tasks.map((t) => adaptTask(t, role.instructions));
+  const apps = role.apps.map(adaptApp);
+  const skills = role.skills.map(adaptSkill);
+
+  const resolvedRole: ResolvedRole = {
+    name: role.metadata.name,
+    version,
+    description: role.metadata.description,
+    risk: role.governance.risk ?? "LOW",
+    permissions,
+    tasks,
+    apps,
+    skills,
+  };
+
+  // Container requirements → ResolvedRole fields
+  if (role.container) {
+    const aptPackages = role.container.packages?.apt;
+    if (aptPackages && aptPackages.length > 0) {
+      resolvedRole.aptPackages = aptPackages;
+    }
+
+    if (role.container.baseImage) {
+      resolvedRole.baseImage = role.container.baseImage;
+    }
+
+    const mounts = role.container.mounts;
+    if (mounts && mounts.length > 0) {
+      resolvedRole.mounts = mounts.map((m) => ({
+        source: m.source,
+        target: m.target,
+        readonly: m.readonly ?? false,
+      }));
+    }
+  }
+
+  // Governance constraints
+  if (role.governance.constraints) {
+    resolvedRole.constraints = {
+      ...role.governance.constraints,
+    };
+  }
+
+  return resolvedRole;
+}
+
+/**
+ * Aggregate tool permissions from all apps into the permissions map
+ * that ResolvedRole expects: { [appName]: { allow: string[], deny: string[] } }
+ */
+function aggregatePermissions(
+  apps: AppConfig[],
+): Record<string, { allow: string[]; deny: string[] }> {
+  const permissions: Record<string, { allow: string[]; deny: string[] }> = {};
+
+  for (const app of apps) {
+    permissions[app.name] = {
+      allow: [...(app.tools?.allow ?? [])],
+      deny: [...(app.tools?.deny ?? [])],
+    };
+  }
+
+  return permissions;
+}
+
+function adaptTask(task: TaskRef, instructions: string): ResolvedTask {
+  return {
+    name: task.name,
+    version: "0.0.0",
+    taskType: "subagent",
+    prompt: instructions,
+    apps: [],
+    skills: [],
+    subTasks: [],
+  };
+}
+
+function adaptApp(app: AppConfig): ResolvedApp {
+  return {
+    name: app.name,
+    version: "0.0.0",
+    transport: app.transport ?? "stdio",
+    command: app.command,
+    args: app.args,
+    url: app.url,
+    env: app.env ? { ...app.env } : undefined,
+    tools: [...(app.tools?.allow ?? [])],
+    capabilities: [],
+    credentials: [...(app.credentials ?? [])],
+  };
+}
+
+function adaptSkill(skill: SkillRef): ResolvedSkill {
+  return {
+    name: skill.name,
+    version: "0.0.0",
+    artifacts: [],
+    description: skill.name,
+  };
+}

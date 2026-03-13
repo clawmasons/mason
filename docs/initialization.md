@@ -47,7 +47,6 @@ acme.platform/
 ├── package.json               # Workspace root with npm workspaces
 ├── .clawmasons/
 │   └── chapter.json           # Workspace metadata
-├── agents/                    # Agent packages
 ├── roles/                     # Role packages
 ├── tasks/                     # Task packages
 ├── skills/                    # Skill packages
@@ -60,7 +59,7 @@ The root `package.json` declares npm workspaces so all packages are linked:
 {
   "name": "@acme.platform/chapter",
   "private": true,
-  "workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*", "agents/*"]
+  "workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*"]
 }
 ```
 
@@ -77,23 +76,22 @@ When you use a `--template`, the CLI copies template files into the workspace di
 
 ## Package Discovery
 
-Before an agent can be built or run, the CLI discovers all chapter packages in the workspace:
+Before a role can be built or run, the CLI discovers all chapter packages in the workspace:
 
-1. Scans `apps/`, `tasks/`, `skills/`, `roles/`, and `agents/` directories
+1. Scans `apps/`, `tasks/`, `skills/`, and `roles/` directories
 2. Scans `node_modules/` for published chapter packages
 3. Reads each `package.json` and validates the `chapter` field
 4. Workspace packages take precedence over `node_modules` versions
 
 The result is a map of every available package and its configuration.
 
-## Agent Resolution
+## Role Resolution
 
-With all packages discovered, the CLI resolves the full dependency graph for an agent:
+With all packages discovered, the CLI resolves the full dependency graph for a role:
 
-1. Looks up the agent package and extracts its roles
-2. For each role, resolves its tasks, skills, and app references
-3. For each task, resolves its required apps and skills (with circular dependency detection)
-4. Validates that all permission references point to real tools on real apps
+1. Looks up the role package and extracts its tasks, skills, and app references
+2. For each task, resolves its required apps and skills (with circular dependency detection)
+3. Validates that all permission references point to real tools on real apps
 
 The resolved graph contains everything needed to generate runtime artifacts.
 
@@ -103,7 +101,7 @@ The resolved graph contains everything needed to generate runtime artifacts.
 clawmasons chapter build
 ```
 
-The build step takes the resolved agent graph and produces deployable artifacts:
+The build step takes the resolved role graph and produces deployable artifacts:
 
 1. **Pack** — Builds all workspace packages into `dist/*.tgz`
 2. **Docker init** — Generates Dockerfiles and a `docker/` directory with all dependencies
@@ -127,7 +125,7 @@ docker/
 ├── package.json
 ├── node_modules/              # Framework packages + packed chapters
 ├── proxy/<role>/Dockerfile
-├── agent/<agent>/<role>/Dockerfile
+├── agent/<role>/Dockerfile
 └── credential-service/Dockerfile
 ```
 
@@ -148,14 +146,14 @@ Registers a role for host-wide use. This creates a runtime directory under the l
     └── logs/                   # Session logs
 ```
 
-The `chapters.json` registry tracks which chapter and agents each role belongs to, enabling the CLI to locate the correct Docker artifacts at runtime.
+The `chapters.json` registry tracks which chapter each role belongs to, enabling the CLI to locate the correct Docker artifacts at runtime.
 
-## Agent Startup
+## Role Startup
 
-When you run `clawmasons agent <slug> <role>`, the CLI ties all of this together:
+When you run `clawmasons run <agent-type> --role <name>`, the CLI ties all of this together:
 
 1. **Discovers** packages in the chapter workspace
-2. **Resolves** the agent's full dependency graph
+2. **Resolves** the role's full dependency graph
 3. **Generates** a session-specific `docker-compose.yml`
 4. **Starts** the MCP proxy container (detached)
 5. **Starts** the credential service in-process

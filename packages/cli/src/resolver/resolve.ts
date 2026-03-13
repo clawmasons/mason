@@ -3,9 +3,7 @@ import type {
   RoleChapterField,
   SkillChapterField,
   TaskChapterField,
-  AgentChapterField,
   DiscoveredPackage,
-  ResolvedAgent,
   ResolvedApp,
   ResolvedRole,
   ResolvedSkill,
@@ -234,34 +232,13 @@ function resolveRole(
 }
 
 /**
- * Resolve an agent package into a fully-resolved dependency graph.
+ * Resolve a role package to a ResolvedRole (public entry point).
+ * Unlike the private resolveRole above, this accepts a package name
+ * without a context parameter.
  */
-export function resolveAgent(
-  agentName: string,
+export function resolveRolePackage(
+  roleName: string,
   packages: Map<string, DiscoveredPackage>,
-): ResolvedAgent {
-  const pkg = getPackage(agentName, packages);
-  assertType(pkg, "agent", undefined);
-  const chapter = pkg.chapterField as AgentChapterField;
-  const agentContext = `agent "${agentName}"`;
-
-  // Resolve all roles
-  const roles: ResolvedRole[] = [];
-  for (const roleName of chapter.roles) {
-    roles.push(resolveRole(roleName, packages, agentContext));
-  }
-
-  return {
-    name: pkg.name,
-    version: pkg.version,
-    agentName: chapter.name,
-    slug: chapter.slug,
-    description: chapter.description,
-    runtimes: chapter.runtimes,
-    credentials: chapter.credentials,
-    roles,
-    resources: chapter.resources.length > 0 ? chapter.resources : undefined,
-    proxy: chapter.proxy,
-    llm: chapter.llm,
-  };
+): ResolvedRole {
+  return resolveRole(roleName, packages);
 }

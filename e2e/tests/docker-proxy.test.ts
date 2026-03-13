@@ -8,9 +8,6 @@
  *   4. Connect MCP client and verify governed tools
  *   5. Make tool calls through the governed proxy
  *
- * Unit tests for internal ACP modules (matcher, rewriter, warnings, audit)
- * live in packages/cli/tests/acp/ and packages/proxy/tests/hooks/.
- *
  * All setup is done exclusively via `chapter build`.
  * Tests verify CLI output: exit codes, generated files, and running containers.
  */
@@ -28,7 +25,7 @@ import {
   waitForHealth,
 } from "./helpers.js";
 
-// ── Docker Proxy E2E with ACP Session Metadata ───────────────────────
+// -- Docker Proxy E2E with ACP Session Metadata -------------------------------
 
 describe("ACP proxy Docker e2e", () => {
   let workspaceDir: string;
@@ -41,8 +38,7 @@ describe("ACP proxy Docker e2e", () => {
   let composeFile: string;
 
   beforeAll(async () => {
-    // 1. Create temp workspace from fixtures, excluding mcp-test agent/role
-    // (mcp-test uses wildcard "*" permissions which docker-init doesn't support)
+    // 1. Create temp workspace from fixtures, excluding mcp-test
     workspaceDir = copyFixtureWorkspace("docker-proxy", {
       excludePaths: ["agents/mcp-test", "roles/mcp-test"],
     });
@@ -50,30 +46,29 @@ describe("ACP proxy Docker e2e", () => {
     // 2. Run chapter build (resolve + pack + docker-init in one step)
     chapterExec(["chapter", "build"], workspaceDir, { timeout: 120_000 });
 
-    dockerDir = path.join(workspaceDir, "docker");
+    dockerDir = path.join(workspaceDir, ".clawmasons", "docker");
 
     // Create notes directory required by the filesystem MCP server
-    // The server runs from /app inside the container and expects ./notes
     const notesDir = path.join(workspaceDir, "notes");
     fs.mkdirSync(notesDir, { recursive: true });
 
     // 3. Generate docker-compose with ACP session env vars
     const composeContent = `# Generated for ACP proxy e2e test
 services:
-  proxy-writer:
+  proxy-test-writer:
     build:
       context: "${dockerDir}"
-      dockerfile: "proxy/writer/Dockerfile"
+      dockerfile: "test-writer/mcp-proxy/Dockerfile"
     ports:
       - "${TEST_PORT}:9090"
     volumes:
-      - "${workspaceDir}:/workspace"
+      - "${workspaceDir}:/home/mason/workspace/project"
       - "${notesDir}:/app/notes"
     environment:
       - CHAPTER_PROXY_TOKEN=${PROXY_TOKEN}
       - CHAPTER_SESSION_TYPE=acp
       - CHAPTER_ACP_CLIENT=${ACP_CLIENT_NAME}
-    command: ["chapter", "proxy", "--agent", "@test/agent-test-note-taker", "--transport", "streamable-http"]
+    command: ["chapter", "proxy", "--role", "@test/role-writer", "--transport", "streamable-http"]
     restart: "no"
 `;
     const composeDir = path.join(workspaceDir, "e2e-compose");
@@ -99,14 +94,14 @@ services:
 
   it("builds proxy Docker image with ACP config", () => {
     execSync(
-      `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" build proxy-writer`,
+      `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" build proxy-test-writer`,
       { cwd: dockerDir, stdio: "pipe", timeout: 120_000 },
     );
   }, 130_000);
 
   it("starts proxy container with ACP session env vars", () => {
     execSync(
-      `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d proxy-writer`,
+      `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" up -d proxy-test-writer`,
       { stdio: "pipe", timeout: 60_000 },
     );
 
@@ -115,14 +110,14 @@ services:
       `docker compose -p ${COMPOSE_PROJECT} -f "${composeFile}" ps --format json`,
       { stdio: "pipe", timeout: 10_000 },
     ).toString();
-    expect(ps).toContain("proxy-writer");
+    expect(ps).toContain("proxy-test-writer");
   }, 65_000);
 
   it("proxy health endpoint responds", async () => {
     await waitForHealth(`http://localhost:${TEST_PORT}/health`, 30_000, {
       composeProject: COMPOSE_PROJECT,
       composeFile,
-      service: "proxy-writer",
+      service: "proxy-test-writer",
     });
   }, 35_000);
 
@@ -198,12 +193,12 @@ services:
     );
 
     if (listDirTool) {
-      // Call the tool - this exercises the full governed pipeline
+      // Call the tool -- this exercises the full governed pipeline
       const callResult = await client.callTool({
         name: listDirTool.name,
         arguments: listDirTool.name.includes("list_allowed_directories")
           ? {}
-          : { path: "/workspace" },
+          : { path: "/home/mason/workspace/project" },
       });
 
       expect(callResult).toHaveProperty("content");

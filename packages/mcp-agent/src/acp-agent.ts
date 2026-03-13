@@ -18,6 +18,7 @@ import type {
   CancelNotification,
 } from "@agentclientprotocol/sdk";
 import type { ToolCaller } from "./tool-caller.js";
+import { executeCommand } from "./tool-caller.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -75,27 +76,24 @@ export class AcpAgent implements Agent {
   }
 
   async prompt(params: PromptRequest): Promise<PromptResponse> {
-    // List available tools and return them as a text response
-    const tools = await this.caller.listTools();
+    // Extract text from prompt content blocks
+    const inputText = params.prompt
+      .filter((block): block is { type: "text"; text: string } => block.type === "text")
+      .map((block) => block.text)
+      .join("\n")
+      .trim();
 
-    const toolText =
-      tools.length > 0
-        ? tools
-            .map((t) => {
-              const desc = t.description ? ` — ${t.description}` : "";
-              return `- ${t.name}${desc}`;
-            })
-            .join("\n")
-        : "No tools available.";
+    // Execute the command (list, help, call <tool> <args>, etc.)
+    const { output } = await executeCommand(inputText, this.caller);
 
-    // Send the tool list as a session update notification
+    // Send the result as a session update notification
     await this.connection.sessionUpdate({
       sessionId: params.sessionId,
       update: {
         sessionUpdate: "agent_message_chunk",
         content: {
           type: "text",
-          text: `Available tools:\n${toolText}`,
+          text: output,
         },
       },
     });
