@@ -16,8 +16,11 @@ import {
   type RoleType,
 } from "@clawmasons/shared";
 import { generateRoleDockerBuildDir } from "../../materializer/docker-generator.js";
-import { ensureProxyDependencies } from "../../materializer/proxy-dependencies.js";
-import { inferAgentType } from "./run-agent.js";
+import {
+  ensureProxyDependencies,
+  synthesizeRolePackages,
+} from "../../materializer/proxy-dependencies.js";
+import { inferAgentType, resolveAgentType } from "./run-agent.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 
 /**
@@ -42,10 +45,15 @@ function buildRole(
 
 /**
  * Run the build for one or all roles in the workspace.
+ *
+ * @param projectDir - Absolute path to the project root
+ * @param roleName - Optional role name to build (builds all if omitted)
+ * @param agentTypeOverride - Optional agent type override (e.g., "mcp-agent")
  */
 export async function runBuild(
   projectDir: string,
   roleName?: string,
+  agentTypeOverride?: string,
 ): Promise<void> {
   // 1. Discover roles
   const roles = await discoverRoles(projectDir);
@@ -73,7 +81,7 @@ export async function runBuild(
 
   // 3. Validate roles via adapter round-trip
   for (const role of targetRoles) {
-    const agentType = inferAgentType(role);
+    const agentType = agentTypeOverride ?? inferAgentType(role);
     try {
       adaptRoleToResolvedAgent(role, agentType);
     } catch (err) {
@@ -97,7 +105,7 @@ export async function runBuild(
   console.log(`\n  Building ${targetRoles.length} role(s)...\n`);
 
   for (const role of targetRoles) {
-    const agentType = inferAgentType(role);
+    const agentType = agentTypeOverride ?? inferAgentType(role);
     const { roleName: name } = buildRole(role, agentType, projectDir);
     console.log(`  ✓ ${name} (${agentType}) → .clawmasons/docker/${name}/`);
   }
@@ -105,6 +113,11 @@ export async function runBuild(
   // 6. Populate shared proxy dependencies (node_modules + package.json)
   const dockerDir = path.join(projectDir, ".clawmasons", "docker");
   ensureProxyDependencies(dockerDir, projectDir);
+
+  // 7. Synthesize inline app/role packages for roles with mcp_servers
+  for (const role of targetRoles) {
+    synthesizeRolePackages(role, dockerDir);
+  }
 
   console.log(`\n  Build complete.\n`);
 }
@@ -117,7 +130,17 @@ export function registerBuildCommand(program: Command): void {
     .command("build")
     .description("Build Docker artifacts for roles in the workspace")
     .argument("[role]", "Role name to build (builds all if omitted)")
-    .action(async (role?: string) => {
-      await runBuild(process.cwd(), role);
+    .option("--agent-type <type>", "Override agent type (e.g., mcp-agent, claude-code)")
+    .action(async (role: string | undefined, options: { agentType?: string }) => {
+      let agentType: string | undefined;
+      if (options.agentType) {
+        agentType = resolveAgentType(options.agentType);
+        if (!agentType) {
+          console.error(`\n  Unknown agent type "${options.agentType}".\n`);
+          process.exit(1);
+          return;
+        }
+      }
+      await runBuild(process.cwd(), role, agentType);
     });
 }

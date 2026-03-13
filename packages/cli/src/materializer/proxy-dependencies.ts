@@ -15,6 +15,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { RoleType } from "@clawmasons/shared";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -405,4 +406,86 @@ export function ensureProxyDependencies(
       2,
     ) + "\n",
   );
+}
+
+/**
+ * Synthesize npm packages from a RoleType's inline apps and role config
+ * into the Docker build node_modules.
+ *
+ * When roles define `mcp_servers` inline (native .claude format) instead of
+ * referencing npm workspace packages, the proxy inside Docker has no packages
+ * to discover. This function bridges the gap by writing synthetic package.json
+ * files that `discoverPackages` / `resolveRolePackage` can find at runtime.
+ *
+ * Idempotent — skips packages that already exist.
+ *
+ * @param role - The RoleType with inline app configs
+ * @param dockerDir - The Docker build root (`.clawmasons/docker/`)
+ */
+export function synthesizeRolePackages(
+  role: RoleType,
+  dockerDir: string,
+): void {
+  const nodeModulesDir = path.join(dockerDir, "node_modules");
+
+  // Synthesize app packages from inline mcp_servers
+  for (const app of role.apps) {
+    const pkgDir = path.join(nodeModulesDir, app.name);
+    if (fs.existsSync(pkgDir)) continue;
+
+    fs.mkdirSync(pkgDir, { recursive: true });
+    const pkgJson = {
+      name: app.name,
+      version: "0.0.0",
+      chapter: {
+        type: "app",
+        transport: app.transport ?? "stdio",
+        command: app.command,
+        args: app.args,
+        url: app.url,
+        env: app.env && Object.keys(app.env).length > 0 ? app.env : undefined,
+        tools: app.tools?.allow ?? [],
+        capabilities: ["tools"],
+        credentials: app.credentials?.length ? app.credentials : undefined,
+      },
+    };
+    fs.writeFileSync(
+      path.join(pkgDir, "package.json"),
+      JSON.stringify(pkgJson, null, 2) + "\n",
+    );
+  }
+
+  // Synthesize role package
+  const roleName = role.metadata.name;
+  const rolePkgDir = path.join(nodeModulesDir, roleName);
+  if (!fs.existsSync(rolePkgDir)) {
+    fs.mkdirSync(rolePkgDir, { recursive: true });
+
+    // Build permissions map from inline apps
+    const permissions: Record<string, { allow: string[]; deny: string[] }> = {};
+    for (const app of role.apps) {
+      permissions[app.name] = {
+        allow: [...(app.tools?.allow ?? [])],
+        deny: [...(app.tools?.deny ?? [])],
+      };
+    }
+
+    // Omit tasks and skills — the proxy only needs apps + permissions.
+    // Including tasks/skills would cause the proxy's package resolver
+    // to fail looking for them as npm packages.
+    const rolePkgJson = {
+      name: roleName,
+      version: role.metadata.version ?? "0.0.0",
+      chapter: {
+        type: "role",
+        description: role.metadata.description,
+        risk: role.governance.risk ?? "LOW",
+        permissions,
+      },
+    };
+    fs.writeFileSync(
+      path.join(rolePkgDir, "package.json"),
+      JSON.stringify(rolePkgJson, null, 2) + "\n",
+    );
+  }
 }

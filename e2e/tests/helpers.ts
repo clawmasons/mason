@@ -14,7 +14,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const E2E_ROOT = path.resolve(__dirname, "..");
 export const PROJECT_ROOT = path.resolve(E2E_ROOT, "..");
-export const FIXTURES_DIR = path.join(E2E_ROOT, "fixtures", "test-chapter");
+export const FIXTURES_BASE = path.join(E2E_ROOT, "fixtures");
+export const FIXTURES_DIR = path.join(FIXTURES_BASE, "test-chapter");
 export const CLAWMASONS_BIN = path.join(PROJECT_ROOT, "bin", "clawmasons.js");
 /** @deprecated Use CLAWMASONS_BIN instead */
 export const CHAPTER_BIN = CLAWMASONS_BIN;
@@ -48,24 +49,29 @@ function copyDirRecursive(src: string, dest: string): void {
  * @param name - A short name used in the temp dir path (e.g., "build-pipeline")
  * @param opts.excludePaths - Relative paths within the workspace to remove after copying
  *                            (e.g., ["agents/mcp-test", "roles/mcp-test"])
+ * @param opts.fixture - Fixture directory name under e2e/fixtures/ (default: "test-chapter")
  */
 export function copyFixtureWorkspace(
   name: string,
-  opts?: { excludePaths?: string[] },
+  opts?: { excludePaths?: string[]; fixture?: string },
 ): string {
+  const fixtureDir = opts?.fixture
+    ? path.join(FIXTURES_BASE, opts.fixture)
+    : FIXTURES_DIR;
+
   const timestamp = Date.now();
   const workspaceDir = path.join(E2E_ROOT, "tmp", `${name}-${timestamp}`);
   fs.mkdirSync(workspaceDir, { recursive: true });
 
   // Copy root package.json
   fs.copyFileSync(
-    path.join(FIXTURES_DIR, "package.json"),
+    path.join(fixtureDir, "package.json"),
     path.join(workspaceDir, "package.json"),
   );
 
   // Copy workspace directories
   for (const wsDir of WORKSPACE_DIRS) {
-    const fixtureSrc = path.join(FIXTURES_DIR, wsDir);
+    const fixtureSrc = path.join(fixtureDir, wsDir);
     const workspaceDest = path.join(workspaceDir, wsDir);
     if (fs.existsSync(fixtureSrc)) {
       copyDirRecursive(fixtureSrc, workspaceDest);
