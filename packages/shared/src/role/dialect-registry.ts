@@ -105,3 +105,13 @@ registerDialect({
     skills: "skills",
   },
 });
+
+registerDialect({
+  name: "mcp-agent",
+  directory: "mcp",
+  fieldMapping: {
+    tasks: "commands",
+    apps: "mcp_servers",
+    skills: "skills",
+  },
+});

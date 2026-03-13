@@ -1,11 +1,11 @@
 /**
- * E2E Test: ACP session lifecycle via `clawmasons run mcp --acp --role mcp-test`
+ * E2E Test: ACP session lifecycle via `clawmasons run --agent-type mcp --acp --role mcp-test`
  *
  * Tests the full ACP flow using the SDK's ClientSideConnection over stdio
  * ndjson — the same protocol path that a real editor would use.
  *
  *   1. Copy fixture workspace with mcp-test role
- *   2. Spawn `clawmasons run mcp --acp --role mcp-test` (project-local)
+ *   2. Spawn `clawmasons run --agent-type mcp --acp --role mcp-test` (project-local)
  *   3. Verify ACP handshake via ClientSideConnection.initialize()
  *   4. Send session/new with cwd — triggers agent container start
  *   5. Verify agent responds to prompt
@@ -36,8 +36,8 @@ import { CLAWMASONS_BIN, copyFixtureWorkspace } from "./helpers.js";
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const READY_TIMEOUT_MS = 300_000; // 5 min — Docker builds with apt packages
-const SESSION_START_TIMEOUT_MS = 120_000; // 2 min — agent container start
+const READY_TIMEOUT_MS = 120_000; // 2 min — Docker builds
+const SESSION_START_TIMEOUT_MS = 60_000; // 1 min — agent container start
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -106,24 +106,6 @@ describe("ACP project-local e2e", () => {
       }
     }
 
-    // Best-effort Docker cleanup
-    try {
-      const sessionsDir = path.join(workspaceDir, ".clawmasons", "sessions");
-      if (fs.existsSync(sessionsDir)) {
-        for (const sessionId of fs.readdirSync(sessionsDir)) {
-          const composeFile = path.join(sessionsDir, sessionId, "docker", "docker-compose.yml");
-          if (fs.existsSync(composeFile)) {
-            try {
-              execSync(`docker compose -f "${composeFile}" --profile agent down --rmi local --volumes`, {
-                stdio: "pipe",
-                timeout: 30_000,
-              });
-            } catch { /* best-effort */ }
-          }
-        }
-      }
-    } catch { /* best-effort */ }
-
     // Clean up workspace
     if (workspaceDir && fs.existsSync(workspaceDir)) {
       fs.rmSync(workspaceDir, { recursive: true, force: true });
@@ -142,7 +124,7 @@ describe("ACP project-local e2e", () => {
       [
         CLAWMASONS_BIN,
         "run",
-        "mcp",
+        "--agent-type", "mcp",
         "--acp",
         "--role", "mcp-test",
       ],
@@ -158,7 +140,13 @@ describe("ACP project-local e2e", () => {
 
     // Accumulate stderr for debugging
     acpProcess.stderr?.on("data", (chunk: Buffer) => {
-      stderrOutput.push(chunk.toString());
+      const text = chunk.toString();
+      stderrOutput.push(text);
+      console.error("[ACP stderr]", text.trimEnd());
+    });
+
+    acpProcess.on("exit", (code, signal) => {
+      console.error(`[ACP process] exited code=${code} signal=${signal}`);
     });
 
     // Create ClientSideConnection over the spawned process's stdin/stdout

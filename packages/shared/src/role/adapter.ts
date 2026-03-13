@@ -51,7 +51,7 @@ export function adaptRoleToResolvedAgent(
   const dialect = getDialect(agentType);
   if (!dialect) {
     throw new AdapterError(
-      `Unknown agent type "${agentType}". Must be a registered dialect (e.g., "claude-code", "codex", "aider").`,
+      `Unknown agent type "${agentType}". Must be a registered dialect (e.g., "claude-code", "codex", "aider", "mcp-agent").`,
     );
   }
 
