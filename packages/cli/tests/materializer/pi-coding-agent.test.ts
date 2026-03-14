@@ -405,6 +405,32 @@ describe("piCodingAgentMaterializer", () => {
       });
     });
 
+    describe("agent-launch.json", () => {
+      it("generates agent-launch.json with pi command", () => {
+        const agent = makePiAgent();
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const launchJson = result.get("agent-launch.json");
+        expect(launchJson).toBeDefined();
+
+        const config = JSON.parse(launchJson!);
+        expect(config.command).toBe("pi");
+      });
+
+      it("includes role-declared credentials as env type", () => {
+        const agent = makePiAgent();
+        agent.credentials = ["OPENROUTER_API_KEY"];
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const config = JSON.parse(result.get("agent-launch.json")!);
+        const cred = config.credentials.find(
+          (c: { key: string }) => c.key === "OPENROUTER_API_KEY",
+        );
+        expect(cred).toBeDefined();
+        expect(cred.type).toBe("env");
+      });
+    });
+
     describe("result completeness", () => {
       it("contains all expected files for pi agent", () => {
         const agent = makePiAgent();
@@ -417,6 +443,7 @@ describe("piCodingAgentMaterializer", () => {
           ".pi/mcp.json",
           ".pi/settings.json",
           "AGENTS.md",
+          "agent-launch.json",
           "skills/labeling/README.md",
         ]);
       });

@@ -398,6 +398,56 @@ describe("claudeCodeMaterializer", () => {
       });
     });
 
+    describe("agent-launch.json", () => {
+      it("generates agent-launch.json with claude command", () => {
+        const agent = makeRepoOpsAgent();
+        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const launchJson = result.get("agent-launch.json");
+        expect(launchJson).toBeDefined();
+
+        const config = JSON.parse(launchJson!);
+        expect(config.command).toBe("claude");
+        expect(config.credentials).toBeDefined();
+      });
+
+      it("includes security.CLAUDE_CODE_CREDENTIALS as file credential", () => {
+        const agent = makeRepoOpsAgent();
+        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const config = JSON.parse(result.get("agent-launch.json")!);
+        const claudeCred = config.credentials.find(
+          (c: { key: string }) => c.key === "security.CLAUDE_CODE_CREDENTIALS",
+        );
+        expect(claudeCred).toBeDefined();
+        expect(claudeCred.type).toBe("file");
+        expect(claudeCred.path).toBe("/home/mason/.claude/.credentials.json");
+      });
+
+      it("includes role-declared credentials as env type", () => {
+        const agent = makeRepoOpsAgent();
+        agent.credentials = ["GITHUB_TOKEN", "SLACK_TOKEN"];
+        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const config = JSON.parse(result.get("agent-launch.json")!);
+        const ghCred = config.credentials.find(
+          (c: { key: string }) => c.key === "GITHUB_TOKEN",
+        );
+        expect(ghCred).toBeDefined();
+        expect(ghCred.type).toBe("env");
+      });
+
+      it("uses ACP command when acpMode is true", () => {
+        const agent = makeRepoOpsAgent();
+        const result = claudeCodeMaterializer.materializeWorkspace(
+          agent, "http://mcp-proxy:9090", undefined, { acpMode: true },
+        );
+
+        const config = JSON.parse(result.get("agent-launch.json")!);
+        expect(config.command).toBe("claude-agent-acp");
+      });
+    });
+
     describe("result completeness", () => {
       it("contains all expected files for repo-ops agent", () => {
         const agent = makeRepoOpsAgent();
@@ -410,6 +460,7 @@ describe("claudeCodeMaterializer", () => {
           ".claude/settings.json",
           ".mcp.json",
           "AGENTS.md",
+          "agent-launch.json",
           "skills/labeling/README.md",
         ]);
       });
@@ -458,7 +509,7 @@ describe("claudeCodeMaterializer", () => {
         expect(result.has(".claude/commands/triage-issue.md")).toBe(true);
       });
 
-      it("includes .chapter/acp.json in result completeness", () => {
+      it("includes .chapter/acp.json and agent-launch.json in result completeness", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
 
@@ -470,6 +521,7 @@ describe("claudeCodeMaterializer", () => {
           ".claude/settings.json",
           ".mcp.json",
           "AGENTS.md",
+          "agent-launch.json",
           "skills/labeling/README.md",
         ]);
       });

@@ -6,12 +6,12 @@ The ACP session manages the two-container Docker Compose session (proxy + agent)
 
 ### Requirement: AcpSession generates a docker-compose.yml with two services
 
-The `generateAcpComposeYml()` function SHALL produce a compose file with proxy and agent services. The credential-service SHALL NOT be included as a Docker container — it runs in-process on the host.
+The `generateAcpComposeYml()` function SHALL produce a compose file with proxy and agent services. The compose file SHALL reference build contexts from `{projectDir}/.clawmasons/docker/{role-name}/` instead of any external docker build path. The credential-service SHALL NOT be included as a Docker container — it runs in-process on the host.
 
 #### Scenario: Two services are present
-- **GIVEN** valid compose options with agent "note-taker" and role "writer"
+- **GIVEN** valid compose options with agent "claude" and role "writer"
 - **WHEN** `generateAcpComposeYml()` is called
-- **THEN** the output contains services `proxy-writer` and `agent-note-taker-writer`
+- **THEN** the output contains services `proxy-writer` and `agent-claude-writer`
 - **AND** the output does NOT contain a `credential-service` service
 
 #### Scenario: Agent depends on proxy
@@ -20,10 +20,11 @@ The `generateAcpComposeYml()` function SHALL produce a compose file with proxy a
 - **THEN** the agent service `depends_on` includes the proxy service
 - **AND** the agent service does NOT depend on `credential-service`
 
-#### Scenario: Correct Dockerfile paths
-- **GIVEN** a docker build path
-- **WHEN** the compose file is generated
-- **THEN** proxy uses `proxy/<role>/Dockerfile`, agent uses `agent/<agent>/<role>/Dockerfile`
+#### Scenario: Correct Dockerfile paths use project-local docker directory
+- **GIVEN** project directory `/home/user/my-project`
+- **WHEN** the compose file is generated for role "writer" with agent "claude"
+- **THEN** proxy uses build context relative to `{projectDir}/.clawmasons/docker/writer/proxy/`
+- **AND** agent uses build context relative to `{projectDir}/.clawmasons/docker/writer/agent/claude/`
 
 ### Requirement: Agent service is non-interactive in ACP mode
 
@@ -44,16 +45,21 @@ The agent service SHALL NOT expose any ACP ports to the host. Communication occu
 - **WHEN** the compose file is generated
 - **THEN** the agent service does NOT contain a `ports` section
 
-### Requirement: AcpSession.start() creates and starts a Docker session
+### Requirement: AcpSession.start() uses project-local session directory
 
-The `start()` method SHALL generate a compose file, create a session directory, and start all services in detached mode.
+The `start()` method SHALL create the session directory at `{projectDir}/.clawmasons/sessions/{session-id}/` and write the compose file there.
 
-#### Scenario: Successful start
-- **GIVEN** a valid project directory with Dockerfiles
+#### Scenario: Successful start with project-local paths
+- **GIVEN** a valid project directory at `/home/user/my-project`
 - **WHEN** `start()` is called
-- **THEN** it returns a SessionInfo with sessionId, composeFile path, and service names
-- **AND** the compose file exists on disk
-- **AND** `docker compose up -d` was invoked
+- **THEN** the session directory SHALL be at `/home/user/my-project/.clawmasons/sessions/{session-id}/`
+- **AND** the compose file SHALL be at `{session-dir}/docker/docker-compose.yml`
+- **AND** `docker compose up -d` SHALL be invoked
+
+#### Scenario: No CLAWMASONS_HOME access during start
+- **WHEN** `start()` is called
+- **THEN** no reads or writes to `~/.clawmasons/` SHALL occur
+- **AND** all paths SHALL be relative to the project directory
 
 #### Scenario: Start fails when already running
 - **GIVEN** a session that has been started
@@ -128,3 +134,31 @@ The initiate template's mcp agent SHALL declare `TEST_LLM_TOKEN` in its credenti
 - **GIVEN** the initiate template's mcp agent package.json
 - **WHEN** the `chapter.credentials` array is inspected
 - **THEN** it contains `"TEST_LLM_TOKEN"`
+
+### Requirement: ACP session resolves project directory from session/new cwd
+
+The ACP session SHALL use the `cwd` field from the `session/new` request as the project directory. It SHALL NOT use `CLAWMASONS_HOME` or `config.json` for path resolution.
+
+#### Scenario: Project directory from ACP session/new
+- **WHEN** an ACP `session/new` request specifies `cwd: "/home/user/my-project"`
+- **THEN** the project directory SHALL be `/home/user/my-project`
+- **AND** docker artifacts SHALL be resolved from `/home/user/my-project/.clawmasons/docker/`
+- **AND** the session SHALL be created at `/home/user/my-project/.clawmasons/sessions/{session-id}/`
+
+### Requirement: ACP session uses project-local role discovery
+
+The ACP session SHALL resolve roles using `resolveRole(name, projectDir)` from the shared discovery module. This is consistent with the interactive run command.
+
+#### Scenario: Role resolved for ACP session
+- **WHEN** an ACP session is started with role "writer"
+- **THEN** `resolveRole("writer", projectDir)` SHALL be called
+- **AND** `findRoleEntryByRole()` and `readChaptersJson()` SHALL NOT be called
+
+### Requirement: ACP session logs written to session directory
+
+ACP session logs SHALL be written to `{projectDir}/.clawmasons/sessions/{session-id}/logs/` instead of any role-relative or global log directory.
+
+#### Scenario: Log file location
+- **WHEN** an ACP session is running with session ID "abc12345"
+- **THEN** logs SHALL be written to `{projectDir}/.clawmasons/sessions/abc12345/logs/acp.log`
+- **AND** no logs SHALL be written to `~/.clawmasons/` or `roleDir/logs/`

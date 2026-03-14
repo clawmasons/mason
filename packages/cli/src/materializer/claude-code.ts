@@ -9,6 +9,7 @@ import {
   generateSkillReadme,
   ACP_RUNTIME_COMMANDS,
   generateAcpConfigJson,
+  generateAgentLaunchJson,
 } from "./common.js";
 
 /**
@@ -157,9 +158,15 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
       );
     }
 
+    // agent-launch.json — tells agent-entry how to bootstrap this agent
+    const primaryRuntime = agent.runtimes[0] ?? "claude-code";
+    result.set(
+      "agent-launch.json",
+      generateAgentLaunchJson(primaryRuntime, agent.credentials, options?.acpMode),
+    );
+
     // ACP mode: generate .chapter/acp.json with command
     if (options?.acpMode) {
-      const primaryRuntime = agent.runtimes[0] ?? "claude-code";
       const acpCommand = ACP_RUNTIME_COMMANDS[primaryRuntime] ?? primaryRuntime;
       result.set(".chapter/acp.json", generateAcpConfigJson(acpCommand));
     }
