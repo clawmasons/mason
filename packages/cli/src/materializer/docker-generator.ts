@@ -345,9 +345,12 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
     logsDir,
   } = opts;
 
+  // Unique compose project name derived from project directory
+  const projectHash = crypto.createHash("sha256").update(projectDir).digest("hex").slice(0, 8);
+  const composeName = `mason-${projectHash}`;
+
   // Compute relative paths from session directory
   const relDockerDir = path.relative(sessionDir, dockerDir);
-  const relBuildDir = path.relative(sessionDir, dockerBuildDir);
   const relProjectDir = path.relative(sessionDir, projectDir);
   const relLogsDir = path.relative(sessionDir, logsDir);
   const relSentinel = path.relative(sessionDir, path.join(projectDir, SENTINEL_RELATIVE_PATH));
@@ -412,6 +415,7 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
 #   docker compose ps
 #   docker compose exec ${agentServiceName} sh
 #   docker compose down
+name: ${composeName}
 services:
   ${proxyServiceName}:
     build:

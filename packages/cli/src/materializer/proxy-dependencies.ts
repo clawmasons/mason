@@ -37,6 +37,7 @@ const FRAMEWORK_PACKAGES = [
   "@clawmasons/shared",
   "@clawmasons/credential-service",
   "@clawmasons/mcp-agent",
+  "@clawmasons/agent-entry",
 ];
 
 // ---------------------------------------------------------------------------

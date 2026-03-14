@@ -313,6 +313,14 @@ export async function launchRuntime(
  * Main bootstrap function — orchestrates the full agent-entry flow.
  */
 export async function bootstrap(): Promise<never> {
+  const verbose = process.env.AGENT_ENTRY_VERBOSE === "1";
+
+  if (verbose) {
+    console.error("[agent-entry] Verbose mode enabled");
+    console.error(`[agent-entry] argv: ${JSON.stringify(process.argv)}`);
+    console.error(`[agent-entry] cwd: ${process.cwd()}`);
+  }
+
   // 1. Read configuration from environment
   const proxyToken = process.env.MCP_PROXY_TOKEN;
   if (!proxyToken) {
@@ -321,6 +329,10 @@ export async function bootstrap(): Promise<never> {
   }
 
   const proxyUrl = process.env.MCP_PROXY_URL ?? "http://proxy:3000";
+
+  if (verbose) {
+    console.error(`[agent-entry] Proxy URL: ${proxyUrl}`);
+  }
 
   // 2. Load agent-launch.json or fall back to env vars
   const launchConfig = loadLaunchConfig();
@@ -371,6 +383,11 @@ export async function bootstrap(): Promise<never> {
 
   const credentialKeys = credentialConfigs.map((c) => c.key);
 
+  if (verbose) {
+    console.error(`[agent-entry] Command: ${command} ${args.join(" ")}`);
+    console.error(`[agent-entry] Credentials: ${credentialKeys.length > 0 ? credentialKeys.join(", ") : "none"}`);
+  }
+
   try {
     // 3. Connect to proxy
     console.error("[agent-entry] Connecting to proxy...");
@@ -409,11 +426,13 @@ function sleep(ms: number): Promise<void> {
 
 // ── Run if executed directly ───────────────────────────────────────────
 
-// Detect if running as main module (works with esbuild bundle)
+// Detect if running as main module (works with esbuild bundle and npm .bin symlinks)
 const isMain =
   typeof process !== "undefined" &&
   process.argv[1] &&
-  (process.argv[1].endsWith("agent-entry.js") || process.argv[1].endsWith("index.js"));
+  (process.argv[1].endsWith("agent-entry.js") ||
+    process.argv[1].endsWith("agent-entry") ||
+    process.argv[1].endsWith("index.js"));
 
 if (isMain) {
   bootstrap();
