@@ -1,39 +1,33 @@
 # Agent Shell — routes unknown non-command input to Claude Code
 # Source this from ~/.bashrc and/or ~/.zshrc:
-#   source ~/agent-shell.sh
+#   source ~/agent-shell/agent-shell.sh
 #
-# Options (set in your shell config before sourcing):
+# Options (export before or after sourcing):
 #   AGENT_THINK=1          — enable extended thinking (default: 0)
 #   AGENT_SHOW_THINK=1     — stream thinking + response to terminal (default: 0)
 #
 # Dependencies:
-#   - claude (Claude Code CLI)
-#   - npm i -g @khanacademy/format-claude-stream (for AGENT_SHOW_THINK mode)
+#   cd ~/agent-shell && npm install
 
 : "${AGENT_THINK:=0}"
-: "${AGENT_SHOW_THINK:=1}"
+: "${AGENT_SHOW_THINK:=0}"
+
+# Resolve the directory this script lives in
+AGENT_SHELL_DIR="${0:a:h}" 2>/dev/null || AGENT_SHELL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Disable history expansion so ! doesn't break prompts ──
 set +H 2>/dev/null  # bash
 setopt NO_BANG_HIST 2>/dev/null  # zsh
 
-# ── Run claude with the right flags ──
+# ── Run claude ──
 
 _agent_run() {
-  local prompt="$1"
-
-  if [[ "$AGENT_SHOW_THINK" == "1" ]] && command -v format-claude-stream &>/dev/null; then
-    # Run in a subshell so Ctrl+C kills the whole pipeline
-    (
-      trap 'kill 0' INT
-      claude --print --verbose --output-format stream-json \
-        --max-thinking-tokens 31999 "$prompt" \
-        | format-claude-stream
-    )
+  if [[ "$AGENT_SHOW_THINK" == "1" ]]; then
+    node "$AGENT_SHELL_DIR/agent-run.mjs" "$1"
   elif [[ "$AGENT_THINK" == "1" ]]; then
-    claude --print --max-thinking-tokens 31999 "$prompt"
+    claude --print --max-thinking-tokens 31999 "$1"
   else
-    claude --print "$prompt"
+    claude --print "$1"
   fi
 }
 
@@ -52,12 +46,11 @@ _agent_at() {
 
   # Slash command: @ /cleanup-docs [extra context]
   if [[ "$input" == /* ]]; then
-    local slash_cmd="${input%% *}"      # "/cleanup-docs"
-    local cmd_name="${slash_cmd#/}"     # "cleanup-docs"
-    local extra="${input#"$slash_cmd"}" # everything after the command
-    extra="${extra# }"                  # trim leading space
+    local slash_cmd="${input%% *}"
+    local cmd_name="${slash_cmd#/}"
+    local extra="${input#"$slash_cmd"}"
+    extra="${extra# }"
 
-    # Search project-local then global commands
     local cmd_file=""
     for dir in ".claude/commands" "$HOME/.claude/commands"; do
       if [[ -f "$dir/$cmd_name.md" ]]; then
@@ -73,26 +66,24 @@ _agent_at() {
       return 1
     fi
 
-    # Pass the slash command directly — Claude Code handles it natively
     if [[ -n "$extra" ]]; then
       _agent_run "$slash_cmd $extra"
     else
       _agent_run "$slash_cmd"
     fi
   else
-    # Free-form prompt
     _agent_run "$input"
   fi
 }
 
-# Alias with noglob so ?, *, [] etc. aren't expanded by the shell
+# ── @ alias / function ──
+
 if [[ -n "$ZSH_VERSION" ]]; then
   alias @='noglob _agent_at'
 
   # Intercept @nospace before the shell parses (and globs) the line
   _agent_accept_line() {
     if [[ "$BUFFER" == @* && "$BUFFER" != "@ "* ]]; then
-      # Rewrite "@foo bar?" → "@ foo bar?" so the alias handles it
       BUFFER="@ ${BUFFER#@}"
     fi
     zle .accept-line
@@ -100,7 +91,6 @@ if [[ -n "$ZSH_VERSION" ]]; then
   zle -N accept-line _agent_accept_line
 
 elif [[ -n "$BASH_VERSION" ]]; then
-  # eval so zsh parser never sees @() as a function definition
   eval '@() { _agent_at "$@"; }'
 fi
 
@@ -182,7 +172,6 @@ _agent_handler() {
     /usr/lib/command-not-found -- "$cmd" 2>&1 && return 127
   fi
 
-  # Send to Claude Code
   _agent_run "$full_input"
 }
 
