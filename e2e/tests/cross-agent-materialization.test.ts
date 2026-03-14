@@ -15,8 +15,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   copyFixtureWorkspace,
-  chapterExecJson,
-  chapterExec,
+  masonExecJson,
+  masonExec,
 } from "./helpers.js";
 
 describe("cross-agent materialization", () => {
@@ -36,7 +36,7 @@ describe("cross-agent materialization", () => {
   });
 
   it("Claude-dialect local role is discovered", () => {
-    const roles = chapterExecJson<Array<Record<string, unknown>>>(
+    const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
     );
@@ -52,7 +52,7 @@ describe("cross-agent materialization", () => {
   });
 
   it("Claude-dialect role has correct metadata from ROLE.md frontmatter", () => {
-    const roles = chapterExecJson<Array<Record<string, unknown>>>(
+    const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
     );
@@ -69,7 +69,7 @@ describe("cross-agent materialization", () => {
   });
 
   it("Claude-dialect role has tasks normalized from commands field", () => {
-    const roles = chapterExecJson<Array<Record<string, unknown>>>(
+    const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
     );
@@ -89,7 +89,7 @@ describe("cross-agent materialization", () => {
   });
 
   it("Claude-dialect role has empty apps when no mcp_servers specified", () => {
-    const roles = chapterExecJson<Array<Record<string, unknown>>>(
+    const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
     );
@@ -107,11 +107,11 @@ describe("cross-agent materialization", () => {
 
   it("Claude-dialect role validates successfully", () => {
     // Should not throw
-    chapterExec(["chapter", "validate", "test-writer"], workspaceDir);
+    masonExec(["chapter", "validate", "test-writer"], workspaceDir);
   });
 
   it("Claude-dialect role contains container requirements from ROLE.md", () => {
-    const roles = chapterExecJson<Array<Record<string, unknown>>>(
+    const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
     );
@@ -131,7 +131,7 @@ describe("cross-agent materialization", () => {
   });
 
   it("Claude-dialect role contains governance config from ROLE.md", () => {
-    const roles = chapterExecJson<Array<Record<string, unknown>>>(
+    const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
     );
@@ -151,7 +151,7 @@ describe("cross-agent materialization", () => {
   });
 
   it("role includes instructions from ROLE.md body", () => {
-    const roles = chapterExecJson<Array<Record<string, unknown>>>(
+    const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
     );

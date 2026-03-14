@@ -428,7 +428,7 @@ In phase 1, these keys exist but are not used for validation (signing is disable
 ```
 chapter run-agent <agent> <role> [<task>]
   │
-  ├─1─ Read .clawmasons/chapter.json
+  ├─1─ Read .mason/chapter.json
   ├─2─ Generate session ID
   ├─3─ Resolve required credentials (from agent + apps)
   ├─4─ Display required credentials to operator (UC-5)
@@ -529,7 +529,7 @@ $ chapter run-agent mcp-test mcp-test-role
     - web-search_search_web
     - web-search_fetch_page
 
-  > web-search_search_web {"query": "clawmasons"}
+  > web-search_search_web {"query": "mason"}
   Result: { "results": [...] }
 
   > exit
@@ -588,7 +588,7 @@ Acceptance criteria:
 The credential service resolves credentials from macOS Keychain.
 
 Acceptance criteria:
-- Given a credential stored in macOS Keychain under service `clawmasons` and not in process env or `.env`, when requested, then the Keychain value is returned.
+- Given a credential stored in macOS Keychain under service `mason` and not in process env or `.env`, when requested, then the Keychain value is returned.
 - Given a non-macOS system, when Keychain resolution is attempted, then it is silently skipped.
 
 **REQ-005: WebSocket Connection to Proxy**
@@ -775,7 +775,7 @@ Acceptance criteria:
 | # | Question | Owner | Blocking? |
 |---|----------|-------|-----------|
 | Q1 | Should the credential service run as a sidecar in the proxy container rather than a separate container? A sidecar reduces network hops but increases proxy image size. | Engineering | No |
-| Q2 | Should macOS Keychain integration use a specific service name (e.g., `clawmasons`) or allow configuration? | Engineering | No |
+| Q2 | Should macOS Keychain integration use a specific service name (e.g., `mason`) or allow configuration? | Engineering | No |
 | Q3 | How should credential rotation be handled? If a credential value changes while an agent is running, should the agent be notified or must it restart? | Product | No |
 | Q4 | Should the `connect-agent` endpoint be a new endpoint or extend the existing SSE/Streamable-HTTP connection flow? | Engineering | Yes |
 | Q5 | Should the credential service support credential caching (e.g., Keychain lookups are slow) or resolve fresh each time? | Engineering | No |
@@ -863,6 +863,6 @@ const credentialServiceConfigSchema = z.object({
   credentialProxyToken: z.string(),
   envFilePath: z.string().optional(),
   requireSigning: z.boolean().default(false),
-  keychainService: z.string().default("clawmasons"),
+  keychainService: z.string().default("mason"),
 });
 ```

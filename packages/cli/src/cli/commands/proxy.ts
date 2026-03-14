@@ -55,7 +55,7 @@ export async function startProxy(
 
   // Graceful shutdown handler
   const shutdown = async () => {
-    console.log("\nShutting down clawmasons proxy...");
+    console.log("\nShutting down mason proxy...");
     try {
       if (server) await server.stop();
     } catch { /* best-effort */ }
@@ -212,7 +212,7 @@ export async function startProxy(
     const promptCount = promptRouter.listPrompts().length;
 
     console.log(
-      `\nclawmasons proxy ready (${totalMs}ms total)\n` +
+      `\nmason proxy ready (${totalMs}ms total)\n` +
       `  Role:      ${roleName}\n` +
       `  Port:      ${port}\n` +
       `  Transport: ${transport}\n` +

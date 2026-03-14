@@ -75,7 +75,7 @@ The system SHALL generate a valid ROLE.md string from scanner results.
 #### Scenario: Default container ignore paths
 - **GIVEN** any `ScanResult`
 - **WHEN** `proposeRoleMd(scanResult)` is called
-- **THEN** the `container.ignore.paths` includes `.clawmasons/`, `.claude/`, and `.env`
+- **THEN** the `container.ignore.paths` includes `.mason/`, `.claude/`, and `.env`
 
 #### Scenario: Custom role name and description
 - **GIVEN** a `ScanResult`

@@ -238,12 +238,12 @@ describe("displayCredentials", () => {
 
 describe("generateComposeYml", () => {
   const defaultOpts = {
-    dockerBuildDir: "/projects/my-project/.clawmasons/docker/writer",
-    dockerDir: "/projects/my-project/.clawmasons/docker",
+    dockerBuildDir: "/projects/my-project/.mason/docker/writer",
+    dockerDir: "/projects/my-project/.mason/docker",
     projectDir: "/projects/my-project",
     agent: "claude-code",
     role: "writer",
-    logsDir: "/projects/my-project/.clawmasons/sessions/abc123/logs",
+    logsDir: "/projects/my-project/.mason/sessions/abc123/logs",
     proxyToken: "test-token-abc",
     credentialProxyToken: "cred-token-xyz",
   };
@@ -342,7 +342,7 @@ describe("generateComposeYml", () => {
   it("uses correct Dockerfile paths for different agent/role combos", () => {
     const yml = generateComposeYml({
       ...defaultOpts,
-      dockerBuildDir: "/projects/my-project/.clawmasons/docker/reviewer",
+      dockerBuildDir: "/projects/my-project/.mason/docker/reviewer",
       agent: "codex",
       role: "reviewer",
       proxyToken: "token-123",
@@ -469,7 +469,7 @@ describe("runAgent", () => {
 
     // Pre-create docker build dir if needed (default: exists)
     const shouldExist = overrides?.dockerBuildExists ?? true;
-    const dockerDir = path.join(projectDir, ".clawmasons", "docker");
+    const dockerDir = path.join(projectDir, ".mason", "docker");
     const dockerBuildDir = path.join(dockerDir, "writer");
     if (shouldExist) {
       fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
@@ -563,12 +563,12 @@ describe("runAgent", () => {
     expect(errorOutput).toContain("not found");
   });
 
-  it("creates per-project .clawmasons/sessions/<id>/ for session state", async () => {
+  it("creates per-project .mason/sessions/<id>/ for session state", async () => {
     const { deps } = makeMockDeps({ sessionId: "sess0001" });
 
     await runAgent(projectDir, "claude-code", "writer", deps);
 
-    const sessionDir = path.join(projectDir, ".clawmasons", "sessions", "sess0001", "docker");
+    const sessionDir = path.join(projectDir, ".mason", "sessions", "sess0001", "docker");
     expect(fs.existsSync(sessionDir)).toBe(true);
 
     const composeFile = path.join(sessionDir, "docker-compose.yml");
@@ -581,7 +581,7 @@ describe("runAgent", () => {
     expect(content).not.toContain("credential-service:");
   });
 
-  it("appends .clawmasons to project .gitignore", async () => {
+  it("appends .mason to project .gitignore", async () => {
     const gitignoreCalled = { called: false, dir: "", pattern: "" };
     const { deps } = makeMockDeps({ gitignoreCalled });
 
@@ -589,7 +589,7 @@ describe("runAgent", () => {
 
     expect(gitignoreCalled.called).toBe(true);
     expect(gitignoreCalled.dir).toBe(projectDir);
-    expect(gitignoreCalled.pattern).toBe(".clawmasons");
+    expect(gitignoreCalled.pattern).toBe(".mason");
   });
 
   it("mounts project dir as /home/mason/workspace/project", async () => {
@@ -598,7 +598,7 @@ describe("runAgent", () => {
     await runAgent(projectDir, "claude-code", "writer", deps);
 
     const composeFile = path.join(
-      projectDir, ".clawmasons", "sessions", "mount001", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "mount001", "docker", "docker-compose.yml",
     );
     const content = fs.readFileSync(composeFile, "utf-8");
     expect(content).toContain(`"${projectDir}:/home/mason/workspace/project"`);
@@ -624,7 +624,7 @@ describe("runAgent", () => {
     };
 
     // Pre-create docker build dirs for both runs
-    const dockerDir = path.join(projectDir, ".clawmasons", "docker");
+    const dockerDir = path.join(projectDir, ".mason", "docker");
     const dockerBuildDir = path.join(dockerDir, "writer");
     fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "claude-code", "Dockerfile"), "FROM node:20\n");
@@ -641,7 +641,7 @@ describe("runAgent", () => {
       generateSessionIdFn: () => ids[callCount++]!,
     });
 
-    const sessionsDir = path.join(projectDir, ".clawmasons", "sessions");
+    const sessionsDir = path.join(projectDir, ".mason", "sessions");
     const sessions = fs.readdirSync(sessionsDir);
     expect(sessions).toContain("aaaa1111");
     expect(sessions).toContain("bbbb2222");
@@ -683,7 +683,7 @@ describe("runAgent", () => {
 
     await runAgent(projectDir, "claude-code", "writer", deps);
 
-    const sessionDir = path.join(projectDir, ".clawmasons", "sessions", "keep0001");
+    const sessionDir = path.join(projectDir, ".mason", "sessions", "keep0001");
     expect(fs.existsSync(sessionDir)).toBe(true);
   });
 
@@ -693,11 +693,11 @@ describe("runAgent", () => {
     await runAgent(projectDir, "claude-code", "writer", deps);
 
     const composeFile = path.join(
-      projectDir, ".clawmasons", "sessions", "ref00001", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "ref00001", "docker", "docker-compose.yml",
     );
     const content = fs.readFileSync(composeFile, "utf-8");
 
-    const dockerDir = path.join(projectDir, ".clawmasons", "docker");
+    const dockerDir = path.join(projectDir, ".mason", "docker");
     expect(content).toContain(`context: "${dockerDir}"`);
     expect(content).toContain('dockerfile: "writer/claude-code/Dockerfile"');
   });
@@ -708,7 +708,7 @@ describe("runAgent", () => {
     await runAgent(projectDir, "claude-code", "writer", deps);
 
     const composeFile = path.join(
-      projectDir, ".clawmasons", "sessions", "tok00001", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "tok00001", "docker", "docker-compose.yml",
     );
     const content = fs.readFileSync(composeFile, "utf-8");
 
@@ -727,7 +727,7 @@ describe("runAgent", () => {
     await runAgent(projectDir, "claude-code", "writer", deps);
 
     const composeFile = path.join(
-      projectDir, ".clawmasons", "sessions", "nokeys01", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "nokeys01", "docker", "docker-compose.yml",
     );
     const content = fs.readFileSync(composeFile, "utf-8");
     const agentSection = content.split("agent-writer:")[1]!;
@@ -746,10 +746,10 @@ describe("runAgent", () => {
     await runAgent(projectDir, "claude-code", "writer", deps2);
 
     const file1 = path.join(
-      projectDir, ".clawmasons", "sessions", "uniq0001", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "uniq0001", "docker", "docker-compose.yml",
     );
     const file2 = path.join(
-      projectDir, ".clawmasons", "sessions", "uniq0002", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "uniq0002", "docker", "docker-compose.yml",
     );
 
     const content1 = fs.readFileSync(file1, "utf-8");
@@ -819,7 +819,7 @@ describe("runAgent", () => {
 
     await runAgent(projectDir, "claude-code", "writer", deps);
 
-    const logsDir = path.join(projectDir, ".clawmasons", "sessions", "logs0001", "logs");
+    const logsDir = path.join(projectDir, ".mason", "sessions", "logs0001", "logs");
     expect(fs.existsSync(logsDir)).toBe(true);
     expect(fs.statSync(logsDir).isDirectory()).toBe(true);
   });
@@ -857,7 +857,7 @@ describe("runProxyOnly", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     // Pre-create docker build dirs
-    const dockerDir = path.join(projectDir, ".clawmasons", "docker");
+    const dockerDir = path.join(projectDir, ".mason", "docker");
     const dockerBuildDir = path.join(dockerDir, "writer");
     fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "claude-code", "Dockerfile"), "FROM node:20\n");
@@ -958,7 +958,7 @@ describe("runProxyOnly", () => {
     await runProxyOnly(projectDir, "claude-code", "writer", 3000, deps);
 
     const composeFile = path.join(
-      projectDir, ".clawmasons", "sessions", "path0001", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "path0001", "docker", "docker-compose.yml",
     );
     expect(fs.existsSync(composeFile)).toBe(true);
 

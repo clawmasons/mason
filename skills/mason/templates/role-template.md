@@ -33,7 +33,7 @@ container:
       - typescript
   ignore:
     paths:
-      - '.clawmasons/'
+      - '.mason/'
       - '.claude/'
       - '.env'
 

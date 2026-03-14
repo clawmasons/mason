@@ -47,7 +47,7 @@ function makeTestRole(): RoleType {
     ],
     container: {
       packages: { apt: ["jq", "curl"], npm: ["typescript"], pip: [] },
-      ignore: { paths: [".clawmasons/", ".claude/"] },
+      ignore: { paths: [".mason/", ".claude/"] },
       mounts: [],
     },
     governance: {

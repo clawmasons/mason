@@ -21,41 +21,41 @@ describe("hasGitignoreEntry", () => {
   it("returns false for non-existent file", () => {
     const result = hasGitignoreEntry(
       path.join(tmpDir, ".gitignore"),
-      ".clawmasons",
+      ".mason",
     );
     expect(result).toBe(false);
   });
 
   it("returns true when pattern is present", () => {
     const gitignorePath = path.join(tmpDir, ".gitignore");
-    fs.writeFileSync(gitignorePath, "node_modules\n.clawmasons\n", "utf-8");
+    fs.writeFileSync(gitignorePath, "node_modules\n.mason\n", "utf-8");
 
-    expect(hasGitignoreEntry(gitignorePath, ".clawmasons")).toBe(true);
+    expect(hasGitignoreEntry(gitignorePath, ".mason")).toBe(true);
   });
 
   it("returns false when pattern is not present", () => {
     const gitignorePath = path.join(tmpDir, ".gitignore");
     fs.writeFileSync(gitignorePath, "node_modules\ndist\n", "utf-8");
 
-    expect(hasGitignoreEntry(gitignorePath, ".clawmasons")).toBe(false);
+    expect(hasGitignoreEntry(gitignorePath, ".mason")).toBe(false);
   });
 
   it("ignores blank lines and whitespace when matching", () => {
     const gitignorePath = path.join(tmpDir, ".gitignore");
     fs.writeFileSync(
       gitignorePath,
-      "node_modules\n\n  .clawmasons  \n\n",
+      "node_modules\n\n  .mason  \n\n",
       "utf-8",
     );
 
-    expect(hasGitignoreEntry(gitignorePath, ".clawmasons")).toBe(true);
+    expect(hasGitignoreEntry(gitignorePath, ".mason")).toBe(true);
   });
 
   it("does not match partial patterns", () => {
     const gitignorePath = path.join(tmpDir, ".gitignore");
-    fs.writeFileSync(gitignorePath, ".clawmasons/logs\n", "utf-8");
+    fs.writeFileSync(gitignorePath, ".mason/logs\n", "utf-8");
 
-    expect(hasGitignoreEntry(gitignorePath, ".clawmasons")).toBe(false);
+    expect(hasGitignoreEntry(gitignorePath, ".mason")).toBe(false);
   });
 });
 
@@ -71,7 +71,7 @@ describe("ensureGitignoreEntry", () => {
   });
 
   it("returns false when .gitignore does not exist", () => {
-    const result = ensureGitignoreEntry(tmpDir, ".clawmasons");
+    const result = ensureGitignoreEntry(tmpDir, ".mason");
     expect(result).toBe(false);
     // Should not create a .gitignore
     expect(fs.existsSync(path.join(tmpDir, ".gitignore"))).toBe(false);
@@ -81,57 +81,57 @@ describe("ensureGitignoreEntry", () => {
     const gitignorePath = path.join(tmpDir, ".gitignore");
     fs.writeFileSync(gitignorePath, "node_modules\n", "utf-8");
 
-    const result = ensureGitignoreEntry(tmpDir, ".clawmasons");
+    const result = ensureGitignoreEntry(tmpDir, ".mason");
     expect(result).toBe(true);
 
     const content = fs.readFileSync(gitignorePath, "utf-8");
-    expect(content).toBe("node_modules\n.clawmasons\n");
+    expect(content).toBe("node_modules\n.mason\n");
   });
 
   it("returns false when pattern is already present", () => {
     const gitignorePath = path.join(tmpDir, ".gitignore");
     fs.writeFileSync(
       gitignorePath,
-      "node_modules\n.clawmasons\n",
+      "node_modules\n.mason\n",
       "utf-8",
     );
 
-    const result = ensureGitignoreEntry(tmpDir, ".clawmasons");
+    const result = ensureGitignoreEntry(tmpDir, ".mason");
     expect(result).toBe(false);
 
     // Content unchanged
     const content = fs.readFileSync(gitignorePath, "utf-8");
-    expect(content).toBe("node_modules\n.clawmasons\n");
+    expect(content).toBe("node_modules\n.mason\n");
   });
 
   it("handles .gitignore with trailing newline", () => {
     const gitignorePath = path.join(tmpDir, ".gitignore");
     fs.writeFileSync(gitignorePath, "node_modules\ndist\n", "utf-8");
 
-    ensureGitignoreEntry(tmpDir, ".clawmasons");
+    ensureGitignoreEntry(tmpDir, ".mason");
 
     const content = fs.readFileSync(gitignorePath, "utf-8");
-    expect(content).toBe("node_modules\ndist\n.clawmasons\n");
+    expect(content).toBe("node_modules\ndist\n.mason\n");
   });
 
   it("handles .gitignore without trailing newline", () => {
     const gitignorePath = path.join(tmpDir, ".gitignore");
     fs.writeFileSync(gitignorePath, "node_modules\ndist", "utf-8");
 
-    ensureGitignoreEntry(tmpDir, ".clawmasons");
+    ensureGitignoreEntry(tmpDir, ".mason");
 
     const content = fs.readFileSync(gitignorePath, "utf-8");
-    expect(content).toBe("node_modules\ndist\n.clawmasons\n");
+    expect(content).toBe("node_modules\ndist\n.mason\n");
   });
 
   it("handles empty .gitignore", () => {
     const gitignorePath = path.join(tmpDir, ".gitignore");
     fs.writeFileSync(gitignorePath, "", "utf-8");
 
-    const result = ensureGitignoreEntry(tmpDir, ".clawmasons");
+    const result = ensureGitignoreEntry(tmpDir, ".mason");
     expect(result).toBe(true);
 
     const content = fs.readFileSync(gitignorePath, "utf-8");
-    expect(content).toBe(".clawmasons\n");
+    expect(content).toBe(".mason\n");
   });
 });

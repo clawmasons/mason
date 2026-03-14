@@ -21,8 +21,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   copyFixtureWorkspace,
-  chapterExec,
-  chapterExecJson,
+  masonExec,
+  masonExecJson,
   isDockerAvailable,
   waitForHealth,
 } from "./helpers.js";
@@ -38,13 +38,13 @@ describe("mcp-proxy with claude-native project", () => {
     });
 
     // Build for mcp-agent agent type
-    chapterExec(
+    masonExec(
       ["chapter", "build", "writer", "--agent-type", "mcp-agent"],
       workspaceDir,
       { timeout: 120_000 },
     );
 
-    dockerDir = path.join(workspaceDir, ".clawmasons", "docker");
+    dockerDir = path.join(workspaceDir, ".mason", "docker");
 
     // Create notes directory required by the filesystem MCP server
     notesDir = path.join(workspaceDir, "notes");
@@ -61,7 +61,7 @@ describe("mcp-proxy with claude-native project", () => {
 
   describe("role discovery", () => {
     it("discovers writer role from .claude/roles/", () => {
-      const roles = chapterExecJson<Array<Record<string, unknown>>>(
+      const roles = masonExecJson<Array<Record<string, unknown>>>(
         ["chapter", "list", "--json"],
         workspaceDir,
       );
@@ -76,7 +76,7 @@ describe("mcp-proxy with claude-native project", () => {
     });
 
     it("writer role has inline mcp_servers parsed as apps", () => {
-      const roles = chapterExecJson<Array<Record<string, unknown>>>(
+      const roles = masonExecJson<Array<Record<string, unknown>>>(
         ["chapter", "list", "--json"],
         workspaceDir,
       );
@@ -104,7 +104,7 @@ describe("mcp-proxy with claude-native project", () => {
     });
 
     it("writer role has tasks normalized from commands", () => {
-      const roles = chapterExecJson<Array<Record<string, unknown>>>(
+      const roles = masonExecJson<Array<Record<string, unknown>>>(
         ["chapter", "list", "--json"],
         workspaceDir,
       );
@@ -123,7 +123,7 @@ describe("mcp-proxy with claude-native project", () => {
     });
 
     it("writer role has skills resolved from local path", () => {
-      const roles = chapterExecJson<Array<Record<string, unknown>>>(
+      const roles = masonExecJson<Array<Record<string, unknown>>>(
         ["chapter", "list", "--json"],
         workspaceDir,
       );
@@ -216,7 +216,7 @@ describe("mcp-proxy with claude-native project", () => {
       if (!isDockerAvailable()) return;
 
       // Use the CLI to build, generate compose, and start the proxy — just like a user would
-      const output = chapterExec(
+      const output = masonExec(
         ["run", "--role", "writer", "--agent-type", "mcp", "--proxy-only", "--proxy-port", String(PROXY_PORT)],
         workspaceDir,
         { timeout: 240_000 },

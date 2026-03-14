@@ -27,7 +27,7 @@ describe("chapter init", () => {
     it("creates all workspace directories", async () => {
       await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
-      const expectedDirs = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons"];
+      const expectedDirs = ["apps", "tasks", "skills", "roles", "agents", ".mason"];
       for (const dir of expectedDirs) {
         const stat = fs.statSync(path.join(tmpDir, dir));
         expect(stat.isDirectory()).toBe(true);
@@ -51,10 +51,10 @@ describe("chapter init", () => {
       ]);
     });
 
-    it("creates .clawmasons/chapter.json with defaults", async () => {
+    it("creates .mason/chapter.json with defaults", async () => {
       await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
-      const configPath = path.join(tmpDir, ".clawmasons", "chapter.json");
+      const configPath = path.join(tmpDir, ".mason", "chapter.json");
       const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       expect(config).toEqual({ chapter: "test.unit", version: "0.1.0" });
     });
@@ -124,9 +124,9 @@ describe("chapter init", () => {
   });
 
   describe("idempotency", () => {
-    it("warns and exits if .clawmasons/ directory already exists", async () => {
-      // Create .clawmasons directory to simulate existing workspace
-      fs.mkdirSync(path.join(tmpDir, ".clawmasons"), { recursive: true });
+    it("warns and exits if .mason/ directory already exists", async () => {
+      // Create .mason directory to simulate existing workspace
+      fs.mkdirSync(path.join(tmpDir, ".mason"), { recursive: true });
 
       await runInit(tmpDir, { name: "test.unit" }, { skipNpmInstall: true });
 
@@ -138,10 +138,10 @@ describe("chapter init", () => {
     });
 
     it("does not modify existing files when workspace exists", async () => {
-      // Create .clawmasons directory and a config file
-      fs.mkdirSync(path.join(tmpDir, ".clawmasons"), { recursive: true });
+      // Create .mason directory and a config file
+      fs.mkdirSync(path.join(tmpDir, ".mason"), { recursive: true });
       fs.writeFileSync(
-        path.join(tmpDir, ".clawmasons", "chapter.json"),
+        path.join(tmpDir, ".mason", "chapter.json"),
         '{"version":"0.0.1"}',
       );
 
@@ -149,7 +149,7 @@ describe("chapter init", () => {
 
       // Config should be untouched
       const config = JSON.parse(
-        fs.readFileSync(path.join(tmpDir, ".clawmasons", "chapter.json"), "utf-8"),
+        fs.readFileSync(path.join(tmpDir, ".mason", "chapter.json"), "utf-8"),
       );
       expect(config.version).toBe("0.0.1");
     });
@@ -425,7 +425,7 @@ describe("chapter init", () => {
 
         // Chapter scaffold should exist
         expect(
-          fs.existsSync(path.join(targetDir, ".clawmasons", "chapter.json")),
+          fs.existsSync(path.join(targetDir, ".mason", "chapter.json")),
         ).toBe(true);
         expect(fs.existsSync(path.join(targetDir, ".gitignore"))).toBe(true);
       } finally {
@@ -475,8 +475,8 @@ describe("chapter init", () => {
 
         const logCalls = vi.mocked(console.log).mock.calls.flat().join("\n");
         expect(logCalls).toContain("Template: test-template");
-        expect(logCalls).toContain("clawmasons chapter validate @test.unit/agent-note-taker");
-        expect(logCalls).toContain("clawmasons chapter list");
+        expect(logCalls).toContain("mason chapter validate @test.unit/agent-note-taker");
+        expect(logCalls).toContain("mason chapter list");
       } finally {
         fs.rmSync(targetDir, { recursive: true, force: true });
       }

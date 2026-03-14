@@ -16,12 +16,12 @@ export const E2E_ROOT = path.resolve(__dirname, "..");
 export const PROJECT_ROOT = path.resolve(E2E_ROOT, "..");
 export const FIXTURES_BASE = path.join(E2E_ROOT, "fixtures");
 export const FIXTURES_DIR = path.join(FIXTURES_BASE, "test-chapter");
-export const CLAWMASONS_BIN = path.join(PROJECT_ROOT, "bin", "clawmasons.js");
-/** @deprecated Use CLAWMASONS_BIN instead */
-export const CHAPTER_BIN = CLAWMASONS_BIN;
+export const MASON_BIN = path.join(PROJECT_ROOT, "bin", "mason.js");
+/** @deprecated Use MASON_BIN instead */
+export const CHAPTER_BIN = MASON_BIN;
 
 /** Workspace directories to copy from fixtures. */
-const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons", ".claude"];
+const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".mason", ".claude"];
 
 /**
  * Recursively copy a directory tree, skipping node_modules and .git.
@@ -94,10 +94,10 @@ export function copyFixtureWorkspace(
 }
 
 /**
- * Run a `chapter` CLI command and return stdout.
+ * Run a `mason` CLI command and return stdout.
  * Throws on non-zero exit code.
  */
-export function chapterExec(
+export function masonExec(
   args: string[],
   cwd: string,
   opts?: { timeout?: number },
@@ -110,14 +110,14 @@ export function chapterExec(
 }
 
 /**
- * Run a `chapter` CLI command with --json and parse the output.
+ * Run a `mason` CLI command with --json and parse the output.
  */
-export function chapterExecJson<T>(
+export function masonExecJson<T>(
   args: string[],
   cwd: string,
   opts?: { timeout?: number },
 ): T {
-  const output = chapterExec(args, cwd, opts);
+  const output = masonExec(args, cwd, opts);
   return JSON.parse(output) as T;
 }
 
@@ -134,10 +134,10 @@ export function isDockerAvailable(): boolean {
 }
 
 /**
- * Run a `chapter` CLI command that is expected to fail (non-zero exit code).
+ * Run a `mason` CLI command that is expected to fail (non-zero exit code).
  * Returns { stdout, stderr, exitCode }.
  */
-export function chapterExecExpectError(
+export function masonExecExpectError(
   args: string[],
   cwd: string,
   opts?: { timeout?: number },

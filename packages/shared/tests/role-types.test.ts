@@ -362,7 +362,7 @@ describe("roleTypeSchema", () => {
       skills: [{ name: "prd-writing", ref: "@acme/skill-prd-writing" }],
       container: {
         packages: { apt: ["jq"], npm: ["typescript"] },
-        ignore: { paths: [".env", ".clawmasons/"] },
+        ignore: { paths: [".env", ".mason/"] },
         mounts: [{ source: "./data", target: "/workspace/data", readonly: true }],
         baseImage: "node:22",
       },

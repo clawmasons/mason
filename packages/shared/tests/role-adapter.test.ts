@@ -77,7 +77,7 @@ function fullRole(): RoleType {
         pip: ["pdfkit"],
       },
       ignore: {
-        paths: [".clawmasons/", ".env"],
+        paths: [".mason/", ".env"],
       },
       mounts: [
         { source: "./data", target: "/workspace/data", readonly: true },

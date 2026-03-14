@@ -1,11 +1,11 @@
 ---
 title: Getting Started
-description: Install clawmasons and run your first role in 5 minutes
+description: Install Mason and run your first role in 5 minutes
 ---
 
 # Getting Started
 
-This guide walks you through installing clawmasons, creating a workspace, and running your first role.
+This guide walks you through installing Mason, creating a workspace, and running your first role.
 
 ## Prerequisites
 
@@ -19,24 +19,24 @@ This guide walks you through installing clawmasons, creating a workspace, and ru
 npm install -g @clawmasons/chapter
 ```
 
-This installs the `clawmasons` CLI globally.
+This installs the `mason` CLI globally.
 
 ## Step 1: Initialize a Lodge
 
 A lodge is the top-level organizational container for your workspaces. See [Lodge](lodge.md) for details.
 
 ```bash
-clawmasons init
+mason init
 ```
 
-This creates a lodge directory at `~/.clawmasons/<lodge-name>/` with a governance charter.
+This creates a lodge directory at `~/.mason/<lodge-name>/` with a governance charter.
 
 ## Step 2: Create a Chapter Workspace
 
 A chapter is an npm workspace containing your role packages. The `--template note-taker` flag scaffolds a complete working example.
 
 ```bash
-clawmasons chapter init --name acme.platform --template note-taker
+mason chapter init --name acme.platform --template note-taker
 cd acme.platform
 ```
 
@@ -48,7 +48,7 @@ acme.platform/
   tasks/take-notes/         # Task definition with prompt
   skills/markdown-conventions/  # Knowledge artifact
   roles/writer/             # Role definition (deployable unit)
-  .clawmasons/              # Workspace metadata
+  .mason/                   # Workspace metadata
   package.json              # npm workspaces root
 ```
 
@@ -57,19 +57,19 @@ acme.platform/
 List the roles and their dependency trees:
 
 ```bash
-clawmasons chapter list
+mason chapter list
 ```
 
 Validate a role's dependency graph and permissions:
 
 ```bash
-clawmasons chapter validate @acme.platform/role-writer
+mason chapter validate @acme.platform/role-writer
 ```
 
 View the resolved permission matrix:
 
 ```bash
-clawmasons chapter permissions @acme.platform/role-writer
+mason chapter permissions @acme.platform/role-writer
 ```
 
 ## Step 4: Build
@@ -77,7 +77,7 @@ clawmasons chapter permissions @acme.platform/role-writer
 Resolve the role graph, pack packages, and generate Docker artifacts:
 
 ```bash
-clawmasons chapter build
+mason chapter build
 ```
 
 This produces:
@@ -90,7 +90,7 @@ This produces:
 Navigate to the project directory where you want the agent to work, then:
 
 ```bash
-clawmasons run claude --role writer
+mason run claude --role writer
 ```
 
 This starts two Docker containers and an in-process credential service:
@@ -102,7 +102,7 @@ The agent starts interactively, and you can give it tasks through the terminal.
 
 ## What Just Happened?
 
-When you ran `clawmasons run`, the system:
+When you ran `mason run`, the system:
 
 1. Discovered the role and resolved its dependency graph (role -> tasks/skills/apps)
 2. Started the MCP proxy with the role's permission rules

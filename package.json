@@ -2,7 +2,7 @@
   "name": "@clawmasons/chapter-monorepo",
   "version": "0.1.0",
   "private": true,
-  "description": "Clawmasons Chapter — npm-native packaging, governance, and runtime portability for AI agents",
+  "description": "Mason — npm-native packaging, governance, and runtime portability for AI agents",
   "type": "module",
   "scripts": {
     "build": "tsc -b packages/shared packages/proxy packages/cli && npm run build --workspace=packages/mcp-agent && npm run build:proxy --workspace=packages/cli",

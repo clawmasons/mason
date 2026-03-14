@@ -38,7 +38,7 @@ export function registerValidateCommand(program: Command): void {
     .action(async (positionalName: string | undefined, options: ValidateOptions) => {
       const roleName = options.role ?? positionalName;
       if (!roleName) {
-        console.error("\n  A role or agent name is required.\n  Usage: clawmasons chapter validate <name>\n         clawmasons chapter validate --role <name>\n");
+        console.error("\n  A role or agent name is required.\n  Usage: mason chapter validate <name>\n         mason chapter validate --role <name>\n");
         process.exit(1);
         return;
       }

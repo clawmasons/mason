@@ -5,7 +5,7 @@ Commander.js-based CLI entry point for the chapter tool. Provides the executable
 ## Requirements
 
 ### Requirement: CLI entry point with Commander.js
-The system SHALL provide a CLI executable registered as `chapter` in package.json's `bin` field, powered by Commander.js with a program name of `chapter`, a version matching package.json, and a description of "Clawmasons Chapter — AI agent packaging, governance, and runtime orchestration".
+The system SHALL provide a CLI executable registered as `chapter` in package.json's `bin` field, powered by Commander.js with a program name of `chapter`, a version matching package.json, and a description of "Mason — AI agent packaging, governance, and runtime orchestration".
 
 #### Scenario: Display version
 - **WHEN** the user runs `chapter --version`
@@ -50,5 +50,5 @@ The system SHALL provide a `bin/chapter.js` file with a Node.js shebang (`#!/usr
 - **THEN** running `chapter` in a terminal invokes the CLI entry point
 
 #### Scenario: npx execution
-- **WHEN** a user runs `npx @clawmasons/chapter init`
+- **WHEN** a user runs `npx @clawmasons/mason init`
 - **THEN** the CLI entry point is invoked with the `init` command

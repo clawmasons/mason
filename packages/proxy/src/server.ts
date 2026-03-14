@@ -86,8 +86,6 @@ export class ChapterProxyServer {
   private activeTransports: Set<SSEServerTransport | StreamableHTTPServerTransport> = new Set();
   private sessionStore: SessionStore;
   private credentialRelay: CredentialRelay | null = null;
-  private readyGateResolved = false;
-
   constructor(config: ChapterProxyServerConfig) {
     this.config = { ...config, port: config.port ?? DEFAULT_PORT };
     this.sessionStore = new SessionStore(config.riskLevel);
@@ -97,12 +95,6 @@ export class ChapterProxyServer {
         credentialProxyToken: config.credentialProxyToken,
         requestTimeoutMs: config.credentialRequestTimeoutMs,
       });
-    }
-
-    if (config.readyGate) {
-      config.readyGate.then(() => { this.readyGateResolved = true; });
-    } else {
-      this.readyGateResolved = true;
     }
   }
 
@@ -333,13 +325,8 @@ export class ChapterProxyServer {
     // ── Tool Handlers ───────────────────────────────────────────────
 
     server.setRequestHandler(ListToolsRequestSchema, async () => {
-      // Before upstreams are ready, return only credential_request
-      // so the agent can fetch credentials immediately on boot
-      if (!this.readyGateResolved) {
-        const tools: Tool[] = [];
-        if (this.credentialRelay) tools.push(CREDENTIAL_REQUEST_TOOL);
-        return { tools };
-      }
+      // Wait for upstream MCP servers to connect and routing tables to be built
+      if (this.config.readyGate) await this.config.readyGate;
 
       const tools = this.config.router.listTools();
       if (this.credentialRelay) {

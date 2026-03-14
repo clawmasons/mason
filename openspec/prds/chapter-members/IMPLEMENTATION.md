@@ -48,15 +48,15 @@ Rename the package.json metadata field from `"forge"` to `"chapter"` across the 
 
 ---
 
-### CHANGE 2: Rename npm Packages & Directory — `@clawmasons/forge` → `@clawmasons/chapter`, `forge-core/` → `chapter-core/`
+### CHANGE 2: Rename npm Packages & Directory — `@clawmasons/forge` → `@clawmasons/mason`, `forge-core/` → `chapter-core/`
 
 Rename the npm package names and the forge-core directory to chapter-core.
 
 **PRD refs:** REQ-004 (Rename npm Packages), REQ-001 (Rename CLI Binary)
 
-**Summary:** Rename root package from `@clawmasons/forge` to `@clawmasons/chapter`. Rename `forge-core/` directory to `chapter-core/` and its package from `@clawmasons/forge-core` to `@clawmasons/chapter-core`. Update the root workspace config. Rename `bin/forge.js` → `bin/chapter.js` and update the `bin` field in package.json. Rename agent packages from `@clawmasons/agent-*` to `@clawmasons/member-*`. Update all cross-references in templates, component packages, and test fixtures.
+**Summary:** Rename root package from `@clawmasons/forge` to `@clawmasons/mason`. Rename `forge-core/` directory to `chapter-core/` and its package from `@clawmasons/forge-core` to `@clawmasons/chapter-core`. Update the root workspace config. Rename `bin/forge.js` → `bin/chapter.js` and update the `bin` field in package.json. Rename agent packages from `@clawmasons/agent-*` to `@clawmasons/member-*`. Update all cross-references in templates, component packages, and test fixtures.
 
-**User Story:** As a user, I install `@clawmasons/chapter` and run `chapter init` to bootstrap my workspace.
+**User Story:** As a user, I install `@clawmasons/mason` and run `chapter init` to bootstrap my workspace.
 
 **Scope:**
 - Rename directory: `forge-core/` → `chapter-core/`
@@ -68,7 +68,7 @@ Rename the npm package names and the forge-core directory to chapter-core.
 - Update all test files referencing `forge-core` paths or `@clawmasons/forge-core` package name
 - Update all source files referencing these package names
 
-**Testable output:** `npm install` succeeds at root. `npm pack` produces `clawmasons-chapter-*.tgz`. `chapter-core/package.json` has `name: "@clawmasons/chapter-core"`. `bin/chapter.js` exists and is referenced in package.json. All tests pass.
+**Testable output:** `npm install` succeeds at root. `npm pack` produces `clawmasons-mason-*.tgz`. `chapter-core/package.json` has `name: "@clawmasons/chapter-core"`. `bin/chapter.js` exists and is referenced in package.json. All tests pass.
 
 **Implemented** -- [Archived Change](../../changes/archive/2026-03-05-rename-npm-packages-and-directory/)
 
@@ -82,7 +82,7 @@ Rename the npm package names and the forge-core directory to chapter-core.
 - [docker-install-pipeline](../../specs/docker-install-pipeline/spec.md) -- updated `forge-proxy/` → `chapter-proxy/`, `forge/` → `chapter/`, ENTRYPOINT paths, `getChapterProjectRoot()`
 - [workspace-init](../../specs/workspace-init/spec.md) -- updated template references: `@clawmasons/chapter-core` dep, `members/` directory, `member-note-taker` package names
 - [package-discovery](../../specs/package-discovery/spec.md) -- updated `forge-core` → `chapter-core` in node_modules examples
-- [cli-framework](../../specs/cli-framework/spec.md) -- updated `bin/forge.js` → `bin/chapter.js`, `@clawmasons/forge` → `@clawmasons/chapter`
+- [cli-framework](../../specs/cli-framework/spec.md) -- updated `bin/forge.js` → `bin/chapter.js`, `@clawmasons/forge` → `@clawmasons/mason`
 - [docker-compose-generation](../../specs/docker-compose-generation/spec.md) -- updated `./forge-proxy` → `./chapter-proxy` build context paths
 
 ---

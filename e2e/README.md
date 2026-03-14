@@ -41,27 +41,27 @@ Run the **note-taker** role with Docker Compose (requires Docker and `OPENROUTER
 
 ```bash
 # From the workspace directory
-clawmasons run claude --role test-writer
+mason run claude --role test-writer
 ```
 
 Run a role as an ACP endpoint (no Docker needed):
 
 ```bash
 # Start the ACP proxy on port 3001 (proxy on 3000)
-clawmasons run claude --role mcp-test --acp
+mason run claude --role mcp-test --acp
 
 # Or specify custom ports
-clawmasons run claude --role mcp-test --acp --port 3001 --proxy-port 3000
+mason run claude --role mcp-test --acp --port 3001 --proxy-port 3000
 ```
 
 Inspect the built artifacts:
 
 ```bash
-ls .clawmasons/docker/             # Generated Dockerfiles and compose per role
+ls .mason/docker/             # Generated Dockerfiles and compose per role
 cat chapter.lock.json              # Resolved dependency graph
 ls dist/                           # Packed tarballs
-clawmasons chapter list            # Show available roles
-clawmasons chapter validate        # Validate role definitions
+mason chapter list            # Show available roles
+mason chapter validate        # Validate role definitions
 ```
 
 ### Tear down

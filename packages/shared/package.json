@@ -1,7 +1,7 @@
 {
   "name": "@clawmasons/shared",
   "version": "0.1.0",
-  "description": "Shared types, schemas, and utilities for Clawmasons Chapter",
+  "description": "Shared types, schemas, and utilities for Mason Chapter",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

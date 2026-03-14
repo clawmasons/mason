@@ -3,7 +3,7 @@
  *
  * Validates the full agent→proxy pipeline by:
  *   1. Copying the claude-test-project fixture
- *   2. Spawning `clawmasons run --role writer --agent-type mcp` with piped stdio
+ *   2. Spawning `mason run --role writer --agent-type mcp` with piped stdio
  *   3. Interacting with the mcp-agent REPL to list and call tools
  *
  * The test does NOT manually orchestrate Docker containers — the CLI handles
@@ -16,7 +16,7 @@ import * as path from "node:path";
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import {
   copyFixtureWorkspace,
-  CLAWMASONS_BIN,
+  MASON_BIN,
   isDockerAvailable,
 } from "./helpers.js";
 
@@ -107,7 +107,7 @@ describe("mcp-proxy-agent: agent↔proxy via CLI", () => {
 
     // Best-effort: tear down any leftover docker compose sessions
     if (workspaceDir) {
-      const sessionsDir = path.join(workspaceDir, ".clawmasons", "sessions");
+      const sessionsDir = path.join(workspaceDir, ".mason", "sessions");
       if (fs.existsSync(sessionsDir)) {
         for (const sessionId of fs.readdirSync(sessionsDir)) {
           const composeFile = path.join(sessionsDir, sessionId, "docker", "docker-compose.yml");
@@ -135,7 +135,7 @@ describe("mcp-proxy-agent: agent↔proxy via CLI", () => {
     // auto-build, proxy startup, credential service, agent container
     cliProcess = spawn(
       "node",
-      [CLAWMASONS_BIN, "run", "--role", "writer", "--agent-type", "mcp", "--proxy-port", "19702"],
+      [MASON_BIN, "run", "--role", "writer", "--agent-type", "mcp", "--proxy-port", "19702"],
       {
         cwd: workspaceDir,
         stdio: ["pipe", "pipe", "pipe"],

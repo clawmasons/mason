@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary
 
-Clawmasons Chapter is currently a single npm package (`@clawmasons/chapter`) that bundles CLI, proxy, schemas, resolver, materializer, compose, and registry code. This PRD defines the restructuring into an npm workspaces monorepo, the replacement of Docker Compose generation with explicit `docker-init` / `run-init` / `run-agent` commands, and the removal of the "member" concept in favor of agent-only packages.
+Clawmasons Chapter is currently a single npm package (`@clawmasons/mason`) that bundles CLI, proxy, schemas, resolver, materializer, compose, and registry code. This PRD defines the restructuring into an npm workspaces monorepo, the replacement of Docker Compose generation with explicit `docker-init` / `run-init` / `run-agent` commands, and the removal of the "member" concept in favor of agent-only packages.
 
 This PRD covers three interrelated changes:
 
@@ -37,7 +37,7 @@ This PRD covers three interrelated changes:
 chapter/
 ├── package.json              # workspaces config, shared dev deps
 ├── packages/
-│   ├── cli/                  # @clawmasons/chapter
+│   ├── cli/                  # @clawmasons/mason
 │   │   ├── package.json
 │   │   ├── src/
 │   │   └── tests/
@@ -57,7 +57,7 @@ chapter/
 
 | Package | npm Name | Purpose |
 |---------|----------|---------|
-| `packages/cli` | `@clawmasons/chapter` | CLI binary — init, add, remove, validate, docker-init, run-init, run-agent, proxy, publish |
+| `packages/cli` | `@clawmasons/mason` | CLI binary — init, add, remove, validate, docker-init, run-init, run-agent, proxy, publish |
 | `packages/proxy` | `@clawmasons/proxy` | Standalone installable proxy server (runs inside Docker containers) |
 | `packages/shared` | `@clawmasons/shared` | Shared TypeScript types, Zod schemas, and utilities used by both cli and proxy |
 
@@ -144,7 +144,7 @@ agent
 
 | Command | Description |
 |---------|-------------|
-| `chapter init` | Initializes a chapter workspace. Creates `.clawmasons/` directory, scaffolds config. |
+| `chapter init` | Initializes a chapter workspace. Creates `.mason/` directory, scaffolds config. |
 | `chapter add <pkg>` | Wraps `npm install`. Validates the package has a `chapter` field. |
 | `chapter remove <pkg>` | Wraps `npm uninstall`. Checks for dependent packages before removing. |
 | `chapter list` | Lists installed packages and their resolved role/task/app tree. |
@@ -196,7 +196,7 @@ A user wants to set up a build system to build Docker images for their chapter.
 
 ### 6.3 Steps
 
-1. Read `.clawmasons/chapter.json` to get `<chapter-full-name>` (format: `<lodge-slug>.<chapter-slug>`)
+1. Read `.mason/chapter.json` to get `<chapter-full-name>` (format: `<lodge-slug>.<chapter-slug>`)
 2. Create `docker/` directory in the chapter root (initialize for TypeScript build system)
 3. If current directory has `package.json`, assume local build environment
 4. Add `install-local` npm script to root `package.json`: `cd docker && npm install ../dist/*.tgz`
@@ -258,13 +258,13 @@ A user wants to initialize a project directory for running chapter agents.
 1. User `cd`s to their project directory (the codebase they want agents to work on)
 2. Runs `chapter run-init`
 3. CLI prompts for the path to the chapter project's `docker/` directory (the build directory from `docker-init`)
-4. Creates `<project-dir>/.clawmasons/` with the following structure:
+4. Creates `<project-dir>/.mason/` with the following structure:
 
 ### 7.3 Generated Structure
 
 ```
 <project-dir>/
-└── .clawmasons/
+└── .mason/
     ├── chapter.json
     ├── logs/
     └── workspace/
@@ -308,9 +308,9 @@ chapter run-agent <agent> <role> [<task>]
 
 ### 8.3 Steps
 
-1. Read `.clawmasons/chapter.json` from the current project directory
+1. Read `.mason/chapter.json` from the current project directory
 2. Generate a session ID (short, since chapter context is already known)
-3. Create `.clawmasons/sessions/<sessionid>/docker/docker-compose.yml`
+3. Create `.mason/sessions/<sessionid>/docker/docker-compose.yml`
 4. Point Docker Compose at correct Dockerfiles from the `docker-build` directory
 5. Start the proxy container detached (background)
 6. Start the agent container with stdio attached (interactive)
@@ -319,7 +319,7 @@ chapter run-agent <agent> <role> [<task>]
 
 ```
 <project-dir>/
-└── .clawmasons/
+└── .mason/
     ├── chapter.json
     ├── logs/
     ├── workspace/
@@ -331,7 +331,7 @@ chapter run-agent <agent> <role> [<task>]
 
 ### 8.5 Docker Compose Behavior
 
-- Proxy runs detached — logs to `.clawmasons/logs/`
+- Proxy runs detached — logs to `.mason/logs/`
 - Agent runs interactively — stdio is connected to the user's terminal
 - When the agent exits, the proxy is torn down
 - Session directory is retained for debugging (logs, compose file)
@@ -385,7 +385,7 @@ Acceptance criteria:
 - Given `npm install` is run at root, then all three packages are linked.
 - Given `npm run build` at root, then all packages build in dependency order.
 
-**REQ-002: `packages/cli` — `@clawmasons/chapter`**
+**REQ-002: `packages/cli` — `@clawmasons/mason`**
 
 The CLI package contains the current CLI code minus proxy server code, plus the new `docker-init`, `run-init`, and `run-agent` commands. The CLI binary name remains `chapter`.
 
@@ -451,11 +451,11 @@ Acceptance criteria:
 
 **REQ-009: `chapter docker-init` — Read Chapter Config**
 
-The `docker-init` command reads `.clawmasons/chapter.json` to determine the chapter's full name (format: `<lodge-slug>.<chapter-slug>`).
+The `docker-init` command reads `.mason/chapter.json` to determine the chapter's full name (format: `<lodge-slug>.<chapter-slug>`).
 
 Acceptance criteria:
-- Given a chapter directory with `.clawmasons/chapter.json` containing a valid chapter name, when `docker-init` is run, then it correctly identifies the chapter scope.
-- Given no `.clawmasons/chapter.json`, when `docker-init` is run, then it errors with a clear message.
+- Given a chapter directory with `.mason/chapter.json` containing a valid chapter name, when `docker-init` is run, then it correctly identifies the chapter scope.
+- Given no `.mason/chapter.json`, when `docker-init` is run, then it errors with a clear message.
 
 **REQ-010: `chapter docker-init` — Create Docker Directory**
 
@@ -507,10 +507,10 @@ Acceptance criteria:
 
 **REQ-016: `chapter run-init` — Create Project Config**
 
-The `run-init` command creates a `.clawmasons/` directory in the current project with `chapter.json`, `logs/`, and `workspace/`.
+The `run-init` command creates a `.mason/` directory in the current project with `chapter.json`, `logs/`, and `workspace/`.
 
 Acceptance criteria:
-- Given a project directory, when `chapter run-init` is run, then `.clawmasons/chapter.json`, `.clawmasons/logs/`, and `.clawmasons/workspace/` are created.
+- Given a project directory, when `chapter run-init` is run, then `.mason/chapter.json`, `.mason/logs/`, and `.mason/workspace/` are created.
 - Given `run-init` is run, then the user is prompted for the path to the chapter docker build directory.
 
 **REQ-017: `chapter run-init` — chapter.json Format**
@@ -518,7 +518,7 @@ Acceptance criteria:
 The generated `chapter.json` contains the chapter identifier, docker registries, and docker build path.
 
 Acceptance criteria:
-- Given `run-init` completes, then `.clawmasons/chapter.json` contains `"chapter"`, `"docker-registries": ["local"]`, and `"docker-build"` fields.
+- Given `run-init` completes, then `.mason/chapter.json` contains `"chapter"`, `"docker-registries": ["local"]`, and `"docker-build"` fields.
 - Given the `docker-build` path, then it is an absolute path to the chapter project's docker directory.
 
 **REQ-018: `chapter run-init` — Idempotent**
@@ -527,14 +527,14 @@ Running `run-init` again does not destroy existing configuration.
 
 Acceptance criteria:
 - Given `run-init` has been run before, when run again, then existing `chapter.json` is not overwritten (or user is prompted to confirm).
-- Given existing sessions in `.clawmasons/sessions/`, when `run-init` is run, then sessions are preserved.
+- Given existing sessions in `.mason/sessions/`, when `run-init` is run, then sessions are preserved.
 
 **REQ-019: `chapter run-agent` — Session ID Generation**
 
 The command generates a short, unique session ID.
 
 Acceptance criteria:
-- Given `run-agent note-taker writer`, then a session directory is created at `.clawmasons/sessions/<sessionid>/`.
+- Given `run-agent note-taker writer`, then a session directory is created at `.mason/sessions/<sessionid>/`.
 - Given multiple invocations, then each generates a unique session ID.
 
 **REQ-020: `chapter run-agent` — Docker Compose Generation**
@@ -542,7 +542,7 @@ Acceptance criteria:
 The command generates a `docker-compose.yml` for the session, pointing at the correct Dockerfiles.
 
 Acceptance criteria:
-- Given `run-agent note-taker writer`, then `.clawmasons/sessions/<sessionid>/docker/docker-compose.yml` is created.
+- Given `run-agent note-taker writer`, then `.mason/sessions/<sessionid>/docker/docker-compose.yml` is created.
 - Given the compose file, then it references Dockerfiles from the `docker-build` path specified in `chapter.json`.
 
 **REQ-021: `chapter run-agent` — Proxy Detached**
@@ -551,7 +551,7 @@ The proxy container starts in detached mode.
 
 Acceptance criteria:
 - Given `run-agent` is run, then the proxy container starts in the background.
-- Given the proxy is running, then its logs are written to `.clawmasons/logs/`.
+- Given the proxy is running, then its logs are written to `.mason/logs/`.
 
 **REQ-022: `chapter run-agent` — Agent Interactive**
 
@@ -566,7 +566,7 @@ Acceptance criteria:
 Session directories are retained after the agent exits for debugging purposes.
 
 Acceptance criteria:
-- Given an agent session has completed, then `.clawmasons/sessions/<sessionid>/` still exists.
+- Given an agent session has completed, then `.mason/sessions/<sessionid>/` still exists.
 - Given the session directory, then it contains the docker-compose.yml and any generated logs.
 
 **REQ-024: Docker Images — `mason` User**
@@ -606,7 +606,7 @@ Acceptance criteria:
 ### 11.1 Package Dependency Graph (Monorepo)
 
 ```
-@clawmasons/chapter (CLI)
+@clawmasons/mason (CLI)
   └─ depends on: @clawmasons/shared
 
 @clawmasons/proxy (Proxy Server)
@@ -640,7 +640,7 @@ const agentChapterFieldSchema = z.object({
 ```
 chapter docker-init
   │
-  ├─1─ Read .clawmasons/chapter.json → get chapter full name
+  ├─1─ Read .mason/chapter.json → get chapter full name
   ├─2─ Create docker/ directory with package.json
   ├─3─ Add install-local script to root package.json
   ├─4─ Run install-local → docker/node_modules/ populated
@@ -659,9 +659,9 @@ chapter docker-init
 ```
 chapter run-agent <agent> <role> [<task>]
   │
-  ├─1─ Read .clawmasons/chapter.json → get docker-build path
+  ├─1─ Read .mason/chapter.json → get docker-build path
   ├─2─ Generate session ID
-  ├─3─ Create .clawmasons/sessions/<sessionid>/docker/
+  ├─3─ Create .mason/sessions/<sessionid>/docker/
   ├─4─ Generate docker-compose.yml
   │      ├── proxy service: references docker/proxy/<role>/Dockerfile
   │      └── agent service: references docker/agent/<agent>/<role>/Dockerfile

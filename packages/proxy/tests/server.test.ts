@@ -1003,7 +1003,7 @@ describe("ChapterProxyServer (readyGate)", () => {
     resolveReady();
   });
 
-  it("listTools returns only credential_request before readyGate, full list after", async () => {
+  it("listTools blocks until readyGate resolves, then returns full list", async () => {
     const port = getPort();
     let resolveReady!: () => void;
     const readyGate = new Promise<void>((r) => { resolveReady = r; });
@@ -1020,19 +1020,12 @@ describe("ChapterProxyServer (readyGate)", () => {
 
     client = await connectClient(port, "streamable-http");
 
-    // Before gate resolves: listTools should return immediately with only credential_request
-    const earlyResult = await client.listTools();
-    expect(earlyResult.tools).toHaveLength(1);
-    expect(earlyResult.tools[0]!.name).toBe("credential_request");
+    // listTools should block until the gate resolves — resolve it after a short delay
+    setTimeout(() => resolveReady(), 50);
 
-    // Resolve gate and let microtask queue flush
-    resolveReady();
-    await new Promise((r) => setTimeout(r, 10));
-
-    // After gate resolves: listTools should return the full tool list
-    const fullResult = await client.listTools();
-    expect(fullResult.tools.length).toBeGreaterThanOrEqual(2);
-    const names = fullResult.tools.map((t) => t.name);
+    const result = await client.listTools();
+    expect(result.tools.length).toBeGreaterThanOrEqual(2);
+    const names = result.tools.map((t) => t.name);
     expect(names).toContain("github_create_pr");
     expect(names).toContain("credential_request");
   });
@@ -1054,8 +1047,6 @@ describe("ChapterProxyServer (readyGate)", () => {
 
     // Resolve the gate before connecting
     resolveReady();
-    // Let microtask queue flush
-    await new Promise((r) => setTimeout(r, 10));
 
     client = await connectClient(port, "streamable-http");
     const result = await client.listTools();

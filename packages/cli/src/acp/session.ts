@@ -74,9 +74,9 @@ export interface AcpSessionConfig {
   acpCommand?: string[];
   /** Declared credential keys for the agent (passed as AGENT_CREDENTIALS env var) */
   credentialKeys?: string[];
-  /** Role-specific Docker build directory (e.g. {projectDir}/.clawmasons/docker/{role-name}/) */
+  /** Role-specific Docker build directory (e.g. {projectDir}/.mason/docker/{role-name}/) */
   dockerBuildDir: string;
-  /** Shared Docker directory containing node_modules (e.g. {projectDir}/.clawmasons/docker/) */
+  /** Shared Docker directory containing node_modules (e.g. {projectDir}/.mason/docker/) */
   dockerDir: string;
 }
 
@@ -160,7 +160,7 @@ export interface AcpSessionDeps {
  * The agent is started later via `docker compose run`.
  *
  * Docker build layout (project-local):
- *   .clawmasons/docker/              ← dockerDir (shared, has node_modules)
+ *   .mason/docker/              ← dockerDir (shared, has node_modules)
  *     {role-name}/                   ← dockerBuildDir
  *       mcp-proxy/Dockerfile
  *       {agent-type}/Dockerfile
@@ -327,7 +327,7 @@ export class AcpSession {
 
     // Generate session directory
     const sessionId = this.deps.generateSessionIdFn();
-    const sessionDir = path.join(projectDir, ".clawmasons", "sessions", sessionId, "docker");
+    const sessionDir = path.join(projectDir, ".mason", "sessions", sessionId, "docker");
     fs.mkdirSync(sessionDir, { recursive: true });
 
     const logsDir = path.join(sessionDir, "logs");
@@ -395,7 +395,7 @@ export class AcpSession {
 
     // Generate session directory
     const sessionId = this.deps.generateSessionIdFn();
-    const sessionDir = path.join(projectDir, ".clawmasons", "sessions", sessionId, "docker");
+    const sessionDir = path.join(projectDir, ".mason", "sessions", sessionId, "docker");
     fs.mkdirSync(sessionDir, { recursive: true });
 
     const logsDir = path.join(sessionDir, "logs");

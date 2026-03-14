@@ -12,28 +12,28 @@ Today, `chapter` is the CLI entry point — an internal-facing name that doesn't
 
 Specific friction points:
 
-- **CLI naming:** The binary is `chapter`, not `clawmasons`. Users install `@clawmasons/chapter-monorepo` but type `chapter` — brand identity is lost.
+- **CLI naming:** The binary is `chapter`, not `mason`. Users install `@clawmasons/chapter-monorepo` but type `chapter` — brand identity is lost.
 - **No bootstrap path:** There is no "initiate" chapter that can create other chapters. A user must manually `chapter init --template X`, `chapter build`, configure their ACP client — multiple steps requiring knowledge of the system.
 - **No lodge concept in runtime:** The `<lodge>.<chapter>` naming exists in workspace metadata, but there is no first-class lodge directory with a charter, config, and multi-chapter management.
 - **Environment variables from ACP clients:** The ACP client `env` block passes environment variables to the spawned process, but the credential-service only checks session overrides (from `CREDENTIAL_SESSION_OVERRIDES`) after initialization. Process-level env vars ARE checked (resolver priority: session overrides > env > keychain > dotenv), but there is no explicit documentation or guarantee that ACP-provided env vars flow correctly through the entire chain.
 - **No agent mounts configuration:** All agent containers mount CWD at `/workspace`. There is no mechanism for a role to declare additional volume mounts (e.g., mounting `LODGE_HOME` for a chapter-creator role that needs to write to the lodge directory).
 - **No per-role base image:** All containers use `node:22-slim`. Roles like `chapter-creator` need heavier images with development tools (python, rust, c compilers).
-- **NPM namespace unprotected:** The `clawmasons` npm package name and related variants are not reserved, leaving the project vulnerable to typosquatting and namespace hijacking.
+- **NPM namespace unprotected:** The `mason` npm package name and related variants are not reserved, leaving the project vulnerable to typosquatting and namespace hijacking.
 
 ---
 
 ## 2. Goals
 
 ### User Goals
-- **Single-command ACP setup:** `npx clawmasons acp --chapter initiate --role chapter-creator` bootstraps everything — lodge, initiate chapter, docker containers — and starts accepting ACP client connections.
+- **Single-command ACP setup:** `npx mason acp --chapter initiate --role chapter-creator` bootstraps everything — lodge, initiate chapter, docker containers — and starts accepting ACP client connections.
 - **Self-bootstrapping agents:** The `initiate` chapter's `chapter-creator` role can analyze a project and create a new chapter for it, complete with roles, tasks, skills, apps, and docker setup.
-- **Brand-aligned CLI:** The binary is `clawmasons`, the npm package is `clawmasons`, the user types `clawmasons` everywhere.
+- **Brand-aligned CLI:** The binary is `mason`, the npm package is `mason`, the user types `mason` everywhere.
 - **Lodge-as-workspace:** A lodge is a persistent directory with a charter, chapters, and configuration — the unit of organization for multi-chapter deployments.
 
 ### Business Goals
-- Secure the `clawmasons` npm namespace and all adjacent names against typosquatting.
+- Secure the `mason` npm namespace and all adjacent names against typosquatting.
 - Enable a zero-to-working-agent flow that can be demonstrated in under 5 minutes.
-- Establish the "initiate" chapter as the entry point for all new clawmasons users.
+- Establish the "initiate" chapter as the entry point for all new mason users.
 
 ---
 
@@ -41,56 +41,56 @@ Specific friction points:
 
 - **Registry-based chapter distribution:** Chapters are built locally. Publishing to npm registry is future work.
 - **Multi-lodge management UI:** The CLI manages one lodge at a time via env vars. A TUI/GUI for multi-lodge is future work.
-- **Windows support:** Lodge paths use POSIX conventions (`~/.clawmasons`).
+- **Windows support:** Lodge paths use POSIX conventions (`~/.mason`).
 - **Custom chapter templates beyond initiate:** Only the `initiate` template is created in this PRD. The existing `note-taker` template remains unchanged.
-- **LLM integration for chapter-creator:** The chapter-creator role provides skills and tasks — the LLM is provided by the ACP client, not by clawmasons.
+- **LLM integration for chapter-creator:** The chapter-creator role provides skills and tasks — the LLM is provided by the ACP client, not by mason.
 
 ---
 
 ## 4. Core Concepts
 
-### 4.1 CLI Rename: `chapter` to `clawmasons`
+### 4.1 CLI Rename: `chapter` to `mason`
 
-The CLI binary changes from `chapter` to `clawmasons`. The npm package name changes from `@clawmasons/chapter-monorepo` (unpublished workspace root) to `clawmasons` (published to npm).
+The CLI binary changes from `chapter` to `mason`. The npm package name changes from `@clawmasons/chapter-monorepo` (unpublished workspace root) to `mason` (published to npm).
 
 **Command restructuring:**
 
 | Old Command | New Command | Notes |
 |---|---|---|
-| `chapter init --name X --template Y` | `clawmasons chapter init --name X --template Y` | Becomes subcommand of `chapter` |
-| `chapter build` | `clawmasons chapter build` | Becomes subcommand of `chapter` |
-| `chapter init-role --role X` | `clawmasons chapter init-role --role X` | Becomes subcommand of `chapter` |
-| `chapter run-agent <agent> <role>` | `clawmasons agent <agent> <role>` | Top-level, renamed |
-| `chapter run-acp-agent --role X` | `clawmasons acp --role X` | Top-level, renamed |
-| `chapter list` | `clawmasons chapter list` | Becomes subcommand of `chapter` |
-| `chapter validate <agent>` | `clawmasons chapter validate <agent>` | Becomes subcommand of `chapter` |
-| `chapter permissions <agent>` | `clawmasons chapter permissions <agent>` | Becomes subcommand of `chapter` |
-| `chapter pack` | `clawmasons chapter pack` | Becomes subcommand of `chapter` |
-| `chapter add <pkg>` | `clawmasons chapter add <pkg>` | Becomes subcommand of `chapter` |
-| `chapter remove <pkg>` | `clawmasons chapter remove <pkg>` | Becomes subcommand of `chapter` |
-| `chapter proxy` | `clawmasons chapter proxy` | Becomes subcommand of `chapter` |
-| _(new)_ | `clawmasons init` | Lodge initialization |
+| `chapter init --name X --template Y` | `mason chapter init --name X --template Y` | Becomes subcommand of `chapter` |
+| `chapter build` | `mason chapter build` | Becomes subcommand of `chapter` |
+| `chapter init-role --role X` | `mason chapter init-role --role X` | Becomes subcommand of `chapter` |
+| `chapter run-agent <agent> <role>` | `mason agent <agent> <role>` | Top-level, renamed |
+| `chapter run-acp-agent --role X` | `mason acp --role X` | Top-level, renamed |
+| `chapter list` | `mason chapter list` | Becomes subcommand of `chapter` |
+| `chapter validate <agent>` | `mason chapter validate <agent>` | Becomes subcommand of `chapter` |
+| `chapter permissions <agent>` | `mason chapter permissions <agent>` | Becomes subcommand of `chapter` |
+| `chapter pack` | `mason chapter pack` | Becomes subcommand of `chapter` |
+| `chapter add <pkg>` | `mason chapter add <pkg>` | Becomes subcommand of `chapter` |
+| `chapter remove <pkg>` | `mason chapter remove <pkg>` | Becomes subcommand of `chapter` |
+| `chapter proxy` | `mason chapter proxy` | Becomes subcommand of `chapter` |
+| _(new)_ | `mason init` | Lodge initialization |
 
 **New top-level commands:**
 
 ```
-clawmasons init              # Initialize a new lodge
-clawmasons agent              # Run agent interactively (was run-agent)
-clawmasons acp                # Start ACP endpoint (was run-acp-agent)
-clawmasons chapter <subcmd>   # All chapter workspace commands
+mason init             # Initialize a new lodge
+mason agent              # Run agent interactively (was run-agent)
+mason acp                # Start ACP endpoint (was run-acp-agent)
+mason chapter<subcmd>   # All chapter workspace commands
 ```
 
 ### 4.2 Lodge
 
-A lodge is a named organizational unit that contains chapters. It has a home directory, a charter, and a configuration entry in `CLAWMASONS_HOME`.
+A lodge is a named organizational unit that contains chapters. It has a home directory, a charter, and a configuration entry in `MASON_HOME`.
 
 **Environment variables:**
 
 | Variable | Default | Description |
 |---|---|---|
-| `CLAWMASONS_HOME` | `~/.clawmasons` | Root directory for all clawmasons runtime state. Can support multiple lodges. |
+| `MASON_HOME` | `~/.mason` | Root directory for all mason runtime state. Can support multiple lodges. |
 | `LODGE` | `$USER` or `"anonymous"` | Lodge name. Used to namespace chapters and config. Falls back to `$USER` env var, then `"anonymous"`. |
-| `LODGE_HOME` | `$CLAWMASONS_HOME/$LODGE` | Parent directory of the lodge. Where the lodge directory structure lives. Can be overridden to point at a project directory (e.g., `~/projects/acme`) for version control. |
+| `LODGE_HOME` | `$MASON_HOME/$LODGE` | Parent directory of the lodge. Where the lodge directory structure lives. Can be overridden to point at a project directory (e.g., `~/projects/acme`) for version control. |
 
 **Lodge directory structure:**
 
@@ -98,23 +98,23 @@ A lodge is a named organizational unit that contains chapters. It has a home dir
 LODGE_HOME/
   CHARTER.md                    # Constitution, rights, and laws for agents in this lodge
   chapters/
-    initiate/                   # Bootstrap chapter (created by clawmasons init)
+    initiate/                   # Bootstrap chapter (created by mason init)
       package.json              # Workspace root
       agents/
       roles/
       tasks/
       skills/
       apps/
-      .clawmasons/
+      .mason/
         chapter.json
     <user-created-chapter>/     # Chapters created by chapter-creator
       ...
 ```
 
-**CLAWMASONS_HOME directory structure:**
+**MASON_HOME directory structure:**
 
 ```
-CLAWMASONS_HOME/
+MASON_HOME/
   config.json                   # Lodge registry: { "<lodge>": { "home": "<LODGE_HOME>" } }
   chapters.json                 # Existing: registry of initialized chapter/roles (unchanged)
   .gitignore
@@ -133,7 +133,7 @@ CLAWMASONS_HOME/
     "home": "/Users/dev/projects/acme"
   },
   "personal": {
-    "home": "~/.clawmasons/personal"
+    "home": "~/.mason/personal"
   }
 }
 ```
@@ -142,7 +142,7 @@ CLAWMASONS_HOME/
 
 A governance document placed at `LODGE_HOME/CHARTER.md`. This is a base constitution defining rights, laws, and constraints that all agents in the lodge must abide by. It is loaded as context for every agent session in the lodge.
 
-The CHARTER.md template lives in the CLI package at `packages/cli/templates/charter/CHARTER.md` and is copied during `clawmasons init`.
+The CHARTER.md template lives in the CLI package at `packages/cli/templates/charter/CHARTER.md` and is copied during `mason init`.
 
 Content should include:
 - Agent behavioral boundaries (what agents may and may not do)
@@ -152,7 +152,7 @@ Content should include:
 
 ### 4.4 Initiate Chapter
 
-The `initiate` chapter is a special chapter template that provides the `chapter-creator` role. It is the bootstrap mechanism: when a user first sets up clawmasons, this chapter is created automatically and provides the tools to create additional chapters.
+The `initiate` chapter is a special chapter template that provides the `chapter-creator` role. It is the bootstrap mechanism: when a user first sets up mason, this chapter is created automatically and provides the tools to create additional chapters.
 
 **Template location:** `packages/cli/templates/initiate/`
 
@@ -207,7 +207,7 @@ Roles can declare additional volume mounts for agent containers beyond the defau
 
 | Field | Type | Description |
 |---|---|---|
-| `source` | string | Host path. Supports env var interpolation: `${LODGE_HOME}`, `${CLAWMASONS_HOME}`, `${LODGE}`. |
+| `source` | string | Host path. Supports env var interpolation: `${LODGE_HOME}`, `${MASON_HOME}`, `${LODGE}`. |
 | `target` | string | Container path. Supports same env var interpolation. |
 | `readonly` | boolean | If true, mount is read-only. Default: false. |
 
@@ -253,7 +253,7 @@ Roles can declare a custom Docker base image instead of the default `node:22-sli
 
 ### 4.7 ACP Client Configuration
 
-The ACP client configuration block for clawmasons:
+The ACP client configuration block for mason:
 
 ```json
 {
@@ -262,16 +262,16 @@ The ACP client configuration block for clawmasons:
       "type": "custom",
       "command": "npx",
       "args": [
-        "clawmasons",
+        "mason",
         "acp",
         "--chapter", "initiate",
         "--role", "chapter-creator",
         "--init-agent", "pi"
       ],
       "env": {
-        "CLAWMASONS_HOME": "~/.clawmasons",
+        "MASON_HOME": "~/.mason",
         "LODGE": "acme",
-        "LODGE_HOME": "~/.clawmasons/acme",
+        "LODGE_HOME": "~/.mason/acme",
         "OPEN_ROUTER_KEY": "$OPENROUTER_API_KEY"
       }
     }
@@ -279,27 +279,27 @@ The ACP client configuration block for clawmasons:
 }
 ```
 
-Environment variables in the `env` block are set as process environment variables on the spawned `npx clawmasons acp` process. The credential-service resolver already checks `process.env` as priority 1 (after session overrides), so these values are available to agents requesting credentials.
+Environment variables in the `env` block are set as process environment variables on the spawned `npx mason acp` process. The credential-service resolver already checks `process.env` as priority 1 (after session overrides), so these values are available to agents requesting credentials.
 
 ---
 
 ## 5. User Stories
 
-**US-1:** As a new user, I want to run `npx clawmasons acp --chapter initiate --role chapter-creator` and have it bootstrap a lodge, create the initiate chapter, build it, and start accepting ACP connections — so I can start using clawmasons with zero prior setup.
+**US-1:** As a new user, I want to run `npx mason acp --chapter initiate --role chapter-creator` and have it bootstrap a lodge, create the initiate chapter, build it, and start accepting ACP connections — so I can start using mason with zero prior setup.
 
 **US-2:** As a developer, I want the `chapter-creator` agent to analyze my project's existing MCP servers, slash commands, and tools, and generate a complete chapter for it — so I don't have to manually create package.json files for every app, task, skill, and role.
 
 **US-3:** As a team lead, I want to set `LODGE_HOME` to a directory in my project repo — so the lodge configuration and chapters can be version-controlled and shared with my team.
 
-**US-4:** As a developer using Zed, I want to configure clawmasons as an ACP agent server with environment variables — so credentials like `OPENROUTER_API_KEY` flow through to the agent without manual `.env` file setup.
+**US-4:** As a developer using Zed, I want to configure mason as an ACP agent server with environment variables — so credentials like `OPENROUTER_API_KEY` flow through to the agent without manual `.env` file setup.
 
 **US-5:** As a chapter author, I want to declare additional volume mounts in my role's `package.json` — so the agent container can access directories beyond the project workspace (e.g., the lodge home for creating new chapters).
 
 **US-6:** As a chapter author, I want to specify a custom base Docker image and additional apt packages for my role — so agents in that role have access to development tools like python, rust, and C compilers.
 
-**US-7:** As a user, I want to type `clawmasons` instead of `chapter` — so the CLI matches the product name.
+**US-7:** As a user, I want to type `mason` instead of `chapter` — so the CLI matches the product name.
 
-**US-8:** As a security-conscious publisher, I want placeholder packages published on npm for all clawmasons-adjacent names — so attackers cannot publish malicious packages under those names.
+**US-8:** As a security-conscious publisher, I want placeholder packages published on npm for all mason-adjacent names — so attackers cannot publish malicious packages under those names.
 
 ---
 
@@ -309,9 +309,9 @@ Environment variables in the `env` block are set as process environment variable
 
 ---
 
-**REQ-001: Rename CLI Binary from `chapter` to `clawmasons`**
+**REQ-001: Rename CLI Binary from `chapter` to `mason`**
 
-The CLI binary registered in `packages/cli/package.json` changes from `chapter` to `clawmasons`.
+The CLI binary registered in `packages/cli/package.json` changes from `chapter` to `mason`.
 
 **Current state:**
 - `packages/cli/package.json` line 7: `"bin": { "chapter": "dist/cli/bin.js" }`
@@ -322,23 +322,23 @@ The CLI binary registered in `packages/cli/package.json` changes from `chapter` 
 
 **Changes required:**
 
-1. `packages/cli/package.json`: Change bin from `"chapter"` to `"clawmasons"`
-2. `packages/cli/src/cli/index.ts`: Change program name from `"chapter"` to `"clawmasons"`
+1. `packages/cli/package.json`: Change bin from `"chapter"` to `"mason"`
+2. `packages/cli/src/cli/index.ts`: Change program name from `"chapter"` to `"mason"`
 3. `packages/cli/src/cli/commands/index.ts`: Restructure command registration:
    - Top-level: `init`, `agent`, `acp`
    - Subcommand group `chapter`: `init` (chapter workspace init), `build`, `init-role`, `list`, `validate`, `permissions`, `pack`, `add`, `remove`, `proxy`
-4. `packages/cli/src/generator/proxy-dockerfile.ts` line 49: Change entrypoint from `chapter` to `clawmasons`
-5. `bin/chapter.js`: Rename to `bin/clawmasons.js` (or update path)
+4. `packages/cli/src/generator/proxy-dockerfile.ts` line 49: Change entrypoint from `chapter` to `mason`
+5. `bin/chapter.js`: Rename to `bin/mason.js` (or update path)
 6. All E2E tests and helpers: Update `CHAPTER_BIN` path
-7. Help text, error messages, and log output: Replace "chapter" with "clawmasons" where it refers to the CLI binary name
+7. Help text, error messages, and log output: Replace "chapter" with "mason" where it refers to the CLI binary name
 
 **Backward compatibility:** The old `chapter` binary name is NOT preserved. This is a breaking rename — no deprecation shim.
 
 **Acceptance criteria:**
-- `npx clawmasons --help` shows the new command structure with `init`, `agent`, `acp`, `chapter` subgroups.
-- `npx clawmasons chapter build` behaves identically to the old `chapter build`.
-- `npx clawmasons agent note-taker writer` behaves identically to the old `chapter run-agent note-taker writer`.
-- `npx clawmasons acp --role writer` behaves identically to the old `chapter run-acp-agent --role writer`.
+- `npx mason --help` shows the new command structure with `init`, `agent`, `acp`, `chapter` subgroups.
+- `npx mason chapter build` behaves identically to the old `chapter build`.
+- `npx mason agent note-taker writer` behaves identically to the old `chapter run-agent note-taker writer`.
+- `npx mason acp --role writer` behaves identically to the old `chapter run-acp-agent --role writer`.
 - All E2E tests pass with the new binary name.
 
 ---
@@ -350,37 +350,37 @@ Commands are reorganized into a hierarchy with three top-level commands and a `c
 **Top-level commands:**
 
 ```
-clawmasons init                              # Lodge initialization (NEW)
-clawmasons agent <agent> <role>              # Run agent interactively (was run-agent)
-clawmasons acp --role <role> [options]       # Start ACP endpoint (was run-acp-agent)
-clawmasons chapter <subcommand>              # Chapter workspace commands
+mason init                             # Lodge initialization (NEW)
+mason agent <agent> <role>              # Run agent interactively (was run-agent)
+mason acp --role <role> [options]       # Start ACP endpoint (was run-acp-agent)
+mason chapter<subcommand>              # Chapter workspace commands
 ```
 
-**`clawmasons chapter` subcommands (all existing, reorganized):**
+**`mason chapter` subcommands (all existing, reorganized):**
 
 ```
-clawmasons chapter init --name <lodge.chapter> [--template <T>]
-clawmasons chapter build [<agent>]
-clawmasons chapter init-role --role <name> [--agent <name>] [--target-dir <path>]
-clawmasons chapter list [--json]
-clawmasons chapter validate <agent> [--json]
-clawmasons chapter permissions <agent> [--json]
-clawmasons chapter pack
-clawmasons chapter add <pkg> [npmArgs...]
-clawmasons chapter remove <pkg> [--force] [npmArgs...]
-clawmasons chapter proxy [options]
+mason chapter init --name <lodge.chapter> [--template <T>]
+mason chapter build [<agent>]
+mason chapter init-role --role <name> [--agent <name>] [--target-dir <path>]
+mason chapter list [--json]
+mason chapter validate <agent> [--json]
+mason chapter permissions <agent> [--json]
+mason chapter pack
+mason chapter add <pkg> [npmArgs...]
+mason chapter remove <pkg> [--force] [npmArgs...]
+mason chapter proxy [options]
 ```
 
 **Implementation:**
 
 In `packages/cli/src/cli/index.ts`:
 ```typescript
-const program = new Command("clawmasons");
+const program = new Command("mason");
 
 // Top-level commands
-registerInitCommand(program);        // clawmasons init
-registerAgentCommand(program);       // clawmasons agent (was run-agent)
-registerAcpCommand(program);         // clawmasons acp (was run-acp-agent)
+registerInitCommand(program);        // mason init
+registerAgentCommand(program);       // mason agent (was run-agent)
+registerAcpCommand(program);         // mason acp (was run-acp-agent)
 
 // Chapter subcommand group
 const chapterCmd = program.command("chapter")
@@ -388,13 +388,13 @@ const chapterCmd = program.command("chapter")
 registerChapterSubcommands(chapterCmd);  // init, build, init-role, list, validate, etc.
 ```
 
-**`clawmasons agent` command:**
-- Signature: `clawmasons agent <agent> <role>`
+**`mason agent` command:**
+- Signature: `mason agent <agent> <role>`
 - Identical behavior to current `run-agent` command
 - Source: Rename `run-agent.ts` registration, keep implementation unchanged
 
-**`clawmasons acp` command:**
-- Signature: `clawmasons acp --role <role> [--agent <name>] [--port <n>] [--proxy-port <n>] [--chapter <name>] [--init-agent <name>]`
+**`mason acp` command:**
+- Signature: `mason acp --role <role> [--agent <name>] [--port <n>] [--proxy-port <n>] [--chapter <name>] [--init-agent <name>]`
 - New options:
   - `--chapter <name>`: Chapter name to use. If combined with `initiate` chapter, triggers lodge init flow.
   - `--init-agent <name>`: Agent to use for the initiate chapter (e.g., `pi`). Only valid with `--chapter initiate`.
@@ -405,46 +405,46 @@ registerChapterSubcommands(chapterCmd);  // init, build, init-role, list, valida
 - `docker-init` — already internal to `build`, fully removed as CLI entry
 
 **Acceptance criteria:**
-- `clawmasons --help` shows `init`, `agent`, `acp`, `chapter` commands.
-- `clawmasons chapter --help` shows all subcommands.
-- `clawmasons agent <agent> <role>` works identically to old `chapter run-agent`.
-- `clawmasons acp --role <role>` works identically to old `chapter run-acp-agent`.
+- `mason --help` shows `init`, `agent`, `acp`, `chapter` commands.
+- `mason chapter--help` shows all subcommands.
+- `mason agent <agent> <role>` works identically to old `chapter run-agent`.
+- `mason acp --role <role>` works identically to old `chapter run-acp-agent`.
 - Old command names (`run-agent`, `run-acp-agent`) are not recognized.
 
 ---
 
-**REQ-003: `clawmasons init` — Lodge Initialization**
+**REQ-003: `mason init` — Lodge Initialization**
 
 New top-level command that initializes a lodge directory structure.
 
 **Signature:**
 ```
-clawmasons init [--lodge <name>] [--lodge-home <path>] [--home <path>]
+mason init [--lodge <name>] [--lodge-home <path>] [--home <path>]
 ```
 
 **Options:**
 - `--lodge <name>`: Lodge name. Overrides `LODGE` env var.
 - `--lodge-home <path>`: Lodge home directory. Overrides `LODGE_HOME` env var.
-- `--home <path>`: Clawmasons home directory. Overrides `CLAWMASONS_HOME` env var.
+- `--home <path>`: Clawmasons home directory. Overrides `MASON_HOME` env var.
 
 **Environment variable resolution (in order of priority):**
 
 | Variable | CLI Flag | Env Var | Default |
 |---|---|---|---|
 | Lodge name | `--lodge` | `LODGE` | `$USER` or `"anonymous"` |
-| Lodge home | `--lodge-home` | `LODGE_HOME` | `$CLAWMASONS_HOME/$LODGE` |
-| Clawmasons home | `--home` | `CLAWMASONS_HOME` | `~/.clawmasons` |
+| Lodge home | `--lodge-home` | `LODGE_HOME` | `$MASON_HOME/$LODGE` |
+| Clawmasons home | `--home` | `MASON_HOME` | `~/.mason` |
 
 **Behavior:**
 
 1. **Resolve variables** per the table above.
 
-2. **Check CLAWMASONS_HOME:**
-   - If `CLAWMASONS_HOME` directory does not exist, create it.
-   - If `CLAWMASONS_HOME/config.json` does not exist, create it with `{}`.
+2. **Check MASON_HOME:**
+   - If `MASON_HOME` directory does not exist, create it.
+   - If `MASON_HOME/config.json` does not exist, create it with `{}`.
 
 3. **Check if lodge already exists:**
-   - Read `CLAWMASONS_HOME/config.json`.
+   - Read `MASON_HOME/config.json`.
    - If an entry for `<lodge>` exists AND `LODGE_HOME/chapters` directory exists:
      - Print: "Lodge '<lodge>' already initialized at <LODGE_HOME>. Skipping init."
      - Return (idempotent — not an error).
@@ -458,34 +458,34 @@ clawmasons init [--lodge <name>] [--lodge-home <path>] [--home <path>]
    - Only if `LODGE_HOME/CHARTER.md` does not already exist (do not overwrite user edits).
 
 6. **Update config.json:**
-   - Read `CLAWMASONS_HOME/config.json`.
+   - Read `MASON_HOME/config.json`.
    - Add/update entry: `{ "<lodge>": { "home": "<LODGE_HOME>" } }`.
-   - Write back to `CLAWMASONS_HOME/config.json`.
+   - Write back to `MASON_HOME/config.json`.
 
 7. **Print summary:**
    ```
    Lodge '<lodge>' initialized at <LODGE_HOME>
 
    Next steps:
-     clawmasons acp --chapter initiate --role chapter-creator
+     mason acp --chapter initiate --role chapter-creator
    ```
 
 **Acceptance criteria:**
-- Given `CLAWMASONS_HOME` does not exist, `clawmasons init` creates it with `config.json`.
-- Given `LODGE=acme` and default `LODGE_HOME`, creates `~/.clawmasons/acme/` with `CHARTER.md` and `chapters/`.
+- Given `MASON_HOME` does not exist, `mason init` creates it with `config.json`.
+- Given `LODGE=acme` and default `LODGE_HOME`, creates `~/.mason/acme/` with `CHARTER.md` and `chapters/`.
 - Given the lodge already exists with a `chapters/` directory, the command exits cleanly without error.
 - Given `--lodge-home ~/projects/acme`, the `config.json` entry points to that custom path.
 - `CHARTER.md` is not overwritten if it already exists.
 
 ---
 
-**REQ-004: `clawmasons acp` — Initiate Chapter Bootstrap Flow**
+**REQ-004: `mason acp` — Initiate Chapter Bootstrap Flow**
 
-When `clawmasons acp` is invoked with `--chapter initiate` and `--role chapter-creator`, it runs a bootstrap flow before the standard ACP startup.
+When `mason acp` is invoked with `--chapter initiate` and `--role chapter-creator`, it runs a bootstrap flow before the standard ACP startup.
 
 **Signature:**
 ```
-clawmasons acp --chapter initiate --role chapter-creator [--init-agent pi] [--port 3001] [--proxy-port 3000]
+mason acp --chapter initiate --role chapter-creator [--init-agent pi] [--port 3001] [--proxy-port 3000]
 ```
 
 **New options (on the `acp` command):**
@@ -497,17 +497,17 @@ clawmasons acp --chapter initiate --role chapter-creator [--init-agent pi] [--po
 
 **Bootstrap flow (runs before standard ACP startup):**
 
-1. **Run `clawmasons init`** (REQ-003) to ensure lodge exists.
-   - Uses env vars `CLAWMASONS_HOME`, `LODGE`, `LODGE_HOME` (same resolution).
+1. **Run `mason init`** (REQ-003) to ensure lodge exists.
+   - Uses env vars `MASON_HOME`, `LODGE`, `LODGE_HOME` (same resolution).
    - Idempotent — skips if already initialized.
 
 2. **Check if initiate chapter exists:**
    - Look for `LODGE_HOME/chapters/initiate/` directory.
-   - If it exists AND has a valid `.clawmasons/chapter.json`, skip to step 5.
+   - If it exists AND has a valid `.mason/chapter.json`, skip to step 5.
 
 3. **Create initiate chapter:**
    - Create `LODGE_HOME/chapters/initiate/` directory.
-   - Run `clawmasons chapter init --name <lodge>.initiate --template initiate` with CWD set to `LODGE_HOME/chapters/initiate/`.
+   - Run `mason chapter init --name <lodge>.initiate --template initiate` with CWD set to `LODGE_HOME/chapters/initiate/`.
    - This copies the `initiate` template and runs `npm install`.
 
 4. **Configure agent for --init-agent:**
@@ -516,12 +516,12 @@ clawmasons acp --chapter initiate --role chapter-creator [--init-agent pi] [--po
    - If `--init-agent` specifies a different agent slug, update the agent's runtime configuration accordingly.
 
 5. **Build the initiate chapter:**
-   - Run `clawmasons chapter build` with CWD set to `LODGE_HOME/chapters/initiate/`.
+   - Run `mason chapter build` with CWD set to `LODGE_HOME/chapters/initiate/`.
    - This runs: resolve > pack > docker-init (generates Dockerfiles and docker/ directory).
 
 6. **Continue standard ACP startup:**
    - The standard `run-acp-agent` flow (from current `packages/cli/src/cli/commands/run-acp-agent.ts`) continues:
-     - Resolve role from `CLAWMASONS_HOME/chapters.json` (auto-init-role if needed)
+     - Resolve role from `MASON_HOME/chapters.json` (auto-init-role if needed)
      - Discover and resolve agent
      - Start infrastructure (proxy + credential-service)
      - Start ACP bridge
@@ -529,7 +529,7 @@ clawmasons acp --chapter initiate --role chapter-creator [--init-agent pi] [--po
    - CWD for the chapter workspace is `LODGE_HOME/chapters/initiate/`.
 
 **Acceptance criteria:**
-- Given a fresh system with no `~/.clawmasons`, `clawmasons acp --chapter initiate --role chapter-creator` creates the lodge, initiate chapter, builds it, and starts the ACP endpoint.
+- Given a fresh system with no `~/.mason`, `mason acp --chapter initiate --role chapter-creator` creates the lodge, initiate chapter, builds it, and starts the ACP endpoint.
 - Given the initiate chapter already exists and is built, the command skips init/build and proceeds directly to ACP startup.
 - Given `--init-agent pi`, the agent uses `pi-coding-agent` runtime.
 - The ACP endpoint is reachable on port 3001 (default) after startup.
@@ -542,8 +542,8 @@ clawmasons acp --chapter initiate --role chapter-creator [--init-agent pi] [--po
 Ensure environment variables from the ACP client configuration's `env` block flow correctly to the credential-service and are available to agents.
 
 **Current behavior (mostly correct, needs verification):**
-1. ACP client spawns `npx clawmasons acp ...` with `env` block set as process environment variables.
-2. The `clawmasons acp` process inherits these env vars in `process.env`.
+1. ACP client spawns `npx mason acp ...` with `env` block set as process environment variables.
+2. The `mason acp` process inherits these env vars in `process.env`.
 3. The credential-service container receives `CREDENTIAL_SESSION_OVERRIDES` (from the `extractCredentials()` rewriter).
 4. The credential resolver checks: session overrides > `process.env` > keychain > `.env`.
 
@@ -558,7 +558,7 @@ Ensure environment variables from the ACP client configuration's `env` block flo
    - Alternatively (preferred): Use `CREDENTIAL_SESSION_OVERRIDES` to pass ALL env vars from the ACP client's `env` block. This already works via `extractCredentials()` in `packages/cli/src/acp/rewriter.ts` — but it only extracts from matched MCP server configs, not from the process env.
 
 2. **Enhance credential resolver to also forward process-level env vars as session overrides:**
-   - In the `clawmasons acp` command, before starting infrastructure:
+   - In the `mason acp` command, before starting infrastructure:
      - Collect all env vars from `process.env` that match any agent's `credentials` array.
      - Merge these into the `credentials` object passed to `AcpSession`.
      - This ensures they appear in `CREDENTIAL_SESSION_OVERRIDES` and have highest priority in the resolver.
@@ -616,7 +616,7 @@ const RoleChapterFieldSchema = z.object({
 
 3. **Supported interpolation variables:**
    - `${LODGE_HOME}` — resolved from env var
-   - `${CLAWMASONS_HOME}` — resolved from env var
+   - `${MASON_HOME}` — resolved from env var
    - `${LODGE}` — resolved from env var
    - `${CWD}` — resolved at runtime to the session's CWD
 
@@ -786,7 +786,7 @@ Create the `initiate` chapter template at `packages/cli/templates/initiate/`.
    - Once the plan is accepted by the user, execute it:
      - Create the chapter directory at `LODGE_HOME/chapters/<chapter-name>/`
      - Scaffold all chapter artifacts (package.json files for apps, tasks, skills, roles, agents)
-     - Run `clawmasons chapter build` to generate Docker artifacts
+     - Run `mason chapter build` to generate Docker artifacts
    - After completion, tell the user they can start a new ACP session to test the chapter, explaining that all skills, commands, and MCP servers will come from the chapter definitions. If anything is missing, return to this bootstrap session and paste the error.
 
 6. **Skill: `skills/create-chapter/package.json`:**
@@ -832,9 +832,9 @@ Create the `initiate` chapter template at `packages/cli/templates/initiate/`.
    Note: The filesystem root is `/home/mason` (the agent's home directory) to allow access to both the workspace and the lodge mount.
 
 **Acceptance criteria:**
-- `clawmasons chapter init --name acme.initiate --template initiate` scaffolds a complete chapter workspace.
+- `mason chapter init --name acme.initiate --template initiate` scaffolds a complete chapter workspace.
 - All `{{projectScope}}` placeholders are correctly substituted.
-- `clawmasons chapter build` succeeds on the scaffolded workspace.
+- `mason chapter build` succeeds on the scaffolded workspace.
 - The generated Dockerfile for the chapter-creator role uses `node:22-bookworm` and installs the specified apt packages.
 - The `create-chapter` task prompt is comprehensive enough for an LLM to follow the workflow.
 
@@ -857,7 +857,7 @@ The CHARTER.md establishes governance rules for all agents in the lodge:
 - **Audit Trail:** All tool invocations are logged by the proxy. Agents must not attempt to circumvent logging.
 
 **Acceptance criteria:**
-- `clawmasons init` copies CHARTER.md to `LODGE_HOME/CHARTER.md`.
+- `mason init` copies CHARTER.md to `LODGE_HOME/CHARTER.md`.
 - The document is readable and provides clear governance guidelines.
 - The document is not overwritten if it already exists.
 
@@ -871,13 +871,13 @@ Publish minimal placeholder packages to npm to prevent namespace hijacking.
 
 | Package Name | Type |
 |---|---|
-| `clawmasons` | COMING SOON — main CLI package (will later contain the actual CLI) |
+| `mason` | COMING SOON — main CLI package (will later contain the actual CLI) |
 | `@clawmasons/acp` | Placeholder |
 | `@clawmasons/mcp-proxy` | Placeholder |
-| `clawmasons-ai` | Placeholder |
-| `clawmasons-com` | Placeholder |
-| `clawmasons.ai` | Placeholder (if npm allows dots) |
-| `clawmasons.com` | Placeholder (if npm allows dots) |
+| `mason-ai` | Placeholder |
+| `mason-com` | Placeholder |
+| `mason.ai` | Placeholder (if npm allows dots) |
+| `mason.com` | Placeholder (if npm allows dots) |
 | `clawmason` | Placeholder |
 | `clawmason.ai` | Placeholder (if npm allows dots) |
 | `clawmason.com` | Placeholder (if npm allows dots) |
@@ -902,7 +902,7 @@ Publish minimal placeholder packages to npm to prevent namespace hijacking.
     "type": "git",
     "url": "https://github.com/clawmasons/chapter"
   },
-  "keywords": ["clawmasons", "placeholder"]
+  "keywords": ["mason", "placeholder"]
 }
 ```
 
@@ -912,16 +912,16 @@ Publish minimal placeholder packages to npm to prevent namespace hijacking.
 
 This is a placeholder package for the Clawmasons project.
 
-For the official CLI, install: `npm install clawmasons`
+For the official CLI, install: `npm install mason`
 
 Learn more: https://github.com/clawmasons
 ```
 
-**COMING SOON package (clawmasons):**
+**COMING SOON package (mason):**
 
 Same structure but with a more informative README:
 ```markdown
-# clawmasons
+# mason
 
 AI agent packaging, governance, and runtime orchestration.
 
@@ -932,8 +932,8 @@ Coming soon. Follow https://github.com/clawmasons for updates.
 
 **Acceptance criteria:**
 - Each placeholder package can be published via `npm publish` from its directory.
-- Each placeholder's README directs users to the official `clawmasons` package.
-- The `clawmasons` package README says "Coming Soon" with a link to the GitHub repo.
+- Each placeholder's README directs users to the official `mason` package.
+- The `mason` package README says "Coming Soon" with a link to the GitHub repo.
 - Placeholder packages are NOT included in the monorepo's `workspaces` array.
 - A publish script (`scripts/publish-placeholders.sh`) iterates over all placeholder directories and publishes them.
 
@@ -943,11 +943,11 @@ Coming soon. Follow https://github.com/clawmasons for updates.
 
 ---
 
-**REQ-011: `--chapter` and `--role` Auto-Resolution for `clawmasons acp`**
+**REQ-011: `--chapter` and `--role` Auto-Resolution for `mason acp`**
 
-When `clawmasons acp` is called without `--chapter` or `--role`, attempt to auto-detect from the current directory:
+When `mason acp` is called without `--chapter` or `--role`, attempt to auto-detect from the current directory:
 
-1. If CWD contains `.clawmasons/chapter.json`, read the chapter name.
+1. If CWD contains `.mason/chapter.json`, read the chapter name.
 2. If the chapter has exactly one role, use it.
 3. If the chapter has multiple roles, prompt the user to select.
 
@@ -955,9 +955,9 @@ This preserves backward compatibility with the current `run-acp-agent` behavior 
 
 ---
 
-**REQ-012: `clawmasons acp` Help Text with ACP Client Config Example**
+**REQ-012: `mason acp` Help Text with ACP Client Config Example**
 
-The `--help` output for `clawmasons acp` should include a complete ACP client configuration example showing:
+The `--help` output for `mason acp` should include a complete ACP client configuration example showing:
 - The `agent_servers` JSON block
 - All supported environment variables
 - The bootstrap flow explanation
@@ -981,24 +981,24 @@ This is referenced by the `create-chapter` task prompt and used by the agent whe
 
 ## 7. Sequence Diagrams
 
-### 7.1 `clawmasons acp --chapter initiate` — Full Bootstrap Flow
+### 7.1 `mason acp --chapter initiate` — Full Bootstrap Flow
 
 ```
-User                     clawmasons CLI              CLAWMASONS_HOME              LODGE_HOME
+User                     mason CLI              MASON_HOME              LODGE_HOME
   │                           │                           │                           │
-  │  clawmasons acp           │                           │                           │
+  │  mason acp           │                           │                           │
   │  --chapter initiate       │                           │                           │
   │  --role chapter-creator   │                           │                           │
   │──────────────────────────►│                           │                           │
   │                           │                           │                           │
   │              ┌────────────┴────────────┐              │                           │
   │              │ 1. Resolve env vars:    │              │                           │
-  │              │    CLAWMASONS_HOME      │              │                           │
+  │              │    MASON_HOME      │              │                           │
   │              │    LODGE                │              │                           │
   │              │    LODGE_HOME           │              │                           │
   │              └────────────┬────────────┘              │                           │
   │                           │                           │                           │
-  │                           │  Run `clawmasons init`    │                           │
+  │                           │  Run `mason init`    │                           │
   │                           │──────────────────────────►│                           │
   │                           │                           │                           │
   │                           │  Check config.json        │                           │
@@ -1053,23 +1053,23 @@ User                     clawmasons CLI              CLAWMASONS_HOME            
   │◄──────────────────────────│                           │                           │
 ```
 
-### 7.2 `clawmasons init` Flow
+### 7.2 `mason init` Flow
 
 ```
-User                     clawmasons CLI              Filesystem
+User                     mason CLI              Filesystem
   │                           │                        │
-  │  clawmasons init          │                        │
+  │  mason init         │                        │
   │  --lodge acme             │                        │
   │──────────────────────────►│                        │
   │                           │                        │
   │              ┌────────────┴──────────┐             │
   │              │ Resolve:              │             │
-  │              │ CLAWMASONS_HOME       │             │
+  │              │ MASON_HOME       │             │
   │              │ LODGE = "acme"        │             │
   │              │ LODGE_HOME            │             │
   │              └────────────┬──────────┘             │
   │                           │                        │
-  │                           │ mkdir CLAWMASONS_HOME  │
+  │                           │ mkdir MASON_HOME  │
   │                           │ (if needed)            │
   │                           │───────────────────────►│
   │                           │                        │
@@ -1127,23 +1127,23 @@ Docker Compose                 Agent Container
 
 ### UC-1: First-Time User — Zero to Working Agent
 
-**Actor:** Developer new to clawmasons
+**Actor:** Developer new to mason
 
-**Precondition:** Node.js and Docker installed. No `~/.clawmasons` directory exists.
+**Precondition:** Node.js and Docker installed. No `~/.mason` directory exists.
 
 **Flow:**
-1. Developer configures ACP client (e.g., Zed) with the clawmasons agent server config block (REQ-004 example), setting `LODGE=myproject` and `OPEN_ROUTER_KEY=$OPENROUTER_API_KEY`.
-2. ACP client spawns `npx clawmasons acp --chapter initiate --role chapter-creator --init-agent pi`.
-3. CLI resolves env vars: `CLAWMASONS_HOME=~/.clawmasons`, `LODGE=myproject`, `LODGE_HOME=~/.clawmasons/myproject`.
-4. `clawmasons init` creates `~/.clawmasons/`, `config.json`, `~/.clawmasons/myproject/`, `CHARTER.md`, `chapters/`.
-5. `chapter init --template initiate` scaffolds `~/.clawmasons/myproject/chapters/initiate/`.
+1. Developer configures ACP client (e.g., Zed) with the mason agent server config block (REQ-004 example), setting `LODGE=myproject` and `OPEN_ROUTER_KEY=$OPENROUTER_API_KEY`.
+2. ACP client spawns `npx mason acp --chapter initiate --role chapter-creator --init-agent pi`.
+3. CLI resolves env vars: `MASON_HOME=~/.mason`, `LODGE=myproject`, `LODGE_HOME=~/.mason/myproject`.
+4. `mason init` creates `~/.mason/`, `config.json`, `~/.mason/myproject/`, `CHARTER.md`, `chapters/`.
+5. `chapter init --template initiate` scaffolds `~/.mason/myproject/chapters/initiate/`.
 6. `chapter build` generates Docker artifacts.
 7. ACP startup: init-role, start infrastructure, start bridge on port 3001.
 8. ACP client connects. Developer opens a project directory. `session/new` arrives with CWD.
 9. Agent container starts with project CWD mounted at `/home/mason/workspace/project` and lodge at `/home/mason/myproject`.
 10. Developer interacts with the chapter-creator agent, which analyzes the project and creates a new chapter.
 
-**Postcondition:** New chapter exists at `~/.clawmasons/myproject/chapters/<new-chapter>/`, built and ready for use.
+**Postcondition:** New chapter exists at `~/.mason/myproject/chapters/<new-chapter>/`, built and ready for use.
 
 ### UC-2: Chapter Creator — Analyze Project and Create Chapter
 
@@ -1170,7 +1170,7 @@ Docker Compose                 Agent Container
 5. Developer reviews and approves the plan.
 6. Agent executes:
    a. Creates `LODGE_HOME/chapters/<name>/` with all package.json files
-   b. Runs `clawmasons chapter build` to generate Docker artifacts
+   b. Runs `mason chapter build` to generate Docker artifacts
 7. Agent tells developer to start a new ACP session to test the chapter.
 
 **Postcondition:** New chapter with roles, apps, tasks, and skills exists and is built.
@@ -1182,9 +1182,9 @@ Docker Compose                 Agent Container
 **Precondition:** Chapter workspace exists at `/projects/my-agents/` with agents and roles already defined. Lodge already initialized.
 
 **Flow:**
-1. Developer runs `clawmasons acp --role writer` from `/projects/my-agents/`.
+1. Developer runs `mason acp --role writer` from `/projects/my-agents/`.
 2. No `--chapter initiate` flag — standard startup path.
-3. CLI auto-detects the chapter from `.clawmasons/chapter.json` in CWD.
+3. CLI auto-detects the chapter from `.mason/chapter.json` in CWD.
 4. Standard ACP startup: init-role, infrastructure, bridge.
 5. ACP client sends `session/new` with project CWD.
 
@@ -1197,11 +1197,11 @@ Docker Compose                 Agent Container
 **Precondition:** Team uses a shared repo at `~/projects/acme/`.
 
 **Flow:**
-1. Team lead sets `LODGE_HOME=~/projects/acme/clawmasons-lodge` in their ACP client config.
-2. Runs `clawmasons init --lodge acme --lodge-home ~/projects/acme/clawmasons-lodge`.
+1. Team lead sets `LODGE_HOME=~/projects/acme/mason-lodge` in their ACP client config.
+2. Runs `mason init --lodge acme --lodge-home ~/projects/acme/mason-lodge`.
 3. Lodge directory created with CHARTER.md.
 4. Team lead creates chapters using the chapter-creator or manually.
-5. Team lead commits `~/projects/acme/clawmasons-lodge/` to the repo.
+5. Team lead commits `~/projects/acme/mason-lodge/` to the repo.
 6. Other team members clone, set the same `LODGE_HOME`, and use the pre-built chapters.
 
 **Postcondition:** Lodge configuration is version-controlled and shared.
@@ -1212,12 +1212,12 @@ Docker Compose                 Agent Container
 
 | # | Question | Owner | Blocking? | Resolution |
 |---|----------|-------|-----------|------------|
-| Q1 | Should `clawmasons` be the actual npm package with the CLI, or should the CLI remain in `@clawmasons/cli` with `clawmasons` as a thin wrapper? | Engineering | No | Recommend: `clawmasons` is the published package with the CLI binary. `@clawmasons/cli` becomes an internal workspace package. |
-| Q2 | npm package names with dots (e.g., `clawmasons.ai`) — does npm allow them? | Engineering | No | npm allows dots in package names. Verify during publish. |
+| Q1 | Should `mason` be the actual npm package with the CLI, or should the CLI remain in `@clawmasons/cli` with `mason` as a thin wrapper? | Engineering | No | Recommend: `mason` is the published package with the CLI binary. `@clawmasons/cli` becomes an internal workspace package. |
+| Q2 | npm package names with dots (e.g., `mason.ai`) — does npm allow them? | Engineering | No | npm allows dots in package names. Verify during publish. |
 | Q3 | Should the chapter-creator agent use `pi-coding-agent` as the only supported runtime, or should it be configurable? | Product | No | Configurable via `--init-agent`. Template provides `pi` as default. |
 | Q4 | How should CHARTER.md be loaded into agent context? Via the skill system, or as a special mount? | Engineering | No | Via the skill system — create a `skill-charter` in the initiate template that references CHARTER.md. |
-| Q5 | Should `clawmasons init` also run `chapter build` for the initiate chapter, or leave that to `clawmasons acp`? | Product | No | `clawmasons init` only creates the lodge. `clawmasons acp --chapter initiate` handles chapter creation and building. This keeps `init` fast and focused. |
-| Q6 | When `clawmasons acp` is called with `--chapter initiate` but the chapter already exists and is built, should it check for template updates? | Engineering | No | No — idempotent. If the chapter exists and is built, skip. User can manually rebuild if needed. |
+| Q5 | Should `mason init` also run `chapter build` for the initiate chapter, or leave that to `mason acp`? | Product | No | `mason init` only creates the lodge. `mason acp --chapter initiate` handles chapter creation and building. This keeps `init` fast and focused. |
+| Q6 | When `mason acp` is called with `--chapter initiate` but the chapter already exists and is built, should it check for template updates? | Engineering | No | No — idempotent. If the chapter exists and is built, skip. User can manually rebuild if needed. |
 
 ---
 
@@ -1227,22 +1227,22 @@ Docker Compose                 Agent Container
 
 | Command | Description |
 |---|---|
-| `clawmasons init` | Initialize a lodge (create LODGE_HOME, CHARTER.md, config.json) |
-| `clawmasons agent <agent> <role>` | Run agent interactively (renamed from `chapter run-agent`) |
-| `clawmasons acp --role <role>` | Start ACP endpoint (renamed from `chapter run-acp-agent`) |
-| `clawmasons chapter <subcommand>` | Chapter workspace commands (groups existing commands) |
+| `mason init` | Initialize a lodge (create LODGE_HOME, CHARTER.md, config.json) |
+| `mason agent <agent> <role>` | Run agent interactively (renamed from `chapter run-agent`) |
+| `mason acp --role <role>` | Start ACP endpoint (renamed from `chapter run-acp-agent`) |
+| `mason chapter <subcommand>` | Chapter workspace commands (groups existing commands) |
 
 ### Removed Commands
 
 | Command | Replacement |
 |---|---|
-| `chapter` (binary) | `clawmasons` |
-| `chapter run-agent` | `clawmasons agent` |
-| `chapter run-acp-agent` | `clawmasons acp` |
+| `chapter` (binary) | `mason` |
+| `chapter run-agent` | `mason agent` |
+| `chapter run-acp-agent` | `mason acp` |
 | `chapter run-init` | Removed (was deprecated) |
 | `chapter docker-init` | Removed (internal to `build`) |
 
-### New `clawmasons acp` Options
+### New `mason acp` Options
 
 | Option | Description |
 |---|---|
@@ -1259,7 +1259,7 @@ Docker Compose                 Agent Container
 |---|---|
 | `packages/cli/templates/charter/CHARTER.md` | Lodge charter template |
 | `packages/cli/templates/initiate/` | Initiate chapter template (full directory) |
-| `packages/cli/src/cli/commands/lodge-init.ts` | `clawmasons init` command implementation |
+| `packages/cli/src/cli/commands/lodge-init.ts` | `mason init` command implementation |
 | `packages/placeholders/*/` | NPM placeholder packages (outside workspaces) |
 | `scripts/publish-placeholders.sh` | Script to publish all placeholder packages |
 
@@ -1267,13 +1267,13 @@ Docker Compose                 Agent Container
 
 | File | Change |
 |---|---|
-| `packages/cli/package.json` | Rename bin from `chapter` to `clawmasons` |
+| `packages/cli/package.json` | Rename bin from `chapter` to `mason` |
 | `packages/cli/src/cli/index.ts` | Program name, command restructuring |
 | `packages/cli/src/cli/commands/index.ts` | New registration structure with subcommands |
 | `packages/cli/src/cli/commands/run-acp-agent.ts` | Add `--chapter`, `--init-agent` options; bootstrap flow |
 | `packages/cli/src/cli/commands/run-agent.ts` | Rename registration (no logic change) |
 | `packages/cli/src/generator/agent-dockerfile.ts` | Support `baseImage`, `aptPackages` from role |
-| `packages/cli/src/generator/proxy-dockerfile.ts` | Update entrypoint from `chapter` to `clawmasons` |
+| `packages/cli/src/generator/proxy-dockerfile.ts` | Update entrypoint from `chapter` to `mason` |
 | `packages/cli/src/acp/session.ts` | Support role mounts in compose generation |
 | `packages/cli/src/cli/commands/init-role.ts` | Support role mounts in compose generation |
 | `packages/shared/src/schemas/role.ts` | Add `mounts`, `baseImage`, `aptPackages` fields |
@@ -1281,7 +1281,7 @@ Docker Compose                 Agent Container
 | `packages/cli/src/runtime/home.ts` | Add `config.json` lodge registry support |
 | `e2e/tests/helpers.ts` | Update `CHAPTER_BIN` path |
 | `e2e/tests/*.test.ts` | Update CLI references |
-| `bin/chapter.js` | Rename to `bin/clawmasons.js` |
+| `bin/chapter.js` | Rename to `bin/mason.js` |
 
 ### Unchanged (but important context)
 

@@ -55,7 +55,7 @@ const credentialResponseSchema = z.union([
 const credentialServiceConfigSchema = z.object({
   dbPath: z.string().optional(),
   envFilePath: z.string().optional(),
-  keychainService: z.string().default("clawmasons"),
+  keychainService: z.string().default("mason"),
 });
 ```
 

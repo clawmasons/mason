@@ -19,7 +19,7 @@ Use Mason when you want to:
    - Frontmatter fields populated from discovered configuration
    - **Least-privilege permissions** — MCP servers start with empty `tools.allow` lists. You explicitly add only the tools you need.
    - Credentials extracted from MCP server environment variables
-   - Default container ignore paths for security (`.clawmasons/`, `.claude/`, `.env`)
+   - Default container ignore paths for security (`.mason/`, `.claude/`, `.env`)
    - System prompt from your existing `CLAUDE.md` or `AGENTS.md`
 
 4. **Customize** — Review the proposed ROLE.md. Add tool permissions, adjust container requirements, refine the system prompt.

@@ -87,7 +87,7 @@ container:
     pip: ['pdfkit']
   ignore:
     paths:
-      - '.clawmasons/'
+      - '.mason/'
       - '.claude/'
       - '.codes/'
       - '.env'
@@ -291,7 +291,7 @@ Materialization is the process of transforming a ROLE_TYPES into the files neede
 Each role gets a dedicated Docker build directory:
 
 ```
-<project>/.clawmasons/docker/<role-name>/
+<project>/.mason/docker/<role-name>/
 ├── <agent-type>/
 │   ├── Dockerfile
 │   └── workspace/
@@ -329,21 +329,21 @@ The `container.ignore.paths` field specifies project paths that should be hidden
 - **Files** (no trailing `/`): Masked with a read-only bind mount of a sentinel empty file.
 - The project tree itself is mounted read-only.
 
-Sentinel file: `.clawmasons/empty-file` (created with `chmod 444`).
+Sentinel file: `.mason/empty-file` (created with `chmod 444`).
 
-Example: Given `ignore.paths: ['.clawmasons/', '.claude/', '.env']`:
+Example: Given `ignore.paths: ['.mason/', '.claude/', '.env']`:
 
 ```yaml
 services:
   agent:
     volumes:
       - ./:/workspace/project:ro
-      - ignore-clawmasons:/workspace/project/.clawmasons
+      - ignore-mason:/workspace/project/.mason
       - ignore-claude:/workspace/project/.claude
-      - ./.clawmasons/empty-file:/workspace/project/.env:ro
+      - ./.mason/empty-file:/workspace/project/.env:ro
 
 volumes:
-  ignore-clawmasons:
+  ignore-mason:
   ignore-claude:
 ```
 
@@ -359,9 +359,9 @@ services:
   agent:
     volumes:
       - ./:/home/mason/workspace/project:ro          # project mount
-      - ignore-clawmasons:/home/mason/workspace/project/.clawmasons  # mask in project
+      - ignore-mason:/home/mason/workspace/project/.mason  # mask in project
       - ignore-claude:/home/mason/workspace/project/.claude           # mask in project
-      - ./.clawmasons/empty-file:/home/mason/workspace/project/.env:ro
+      - ./.mason/empty-file:/home/mason/workspace/project/.env:ro
 ```
 
 The materialized `.claude/` at `/home/mason/workspace/.claude/` remains untouched. The agent sees the materialized configuration files while the host project's `.claude/` directory (which may contain different or sensitive settings) is hidden.
@@ -370,7 +370,7 @@ The materialized `.claude/` at `/home/mason/workspace/.claude/` remains untouche
 
 The proxy materializer generates:
 
-The proxy uses the native `@clawmasons/proxy` package (not an external proxy). It is built from a generated Dockerfile at `docker/proxy/<role-name>/Dockerfile` using the `node:22-slim` base image, with all framework packages (`@clawmasons/chapter`, `@clawmasons/proxy`, `@clawmasons/shared`, etc.) and their transitive dependencies pre-copied into `docker/node_modules/` by the `docker-init` command. The proxy runs as: `node node_modules/.bin/clawmasons chapter proxy --agent <agentName> --transport streamable-http`.
+The proxy uses the native `@clawmasons/proxy` package (not an external proxy). It is built from a generated Dockerfile at `docker/proxy/<role-name>/Dockerfile` using the `node:22-slim` base image, with all framework packages (`@clawmasons/mason`, `@clawmasons/proxy`, `@clawmasons/shared`, etc.) and their transitive dependencies pre-copied into `docker/node_modules/` by the `docker-init` command. The proxy runs as: `node node_modules/.bin/mason chapter proxy --agent <agentName> --transport streamable-http`.
 
 The proxy materializer generates:
 
@@ -382,7 +382,7 @@ The proxy materializer generates:
 Each run creates a session:
 
 ```
-<project>/.clawmasons/sessions/<session-id>/
+<project>/.mason/sessions/<session-id>/
 ├── docker-compose.yaml    # References docker-role-build-dir for Dockerfiles
 └── logs/
 ```
@@ -392,7 +392,7 @@ The session's `docker-compose.yaml` references the role's Docker build directory
 **Operator access:** The session directory is a fully functional Docker Compose project. Users can run standard `docker compose` commands from this directory for debugging and operational tasks:
 
 ```bash
-cd .clawmasons/sessions/<session-id>/
+cd .mason/sessions/<session-id>/
 docker compose logs -f          # Stream logs from all services
 docker compose logs agent       # Logs from the agent container only
 docker compose ps               # Check container status
@@ -464,7 +464,7 @@ clawmasons run codex --role create-prd --acp
 
 The `run` command replaces the previous `agent` command. The agent type (`claude`, `codex`, `aider`) is a required positional argument that selects the runtime. The `--role` flag selects which role to materialize and run on that runtime.
 
-**Shorthand syntax:** As a convenience, `clawmasons <agent-type> --role <name>` is also supported. If the CLI receives a top-level argument that does not match any known command (`run`, `init`, `chapter`, etc.), it checks the argument against the registered agent type registry. If it matches a known agent type, the CLI treats the invocation as equivalent to `clawmasons run <agent-type> ...`. If it does not match any known command or agent type, the CLI exits with an error listing available commands and agent types.
+**Shorthand syntax:** As a convenience, `mason <agent-type> --role <name>` is also supported. If the CLI receives a top-level argument that does not match any known command (`run`, `init`, `chapter`, etc.), it checks the argument against the registered agent type registry. If it matches a known agent type, the CLI treats the invocation as equivalent to `mason run <agent-type> ...`. If it does not match any known command or agent type, the CLI exits with an error listing available commands and agent types.
 
 ```
 # These are equivalent:
@@ -476,19 +476,19 @@ clawmasons claude --role create-prd        # shorthand
 
 | Command | Description |
 |---------|-------------|
-| `clawmasons run <agent-type> --role <name>` | Run a role on the specified agent runtime. |
-| `clawmasons <agent-type> --role <name>` | Shorthand for `run`. |
-| `clawmasons run <agent-type> --role <name> --acp` | Run a role as an ACP server. |
-| `clawmasons init` | Initialize a project (lodge). |
-| `clawmasons chapter init` | Initialize a chapter workspace. |
-| `clawmasons chapter build` | Build: resolve + materialize Docker dirs for all roles. |
-| `clawmasons chapter list` | List available roles (local + installed). |
-| `clawmasons chapter validate` | Validate role definitions and dependency graphs. |
-| `clawmasons chapter permissions <role>` | Display resolved permissions for a role. |
-| `clawmasons chapter pack` | Package roles to distributable tarballs. |
-| `clawmasons chapter add <pkg>` | Install a role/skill/app package. |
-| `clawmasons chapter remove <pkg>` | Remove a package. |
-| `clawmasons chapter proxy` | Start standalone proxy. |
+| `mason run <agent-type> --role <name>` | Run a role on the specified agent runtime. |
+| `mason <agent-type> --role <name>` | Shorthand for `run`. |
+| `mason run <agent-type> --role <name> --acp` | Run a role as an ACP server. |
+| `mason init` | Initialize a project (lodge). |
+| `mason chapter init` | Initialize a chapter workspace. |
+| `mason chapter build` | Build: resolve + materialize Docker dirs for all roles. |
+| `mason chapter list` | List available roles (local + installed). |
+| `mason chapter validate` | Validate role definitions and dependency graphs. |
+| `mason chapter permissions <role>` | Display resolved permissions for a role. |
+| `mason chapter pack` | Package roles to distributable tarballs. |
+| `mason chapter add <pkg>` | Install a role/skill/app package. |
+| `mason chapter remove <pkg>` | Remove a package. |
+| `mason chapter proxy` | Start standalone proxy. |
 
 ### 9.3 Package Type Changes
 
@@ -539,7 +539,7 @@ Generate a publishable npm monorepo from a local role definition, enabling distr
 mason init-repo --role create-prd [--target-dir <path>]
 ```
 
-Default target: `.clawmasons/repositories/<role-name>/`
+Default target: `.mason/repositories/<role-name>/`
 
 ### 11.3 Generated Structure
 
@@ -570,11 +570,11 @@ Each dependency is a separate workspace package, independently publishable.
 1. **Generate:** `mason init-repo --role create-prd`
 2. **Publish:** `npm publish` from each package (or use npm workspaces `--workspaces`).
 3. **Install in another project:** `npm install --save-dev @acme/role-create-prd`
-4. **Run:** `clawmasons run claude --role @acme/role-create-prd`
+4. **Run:** `mason run claude --role @acme/role-create-prd`
 
 Alternative (local-only distribution):
 
-1. **Generate + pack:** `mason init-repo --role create-prd && cd .clawmasons/repositories/create-prd && npm pack --workspaces`
+1. **Generate + pack:** `mason init-repo --role create-prd && cd .mason/repositories/create-prd && npm pack --workspaces`
 2. **Install from tarballs:** `npm install ./dist/*.tgz`
 
 Projects do not work directly with a role repository — only through installed packages or local ROLE.md files.
@@ -591,7 +591,7 @@ Projects do not work directly with a role repository — only through installed 
 **Flow:**
 1. Developer creates `.claude/roles/create-prd/ROLE.md` with frontmatter and system prompt.
 2. Optionally adds bundled resources (templates, scripts) in the role directory.
-3. Runs `clawmasons run claude --role create-prd`.
+3. Runs `mason run claude --role create-prd`.
 4. System reads ROLE.md, resolves dependencies, materializes Docker build directory, starts session.
 5. Agent starts with the role's system prompt, permissions, and tools active.
 
@@ -609,7 +609,7 @@ Projects do not work directly with a role repository — only through installed 
 
 **Flow:**
 1. Developer has `.claude/roles/create-prd/ROLE.md` (Claude dialect).
-2. Runs `clawmasons run codex --role create-prd`.
+2. Runs `mason run codex --role create-prd`.
 3. System reads ROLE.md, normalizes Claude-specific field names to ROLE_TYPES.
 4. Codex materializer generates Codex-native workspace from ROLE_TYPES.
 5. Agent starts on Codex with equivalent configuration.
@@ -631,7 +631,7 @@ Projects do not work directly with a role repository — only through installed 
 2. Runs `mason init-repo --role create-prd` to generate a monorepo.
 3. Publishes packages to npm registry.
 4. In another project, runs `npm install --save-dev @acme/role-create-prd`.
-5. Runs `clawmasons run claude --role @acme/role-create-prd`.
+5. Runs `mason run claude --role @acme/role-create-prd`.
 
 **Acceptance Criteria:**
 - Local roles and packaged roles produce identical ROLE_TYPES (except source metadata).
@@ -647,8 +647,8 @@ Projects do not work directly with a role repository — only through installed 
 
 **Flow:**
 1. Developer defines a role with `container.packages` and `container.ignore`.
-2. Runs `clawmasons run claude --role create-prd`.
-3. System generates Docker build directory at `.clawmasons/docker/create-prd/`.
+2. Runs `mason run claude --role create-prd`.
+3. System generates Docker build directory at `.mason/docker/create-prd/`.
 4. Dockerfile installs all declared packages at build time.
 5. Docker Compose masks ignored paths using volume stacking.
 6. Agent runs in container with project mounted read-only.
