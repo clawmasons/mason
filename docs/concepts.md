@@ -1,11 +1,11 @@
 ---
 title: Core Concepts
-description: The mental model behind clawmasons role packaging
+description: The mental model behind mason role packaging
 ---
 
 # Core Concepts
 
-Clawmasons organizes AI agent roles using a hierarchy of composable npm packages. Each package type serves a specific purpose in the governance model.
+Mason organizes AI agent roles using a hierarchy of composable npm packages. Each package type serves a specific purpose in the governance model.
 
 ## Hierarchy
 

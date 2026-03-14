@@ -412,7 +412,7 @@ describe("generateMonorepo", () => {
 describe("initRepo", () => {
   it("resolves role and generates monorepo at default target", async () => {
     const role = makeMockRole();
-    const targetDir = join(testDir, ".clawmasons", "repositories", "create-prd");
+    const targetDir = join(testDir, ".mason", "repositories", "create-prd");
 
     await initRepo(testDir, { role: "create-prd" }, {
       resolveRoleFn: async () => role,

@@ -2,7 +2,7 @@
  * `chapter build` command — generates project-local Docker build artifacts.
  *
  * Discovers roles in the current workspace, resolves their agent types,
- * and generates Docker build directories at `.clawmasons/docker/<role-name>/`.
+ * and generates Docker build directories at `.mason/docker/<role-name>/`.
  *
  * This replaces the old build pipeline that used lodge-based paths.
  */
@@ -92,14 +92,14 @@ export async function runBuild(
     }
   }
 
-  // 4. Ensure .clawmasons/.gitignore
-  const clawmasonsDir = path.join(projectDir, ".clawmasons");
-  fs.mkdirSync(clawmasonsDir, { recursive: true });
-  const gitignorePath = path.join(clawmasonsDir, ".gitignore");
+  // 4. Ensure .mason/.gitignore
+  const masonDir = path.join(projectDir, ".mason");
+  fs.mkdirSync(masonDir, { recursive: true });
+  const gitignorePath = path.join(masonDir, ".gitignore");
   if (!fs.existsSync(gitignorePath) || !fs.readFileSync(gitignorePath, "utf-8").includes("docker/")) {
     fs.appendFileSync(gitignorePath, "docker/\nsessions/\n");
   }
-  ensureGitignoreEntry(projectDir, ".clawmasons");
+  ensureGitignoreEntry(projectDir, ".mason");
 
   // 5. Build Docker artifacts for each role
   console.log(`\n  Building ${targetRoles.length} role(s)...\n`);
@@ -107,11 +107,11 @@ export async function runBuild(
   for (const role of targetRoles) {
     const agentType = agentTypeOverride ?? inferAgentType(role);
     const { roleName: name } = buildRole(role, agentType, projectDir);
-    console.log(`  ✓ ${name} (${agentType}) → .clawmasons/docker/${name}/`);
+    console.log(`  ✓ ${name} (${agentType}) → .mason/docker/${name}/`);
   }
 
   // 6. Populate shared proxy dependencies (node_modules + package.json)
-  const dockerDir = path.join(projectDir, ".clawmasons", "docker");
+  const dockerDir = path.join(projectDir, ".mason", "docker");
   ensureProxyDependencies(dockerDir, projectDir);
 
   // 7. Synthesize inline app/role packages for roles with mcp_servers

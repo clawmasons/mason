@@ -339,7 +339,7 @@ e2e/
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "@clawmasons/chapter": "workspace:*",
+    "@clawmasons/mason": "workspace:*",
     "typescript": "^5.8.0",
     "vitest": "^3.0.0",
     "tsx": "^4.0.0",

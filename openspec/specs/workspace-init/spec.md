@@ -93,7 +93,7 @@ The `chapter init` command SHALL print a summary of created files and directorie
 - **THEN** the CLI prints the template name and next-step commands using the project scope (e.g., `chapter validate @test-chapter/member-note-taker`)
 
 ### Requirement: Template directory structure
-The `@clawmasons/chapter` package SHALL contain a `templates/` directory with at least one template (`note-taker/`). Each template directory SHALL contain the files needed to bootstrap a working chapter project.
+The `@clawmasons/mason` package SHALL contain a `templates/` directory with at least one template (`note-taker/`). Each template directory SHALL contain the files needed to bootstrap a working chapter project.
 
 #### Scenario: note-taker template exists
 - **WHEN** the `templates/` directory is inspected

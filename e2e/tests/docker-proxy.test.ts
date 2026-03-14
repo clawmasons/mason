@@ -21,7 +21,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   copyFixtureWorkspace,
-  chapterExec,
+  masonExec,
   waitForHealth,
 } from "./helpers.js";
 
@@ -44,9 +44,9 @@ describe("ACP proxy Docker e2e", () => {
     });
 
     // 2. Run chapter build (resolve + pack + docker-init in one step)
-    chapterExec(["chapter", "build"], workspaceDir, { timeout: 120_000 });
+    masonExec(["chapter", "build"], workspaceDir, { timeout: 120_000 });
 
-    dockerDir = path.join(workspaceDir, ".clawmasons", "docker");
+    dockerDir = path.join(workspaceDir, ".mason", "docker");
 
     // Create notes directory required by the filesystem MCP server
     const notesDir = path.join(workspaceDir, "notes");

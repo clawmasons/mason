@@ -3,7 +3,7 @@
  *
  * The proxy Dockerfile at `{role}/mcp-proxy/Dockerfile` expects `package.json`
  * and `node_modules/` to be available in the Docker build context root
- * (`.clawmasons/docker/`).
+ * (`.mason/docker/`).
  *
  * This module resolves framework packages and their transitive production
  * dependencies from the host's node_modules, copies them into the Docker
@@ -32,7 +32,7 @@ const CLI_PACKAGE_ROOT = path.resolve(__dirname, "../..");
 
 /** Framework packages the proxy image needs at runtime. */
 const FRAMEWORK_PACKAGES = [
-  "@clawmasons/chapter",
+  "@clawmasons/mason",
   "@clawmasons/proxy",
   "@clawmasons/shared",
   "@clawmasons/credential-service",
@@ -350,10 +350,10 @@ function copyWorkspacePackages(
  * Populates `{dockerDir}/node_modules/` and `{dockerDir}/package.json`
  * with framework packages and their transitive production dependencies.
  *
- * Idempotent: skips if `{dockerDir}/node_modules/@clawmasons/chapter` already
+ * Idempotent: skips if `{dockerDir}/node_modules/@clawmasons/mason` already
  * exists.
  *
- * @param dockerDir - The Docker build root directory (`.clawmasons/docker/`).
+ * @param dockerDir - The Docker build root directory (`.mason/docker/`).
  * @param projectDir - The project root (used as a search path for packages).
  */
 export function ensureProxyDependencies(
@@ -363,7 +363,7 @@ export function ensureProxyDependencies(
   const nodeModulesDir = path.join(dockerDir, "node_modules");
 
   // Idempotent check
-  if (fs.existsSync(path.join(nodeModulesDir, "@clawmasons", "chapter"))) {
+  if (fs.existsSync(path.join(nodeModulesDir, "@clawmasons", "mason"))) {
     return;
   }
 
@@ -378,7 +378,7 @@ export function ensureProxyDependencies(
   if (packages.size === 0) {
     throw new Error(
       "Could not resolve any framework packages for the proxy Docker build. " +
-      "Ensure @clawmasons/chapter is properly installed.",
+      "Ensure @clawmasons/mason is properly installed.",
     );
   }
 
@@ -415,7 +415,7 @@ export function ensureProxyDependencies(
  * Copy the pre-built proxy bundle into the Docker build context.
  *
  * The bundle is built by `npm run build:proxy` in @clawmasons/chapter
- * and lives at `packages/cli/dist/proxy-bundle.js`.  Inside Docker
+ * and lives at `packages/cli/dist/proxy-bundle.js`. Inside Docker
  * this replaces the multi-file ESM resolution chain for faster boot.
  */
 function copyProxyBundle(dockerDir: string): void {
@@ -428,7 +428,7 @@ function copyProxyBundle(dockerDir: string): void {
   if (!fs.existsSync(bundleSrc)) {
     console.warn(
       `Warning: proxy bundle not found at ${bundleSrc}. ` +
-      "Run 'npm run build:proxy' in @clawmasons/chapter to build it. " +
+      "Run 'npm run build:proxy' in @clawmasons/mason to build it. " +
       "Falling back to unbundled proxy entrypoint.",
     );
     return;
@@ -455,7 +455,7 @@ function copyProxyBundle(dockerDir: string): void {
  * Idempotent — skips packages that already exist.
  *
  * @param role - The RoleType with inline app configs
- * @param dockerDir - The Docker build root (`.clawmasons/docker/`)
+ * @param dockerDir - The Docker build root (`.mason/docker/`)
  */
 export function synthesizeRolePackages(
   role: RoleType,

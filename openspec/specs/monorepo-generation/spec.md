@@ -11,7 +11,7 @@ The system SHALL provide a `mason init-repo` command that generates an npm works
 #### Scenario: Generate monorepo from local role
 - **GIVEN** a local role named "create-prd" defined in `.claude/roles/create-prd/ROLE.md`
 - **WHEN** `mason init-repo --role create-prd` is executed
-- **THEN** a monorepo is created at `.clawmasons/repositories/create-prd/` with the correct workspace structure
+- **THEN** a monorepo is created at `.mason/repositories/create-prd/` with the correct workspace structure
 
 #### Scenario: Custom target directory
 - **GIVEN** a local role named "create-prd"
@@ -21,7 +21,7 @@ The system SHALL provide a `mason init-repo` command that generates an npm works
 #### Scenario: Default target directory
 - **GIVEN** a local role named "create-prd"
 - **WHEN** `mason init-repo --role create-prd` is executed without `--target-dir`
-- **THEN** the monorepo is created at `.clawmasons/repositories/create-prd/`
+- **THEN** the monorepo is created at `.mason/repositories/create-prd/`
 
 #### Scenario: Reject packaged roles
 - **GIVEN** a role that was installed as an npm package (source.type = "package")
@@ -104,5 +104,5 @@ The generated monorepo SHALL support standard npm distribution workflows.
 The `mason init-repo` command SHALL be registered under the `mason` command group.
 
 #### Scenario: Command is accessible
-- **WHEN** `clawmasons mason init-repo --role <name>` is invoked
+- **WHEN** `mason mason init-repo --role <name>` is invoked
 - **THEN** the command executes the monorepo generation flow

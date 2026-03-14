@@ -95,7 +95,7 @@ container:
       - typescript
   ignore:
     paths:
-      - '.clawmasons/'
+      - '.mason/'
       - '.env'
 risk: LOW
 credentials:

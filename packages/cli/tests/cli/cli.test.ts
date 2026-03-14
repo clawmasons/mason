@@ -3,7 +3,7 @@ import { program } from "../../src/cli/index.js";
 
 describe("CLI entry point", () => {
   it("has the correct program name", () => {
-    expect(program.name()).toBe("clawmasons");
+    expect(program.name()).toBe("mason");
   });
 
   it("has a version matching package.json", () => {
@@ -11,7 +11,7 @@ describe("CLI entry point", () => {
   });
 
   it("has a description", () => {
-    expect(program.description()).toContain("Clawmasons Chapter");
+    expect(program.description()).toContain("Mason");
   });
 
   it("does not have top-level init command (lodge-init removed)", () => {

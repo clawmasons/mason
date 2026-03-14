@@ -8,18 +8,18 @@
 
 ## Overview
 
-Replace the `agent` CLI command with a `run` command that takes an agent type as a positional argument and `--role <name>` as a required option. Add shorthand syntax where `clawmasons <agent-type> --role <name>` is equivalent to `clawmasons run <agent-type> --role <name>`. Update `chapter list` to show roles, `chapter validate` to validate roles, and `chapter build` completion instructions.
+Replace the `agent` CLI command with a `run` command that takes an agent type as a positional argument and `--role <name>` as a required option. Add shorthand syntax where `mason <agent-type> --role <name>` is equivalent to `mason run <agent-type> --role <name>`. Update `chapter list` to show roles, `chapter validate` to validate roles, and `chapter build` completion instructions.
 
 ## Command Structure
 
 ### Primary command
 ```
-clawmasons run <agent-type> --role <role-name> [--acp] [--proxy-port <n>]
+mason run <agent-type> --role <role-name> [--acp] [--proxy-port <n>]
 ```
 
 ### Shorthand
 ```
-clawmasons <agent-type> --role <role-name>
+mason <agent-type> --role <role-name>
 ```
 
 When the first positional argument doesn't match a known command but matches a known agent type (via aliases or registry), the CLI inserts `run` before it and re-parses.
@@ -38,7 +38,7 @@ Direct registry names (e.g., `claude-code`) also work.
 
 ### Backward Compatibility
 
-A hidden `agent` command is registered that preserves the old `clawmasons agent <agent> <role>` and `clawmasons agent --acp --role <name>` syntax.
+A hidden `agent` command is registered that preserves the old `mason agent <agent> <role>` and `mason agent --acp --role <name>` syntax.
 
 ## Files Modified
 
@@ -48,7 +48,7 @@ A hidden `agent` command is registered that preserves the old `clawmasons agent 
 | `packages/cli/src/cli/commands/index.ts` | Imports `registerRunCommand` and `isKnownAgentType`. Installs shorthand detection via `installAgentTypeShorthand()` which overrides `program.parse/parseAsync` to rewrite argv. |
 | `packages/cli/src/cli/commands/list.ts` | Replaced agent-centric listing with `discoverRoles()`. Shows role metadata, source (local/package), tasks, apps, skills. JSON mode outputs `RoleType[]`. |
 | `packages/cli/src/cli/commands/validate.ts` | Now tries role validation first via `resolveRole()` + adapter round-trip. Falls back to agent validation. Provides npm install instructions for package-style role names not found. |
-| `packages/cli/src/cli/commands/build.ts` | Updated completion instructions from `clawmasons agent` to `clawmasons run`. |
+| `packages/cli/src/cli/commands/build.ts` | Updated completion instructions from `mason agent` to `mason run`. |
 
 ## Tests Modified
 
@@ -58,7 +58,7 @@ A hidden `agent` command is registered that preserves the old `clawmasons agent 
 | `packages/cli/tests/cli/run-agent.test.ts` | Added tests for `resolveAgentType`, `isKnownAgentType`, `getKnownAgentTypeNames`. Updated command registration tests. |
 | `packages/cli/tests/cli/list.test.ts` | Rewritten for role-centric listing using ROLE.md files. |
 | `packages/cli/tests/cli/validate.test.ts` | Added role validation tests, install instruction tests, agent fallback test. |
-| `packages/cli/tests/cli/build.test.ts` | Updated to check `clawmasons run` in completion instructions. |
+| `packages/cli/tests/cli/build.test.ts` | Updated to check `mason run` in completion instructions. |
 | `packages/cli/tests/cli/run-acp-agent.test.ts` | Updated help text tests to reference `run` command. |
 
 ## Error Handling

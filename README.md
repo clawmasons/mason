@@ -1,12 +1,12 @@
-# Clawmasons Chapter
+# Mason
 
 npm-native packaging, governance, and runtime portability for AI agent roles.
 
-## Why Clawmasons?
+## Why Mason?
 
 AI agents need tools, but tool access today is ungoverned. Credentials leak via environment variables. There's no audit trail. Agent definitions are locked to a single runtime.
 
-Clawmasons solves this:
+Mason solves this:
 
 - **Credential isolation** — Secrets resolved on-demand, never in env vars or Docker inspect
 - **Role-based tool filtering** — Agents only see tools their role permits
@@ -46,24 +46,24 @@ EOF
 Run it:
 
 ```bash
-clawmasons run claude --role writer
+mason run claude --role writer
 ```
 
 ### Option 2: Chapter Workspace
 
 ```bash
 # Initialize a lodge (organizational container)
-clawmasons init
+mason init
 
 # Create a chapter workspace with the note-taker template
-clawmasons chapter init --name acme.platform --template note-taker
+mason chapter init --name acme.platform --template note-taker
 cd acme.platform
 
 # Build all roles
-clawmasons chapter build
+mason chapter build
 
 # Run a role
-clawmasons run claude --role note-taker
+mason run claude --role note-taker
 ```
 
 This spins up an MCP proxy (tool filtering), credential service (secret management), and agent container — all governed by the role's permissions.
@@ -109,18 +109,18 @@ The `ROLE.md` uses agent-native field names (e.g., `commands` for Claude Code, `
 
 | Command | Description |
 |---------|-------------|
-| `clawmasons run <agent-type> --role <name>` | Run a role on the specified agent runtime |
-| `clawmasons <agent-type> --role <name>` | Shorthand for `run` |
-| `clawmasons run <agent-type> --role <name> --acp` | Run as an ACP server |
-| `clawmasons chapter build` | Build: resolve + materialize Docker dirs for all roles |
-| `clawmasons chapter list` | List available roles (local + installed) |
-| `clawmasons chapter validate` | Validate role definitions and dependency graphs |
+| `mason run <agent-type> --role <name>` | Run a role on the specified agent runtime |
+| `mason <agent-type> --role <name>` | Shorthand for `run` |
+| `mason run <agent-type> --role <name> --acp` | Run as an ACP server |
+| `mason chapter build` | Build: resolve + materialize Docker dirs for all roles |
+| `mason chapter list` | List available roles (local + installed) |
+| `mason chapter validate` | Validate role definitions and dependency graphs |
 
 ## Documentation
 
 | Doc | Description |
 |-----|-------------|
-| [Overview](docs/overview.md) | What clawmasons is and why it matters |
+| [Overview](docs/overview.md) | What Mason is and why it matters |
 | [Getting Started](docs/get-started.md) | Install and run your first role |
 | [Core Concepts](docs/concepts.md) | Lodges, chapters, roles, tasks, skills, apps |
 | [Architecture](docs/architecture.md) | Runtime architecture with sequence diagrams |
@@ -134,10 +134,10 @@ The `ROLE.md` uses agent-native field names (e.g., `commands` for Claude Code, `
 Integrate with your editor via the Agent Communication Protocol:
 
 ```bash
-clawmasons run claude --role writer --acp
+mason run claude --role writer --acp
 ```
 
-Works with Zed, JetBrains, Neovim, and any ACP-compatible client. See the [CLI reference](docs/cli.md#clawmasons-run) for configuration details.
+Works with Zed, JetBrains, Neovim, and any ACP-compatible client. See the [CLI reference](docs/cli.md#mason-run) for configuration details.
 
 ## Contributing
 

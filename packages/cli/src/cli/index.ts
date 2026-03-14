@@ -12,10 +12,10 @@ const pkg = JSON.parse(
 const program = new Command();
 
 program
-  .name("clawmasons")
+  .name("mason")
   .version(pkg.version)
   .description(
-    "Clawmasons Chapter — AI agent packaging, governance, and runtime orchestration",
+    "Mason — AI agent packaging, governance, and runtime orchestration",
   );
 
 registerCommands(program);

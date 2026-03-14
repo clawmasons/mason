@@ -360,7 +360,7 @@ export async function initRepo(
     // 3. Determine target directory
     const targetDir = options.targetDir
       ? pathResolve(options.targetDir)
-      : join(projectDir, ".clawmasons", "repositories", role.metadata.name);
+      : join(projectDir, ".mason", "repositories", role.metadata.name);
 
     console.log(`  Target directory: ${targetDir}`);
 

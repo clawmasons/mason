@@ -178,7 +178,7 @@ describe("AcpSdkBridge", () => {
       });
 
       expect(response.protocolVersion).toBe(PROTOCOL_VERSION);
-      expect(response.agentInfo?.name).toBe("clawmasons");
+      expect(response.agentInfo?.name).toBe("mason");
       expect(response.agentInfo?.version).toBe("1.0.0");
       // Container should NOT have been started
       expect(onSessionNew).not.toHaveBeenCalled();

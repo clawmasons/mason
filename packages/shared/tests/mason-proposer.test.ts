@@ -134,7 +134,7 @@ describe("proposeRoleMd", () => {
   it("includes default container ignore paths", () => {
     const result = proposeRoleMd(makeScanResult());
 
-    expect(result).toContain(".clawmasons/");
+    expect(result).toContain(".mason/");
     expect(result).toContain(".claude/");
     expect(result).toContain(".env");
   });

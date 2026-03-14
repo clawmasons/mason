@@ -14,7 +14,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   copyFixtureWorkspace,
-  chapterExecExpectError,
+  masonExecExpectError,
 } from "./helpers.js";
 
 describe("error paths", () => {
@@ -36,7 +36,7 @@ describe("error paths", () => {
 
   describe("missing role", () => {
     it("chapter validate exits with error for nonexistent role", () => {
-      const result = chapterExecExpectError(
+      const result = masonExecExpectError(
         ["chapter", "validate", "nonexistent-role"],
         workspaceDir,
       );
@@ -47,7 +47,7 @@ describe("error paths", () => {
     });
 
     it("chapter build exits with error for nonexistent role", () => {
-      const result = chapterExecExpectError(
+      const result = masonExecExpectError(
         ["chapter", "build", "nonexistent-role"],
         workspaceDir,
       );
@@ -62,7 +62,7 @@ describe("error paths", () => {
 
   describe("missing packaged role", () => {
     it("chapter validate shows install instructions for uninstalled package role", () => {
-      const result = chapterExecExpectError(
+      const result = masonExecExpectError(
         ["chapter", "validate", "@acme/role-missing"],
         workspaceDir,
       );
@@ -94,7 +94,7 @@ describe("error paths", () => {
 
       // chapter list should still succeed (discovery skips malformed roles)
       // but the malformed role should not appear in the results
-      const result = chapterExecExpectError(
+      const result = masonExecExpectError(
         ["chapter", "list", "--json"],
         workspaceDir,
       );
@@ -133,7 +133,7 @@ Some instructions.
 `,
       );
 
-      const result = chapterExecExpectError(
+      const result = masonExecExpectError(
         ["chapter", "validate", "bad-yaml"],
         workspaceDir,
       );

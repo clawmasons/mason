@@ -1,10 +1,10 @@
 {
-  "name": "@clawmasons/chapter",
+  "name": "@clawmasons/mason",
   "version": "0.1.0",
-  "description": "Clawmasons Chapter CLI — AI agent packaging, governance, and runtime orchestration",
+  "description": "Mason — AI agent packaging, governance, and runtime orchestration",
   "type": "module",
   "bin": {
-    "clawmasons": "dist/cli/bin.js"
+    "mason": "dist/cli/bin.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

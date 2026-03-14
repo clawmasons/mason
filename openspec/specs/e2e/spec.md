@@ -84,7 +84,7 @@ E2E tests MAY verify the observable effects of these modules (e.g., checking tha
 
 **Coverage:**
 - Build output: chapter.lock.json, dist/*.tgz
-- docker/node_modules: @clawmasons/chapter, @clawmasons/proxy, @clawmasons/shared, chapter packages from dist, .bin/chapter symlink, transitive dependencies
+- docker/node_modules: @clawmasons/mason, @clawmasons/proxy, @clawmasons/shared, chapter packages from dist, .bin/chapter symlink, transitive dependencies
 - Proxy Dockerfile: existence and structure
 - Agent Dockerfile: existence and structure
 - Workspace materialization: workspace directory exists

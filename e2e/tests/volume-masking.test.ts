@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs";
 import {
   copyFixtureWorkspace,
-  chapterExecJson,
+  masonExecJson,
 } from "./helpers.js";
 
 describe("volume masking and container ignore", () => {
@@ -34,7 +34,7 @@ describe("volume masking and container ignore", () => {
   });
 
   it("local role includes container.ignore.paths from ROLE.md", () => {
-    const roles = chapterExecJson<Array<Record<string, unknown>>>(
+    const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
     );
@@ -54,12 +54,12 @@ describe("volume masking and container ignore", () => {
     const paths = ignore.paths as string[];
     expect(paths).toBeDefined();
     expect(paths).toEqual(
-      expect.arrayContaining([".clawmasons/", ".claude/", ".env"]),
+      expect.arrayContaining([".mason/", ".claude/", ".env"]),
     );
   });
 
   it("container.ignore.paths distinguishes directories from files", () => {
-    const roles = chapterExecJson<Array<Record<string, unknown>>>(
+    const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
     );
@@ -81,8 +81,8 @@ describe("volume masking and container ignore", () => {
     expect(directories.length).toBeGreaterThan(0);
     expect(files.length).toBeGreaterThan(0);
 
-    // .clawmasons/ and .claude/ are directories
-    expect(directories).toContain(".clawmasons/");
+    // .mason/ and .claude/ are directories
+    expect(directories).toContain(".mason/");
     expect(directories).toContain(".claude/");
 
     // .env is a file
@@ -90,7 +90,7 @@ describe("volume masking and container ignore", () => {
   });
 
   it("container.packages.apt from ROLE.md is preserved", () => {
-    const roles = chapterExecJson<Array<Record<string, unknown>>>(
+    const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
     );

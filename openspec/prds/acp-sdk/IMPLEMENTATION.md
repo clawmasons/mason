@@ -115,7 +115,7 @@ Rewrite `bridge.ts` to use the SDK's dual-connection architecture. Remove `stdio
   - Test connection lifecycle (`connection.closed`)
   - Remove `parseRequestBody`, `extractCwdFromBody` tests (functions removed)
 
-**User Story:** As an editor, I spawn `clawmasons acp --role <name>` and communicate via ndjson on stdin/stdout using the standard ACP protocol. The bridge handles deferred startup transparently — `initialize` responds immediately, `session/new` starts the container, and subsequent `prompt` messages are forwarded to the container.
+**User Story:** As an editor, I spawn `mason acp --role <name>` and communicate via ndjson on stdin/stdout using the standard ACP protocol. The bridge handles deferred startup transparently — `initialize` responds immediately, `session/new` starts the container, and subsequent `prompt` messages are forwarded to the container.
 
 **Testing:** Unit test using mock streams: verify `initialize` returns capabilities without starting container, `session/new` triggers `onSessionNew` callback and creates `ClientSideConnection`, `prompt` is forwarded and response returned. Verify container crash triggers cleanup. Verify notifications forwarded bidirectionally.
 
@@ -149,9 +149,9 @@ Update `run-acp-agent.ts` to use the new SDK bridge and remove the `--transport`
   - Update bridge wiring tests for SDK bridge
   - Update `acpCommand` assertions to verify no `--port` arg
 
-**User Story:** As an editor plugin author, I configure `clawmasons acp --role <name>` as a stdio command. The `--transport` flag is gone; stdio is the only mode. If I accidentally pass `--transport http`, I get "unknown option".
+**User Story:** As an editor plugin author, I configure `mason acp --role <name>` as a stdio command. The `--transport` flag is gone; stdio is the only mode. If I accidentally pass `--transport http`, I get "unknown option".
 
-**Testing:** Verify `clawmasons acp --transport http` fails with unknown option error. Verify the orchestrator creates the SDK bridge and wires lifecycle correctly. Verify `acpCommand` has no `--port`.
+**Testing:** Verify `mason acp --transport http` fails with unknown option error. Verify the orchestrator creates the SDK bridge and wires lifecycle correctly. Verify `acpCommand` has no `--port`.
 
 **PRD refs:** REQ-SDK-006
 
@@ -165,7 +165,7 @@ Rewrite `e2e/tests/acp-client-spawn.test.ts` to use `ClientSideConnection` from 
 
 **Scope:**
 - `e2e/tests/acp-client-spawn.test.ts`:
-  - Spawn `clawmasons acp --role chapter-creator` (no `--transport http`, no `--port`)
+  - Spawn `mason acp --role chapter-creator` (no `--transport http`, no `--port`)
   - Create `ClientSideConnection` with `ndJsonStream(child.stdin, child.stdout)` over the spawned process
   - Send `initialize` via `client.initialize(...)` — verify response has `protocolVersion` and `agentInfo`
   - Send `session/new` via `client.newSession({ cwd, mcpServers: [] })` — triggers container start

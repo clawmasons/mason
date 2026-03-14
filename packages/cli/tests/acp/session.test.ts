@@ -15,7 +15,7 @@ import {
 // ── Test Helpers ──────────────────────────────────────────────────────
 
 function setupProjectDir(tmpDir: string): { projectDir: string; dockerBuildDir: string; dockerDir: string } {
-  const dockerDir = path.join(tmpDir, "my-project", ".clawmasons", "docker");
+  const dockerDir = path.join(tmpDir, "my-project", ".mason", "docker");
   const dockerBuildDir = path.join(dockerDir, "writer");
 
   // Create proxy and agent Dockerfiles in new layout
@@ -29,7 +29,7 @@ function setupProjectDir(tmpDir: string): { projectDir: string; dockerBuildDir: 
 
   // Set up project directory
   const projectDir = path.join(tmpDir, "my-project");
-  fs.mkdirSync(path.join(projectDir, ".clawmasons"), { recursive: true });
+  fs.mkdirSync(path.join(projectDir, ".mason"), { recursive: true });
 
   return { projectDir, dockerBuildDir, dockerDir };
 }
@@ -110,11 +110,11 @@ function makeMockDepsWithSpawn(overrides?: {
 
 describe("generateAcpComposeYml", () => {
   const defaultOpts = {
-    dockerBuildDir: "/projects/my-project/.clawmasons/docker/writer",
-    dockerDir: "/projects/my-project/.clawmasons/docker",
+    dockerBuildDir: "/projects/my-project/.mason/docker/writer",
+    dockerDir: "/projects/my-project/.mason/docker",
     agent: "note-taker",
     role: "writer",
-    logsDir: "/projects/my-project/.clawmasons/sessions/abc123/docker/logs",
+    logsDir: "/projects/my-project/.mason/sessions/abc123/docker/logs",
     proxyToken: "test-proxy-token",
     credentialProxyToken: "test-cred-token",
   };

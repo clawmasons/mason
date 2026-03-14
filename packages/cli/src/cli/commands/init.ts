@@ -9,7 +9,7 @@ export interface InitOptions {
   template?: string;
 }
 
-const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons"];
+const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".mason"];
 
 const GITIGNORE = `node_modules/
 dist/
@@ -18,10 +18,10 @@ dist/
 `;
 
 /**
- * Resolve the chapter project root directory (where package.json, src/, bin/ live).
+ * Resolve the mason project root directory (where package.json, src/, bin/ live).
  * The templates/ directory lives at the project root.
  */
-function getChapterProjectRoot(): string {
+function getMasonProjectRoot(): string {
   // This file is at src/cli/commands/init.ts (or dist/cli/commands/init.js)
   // The project root is 3 levels up from the file's directory.
   const thisFile = fileURLToPath(import.meta.url);
@@ -29,10 +29,10 @@ function getChapterProjectRoot(): string {
 }
 
 /**
- * Get the path to the templates directory inside the chapter package.
+ * Get the path to the templates directory inside the mason package.
  */
 export function getTemplatesDir(): string {
-  return path.join(getChapterProjectRoot(), "templates");
+  return path.join(getMasonProjectRoot(), "templates");
 }
 
 /**
@@ -98,12 +98,12 @@ export async function runInit(
   options: InitOptions,
   deps?: { templatesDir?: string; skipNpmInstall?: boolean },
 ): Promise<void> {
-  const clawmasonsDir = path.join(targetDir, ".clawmasons");
+  const masonDir = path.join(targetDir, ".mason");
 
   // Idempotency check
-  if (fs.existsSync(clawmasonsDir)) {
+  if (fs.existsSync(masonDir)) {
     console.log(
-      "⚠ Workspace already initialized (.clawmasons/ directory exists). Nothing to do.",
+      "⚠ Workspace already initialized (.mason/ directory exists). Nothing to do.",
     );
     return;
   }
@@ -188,14 +188,14 @@ export async function runInit(
     created.push("package.json");
   }
 
-  // Generate .clawmasons/chapter.json
-  const configPath = path.join(targetDir, "/.clawmasons/", "chapter.json");
+  // Generate .mason/chapter.json
+  const configPath = path.join(targetDir, "/.mason/", "chapter.json");
   const managingChapter = {
     chapter: projectScope,
     version: "0.1.0"
   };
   fs.writeFileSync(configPath, JSON.stringify(managingChapter, null, 2) + "\n");
-  created.push(".clawmasons/chapter.json");
+  created.push(".mason/chapter.json");
 
 
   // Generate .gitignore (only if it doesn't exist)
@@ -232,12 +232,12 @@ export async function runInit(
   if (usedTemplate) {
     console.log(`\nTemplate: ${options.template}`);
     console.log("\nNext steps:");
-    console.log(`  clawmasons chapter list                                    List discovered packages`);
-    console.log(`  clawmasons chapter validate @${projectScope}/agent-note-taker   Validate the agent graph`);
-    console.log(`  clawmasons chapter build @${projectScope}/agent-note-taker      Build the agent lock file\n`);
+    console.log(`  mason chapter list                                    List discovered packages`);
+    console.log(`  mason chapter validate @${projectScope}/agent-note-taker   Validate the agent graph`);
+    console.log(`  mason chapter build @${projectScope}/agent-note-taker      Build the agent lock file\n`);
   } else {
     console.log("\nNext steps:");
-    console.log("  clawmasons chapter add <package>    Add a chapter component");
-    console.log("  clawmasons chapter build <agent>    Build and validate an agent\n");
+    console.log("  mason chapter add <package>    Add a chapter component");
+    console.log("  mason chapter build <agent>    Build and validate an agent\n");
   }
 }

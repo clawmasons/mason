@@ -150,7 +150,7 @@ export class AcpSdkBridge {
     return {
       protocolVersion: params.protocolVersion ?? PROTOCOL_VERSION,
       agentCapabilities: {},
-      agentInfo: { name: "clawmasons", version: "1.0.0" },
+      agentInfo: { name: "mason", version: "1.0.0" },
     };
   }
 

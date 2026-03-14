@@ -69,7 +69,7 @@ async function main(): Promise<void> {
   console.log(`Created workspace at ${workspaceDir}`);
 
   // Copy fixture tree
-  const dirs = ["apps", "tasks", "skills", "roles", "agents", ".clawmasons"];
+  const dirs = ["apps", "tasks", "skills", "roles", "agents", ".mason"];
   fs.copyFileSync(
     path.join(FIXTURES_DIR, "package.json"),
     path.join(workspaceDir, "package.json"),

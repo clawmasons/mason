@@ -43,7 +43,7 @@ The pack command SHALL run the project build (`npm run build`) before packing to
 The pack command SHALL discover all workspace packages by reading `packages/*/package.json` and run `npm pack` for each with `--pack-destination dist/`.
 
 #### Scenario: All packages packed
-- **GIVEN** workspace packages `@clawmasons/shared`, `@clawmasons/proxy`, and `@clawmasons/chapter`
+- **GIVEN** workspace packages `@clawmasons/shared`, `@clawmasons/proxy`, and `@clawmasons/mason`
 - **WHEN** `chapter pack` is run successfully
 - **THEN** `dist/` contains one `.tgz` file per workspace package (3 total)
 
@@ -63,7 +63,7 @@ The pack command SHALL log each step: cleaning, building, and packing each packa
 
 ### Requirement: Pack command runs from project root
 
-The pack command SHALL detect the chapter project root (directory containing `.clawmasons/chapter.json`) and operate relative to it, or use the current working directory if it contains a `package.json` with workspaces.
+The pack command SHALL detect the chapter project root (directory containing `.mason/chapter.json`) and operate relative to it, or use the current working directory if it contains a `package.json` with workspaces.
 
 #### Scenario: Run from project root
 - **GIVEN** user is in the chapter project root directory

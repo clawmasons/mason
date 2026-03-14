@@ -1,0 +1,1 @@
+_No requirement changes._ Environment variable names (`CHAPTER_PROXY_TOKEN`, `CHAPTER_PROXY_PORT`) are kept unchanged per design decision #4. This capability has no `.clawmasons` or `clawmasons` binary references to update.

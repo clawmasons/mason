@@ -1,22 +1,22 @@
 ---
 title: Initialization
-description: How clawmasons sets up lodges, chapters, and runtime directories
+description: How mason sets up lodges, chapters, and runtime directories
 ---
 
 # Initialization
 
-Clawmasons uses a layered initialization process: **lodge** (organizational container), **chapter** (workspace), **build** (Docker artifacts), and **role** (runtime directory). Each step is idempotent — running it again safely skips what already exists.
+Mason uses a layered initialization process: **lodge** (organizational container), **chapter** (workspace), **build** (Docker artifacts), and **role** (runtime directory). Each step is idempotent — running it again safely skips what already exists.
 
 ## Lodge Initialization
 
 ```bash
-clawmasons init
+mason init
 ```
 
-Creates the top-level organizational container at `~/.clawmasons/`:
+Creates the top-level organizational container at `~/.mason/`:
 
 ```
-~/.clawmasons/
+~/.mason/
 ├── config.json              # Registry of initialized lodges
 ├── .gitignore
 └── <lodge>/
@@ -30,14 +30,14 @@ The lodge name defaults to your system username. Override it with `--lodge <name
 
 ```json
 {
-  "acme": { "home": "/Users/you/.clawmasons/acme" }
+  "acme": { "home": "/Users/you/.mason/acme" }
 }
 ```
 
 ## Chapter Initialization
 
 ```bash
-clawmasons chapter init --name acme.platform --template note-taker
+mason chapter init --name acme.platform --template note-taker
 ```
 
 Creates an npm workspace with the standard package directory layout:
@@ -45,7 +45,7 @@ Creates an npm workspace with the standard package directory layout:
 ```
 acme.platform/
 ├── package.json               # Workspace root with npm workspaces
-├── .clawmasons/
+├── .mason/
 │   └── chapter.json           # Workspace metadata
 ├── roles/                     # Role packages
 ├── tasks/                     # Task packages
@@ -63,7 +63,7 @@ The root `package.json` declares npm workspaces so all packages are linked:
 }
 ```
 
-`.clawmasons/chapter.json` stores workspace metadata:
+`.mason/chapter.json` stores workspace metadata:
 
 ```json
 {
@@ -98,7 +98,7 @@ The resolved graph contains everything needed to generate runtime artifacts.
 ## Build
 
 ```bash
-clawmasons chapter build
+mason chapter build
 ```
 
 The build step takes the resolved role graph and produces deployable artifacts:
@@ -132,15 +132,15 @@ docker/
 ## Role Initialization
 
 ```bash
-clawmasons chapter init-role --role writer
+mason chapter init-role --role writer
 ```
 
-Registers a role for host-wide use. This creates a runtime directory under the lodge and records the role in `~/.clawmasons/chapters.json`:
+Registers a role for host-wide use. This creates a runtime directory under the lodge and records the role in `~/.mason/chapters.json`:
 
 ```
-~/.clawmasons/<lodge>/
+~/.mason/<lodge>/
 └── roles/<role>/
-    ├── .clawmasons/role.json   # Role metadata
+    ├── .mason/role.json   # Role metadata
     ├── docker/
     │   └── docker-compose.yml  # Reusable compose template
     └── logs/                   # Session logs
@@ -150,7 +150,7 @@ The `chapters.json` registry tracks which chapter each role belongs to, enabling
 
 ## Role Startup
 
-When you run `clawmasons run <agent-type> --role <name>`, the CLI ties all of this together:
+When you run `mason run <agent-type> --role <name>`, the CLI ties all of this together:
 
 1. **Discovers** packages in the chapter workspace
 2. **Resolves** the role's full dependency graph
@@ -165,9 +165,9 @@ See [Architecture](architecture.md) for the full startup sequence diagram.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CLAWMASONS_HOME` | `~/.clawmasons` | Root directory for all clawmasons data |
+| `MASON_HOME` | `~/.mason` | Root directory for all mason data |
 | `LODGE` | System username | Current lodge name |
-| `LODGE_HOME` | `$CLAWMASONS_HOME/$LODGE` | Current lodge directory |
+| `LODGE_HOME` | `$MASON_HOME/$LODGE` | Current lodge directory |
 
 CLI flags take precedence over environment variables, which take precedence over defaults.
 

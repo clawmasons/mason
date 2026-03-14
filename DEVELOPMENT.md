@@ -1,6 +1,6 @@
 # Development
 
-Developer guide for contributing to the clawmasons/chapter monorepo.
+Developer guide for contributing to the mason/chapter monorepo.
 
 ## Project Structure
 

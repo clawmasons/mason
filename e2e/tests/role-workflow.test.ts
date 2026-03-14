@@ -18,9 +18,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   copyFixtureWorkspace,
-  chapterExec,
-  chapterExecJson,
-  chapterExecExpectError,
+  masonExec,
+  masonExecJson,
+  masonExecExpectError,
 } from "./helpers.js";
 
 describe("role-based workflow", () => {
@@ -43,7 +43,7 @@ describe("role-based workflow", () => {
 
   describe("chapter list", () => {
     it("discovers local ROLE.md roles", () => {
-      const roles = chapterExecJson<unknown[]>(
+      const roles = masonExecJson<unknown[]>(
         ["chapter", "list", "--json"],
         workspaceDir,
       );
@@ -60,7 +60,7 @@ describe("role-based workflow", () => {
     });
 
     it("returns roles with expected structure", () => {
-      const roles = chapterExecJson<Array<Record<string, unknown>>>(
+      const roles = masonExecJson<Array<Record<string, unknown>>>(
         ["chapter", "list", "--json"],
         workspaceDir,
       );
@@ -82,12 +82,12 @@ describe("role-based workflow", () => {
   describe("chapter validate", () => {
     it("validates local ROLE.md role successfully", () => {
       // Should exit 0 (no throw)
-      chapterExec(["chapter", "validate", "test-writer"], workspaceDir);
+      masonExec(["chapter", "validate", "test-writer"], workspaceDir);
     });
 
     it("validates packaged role not found when not installed in node_modules", () => {
       // Packaged roles are only discoverable from node_modules, not workspace packages
-      const result = chapterExecExpectError(
+      const result = masonExecExpectError(
         ["chapter", "validate", "@test/role-writer"],
         workspaceDir,
       );
@@ -104,10 +104,10 @@ describe("role-based workflow", () => {
 
     beforeAll(() => {
       // Build the workspace using the local role
-      chapterExec(["chapter", "build", "test-writer"], workspaceDir, {
+      masonExec(["chapter", "build", "test-writer"], workspaceDir, {
         timeout: 120_000,
       });
-      dockerDir = path.join(workspaceDir, ".clawmasons", "docker");
+      dockerDir = path.join(workspaceDir, ".mason", "docker");
     }, 120_000);
 
     it("generates docker directory", () => {

@@ -41,7 +41,7 @@ function makeTestRole(overrides?: Partial<RoleType>): RoleType {
     skills: [{ name: "prd-writing" }],
     container: {
       packages: { apt: ["jq", "curl"], npm: ["typescript"], pip: [] },
-      ignore: { paths: [".clawmasons/", ".claude/", ".env"] },
+      ignore: { paths: [".mason/", ".claude/", ".env"] },
       mounts: [],
     },
     governance: {
@@ -64,8 +64,8 @@ function makeTestRole(overrides?: Partial<RoleType>): RoleType {
 // ---------------------------------------------------------------------------
 
 describe("sanitizeVolumeName", () => {
-  it("converts .clawmasons to ignore-clawmasons", () => {
-    expect(sanitizeVolumeName(".clawmasons")).toBe("ignore-clawmasons");
+  it("converts .mason to ignore-mason", () => {
+    expect(sanitizeVolumeName(".mason")).toBe("ignore-mason");
   });
 
   it("converts .claude to ignore-claude", () => {
@@ -93,7 +93,7 @@ describe("sanitizeVolumeName", () => {
 
 describe("generateVolumeMasks", () => {
   it("classifies paths ending with / as directories", () => {
-    const masks = generateVolumeMasks([".clawmasons/", ".claude/"]);
+    const masks = generateVolumeMasks([".mason/", ".claude/"]);
 
     expect(masks).toHaveLength(2);
     expect(masks[0]!.type).toBe("directory");
@@ -109,9 +109,9 @@ describe("generateVolumeMasks", () => {
   });
 
   it("generates named volume names for directories", () => {
-    const masks = generateVolumeMasks([".clawmasons/"]);
+    const masks = generateVolumeMasks([".mason/"]);
 
-    expect(masks[0]!.volumeName).toBe("ignore-clawmasons");
+    expect(masks[0]!.volumeName).toBe("ignore-mason");
   });
 
   it("does not generate volume names for files", () => {
@@ -121,7 +121,7 @@ describe("generateVolumeMasks", () => {
   });
 
   it("targets /home/mason/workspace/project/ for all masks", () => {
-    const masks = generateVolumeMasks([".clawmasons/", ".env"]);
+    const masks = generateVolumeMasks([".mason/", ".env"]);
 
     for (const mask of masks) {
       expect(mask.containerPath).toMatch(/^\/home\/mason\/workspace\/project\//);
@@ -129,14 +129,14 @@ describe("generateVolumeMasks", () => {
   });
 
   it("correctly builds container paths", () => {
-    const masks = generateVolumeMasks([".clawmasons/", ".env"]);
+    const masks = generateVolumeMasks([".mason/", ".env"]);
 
-    expect(masks[0]!.containerPath).toBe("/home/mason/workspace/project/.clawmasons");
+    expect(masks[0]!.containerPath).toBe("/home/mason/workspace/project/.mason");
     expect(masks[1]!.containerPath).toBe("/home/mason/workspace/project/.env");
   });
 
   it("handles mixed directories and files", () => {
-    const masks = generateVolumeMasks([".clawmasons/", ".claude/", ".env", ".codes/"]);
+    const masks = generateVolumeMasks([".mason/", ".claude/", ".env", ".codes/"]);
 
     const dirs = masks.filter((m) => m.type === "directory");
     const files = masks.filter((m) => m.type === "file");
@@ -171,7 +171,7 @@ describe("ensureSentinelFile", () => {
 
     expect(calls.writeFileSync).toHaveLength(1);
     const writeCall = calls.writeFileSync[0] as { p: string; data: string; opts: { mode: number } };
-    expect(writeCall.p).toBe(path.join("/project", ".clawmasons", "empty-file"));
+    expect(writeCall.p).toBe(path.join("/project", ".mason", "empty-file"));
     expect(writeCall.data).toBe("");
     expect(writeCall.opts.mode).toBe(0o444);
   });
@@ -197,7 +197,7 @@ describe("ensureSentinelFile", () => {
       chmodSync: () => {},
     });
 
-    expect(result).toBe(path.join("/project", ".clawmasons", "empty-file"));
+    expect(result).toBe(path.join("/project", ".mason", "empty-file"));
   });
 
   it("creates parent directory with recursive option", () => {
@@ -229,7 +229,7 @@ describe("generateRoleDockerBuildDir", () => {
         agentType: "claude-code",
         projectDir: "/project",
         agentName: "@acme/agent-note-taker",
-        dockerBuildRoot: "/project/.clawmasons/docker",
+        dockerBuildRoot: "/project/.mason/docker",
       },
       {
         mkdirSync: (p) => { createdDirs.push(p); },
@@ -238,7 +238,7 @@ describe("generateRoleDockerBuildDir", () => {
     );
 
     // Build dir path
-    expect(result.buildDir).toBe(path.join("/project/.clawmasons/docker", "create-prd"));
+    expect(result.buildDir).toBe(path.join("/project/.mason/docker", "create-prd"));
 
     // Agent Dockerfile exists
     const agentDockerfile = path.join(result.buildDir, "claude-code", "Dockerfile");
@@ -300,7 +300,7 @@ describe("generateRoleDockerBuildDir", () => {
     );
     expect(proxyDockerfile).toBeDefined();
     expect(proxyDockerfile![1]).toContain("FROM node:22-slim");
-    expect(proxyDockerfile![1]).toContain("clawmasons");
+    expect(proxyDockerfile![1]).toContain("mason");
     expect(proxyDockerfile![1]).toContain("proxy");
   });
 
@@ -339,7 +339,7 @@ describe("generateRoleDockerBuildDir", () => {
 describe("generateSessionComposeYml", () => {
   const baseOpts = {
     projectDir: "/project",
-    dockerBuildDir: "/project/.clawmasons/docker/create-prd",
+    dockerBuildDir: "/project/.mason/docker/create-prd",
     dockerDir: "/project/docker",
     roleName: "create-prd",
     agentType: "claude-code",
@@ -347,9 +347,9 @@ describe("generateSessionComposeYml", () => {
     proxyToken: "test-proxy-token",
     credentialProxyToken: "test-cred-token",
     proxyPort: 3000,
-    volumeMasks: generateVolumeMasks([".clawmasons/", ".claude/", ".env"]),
-    sessionDir: "/project/.clawmasons/sessions/abc12345",
-    logsDir: "/project/.clawmasons/sessions/abc12345/logs",
+    volumeMasks: generateVolumeMasks([".mason/", ".claude/", ".env"]),
+    sessionDir: "/project/.mason/sessions/abc12345",
+    logsDir: "/project/.mason/sessions/abc12345/logs",
   };
 
   it("generates valid YAML with proxy and agent services", () => {
@@ -363,7 +363,7 @@ describe("generateSessionComposeYml", () => {
   it("includes volume masking for directories as named volumes", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
-    expect(yml).toContain("ignore-clawmasons:/home/mason/workspace/project/.clawmasons");
+    expect(yml).toContain("ignore-mason:/home/mason/workspace/project/.mason");
     expect(yml).toContain("ignore-claude:/home/mason/workspace/project/.claude");
   });
 
@@ -378,7 +378,7 @@ describe("generateSessionComposeYml", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
     expect(yml).toContain("volumes:");
-    expect(yml).toContain("  ignore-clawmasons:");
+    expect(yml).toContain("  ignore-mason:");
     expect(yml).toContain("  ignore-claude:");
   });
 
@@ -392,7 +392,7 @@ describe("generateSessionComposeYml", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
     // Should NOT contain absolute host paths in build contexts or volume sources
-    expect(yml).not.toContain("/project/.clawmasons/docker");
+    expect(yml).not.toContain("/project/.mason/docker");
     // Host volume sources should use relative paths like ../../..
     // Container paths like /home/mason/workspace/project are fine (they're container-internal)
     const lines = yml.split("\n");
@@ -478,7 +478,7 @@ describe("createSessionDirectory", () => {
     const result = createSessionDirectory(
       {
         projectDir: "/project",
-        dockerBuildDir: "/project/.clawmasons/docker/create-prd",
+        dockerBuildDir: "/project/.mason/docker/create-prd",
         dockerDir: "/project/docker",
         role: makeTestRole(),
         agentType: "claude-code",
@@ -492,7 +492,7 @@ describe("createSessionDirectory", () => {
     );
 
     expect(result.sessionId).toBeDefined();
-    expect(result.sessionDir).toContain(".clawmasons/sessions/");
+    expect(result.sessionDir).toContain(".mason/sessions/");
     expect(result.composeFile).toContain("docker-compose.yaml");
     expect(result.proxyServiceName).toBe("proxy-create-prd");
     expect(result.agentServiceName).toBe("agent-create-prd");
@@ -514,7 +514,7 @@ describe("createSessionDirectory", () => {
     const result = createSessionDirectory(
       {
         projectDir: "/project",
-        dockerBuildDir: "/project/.clawmasons/docker/create-prd",
+        dockerBuildDir: "/project/.mason/docker/create-prd",
         dockerDir: "/project/docker",
         role: makeTestRole(),
         agentType: "claude-code",
@@ -541,7 +541,7 @@ describe("createSessionDirectory", () => {
     createSessionDirectory(
       {
         projectDir: "/project",
-        dockerBuildDir: "/project/.clawmasons/docker/create-prd",
+        dockerBuildDir: "/project/.mason/docker/create-prd",
         dockerDir: "/project/docker",
         role: makeTestRole(),
         agentType: "claude-code",
@@ -561,7 +561,7 @@ describe("createSessionDirectory", () => {
 
     const content = composeFile![1];
     // Directory masks
-    expect(content).toContain("ignore-clawmasons:/home/mason/workspace/project/.clawmasons");
+    expect(content).toContain("ignore-mason:/home/mason/workspace/project/.mason");
     expect(content).toContain("ignore-claude:/home/mason/workspace/project/.claude");
     // File mask
     expect(content).toContain("/home/mason/workspace/project/.env:ro");
@@ -580,7 +580,7 @@ describe("createSessionDirectory", () => {
     createSessionDirectory(
       {
         projectDir: "/project",
-        dockerBuildDir: "/project/.clawmasons/docker/minimal",
+        dockerBuildDir: "/project/.mason/docker/minimal",
         dockerDir: "/project/docker",
         role: roleNoIgnore,
         agentType: "claude-code",

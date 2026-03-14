@@ -5,7 +5,7 @@ import type { UnmatchedServer } from "./matcher.js";
  *
  * Produces a multi-line string matching the PRD REQ-004 format:
  * ```
- * [clawmasons run-acp-agent] WARNING: Dropping unmatched MCP server "<name>"
+ * [mason run-acp-agent] WARNING: Dropping unmatched MCP server "<name>"
  *   -> No chapter App matches server name, command, or URL
  *   -> Agent will not have access to tools from this server
  *   -> To govern this server, create a chapter App package for it
@@ -16,7 +16,7 @@ import type { UnmatchedServer } from "./matcher.js";
  */
 export function formatWarning(server: UnmatchedServer): string {
   return [
-    `[clawmasons run-acp-agent] WARNING: Dropping unmatched MCP server "${server.name}"`,
+    `[mason run-acp-agent] WARNING: Dropping unmatched MCP server "${server.name}"`,
     `  \u2192 ${server.reason}`,
     `  \u2192 Agent will not have access to tools from this server`,
     `  \u2192 To govern this server, create a chapter App package for it`,

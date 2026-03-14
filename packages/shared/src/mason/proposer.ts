@@ -97,7 +97,7 @@ export function proposeRoleMd(
   // Container requirements with default ignore paths
   frontmatter.container = {
     ignore: {
-      paths: [".clawmasons/", ".claude/", ".env"],
+      paths: [".mason/", ".claude/", ".env"],
     },
   };
 

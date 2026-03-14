@@ -15,8 +15,8 @@ import { registerValidateCommand } from "./validate.js";
  * and register top-level commands (`init`, `run`).
  *
  * Also installs shorthand detection: if the first positional argument is a known
- * agent type (e.g., `clawmasons claude --role x`), it is treated as
- * `clawmasons run claude --role x`.
+ * agent type (e.g., `mason claude --role x`), it is treated as
+ * `mason run claude --role x`.
  */
 export function registerCommands(program: Command): void {
   // ── Top-level commands ──────────────────────────────────────────────
@@ -49,14 +49,14 @@ export function registerCommands(program: Command): void {
 
   // ── Shorthand detection ─────────────────────────────────────────────
   // If the first argument is a known agent type but not a registered command,
-  // rewrite `clawmasons <agent-type> ...` to `clawmasons run <agent-type> ...`
+  // rewrite `mason <agent-type> ...` to `mason run <agent-type> ...`
   installAgentTypeShorthand(program);
 }
 
 /**
  * Install a pre-parse hook that detects when the first argument is a known
- * agent type (e.g., `clawmasons claude --role x`) and rewrites it to
- * `clawmasons run claude --role x`.
+ * agent type (e.g., `mason claude --role x`) and rewrites it to
+ * `mason run claude --role x`.
  */
 function installAgentTypeShorthand(program: Command): void {
   // Collect the names of all registered commands (including subcommands)

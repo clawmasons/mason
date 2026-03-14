@@ -12,7 +12,7 @@ Clawmasons Chapter (formerly Agent Forge / forge) is a framework for creating an
 
 This PRD covers two interrelated changes:
 
-- **Rebrand:** Rename forge → chapter across all CLI commands, package names, directory structures, and documentation. The `forge` CLI becomes `chapter`, `.forge/` becomes `.chapter/`, and the `@clawmasons/forge` package becomes `@clawmasons/chapter`.
+- **Rebrand:** Rename forge → chapter across all CLI commands, package names, directory structures, and documentation. The `forge` CLI becomes `chapter`, `.forge/` becomes `.chapter/`, and the `@clawmasons/forge` package becomes `@clawmasons/mason`.
 - **Members model:** Replace the agent-centric model with a member-centric model. Members are either `human` or `agent` type. Both have roles, identities, and activity logs. Agent members retain runtimes (claude-code, codex). The CLI gains `chapter enable/disable @member` commands for managing member status.
 
 ---
@@ -34,7 +34,7 @@ This PRD covers two interrelated changes:
 | forge (CLI) | chapter (CLI) | All CLI commands |
 | `.forge/` | `.chapter/` | Workspace config directory |
 | `forge` field in package.json | `chapter` field in package.json | Package metadata key |
-| `@clawmasons/forge` | `@clawmasons/chapter` | Main CLI package |
+| `@clawmasons/forge` | `@clawmasons/mason` | Main CLI package |
 | `@clawmasons/forge-core` | `@clawmasons/chapter-core` | Component library |
 | `forge.config.json` | `chapter.config.json` | Workspace config file |
 | `forge.lock.json` | `chapter.lock.json` | Lock file |
@@ -317,7 +317,7 @@ Acceptance criteria:
 
 | Before | After |
 |--------|-------|
-| `@clawmasons/forge` | `@clawmasons/chapter` |
+| `@clawmasons/forge` | `@clawmasons/mason` |
 | `@clawmasons/forge-core` | `@clawmasons/chapter-core` |
 | `@clawmasons/app-*` | `@clawmasons/app-*` (unchanged) |
 | `@clawmasons/task-*` | `@clawmasons/task-*` (unchanged) |
@@ -326,7 +326,7 @@ Acceptance criteria:
 | `@clawmasons/agent-*` | `@clawmasons/member-*` |
 
 Acceptance criteria:
-- Given the root `package.json`, when inspected, then `name` is `"@clawmasons/chapter"`.
+- Given the root `package.json`, when inspected, then `name` is `"@clawmasons/mason"`.
 - Given `forge-core/package.json` (renamed to `chapter-core/`), when inspected, then `name` is `"@clawmasons/chapter-core"`.
 - Given existing agent packages, when migrated, then their names use the `member-` prefix.
 
@@ -550,7 +550,7 @@ const memberChapterFieldSchema = z.discriminatedUnion("memberType", [
 
 ### 9.2 For Users
 
-1. Install `@clawmasons/chapter` instead of `@clawmasons/forge`.
+1. Install `@clawmasons/mason` instead of `@clawmasons/forge`.
 2. Use `chapter` CLI instead of `forge`.
 3. Existing `.forge/` directories will need to be migrated to `.chapter/`.
 

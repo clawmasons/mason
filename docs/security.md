@@ -1,17 +1,17 @@
 ---
 title: Security Model
-description: How clawmasons secures agent execution and credential management
+description: How Mason secures agent execution and credential management
 ---
 
 # Security Model
 
-Clawmasons is built around the principle that AI agents should operate under explicit governance — with controlled tool access, isolated credentials, and full audit trails.
+Mason is built around the principle that AI agents should operate under explicit governance — with controlled tool access, isolated credentials, and full audit trails.
 
 ## Credential Isolation
 
 **Problem**: Most agent frameworks pass credentials via environment variables, which are visible through `docker inspect`, `/proc/*/environ`, and shell history.
 
-**Solution**: Clawmasons resolves credentials on-demand through the [credential service](component-credential-service.md):
+**Solution**: Mason resolves credentials on-demand through the [credential service](component-credential-service.md):
 
 - Credentials are **never stored** in Docker environment variables or compose files
 - The agent-entry bootstrap requests credentials through the MCP proxy at startup

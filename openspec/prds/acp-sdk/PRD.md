@@ -36,7 +36,7 @@ The `@agentclientprotocol/sdk` provides `AgentSideConnection`, `ClientSideConnec
 
 ### User Goals
 
-- No change to the editor-facing CLI interface (`clawmasons acp --role <name>`). Editors still spawn the process and communicate via stdio ndjson.
+- No change to the editor-facing CLI interface (`mason acp --role <name>`). Editors still spawn the process and communicate via stdio ndjson.
 - No change to credential resolution flow.
 
 ---
@@ -128,7 +128,7 @@ The bridge SHALL use `AgentSideConnection` to handle the editor-facing stdio con
 
 Acceptance criteria:
 
-- GIVEN the CLI starts with `clawmasons acp --role <name>`
+- GIVEN the CLI starts with `mason acp --role <name>`
 - WHEN the editor writes ndjson to the process's stdin
 - THEN the bridge SHALL process it via `AgentSideConnection`
 - AND responses SHALL be written as ndjson to stdout
@@ -180,11 +180,11 @@ Acceptance criteria:
 
 **REQ-SDK-006: Remove HTTP transport mode**
 
-The `--transport` CLI option SHALL be removed from the `clawmasons acp` command. The bridge SHALL use stdio exclusively. The internal HTTP bridge server SHALL be removed.
+The `--transport` CLI option SHALL be removed from the `mason acp` command. The bridge SHALL use stdio exclusively. The internal HTTP bridge server SHALL be removed.
 
 Acceptance criteria:
 
-- GIVEN the CLI command `clawmasons acp`
+- GIVEN the CLI command `mason acp`
 - WHEN `--transport http` is passed
 - THEN the CLI SHALL reject it with an error (unknown option)
 
@@ -196,7 +196,7 @@ The E2E test (`e2e/tests/acp-client-spawn.test.ts`) SHALL use `ClientSideConnect
 
 Acceptance criteria:
 
-- GIVEN the E2E test spawns the `clawmasons acp` process
+- GIVEN the E2E test spawns the `mason acp` process
 - WHEN the test sends `initialize` and `session/new`
 - THEN it SHALL use `ClientSideConnection` with `ndJsonStream` over the spawned process's stdio
 - AND the test SHALL verify the full ACP handshake and session lifecycle

@@ -1,6 +1,6 @@
 ---
 title: CLI Reference
-description: Complete command reference for the clawmasons CLI
+description: Complete command reference for the Mason CLI
 ---
 
 # CLI Reference
@@ -8,31 +8,31 @@ description: Complete command reference for the clawmasons CLI
 Install the CLI globally:
 
 ```bash
-npm install -g @clawmasons/chapter
+npm install -g @clawmasons/mason
 ```
 
 ## Top-Level Commands
 
-### `clawmasons init`
+### `mason init`
 
 Initialize a new lodge.
 
 ```bash
-clawmasons init [options]
+mason init [options]
 ```
 
 | Option | Description |
 |--------|-------------|
 | `--lodge <name>` | Lodge name (overrides `LODGE` env var) |
 | `--lodge-home <path>` | Lodge home directory (overrides `LODGE_HOME` env var) |
-| `--home <path>` | Clawmasons home directory (overrides `CLAWMASONS_HOME` env var) |
+| `--home <path>` | Mason home directory (overrides `MASON_HOME` env var) |
 
-### `clawmasons run`
+### `mason run`
 
 Run a role on the specified agent runtime, either interactively or as an ACP endpoint for editor integration.
 
 ```bash
-clawmasons run <agent-type> --role <name> [options]
+mason run <agent-type> --role <name> [options]
 ```
 
 | Argument | Description |
@@ -46,12 +46,12 @@ clawmasons run <agent-type> --role <name> [options]
 | `--proxy-port <number>` | Internal proxy port (default: `3000`) |
 | `--chapter <name>` | Chapter name (use `initiate` for bootstrap flow, ACP mode) |
 
-**Shorthand**: You can omit `run` — `clawmasons <agent-type> --role <name>` is equivalent.
+**Shorthand**: You can omit `run` — `mason <agent-type> --role <name>` is equivalent.
 
 **Interactive mode** (default):
 
 ```bash
-clawmasons run claude --role writer
+mason run claude --role writer
 ```
 
 Starts the MCP proxy and agent containers via Docker Compose, then attaches interactively.
@@ -59,7 +59,7 @@ Starts the MCP proxy and agent containers via Docker Compose, then attaches inte
 **ACP mode** (`--acp`):
 
 ```bash
-clawmasons run claude --role writer --acp
+mason run claude --role writer --acp
 ```
 
 Starts an ACP-compliant endpoint for editor integration via stdio ndjson.
@@ -69,9 +69,9 @@ Starts an ACP-compliant endpoint for editor integration via stdio ndjson.
 ```json
 {
   "context_servers": {
-    "clawmasons": {
+    "mason": {
       "command": {
-        "path": "clawmasons",
+        "path": "mason",
         "args": ["run", "claude", "--role", "writer", "--acp"]
       }
     }
@@ -87,12 +87,12 @@ In both modes, the MCP proxy runs in a Docker container and the credential servi
 
 All workspace management commands are under the `chapter` subgroup.
 
-### `clawmasons chapter init`
+### `mason chapter init`
 
 Initialize a new chapter workspace.
 
 ```bash
-clawmasons chapter init --name <lodge>.<chapter> [options]
+mason chapter init --name <lodge>.<chapter> [options]
 ```
 
 | Option | Description |
@@ -100,12 +100,12 @@ clawmasons chapter init --name <lodge>.<chapter> [options]
 | `--name <name>` | **(required)** Workspace name in `<lodge>.<chapter>` format |
 | `--template <template>` | Use a project template (e.g., `note-taker`) |
 
-### `clawmasons chapter build`
+### `mason chapter build`
 
 Build chapter workspace: resolve roles, pack packages, and generate Docker artifacts.
 
 ```bash
-clawmasons chapter build [role] [options]
+mason chapter build [role] [options]
 ```
 
 | Argument | Description |
@@ -117,24 +117,24 @@ clawmasons chapter build [role] [options]
 | `--output <path>` | Output path for lock file |
 | `--json` | Print lock file to stdout as JSON |
 
-### `clawmasons chapter list`
+### `mason chapter list`
 
 List roles and their dependency trees.
 
 ```bash
-clawmasons chapter list [options]
+mason chapter list [options]
 ```
 
 | Option | Description |
 |--------|-------------|
 | `--json` | Output as JSON |
 
-### `clawmasons chapter validate`
+### `mason chapter validate`
 
 Validate a role's dependency graph and permissions.
 
 ```bash
-clawmasons chapter validate <role> [options]
+mason chapter validate <role> [options]
 ```
 
 | Argument | Description |
@@ -145,12 +145,12 @@ clawmasons chapter validate <role> [options]
 |--------|-------------|
 | `--json` | Output validation result as JSON |
 
-### `clawmasons chapter permissions`
+### `mason chapter permissions`
 
 Display the resolved permission matrix and tool filters for a role.
 
 ```bash
-clawmasons chapter permissions <role> [options]
+mason chapter permissions <role> [options]
 ```
 
 | Argument | Description |
@@ -161,12 +161,12 @@ clawmasons chapter permissions <role> [options]
 |--------|-------------|
 | `--json` | Output as JSON |
 
-### `clawmasons chapter add`
+### `mason chapter add`
 
 Add a chapter package dependency (wraps npm install with chapter validation).
 
 ```bash
-clawmasons chapter add <pkg> [npmArgs...]
+mason chapter add <pkg> [npmArgs...]
 ```
 
 | Argument | Description |
@@ -174,12 +174,12 @@ clawmasons chapter add <pkg> [npmArgs...]
 | `<pkg>` | Package name to add |
 | `[npmArgs...]` | Additional arguments forwarded to npm install |
 
-### `clawmasons chapter remove`
+### `mason chapter remove`
 
 Remove a chapter package dependency (wraps npm uninstall with dependent checking).
 
 ```bash
-clawmasons chapter remove <pkg> [npmArgs...] [options]
+mason chapter remove <pkg> [npmArgs...] [options]
 ```
 
 | Argument | Description |
@@ -191,12 +191,12 @@ clawmasons chapter remove <pkg> [npmArgs...] [options]
 |--------|-------------|
 | `--force` | Remove even if other packages depend on it |
 
-### `clawmasons chapter init-role`
+### `mason chapter init-role`
 
 Initialize a host-wide runtime directory for a chapter role.
 
 ```bash
-clawmasons chapter init-role --role <name> [options]
+mason chapter init-role --role <name> [options]
 ```
 
 | Option | Description |
@@ -204,20 +204,20 @@ clawmasons chapter init-role --role <name> [options]
 | `--role <name>` | **(required)** Role to initialize |
 | `--target-dir <path>` | Override the default role directory location |
 
-### `clawmasons chapter pack`
+### `mason chapter pack`
 
 Build and pack all workspace packages into `dist/`.
 
 ```bash
-clawmasons chapter pack
+mason chapter pack
 ```
 
-### `clawmasons chapter proxy`
+### `mason chapter proxy`
 
 Start the chapter MCP proxy server for a role.
 
 ```bash
-clawmasons chapter proxy [options]
+mason chapter proxy [options]
 ```
 
 | Option | Description |
@@ -233,6 +233,6 @@ clawmasons chapter proxy [options]
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CLAWMASONS_HOME` | `~/.clawmasons` | Root directory for clawmasons data |
+| `MASON_HOME` | `~/.mason` | Root directory for mason data |
 | `LODGE` | Auto-detected | Current lodge name |
-| `LODGE_HOME` | `$CLAWMASONS_HOME/$LODGE` | Current lodge directory |
+| `LODGE_HOME` | `$MASON_HOME/$LODGE` | Current lodge directory |

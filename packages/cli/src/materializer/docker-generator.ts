@@ -2,7 +2,7 @@
  * Role-centric Docker build directory and session generation.
  *
  * Generates:
- * 1. Docker build directories at `.clawmasons/docker/<role-name>/` (PRD §7.1)
+ * 1. Docker build directories at `.mason/docker/<role-name>/` (PRD §7.1)
  * 2. Volume masking for container.ignore.paths (PRD §7.3)
  * 3. Sentinel empty file for file-level volume masking
  * 4. Session directories with self-contained compose files (PRD §7.5)
@@ -26,7 +26,7 @@ import { resolveRoleMountVolumes, type RoleMount } from "../generator/mount-volu
 // ---------------------------------------------------------------------------
 
 /** Path to sentinel empty file relative to project root. */
-const SENTINEL_RELATIVE_PATH = ".clawmasons/empty-file";
+const SENTINEL_RELATIVE_PATH = ".mason/empty-file";
 
 /** Container path where the project is mounted read-only. */
 const PROJECT_MOUNT_PATH = "/home/mason/workspace/project";
@@ -105,7 +105,7 @@ export function generateVolumeMasks(ignorePaths: string[]): VolumeMaskEntry[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Ensure the sentinel empty file exists at `.clawmasons/empty-file`.
+ * Ensure the sentinel empty file exists at `.mason/empty-file`.
  *
  * The file is 0 bytes with permissions `0o444` (read-only for all).
  * Idempotent — does nothing if the file already exists.
@@ -151,7 +151,7 @@ export interface GenerateBuildDirOptions {
   agentType: string;
   /** Absolute path to the project root. */
   projectDir: string;
-  /** Root of docker build output (defaults to `<projectDir>/.clawmasons/docker`). */
+  /** Root of docker build output (defaults to `<projectDir>/.mason/docker`). */
   dockerBuildRoot?: string;
   /** Agent name for the proxy CMD (the npm agent package name). */
   agentName: string;
@@ -170,7 +170,7 @@ export interface BuildDirResult {
 
 /**
  * Generate the role-centric Docker build directory at
- * `.clawmasons/docker/<role-name>/`.
+ * `.mason/docker/<role-name>/`.
  *
  * Structure (PRD §7.1):
  * ```
@@ -198,7 +198,7 @@ export function generateRoleDockerBuildDir(
 
   const { role, agentType, projectDir, agentName, proxyEndpoint } = opts;
   const roleName = getAppShortName(role.metadata.name);
-  const buildRoot = opts.dockerBuildRoot ?? path.join(projectDir, ".clawmasons", "docker");
+  const buildRoot = opts.dockerBuildRoot ?? path.join(projectDir, ".mason", "docker");
   const buildDir = path.join(buildRoot, roleName);
 
   // --- Agent subdirectory ---
@@ -252,7 +252,7 @@ function generateReferenceBuildCompose(
 ): string {
   return `# Reference docker-compose for role: ${roleName}
 # This is for reference only. Runnable compose files are in session directories.
-# See .clawmasons/sessions/<session-id>/docker-compose.yaml
+# See .mason/sessions/<session-id>/docker-compose.yaml
 services:
   proxy-${roleName}:
     build:
@@ -518,7 +518,7 @@ export function createSessionDirectory(
   const sessionId = deps.randomBytes(4).toString("hex");
 
   // Create session directory
-  const sessionDir = path.join(projectDir, ".clawmasons", "sessions", sessionId);
+  const sessionDir = path.join(projectDir, ".mason", "sessions", sessionId);
   deps.mkdirSync(sessionDir, { recursive: true });
 
   // Create logs directory

@@ -1,11 +1,11 @@
 /**
- * E2E Test: ACP session lifecycle via `clawmasons run --agent-type mcp --acp --role mcp-test`
+ * E2E Test: ACP session lifecycle via `mason run --agent-type mcp --acp --role mcp-test`
  *
  * Tests the full ACP flow using the SDK's ClientSideConnection over stdio
  * ndjson — the same protocol path that a real editor would use.
  *
  *   1. Copy fixture workspace with mcp-test role
- *   2. Spawn `clawmasons run --agent-type mcp --acp --role mcp-test` (project-local)
+ *   2. Spawn `mason run --agent-type mcp --acp --role mcp-test` (project-local)
  *   3. Verify ACP handshake via ClientSideConnection.initialize()
  *   4. Send session/new with cwd — triggers agent container start
  *   5. Verify agent responds to prompt
@@ -32,7 +32,7 @@ import {
   type NewSessionResponse,
   type PromptResponse,
 } from "@agentclientprotocol/sdk";
-import { CLAWMASONS_BIN, copyFixtureWorkspace } from "./helpers.js";
+import { MASON_BIN, copyFixtureWorkspace } from "./helpers.js";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -77,7 +77,7 @@ describe("ACP project-local e2e", () => {
     });
 
     // Clean up Docker containers from previous runs
-    const sessionsDir = path.join(workspaceDir, ".clawmasons", "sessions");
+    const sessionsDir = path.join(workspaceDir, ".mason", "sessions");
     if (fs.existsSync(sessionsDir)) {
       for (const sessionId of fs.readdirSync(sessionsDir)) {
         const composeFile = path.join(sessionsDir, sessionId, "docker", "docker-compose.yml");
@@ -122,7 +122,7 @@ describe("ACP project-local e2e", () => {
     acpProcess = spawn(
       "node",
       [
-        CLAWMASONS_BIN,
+        MASON_BIN,
         "run",
         "--agent-type", "mcp",
         "--acp",
@@ -175,11 +175,11 @@ describe("ACP project-local e2e", () => {
     expect(initResponse.agentInfo).toBeTruthy();
 
     // Verify docker artifacts were auto-built in project-local path
-    const dockerDir = path.join(workspaceDir, ".clawmasons", "docker");
+    const dockerDir = path.join(workspaceDir, ".mason", "docker");
     expect(fs.existsSync(dockerDir)).toBe(true);
 
-    // Verify .clawmasons/.gitignore was created
-    const gitignorePath = path.join(workspaceDir, ".clawmasons", ".gitignore");
+    // Verify .mason/.gitignore was created
+    const gitignorePath = path.join(workspaceDir, ".mason", ".gitignore");
     if (fs.existsSync(gitignorePath)) {
       const gitignoreContent = fs.readFileSync(gitignorePath, "utf-8");
       expect(gitignoreContent).toContain("docker/");
@@ -204,8 +204,8 @@ describe("ACP project-local e2e", () => {
     expect(typeof sessionResponse.sessionId).toBe("string");
     expect(sessionResponse.sessionId.length).toBeGreaterThan(0);
 
-    // Verify .clawmasons directory was created in the session CWD
-    expect(fs.existsSync(path.join(sessionCwd, ".clawmasons"))).toBe(true);
+    // Verify .mason directory was created in the session CWD
+    expect(fs.existsSync(path.join(sessionCwd, ".mason"))).toBe(true);
   }, SESSION_START_TIMEOUT_MS + 15_000);
 
   // ── Test 3: Tool Listing via Prompt ────────────────────────────────

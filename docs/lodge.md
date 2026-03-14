@@ -5,23 +5,23 @@ description: Top-level organizational container for agent governance
 
 # Lodge
 
-A **lodge** is the top-level organizational container in clawmasons. It represents a governance boundary — like a company or team workspace — under which all agent [chapters](chapter.md) are organized.
+A **lodge** is the top-level organizational container in mason. It represents a governance boundary — like a company or team workspace — under which all agent [chapters](chapter.md) are organized.
 
 ## Creating a Lodge
 
 ```bash
-clawmasons init
+mason init
 ```
 
 Options:
 - `--lodge <name>` — Lodge name (overrides `LODGE` env var)
 - `--lodge-home <path>` — Lodge home directory (overrides `LODGE_HOME` env var)
-- `--home <path>` — Clawmasons home directory (overrides `CLAWMASONS_HOME` env var)
+- `--home <path>` — Mason home directory (overrides `MASON_HOME` env var)
 
 ## Directory Structure
 
 ```
-~/.clawmasons/
+~/.mason/
   config.json              # Registered lodges
   <lodge-name>/
     CHARTER.md             # Governance charter
@@ -36,9 +36,9 @@ Each lodge contains a `CHARTER.md` that defines governance rules for all agents 
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `CLAWMASONS_HOME` | `~/.clawmasons` | Root directory for all clawmasons data |
+| `MASON_HOME` | `~/.mason` | Root directory for all mason data |
 | `LODGE` | Auto-detected | Current lodge name |
-| `LODGE_HOME` | `$CLAWMASONS_HOME/$LODGE` | Current lodge directory |
+| `LODGE_HOME` | `$MASON_HOME/$LODGE` | Current lodge directory |
 
 ## Multi-Lodge Setups
 

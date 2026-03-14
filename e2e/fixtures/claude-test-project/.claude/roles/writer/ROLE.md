@@ -30,7 +30,7 @@ container:
       - curl
   ignore:
     paths:
-      - '.clawmasons/'
+      - '.mason/'
       - '.claude/'
       - '.env'
 

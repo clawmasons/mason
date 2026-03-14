@@ -129,9 +129,9 @@ Extract shared types, schemas, and utilities into `packages/shared` so both CLI 
 
 Split remaining code into `packages/cli` and `packages/proxy`, convert root to npm workspaces monorepo.
 
-**PRD refs:** REQ-001 (npm Workspaces Monorepo), REQ-002 (`packages/cli` — `@clawmasons/chapter`), REQ-003 (`packages/proxy` — `@clawmasons/proxy`)
+**PRD refs:** REQ-001 (npm Workspaces Monorepo), REQ-002 (`packages/cli` — `@clawmasons/mason`), REQ-003 (`packages/proxy` — `@clawmasons/proxy`)
 
-**Summary:** Now that shared types are extracted (CHANGE 3), split the remaining source code. Move proxy code (`src/proxy/*`) into `packages/proxy/src/`. Move remaining CLI code (`src/cli/*`, `src/resolver/*`, `src/generator/*`, `src/validator/*`) into `packages/cli/src/`. Split tests between packages accordingly. Create `packages/proxy/package.json` (`@clawmasons/proxy`) and `packages/cli/package.json` (`@clawmasons/chapter`). Update root `package.json` to add `"workspaces": ["packages/*"]` and shared dev dependencies. Update root `tsconfig.json` for TypeScript project references. Both packages depend on `@clawmasons/shared`.
+**Summary:** Now that shared types are extracted (CHANGE 3), split the remaining source code. Move proxy code (`src/proxy/*`) into `packages/proxy/src/`. Move remaining CLI code (`src/cli/*`, `src/resolver/*`, `src/generator/*`, `src/validator/*`) into `packages/cli/src/`. Split tests between packages accordingly. Create `packages/proxy/package.json` (`@clawmasons/proxy`) and `packages/cli/package.json` (`@clawmasons/mason`). Update root `package.json` to add `"workspaces": ["packages/*"]` and shared dev dependencies. Update root `tsconfig.json` for TypeScript project references. Both packages depend on `@clawmasons/shared`.
 
 **User Story:** As a developer, when I run `npm install` at the monorepo root, all three packages are linked. `npm run build` builds all packages in dependency order. Each package can be published independently.
 
@@ -141,7 +141,7 @@ Split remaining code into `packages/cli` and `packages/proxy`, convert root to n
 - Move: `tests/` → split between `packages/cli/tests/` and `packages/proxy/tests/`
 - New: `packages/proxy/package.json` — `@clawmasons/proxy`, depends on `@clawmasons/shared`
 - New: `packages/proxy/tsconfig.json`
-- New: `packages/cli/package.json` — `@clawmasons/chapter`, depends on `@clawmasons/shared`
+- New: `packages/cli/package.json` — `@clawmasons/mason`, depends on `@clawmasons/shared`
 - New: `packages/cli/tsconfig.json`
 - Modify: root `package.json` — add `"workspaces": ["packages/*"]`, shared dev deps, build scripts
 - Modify: root `tsconfig.json` — project references to all three packages
@@ -159,7 +159,7 @@ Implement the docker-init command: read chapter config, create docker directory,
 
 **PRD refs:** REQ-009 (Read Chapter Config), REQ-010 (Create Docker Directory), REQ-011 (Install Local Packages)
 
-**Summary:** Create a new `docker-init` CLI command at `packages/cli/src/commands/docker-init.ts`. The command reads `.clawmasons/chapter.json` to get the chapter's full name (`<lodge-slug>.<chapter-slug>`). Creates a `docker/` directory in the chapter root with a `package.json`. Adds an `install-local` npm script to the root `package.json` (`cd docker && npm install ../dist/*.tgz`). Runs the local install to populate `docker/node_modules/` with all chapter packages from packed tgz files.
+**Summary:** Create a new `docker-init` CLI command at `packages/cli/src/commands/docker-init.ts`. The command reads `.mason/chapter.json` to get the chapter's full name (`<lodge-slug>.<chapter-slug>`). Creates a `docker/` directory in the chapter root with a `package.json`. Adds an `install-local` npm script to the root `package.json` (`cd docker && npm install ../dist/*.tgz`). Runs the local install to populate `docker/node_modules/` with all chapter packages from packed tgz files.
 
 **User Story:** As a chapter author, when I run `chapter docker-init` in my chapter project (after packing to `/dist`), it creates a `docker/` directory with `package.json` and a populated `node_modules/` containing all my chapter packages.
 
@@ -169,7 +169,7 @@ Implement the docker-init command: read chapter config, create docker directory,
 - Modify: `packages/cli/src/commands/index.ts` — register `docker-init` command
 - Reuse: `src/resolver/discover.ts` patterns for scanning packages
 
-**Testable output:** Running `chapter docker-init` in a chapter project reads `.clawmasons/chapter.json` successfully. `docker/` directory is created with `package.json`. Root `package.json` has the `install-local` script. `docker/node_modules/` is populated after install. Error message shown when `.clawmasons/chapter.json` is missing. `npx tsc --noEmit` compiles. `npx vitest run` passes.
+**Testable output:** Running `chapter docker-init` in a chapter project reads `.mason/chapter.json` successfully. `docker/` directory is created with `package.json`. Root `package.json` has the `install-local` script. `docker/node_modules/` is populated after install. Error message shown when `.mason/chapter.json` is missing. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
 **Not Implemented Yet**
 
@@ -207,16 +207,16 @@ Implement the run-init command to initialize a project directory for running cha
 
 **PRD refs:** REQ-016 (Create Project Config), REQ-017 (chapter.json Format), REQ-018 (Idempotent)
 
-**Summary:** Create a new `run-init` CLI command at `packages/cli/src/commands/run-init.ts`. The command creates `.clawmasons/` in the current directory with `chapter.json`, `logs/`, and `workspace/` subdirectories. Prompts the user for the absolute path to the chapter project's `docker/` directory (the build directory from `docker-init`). The generated `chapter.json` contains `chapter` (identifier), `docker-registries: ["local"]`, and `docker-build` (absolute path). The command is idempotent — re-running preserves existing config and sessions.
+**Summary:** Create a new `run-init` CLI command at `packages/cli/src/commands/run-init.ts`. The command creates `.mason/` in the current directory with `chapter.json`, `logs/`, and `workspace/` subdirectories. Prompts the user for the absolute path to the chapter project's `docker/` directory (the build directory from `docker-init`). The generated `chapter.json` contains `chapter` (identifier), `docker-registries: ["local"]`, and `docker-build` (absolute path). The command is idempotent — re-running preserves existing config and sessions.
 
-**User Story:** As a developer, when I `cd` to my project directory and run `chapter run-init`, it creates `.clawmasons/` with the correct structure. When I run it again, my existing config and sessions are preserved.
+**User Story:** As a developer, when I `cd` to my project directory and run `chapter run-init`, it creates `.mason/` with the correct structure. When I run it again, my existing config and sessions are preserved.
 
 **Scope:**
 - New: `packages/cli/src/commands/run-init.ts` — command implementation
 - New: `packages/cli/tests/commands/run-init.test.ts` — unit tests
 - Modify: `packages/cli/src/commands/index.ts` — register `run-init` command
 
-**Testable output:** Running `chapter run-init` creates `.clawmasons/chapter.json`, `.clawmasons/logs/`, and `.clawmasons/workspace/`. `chapter.json` contains `chapter`, `docker-registries`, and `docker-build` fields. `docker-build` is an absolute path. Re-running does not overwrite existing `chapter.json`. Existing sessions are preserved. `npx tsc --noEmit` compiles. `npx vitest run` passes.
+**Testable output:** Running `chapter run-init` creates `.mason/chapter.json`, `.mason/logs/`, and `.mason/workspace/`. `chapter.json` contains `chapter`, `docker-registries`, and `docker-build` fields. `docker-build` is an absolute path. Re-running does not overwrite existing `chapter.json`. Existing sessions are preserved. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
 **Not Implemented Yet**
 
@@ -228,7 +228,7 @@ Implement the run-agent command to run a chapter agent interactively against a p
 
 **PRD refs:** REQ-019 (Session ID Generation), REQ-020 (Docker Compose Generation), REQ-021 (Proxy Detached), REQ-022 (Agent Interactive), REQ-023 (Session Retained)
 
-**Summary:** Create a new `run-agent` CLI command at `packages/cli/src/commands/run-agent.ts`. The command reads `.clawmasons/chapter.json` from the current project directory, generates a short unique session ID, creates `.clawmasons/sessions/<sessionid>/docker/`, and generates a `docker-compose.yml` pointing at the correct proxy and agent Dockerfiles from the `docker-build` path. Starts the proxy container detached (background, logs to `.clawmasons/logs/`). Starts the agent container interactively with stdio connected to the user's terminal. When the agent exits, the proxy is torn down via `docker compose down`. The session directory is retained for debugging.
+**Summary:** Create a new `run-agent` CLI command at `packages/cli/src/commands/run-agent.ts`. The command reads `.mason/chapter.json` from the current project directory, generates a short unique session ID, creates `.mason/sessions/<sessionid>/docker/`, and generates a `docker-compose.yml` pointing at the correct proxy and agent Dockerfiles from the `docker-build` path. Starts the proxy container detached (background, logs to `.mason/logs/`). Starts the agent container interactively with stdio connected to the user's terminal. When the agent exits, the proxy is torn down via `docker compose down`. The session directory is retained for debugging.
 
 **User Story:** As a developer, when I run `chapter run-agent note-taker writer` in my project directory, it starts a proxy in the background and opens an interactive agent session. When I exit the agent, the proxy shuts down. My session directory with compose file and logs is preserved for debugging.
 
@@ -238,6 +238,6 @@ Implement the run-agent command to run a chapter agent interactively against a p
 - Modify: `packages/cli/src/commands/index.ts` — register `run-agent` command
 - Reuse: `packages/cli/src/cli/commands/docker-utils.ts` — `checkDockerCompose()` for pre-flight check, `execDockerCompose()` for `docker compose up/down`
 
-**Testable output:** Running `chapter run-agent note-taker writer` creates `.clawmasons/sessions/<sessionid>/docker/docker-compose.yml`. The compose file references correct Dockerfiles from the `docker-build` path. Each invocation generates a unique session ID. Proxy starts detached, agent starts interactively. On agent exit, proxy is torn down. Session directory is retained after exit. `npx tsc --noEmit` compiles. `npx vitest run` passes.
+**Testable output:** Running `chapter run-agent note-taker writer` creates `.mason/sessions/<sessionid>/docker/docker-compose.yml`. The compose file references correct Dockerfiles from the `docker-build` path. Each invocation generates a unique session ID. Proxy starts detached, agent starts interactively. On agent exit, proxy is torn down. Session directory is retained after exit. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
 **Not Implemented Yet**
