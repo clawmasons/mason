@@ -1,34 +1,76 @@
 # Spec: run-command
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: chapter run command is registered as a CLI command
 
-The CLI SHALL register a `run` command that accepts a required `<member>` argument (member package name), an optional `--runtime <name>` option, and an optional `--output-dir <dir>` option.
+The CLI SHALL register a `run` command that accepts a required `--role <name>` option and an optional `--agent-type <type>` option. The `<agent-type>` positional argument is removed.
 
 #### Scenario: Command registration
 - **WHEN** the CLI program is initialized
-- **THEN** the `run` command SHALL be available with argument `<member>`, option `--runtime`, and option `--output-dir`
+- **THEN** the `run` command SHALL be available with option `--role` (required) and option `--agent-type` (optional)
+- **AND** there SHALL be no positional `<agent-type>` argument
 
-### Requirement: chapter run resolves the member directory
+### Requirement: chapter run resolves project directory from cwd
 
-The run command SHALL resolve the member's scaffolded directory at `.chapter/members/<short-name>/` relative to the current working directory by default. If `--output-dir` is specified, it SHALL use that path instead. The short name is derived from the member package name by stripping the scope prefix and `member-` prefix (matching `getAppShortName` behavior).
+The run command SHALL resolve the project directory from `process.cwd()`. It SHALL NOT read `CLAWMASONS_HOME`, `chapters.json`, `config.json`, or any global state.
 
-#### Scenario: Default member directory resolution
-- **WHEN** `chapter run @acme/member-ops` is executed in a workspace where `.chapter/members/ops/docker-compose.yml` exists
-- **THEN** the command SHALL use `.chapter/members/ops/` as the member directory
+#### Scenario: Project directory from cwd
+- **WHEN** `chapter run --role writer` is executed from `/home/user/my-project`
+- **THEN** the project directory SHALL be `/home/user/my-project`
+- **AND** no reads to `~/.clawmasons/` SHALL occur
 
-#### Scenario: Custom output directory
-- **WHEN** `chapter run @acme/member-ops --output-dir ./custom/path` is executed
-- **THEN** the command SHALL use `./custom/path` as the member directory
+### Requirement: chapter run infers agent type from role source
 
-#### Scenario: Member directory not found
-- **WHEN** `chapter run @acme/member-ops` is executed but `.chapter/members/ops/` does not exist
-- **THEN** the command SHALL print an error message indicating the member is not installed and exit with code 1
+The run command SHALL infer the agent type from the role's source directory (e.g., `.claude/roles/foo/` → agent type `claude`). If `--agent-type` is specified, it SHALL override the inferred type.
 
-#### Scenario: docker-compose.yml missing
-- **WHEN** the member directory exists but does not contain `docker-compose.yml`
-- **THEN** the command SHALL print an error message indicating the member needs to be reinstalled and exit with code 1
+#### Scenario: Agent type inferred from role directory
+- **WHEN** `chapter run --role writer` is executed
+- **AND** the role "writer" is found at `.claude/roles/writer/ROLE.md`
+- **THEN** the agent type SHALL be inferred as "claude"
+
+#### Scenario: Agent type override
+- **WHEN** `chapter run --role writer --agent-type codex` is executed
+- **AND** the role "writer" is found at `.claude/roles/writer/ROLE.md`
+- **THEN** the agent type SHALL be "codex" (override takes precedence)
+
+### Requirement: chapter run uses project-local role discovery
+
+The run command SHALL use `resolveRole(name, projectDir)` from the shared discovery module to locate the role. It SHALL NOT use `findRoleEntryByRole()` from `home.ts` or read from any global registry.
+
+#### Scenario: Role resolved via project-local discovery
+- **WHEN** `chapter run --role writer` is executed
+- **THEN** the command SHALL call `resolveRole("writer", projectDir)`
+- **AND** SHALL NOT call `findRoleEntryByRole()`, `readChaptersJson()`, or `getClawmasonsHome()`
+
+#### Scenario: Role not found
+- **WHEN** `chapter run --role nonexistent` is executed
+- **AND** the role is not found locally or in `node_modules/`
+- **THEN** the command SHALL print an error and exit with code 1
+
+### Requirement: chapter run auto-builds docker artifacts if missing
+
+The run command SHALL check if docker build artifacts exist at `{projectDir}/.clawmasons/docker/{role-name}/`. If they do not exist, it SHALL automatically trigger `docker-init` to materialize them before proceeding.
+
+#### Scenario: Docker artifacts exist
+- **WHEN** `chapter run --role writer` is executed
+- **AND** `{projectDir}/.clawmasons/docker/writer/` contains the expected Dockerfiles
+- **THEN** the command SHALL proceed directly to session creation
+
+#### Scenario: Docker artifacts missing — auto-build
+- **WHEN** `chapter run --role writer` is executed
+- **AND** `{projectDir}/.clawmasons/docker/writer/` does not exist
+- **THEN** the command SHALL run `docker-init` for the role before proceeding
+- **AND** SHALL print a message indicating docker artifacts are being built
+
+### Requirement: chapter run uses project-local session directory
+
+The run command SHALL create the session at `{projectDir}/.clawmasons/sessions/{session-id}/` and generate docker-compose.yml referencing the project-local docker build directory.
+
+#### Scenario: Session created project-locally
+- **WHEN** `chapter run --role writer` is executed from `/home/user/my-project`
+- **THEN** the session directory SHALL be at `/home/user/my-project/.clawmasons/sessions/{session-id}/`
+- **AND** the docker-compose.yml SHALL reference `../../docker/writer/` for build contexts
 
 ### Requirement: chapter run validates environment variables before starting
 
@@ -103,20 +145,3 @@ Before attempting to start the stack, the run command SHALL verify that `docker 
 #### Scenario: Docker Compose not installed
 - **WHEN** `chapter run @acme/member-ops` is executed but `docker compose` is not available
 - **THEN** the command SHALL print an error indicating Docker Compose v2 is required and exit with code 1
-
-### Requirement: chapter run rejects disabled members
-
-After checking Docker Compose availability, the run command SHALL check the member's status in `.chapter/members.json`. If the member is explicitly disabled, the command SHALL refuse to start it. If the member is not in the registry at all, the command SHALL proceed normally (lenient behavior for backward compatibility and `--output-dir` usage).
-
-#### Scenario: Disabled member
-- **WHEN** `chapter run @acme/member-ops` is executed and the member has status `"disabled"` in `members.json`
-- **THEN** the command SHALL print an error indicating the member is disabled and suggesting `chapter enable @<slug>`
-- **AND** the process SHALL exit with code 1
-
-#### Scenario: Enabled member
-- **WHEN** `chapter run @acme/member-ops` is executed and the member has status `"enabled"` in `members.json`
-- **THEN** the command SHALL proceed normally with directory resolution and Docker Compose startup
-
-#### Scenario: Member not in registry
-- **WHEN** `chapter run @acme/member-ops` is executed and the member is not present in `members.json` (or the file does not exist)
-- **THEN** the command SHALL proceed normally (no blocking)
