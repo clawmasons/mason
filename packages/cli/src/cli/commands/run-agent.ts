@@ -185,6 +185,7 @@ export function generateComposeYml(opts: {
   proxyPort?: number;
   roleMounts?: RoleMount[];
   credentialKeys?: string[];
+  bashMode?: boolean;
 }): string {
   const { dockerBuildDir, dockerDir, projectDir, agent, role, logsDir, proxyToken, credentialProxyToken, proxyPort = 3000, roleMounts, credentialKeys } = opts;
 
@@ -233,7 +234,7 @@ ${agentVolumeLines.join("\n")}
       - ${proxyServiceName}
     environment:
       - MCP_PROXY_TOKEN=${proxyToken}
-      - MCP_PROXY_URL=http://${proxyServiceName}:9090${credentialKeys && credentialKeys.length > 0 ? `\n      - AGENT_CREDENTIALS=${JSON.stringify(credentialKeys)}` : ""}
+      - MCP_PROXY_URL=http://${proxyServiceName}:9090${credentialKeys && credentialKeys.length > 0 ? `\n      - AGENT_CREDENTIALS=${JSON.stringify(credentialKeys)}` : ""}${opts.bashMode ? `\n      - AGENT_COMMAND_OVERRIDE=bash` : ""}
     stdin_open: true
     tty: true
     init: true
@@ -421,6 +422,7 @@ function createRunAction() {
     positionalAgentType: string | undefined,
     options: {
       acp?: boolean;
+      bash?: boolean;
       proxyOnly?: boolean;
       agentType?: string;
       role?: string;
@@ -432,6 +434,12 @@ function createRunAction() {
 
     if (!role) {
       console.error("\n  --role <name> is required.\n  Usage: mason run --role <name> [--agent-type <type>]\n");
+      process.exit(1);
+      return;
+    }
+
+    if (options.bash && options.acp) {
+      console.error("\n  --bash and --acp are mutually exclusive.\n");
       process.exit(1);
       return;
     }
@@ -458,6 +466,7 @@ function createRunAction() {
     } else {
       await runAgent(process.cwd(), resolvedAgentType, role, undefined, {
         proxyPort: parseInt(options.proxyPort, 10),
+        bash: options.bash,
       });
     }
   };
@@ -469,6 +478,7 @@ export function registerRunCommand(program: Command): void {
     .description("Run a role on the specified agent runtime")
     .argument("[agent-type]", "Agent runtime type (e.g., claude, codex, aider, pi, mcp)")
     .option("--acp", "Start in ACP mode for editor integration")
+    .option("--bash", "Launch bash shell instead of the agent (for debugging)")
     .option("--role <name>", "Role name to run (required)")
     .option("--agent-type <name>", "Agent type (alternative to positional argument, overrides inference)")
     .option("--proxy-only", "Start proxy infrastructure only, output connection info as JSON")
@@ -502,15 +512,17 @@ export async function runAgent(
   acpOptions?: {
     acp?: boolean;
     proxyPort?: number;
+    bash?: boolean;
   },
 ): Promise<void> {
   const isAcpMode = acpOptions?.acp === true;
   const proxyPort = acpOptions?.proxyPort ?? 3000;
+  const bashMode = acpOptions?.bash === true;
 
   if (isAcpMode) {
     return runAgentAcpMode(projectDir, agent, role, proxyPort, deps);
   } else {
-    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps);
+    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode);
   }
 }
 
@@ -538,6 +550,7 @@ async function runAgentInteractiveMode(
   role: string,
   proxyPort: number,
   deps?: RunAgentDeps,
+  bashMode?: boolean,
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
@@ -605,6 +618,7 @@ async function runAgentInteractiveMode(
       proxyPort,
       roleMounts: roleType.container?.mounts,
       credentialKeys: declaredCredentialKeys,
+      bashMode,
     });
 
     const composeFile = path.join(dockerSessionDir, "docker-compose.yml");

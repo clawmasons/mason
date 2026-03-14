@@ -185,9 +185,6 @@ export const RUNTIME_CREDENTIALS: Record<string, LaunchCredentialConfig[]> = {
   "claude-code": [
     { key: "security.CLAUDE_CODE_CREDENTIALS", type: "file", path: "/home/mason/.claude/.credentials.json" },
   ],
-  "bash-agent": [
-    { key: "security.CLAUDE_CODE_CREDENTIALS", type: "file", path: "/home/mason/.claude/.credentials.json" },
-  ],
 };
 
 /**
@@ -197,7 +194,6 @@ export const RUNTIME_COMMANDS: Record<string, { command: string; args?: string[]
   "claude-code": { command: "claude" },
   "pi-coding-agent": { command: "pi" },
   "mcp-agent": { command: "mcp-agent" },
-  "bash-agent": { command: "bash" },
 };
 
 /**

@@ -203,15 +203,6 @@ describe("generateAgentDockerfile", () => {
     expect(result).toContain('ENTRYPOINT ["agent-entry"]');
   });
 
-  it("uses agent-entry entrypoint for bash-agent runtime", () => {
-    const agent = makeNoteTakerAgent();
-    agent.runtimes = ["bash-agent"];
-    const result = generateAgentDockerfile(agent, agent.roles[0]);
-
-    expect(result).toContain('ENTRYPOINT ["agent-entry"]');
-    expect(result).toContain("bash-agent");
-  });
-
   it("does not include LLM provider env vars (passed via compose)", () => {
     const agent = makeNoteTakerAgent();
     const result = generateAgentDockerfile(agent, agent.roles[0]);

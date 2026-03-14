@@ -361,6 +361,14 @@ export async function bootstrap(): Promise<never> {
     args = cmdParts.slice(1);
   }
 
+  // Allow runtime command override (e.g. --bash flag sets AGENT_COMMAND_OVERRIDE=bash)
+  const commandOverride = process.env.AGENT_COMMAND_OVERRIDE;
+  if (commandOverride) {
+    console.error(`[agent-entry] Command override: ${commandOverride}`);
+    command = commandOverride;
+    args = [];
+  }
+
   const credentialKeys = credentialConfigs.map((c) => c.key);
 
   try {

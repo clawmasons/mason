@@ -106,12 +106,6 @@ RUN npm install -g @mariozechner/pi-coding-agent
 # Runtime: mcp-agent (uses @clawmasons/mcp-agent from node_modules)
 `;
 
-    case "bash-agent":
-      return `
-# Runtime: bash-agent (interactive shell, no additional install)
-# Claude credentials will be installed by agent-entry from agent-launch.json
-`;
-
     default:
       return `
 # Runtime: ${runtime} (no specific install)

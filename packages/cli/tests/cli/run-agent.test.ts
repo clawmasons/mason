@@ -49,6 +49,15 @@ describe("CLI run command", () => {
       expect(acpOpt).toBeDefined();
     }
   });
+
+  it("run command has --bash option", () => {
+    const cmd = program.commands.find((c) => c.name() === "run");
+    expect(cmd).toBeDefined();
+    if (cmd) {
+      const bashOpt = cmd.options.find((o) => o.long === "--bash");
+      expect(bashOpt).toBeDefined();
+    }
+  });
 });
 
 // ── Agent Type Resolution ────────────────────────────────────────────────
@@ -409,6 +418,25 @@ describe("generateComposeYml", () => {
     expect(proxySection).toContain(
       `"${defaultOpts.dockerBuildDir}/mcp-proxy/.cache:/app/.cache"`,
     );
+  });
+
+  it("adds AGENT_COMMAND_OVERRIDE=bash when bashMode is true", () => {
+    const yml = generateComposeYml({ ...defaultOpts, bashMode: true });
+    const agentSection = yml.split("agent-writer:")[1]!;
+
+    expect(agentSection).toContain("AGENT_COMMAND_OVERRIDE=bash");
+  });
+
+  it("does not add AGENT_COMMAND_OVERRIDE when bashMode is false", () => {
+    const yml = generateComposeYml({ ...defaultOpts, bashMode: false });
+
+    expect(yml).not.toContain("AGENT_COMMAND_OVERRIDE");
+  });
+
+  it("does not add AGENT_COMMAND_OVERRIDE when bashMode is undefined", () => {
+    const yml = generateComposeYml(defaultOpts);
+
+    expect(yml).not.toContain("AGENT_COMMAND_OVERRIDE");
   });
 });
 
