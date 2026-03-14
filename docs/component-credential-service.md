@@ -54,11 +54,11 @@ Every credential request is logged to the SQLite audit database with:
 
 ## Architecture
 
-The credential service always runs **in-process** on the host machine, within the `clawmasons run` CLI process. It connects to the MCP proxy via WebSocket to relay credential requests from the agent container.
+The credential service always runs **in-process** on the host machine, within the `mason run` CLI process. It connects to the MCP proxy via WebSocket to relay credential requests from the agent container.
 
 ```
 Host Machine:
-  clawmasons run CLI process
+  mason run CLI process
     ├─ Credential Service (in-memory SQLite)
     └─ WebSocket client → Proxy /ws/credentials
 
@@ -67,7 +67,7 @@ Docker:
   agent:  → Agent Runtime (requests credentials via proxy)
 ```
 
-In **ACP mode** (`clawmasons run <agent-type> --role <name> --acp`), credentials from the editor's session configuration are injected as session overrides, giving them highest resolution priority.
+In **ACP mode** (`mason run <agent-type> --role <name> --acp`), credentials from the editor's session configuration are injected as session overrides, giving them highest resolution priority.
 
 ## Related
 

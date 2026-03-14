@@ -5,9 +5,9 @@ description: Primary deployable unit defining tools, permissions, and system pro
 
 # Role
 
-A **role** is the primary deployable unit in clawmasons. It defines which [tasks](chapter-task.md), [skills](chapter-skill.md), and [apps](chapter-app.md) are available, sets explicit allow/deny lists for individual tools, and provides the system prompt for the agent runtime.
+A **role** is the primary deployable unit in mason. It defines which [tasks](chapter-task.md), [skills](chapter-skill.md), and [apps](chapter-app.md) are available, sets explicit allow/deny lists for individual tools, and provides the system prompt for the agent runtime.
 
-Roles are the security enforcement point in clawmasons. The [MCP proxy](component-mcp-proxy.md) reads the role's permissions at runtime and filters tool access accordingly.
+Roles are the security enforcement point in mason. The [MCP proxy](component-mcp-proxy.md) reads the role's permissions at runtime and filters tool access accordingly.
 
 ## ROLE.md Format
 
@@ -80,13 +80,13 @@ Local roles take precedence over packaged roles with the same name. This allows 
 
 ```bash
 # Run a role on Claude Code
-clawmasons run claude --role writer
+mason run claude --role writer
 
 # Shorthand
-clawmasons claude --role writer
+mason claude --role writer
 
 # ACP mode for editor integration
-clawmasons run claude --role writer --acp
+mason run claude --role writer --acp
 ```
 
 See [CLI Reference](cli.md) for full options.

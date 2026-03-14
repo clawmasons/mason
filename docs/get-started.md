@@ -16,7 +16,7 @@ This guide walks you through installing Mason, creating a workspace, and running
 ## Install
 
 ```bash
-npm install -g @clawmasons/chapter
+npm install -g @clawmasons/mason
 ```
 
 This installs the `mason` CLI globally.

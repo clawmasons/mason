@@ -10,7 +10,7 @@ A **chapter** is an npm workspace containing role packages. It's the development
 ## Creating a Chapter
 
 ```bash
-clawmasons chapter init --name <lodge>.<chapter>
+mason chapter init --name <lodge>.<chapter>
 ```
 
 Options:
@@ -20,7 +20,7 @@ Options:
 Example:
 
 ```bash
-clawmasons chapter init --name acme.platform --template note-taker
+mason chapter init --name acme.platform --template note-taker
 ```
 
 ## Directory Structure
@@ -31,7 +31,7 @@ clawmasons chapter init --name acme.platform --template note-taker
   tasks/           # Task packages
   skills/          # Skill packages
   roles/           # Role packages
-  .clawmasons/
+  .mason/
     chapter.json   # Workspace metadata
   package.json     # npm workspaces root
 ```
@@ -40,22 +40,22 @@ clawmasons chapter init --name acme.platform --template note-taker
 
 ```bash
 # Add a chapter package dependency
-clawmasons chapter add @clawmasons/app-github
+mason chapter add @clawmasons/app-github
 
 # Remove a dependency
-clawmasons chapter remove @clawmasons/app-github
+mason chapter remove @clawmasons/app-github
 
 # List roles and dependency trees
-clawmasons chapter list
+mason chapter list
 
 # Validate a role's graph and permissions
-clawmasons chapter validate @acme.platform/role-writer
+mason chapter validate @acme.platform/role-writer
 ```
 
 ## Building
 
 ```bash
-clawmasons chapter build
+mason chapter build
 ```
 
 Build resolves the role dependency graph, packs all workspace packages to `dist/*.tgz`, and generates Docker artifacts. The output includes:

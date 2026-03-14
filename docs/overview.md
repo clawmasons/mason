@@ -1,6 +1,6 @@
 ---
 title: Overview
-description: What is clawmasons and why secure agent packaging matters
+description: What is mason and why secure agent packaging matters
 ---
 
 # Overview
@@ -9,7 +9,7 @@ Easily run your AI agents in secure Docker containers.
 
 Agents are powerful — but dangerous. They need tools, credentials, and broad system access to be useful. Without guardrails, credentials leak through environment variables and `docker inspect`, there's no audit trail of what tools were called, and role definitions are locked to a single runtime.
 
-**Clawmasons Chapter** makes it easy to secure your agents with npm-native packaging, governance, and runtime portability.
+**Mason** makes it easy to secure your agents with npm-native packaging, governance, and runtime portability.
 
 ## What It Does
 

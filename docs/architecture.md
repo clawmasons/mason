@@ -1,17 +1,17 @@
 ---
 title: Runtime Architecture
-description: How clawmasons orchestrates agent execution at runtime
+description: How mason orchestrates agent execution at runtime
 ---
 
 # Runtime Architecture
 
-Clawmasons uses a two-container model for agent execution: an **MCP Proxy** for tool filtering and a containerized **Agent** running the AI runtime. The **Credential Service** runs in-process on the host for secure secret management.
+Mason uses a two-container model for agent execution: an **MCP Proxy** for tool filtering and a containerized **Agent** running the AI runtime. The **Credential Service** runs in-process on the host for secure secret management.
 
 ## Container Architecture
 
 ```mermaid
 graph TB
-    CLI["clawmasons run"]
+    CLI["mason run"]
     CLI -->|docker compose up| Proxy["MCP Proxy<br/>(tool filtering + audit)"]
     CLI -->|docker compose run| Agent["Agent Container<br/>(Claude Code / Codex / Aider)"]
     CLI -.-|in-process| CredSvc["Credential Service<br/>(secret resolution)"]
@@ -25,11 +25,11 @@ graph TB
 
 ## Role Startup Sequence
 
-When you run `clawmasons run <agent-type> --role <name>`, the following sequence executes. See [Initialization](initialization.md) for details on how the `.clawmasons` and chapter directories are set up before this point.
+When you run `mason run <agent-type> --role <name>`, the following sequence executes. See [Initialization](initialization.md) for details on how the `.mason` and chapter directories are set up before this point.
 
 ```mermaid
 sequenceDiagram
-    participant CLI as clawmasons CLI
+    participant CLI as mason CLI
     participant DC as Docker Compose
     participant Proxy as MCP Proxy
     participant CS as Credential Service (in-process)
@@ -120,7 +120,7 @@ sequenceDiagram
 
 ## ACP Mode Architecture
 
-In ACP (Agent Communication Protocol) mode (`clawmasons run <agent-type> --role <name> --acp`), clawmasons integrates directly with editors:
+In ACP (Agent Communication Protocol) mode (`mason run <agent-type> --role <name> --acp`), mason integrates directly with editors:
 
 ```mermaid
 sequenceDiagram
