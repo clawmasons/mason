@@ -115,3 +115,13 @@ registerDialect({
     skills: "skills",
   },
 });
+
+registerDialect({
+  name: "bash-agent",
+  directory: "bash",
+  fieldMapping: {
+    tasks: "commands",
+    apps: "mcp_servers",
+    skills: "skills",
+  },
+});

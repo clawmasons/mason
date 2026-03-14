@@ -96,10 +96,11 @@ describe("materializer registry", () => {
       expect(types).toContain("claude-code");
       expect(types).toContain("pi-coding-agent");
       expect(types).toContain("mcp-agent");
+      expect(types).toContain("bash-agent");
     });
 
-    it("returns exactly three types", () => {
-      expect(getRegisteredAgentTypes()).toHaveLength(3);
+    it("returns exactly four types", () => {
+      expect(getRegisteredAgentTypes()).toHaveLength(4);
     });
   });
 });

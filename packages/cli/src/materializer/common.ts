@@ -168,6 +168,96 @@ export function generateAgentsMd(agent: ResolvedAgent): string {
   return lines.join("\n");
 }
 
+// ── agent-launch.json Generation ──────────────────────────────────────
+
+/** Credential configuration for agent-launch.json. */
+export interface LaunchCredentialConfig {
+  key: string;
+  type: "env" | "file";
+  path?: string;
+}
+
+/**
+ * Runtime-specific credential configs that are always included
+ * for a given agent type (in addition to role-declared credentials).
+ */
+export const RUNTIME_CREDENTIALS: Record<string, LaunchCredentialConfig[]> = {
+  "claude-code": [
+    { key: "security.CLAUDE_CODE_CREDENTIALS", type: "file", path: "/home/mason/.claude/.credentials.json" },
+  ],
+  "bash-agent": [
+    { key: "security.CLAUDE_CODE_CREDENTIALS", type: "file", path: "/home/mason/.claude/.credentials.json" },
+  ],
+};
+
+/**
+ * Default runtime commands for each agent type.
+ */
+export const RUNTIME_COMMANDS: Record<string, { command: string; args?: string[] }> = {
+  "claude-code": { command: "claude" },
+  "pi-coding-agent": { command: "pi" },
+  "mcp-agent": { command: "mcp-agent" },
+  "bash-agent": { command: "bash" },
+};
+
+/**
+ * Generate agent-launch.json content for the agent-entry entrypoint.
+ *
+ * Combines runtime-specific credentials with role-declared credentials.
+ * Uses the ACP command when in ACP mode.
+ *
+ * @param runtime - The agent runtime (e.g., "claude-code", "mcp-agent")
+ * @param roleCredentials - Credential keys declared by the role
+ * @param acpMode - Whether to generate ACP mode config
+ * @returns JSON string of agent-launch.json
+ */
+export function generateAgentLaunchJson(
+  runtime: string,
+  roleCredentials: string[],
+  acpMode?: boolean,
+): string {
+  // Start with runtime-specific credentials
+  const credentials: LaunchCredentialConfig[] = [
+    ...(RUNTIME_CREDENTIALS[runtime] ?? []),
+  ];
+
+  // Add role-declared credentials as env vars (skip any already added as runtime credentials)
+  const runtimeKeys = new Set(credentials.map((c) => c.key));
+  for (const key of roleCredentials) {
+    if (!runtimeKeys.has(key)) {
+      credentials.push({ key, type: "env" });
+    }
+  }
+
+  // Determine command
+  let command: string;
+  let args: string[] | undefined;
+
+  if (acpMode) {
+    const acpCommand = ACP_RUNTIME_COMMANDS[runtime];
+    if (acpCommand) {
+      const parts = acpCommand.split(/\s+/);
+      command = parts[0];
+      args = parts.length > 1 ? parts.slice(1) : undefined;
+    } else {
+      const base = RUNTIME_COMMANDS[runtime] ?? { command: runtime };
+      command = base.command;
+      args = base.args;
+    }
+  } else {
+    const base = RUNTIME_COMMANDS[runtime] ?? { command: runtime };
+    command = base.command;
+    args = base.args;
+  }
+
+  const config: Record<string, unknown> = { credentials, command };
+  if (args && args.length > 0) {
+    config.args = args;
+  }
+
+  return JSON.stringify(config, null, 2);
+}
+
 /**
  * Generate a skill README.md.
  */

@@ -4,6 +4,7 @@ import {
   generateAgentsMd,
   ACP_RUNTIME_COMMANDS,
   generateAcpConfigJson,
+  generateAgentLaunchJson,
 } from "./common.js";
 
 /**
@@ -67,6 +68,12 @@ export const mcpAgentMaterializer: RuntimeMaterializer = {
 
     // AGENTS.md — agent identity and role documentation
     result.set("AGENTS.md", generateAgentsMd(agent));
+
+    // agent-launch.json — tells agent-entry how to bootstrap this agent
+    result.set(
+      "agent-launch.json",
+      generateAgentLaunchJson("mcp-agent", agent.credentials, options?.acpMode),
+    );
 
     // ACP mode: generate .chapter/acp.json with command
     if (options?.acpMode) {

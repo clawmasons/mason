@@ -2,21 +2,97 @@
  * Agent Entry — Standalone entrypoint for agent Docker containers.
  *
  * Bootstrap flow:
- * 1. Read MCP_PROXY_TOKEN from environment
- * 2. POST to proxy /connect-agent → receive AGENT_SESSION_TOKEN + session_id
- * 3. Initialize MCP session with proxy
- * 4. For each credential, call credential_request MCP tool
- * 5. Spawn agent runtime with credentials in child env only
- * 6. Pipe stdio, propagate exit code
+ * 1. Read agent-launch.json for credential config and runtime command
+ * 2. Read MCP_PROXY_TOKEN from environment
+ * 3. POST to proxy /connect-agent → receive AGENT_SESSION_TOKEN + session_id
+ * 4. Initialize MCP session with proxy
+ * 5. For each credential, call credential_request MCP tool
+ * 6. Install credentials (env vars or files)
+ * 7. Spawn agent runtime with credentials in child env only
+ * 8. Pipe stdio, propagate exit code
  */
 
 import { spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { initializeMcpSession, callTool } from "./mcp-client.js";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
+
+// ── agent-launch.json Schema ──────────────────────────────────────────
+
+export interface CredentialConfig {
+  /** Credential key to request from credential service. */
+  key: string;
+  /** How to install the credential: "env" sets it as an env var, "file" writes it to a path. */
+  type: "env" | "file";
+  /** File path to write the credential value to (required when type is "file"). */
+  path?: string;
+}
+
+export interface AgentLaunchConfig {
+  /** Credentials to request and how to install them. */
+  credentials: CredentialConfig[];
+  /** Command to execute as the agent runtime. */
+  command: string;
+  /** Arguments to pass to the command. */
+  args?: string[];
+}
+
+/**
+ * Load agent-launch.json from the workspace or working directory.
+ *
+ * Search order:
+ * 1. /home/mason/workspace/agent-launch.json (Docker container path)
+ * 2. ./agent-launch.json (current working directory)
+ *
+ * Returns null if no config file is found (falls back to env vars).
+ */
+export function loadLaunchConfig(): AgentLaunchConfig | null {
+  const searchPaths = [
+    "/home/mason/workspace/agent-launch.json",
+    path.join(process.cwd(), "agent-launch.json"),
+  ];
+
+  for (const configPath of searchPaths) {
+    try {
+      const content = fs.readFileSync(configPath, "utf-8");
+      const config = JSON.parse(content) as AgentLaunchConfig;
+
+      // Basic validation
+      if (!config.command || typeof config.command !== "string") {
+        throw new Error("agent-launch.json: 'command' is required and must be a string");
+      }
+      if (!Array.isArray(config.credentials)) {
+        throw new Error("agent-launch.json: 'credentials' must be an array");
+      }
+      for (const cred of config.credentials) {
+        if (!cred.key || typeof cred.key !== "string") {
+          throw new Error("agent-launch.json: each credential must have a 'key' string");
+        }
+        if (cred.type !== "env" && cred.type !== "file") {
+          throw new Error(`agent-launch.json: credential type must be 'env' or 'file', got '${cred.type}'`);
+        }
+        if (cred.type === "file" && (!cred.path || typeof cred.path !== "string")) {
+          throw new Error(`agent-launch.json: credential '${cred.key}' with type 'file' must have a 'path'`);
+        }
+      }
+
+      console.error(`[agent-entry] Loaded config from ${configPath}`);
+      return config;
+    } catch (err) {
+      if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT") {
+        continue; // File not found, try next path
+      }
+      throw err; // Re-throw parse or validation errors
+    }
+  }
+
+  return null;
+}
 
 // ── Public API ─────────────────────────────────────────────────────────
 
@@ -151,6 +227,38 @@ export async function requestCredentials(
 }
 
 /**
+ * Install credentials based on their config type.
+ *
+ * - "env" credentials are returned as env vars for the child process
+ * - "file" credentials are written to disk before launching the runtime
+ *
+ * @returns Record of env vars to pass to the child process
+ */
+export function installCredentials(
+  credentialConfigs: CredentialConfig[],
+  credentialValues: Record<string, string>,
+): Record<string, string> {
+  const envVars: Record<string, string> = {};
+
+  for (const config of credentialConfigs) {
+    const value = credentialValues[config.key];
+    if (value === undefined) continue;
+
+    if (config.type === "env") {
+      envVars[config.key] = value;
+    } else if (config.type === "file" && config.path) {
+      // Ensure directory exists
+      const dir = path.dirname(config.path);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(config.path, value, { mode: 0o600 });
+      console.error(`[agent-entry] Wrote credential to ${config.path}`);
+    }
+  }
+
+  return envVars;
+}
+
+/**
  * Launch the agent runtime as a child process with credentials in its env.
  *
  * The child process inherits stdio from the container process.
@@ -214,49 +322,70 @@ export async function bootstrap(): Promise<never> {
 
   const proxyUrl = process.env.MCP_PROXY_URL ?? "http://proxy:3000";
 
-  const credentialsJson = process.env.AGENT_CREDENTIALS ?? "[]";
-  let credentialKeys: string[];
-  try {
-    credentialKeys = JSON.parse(credentialsJson) as string[];
-    if (!Array.isArray(credentialKeys)) throw new Error("not an array");
-  } catch {
-    console.error("[agent-entry] AGENT_CREDENTIALS must be a JSON array of strings");
-    process.exit(1);
+  // 2. Load agent-launch.json or fall back to env vars
+  const launchConfig = loadLaunchConfig();
+
+  let credentialConfigs: CredentialConfig[];
+  let command: string;
+  let args: string[];
+
+  if (launchConfig) {
+    credentialConfigs = launchConfig.credentials;
+    command = launchConfig.command;
+    args = launchConfig.args ?? [];
+  } else {
+    // Legacy env var fallback
+    console.error("[agent-entry] No agent-launch.json found, falling back to env vars");
+
+    const credentialsJson = process.env.AGENT_CREDENTIALS ?? "[]";
+    let credentialKeys: string[];
+    try {
+      credentialKeys = JSON.parse(credentialsJson) as string[];
+      if (!Array.isArray(credentialKeys)) throw new Error("not an array");
+    } catch {
+      console.error("[agent-entry] AGENT_CREDENTIALS must be a JSON array of strings");
+      process.exit(1);
+    }
+
+    // Convert legacy format: all credentials as env vars
+    credentialConfigs = credentialKeys.map((key) => ({ key, type: "env" as const }));
+
+    const runtimeCmd = process.env.AGENT_RUNTIME_CMD;
+    if (!runtimeCmd) {
+      console.error("[agent-entry] AGENT_RUNTIME_CMD not set");
+      process.exit(1);
+    }
+
+    const cmdParts = runtimeCmd.split(/\s+/);
+    command = cmdParts[0];
+    args = cmdParts.slice(1);
   }
 
-  const runtimeCmd = process.env.AGENT_RUNTIME_CMD;
-  if (!runtimeCmd) {
-    console.error("[agent-entry] AGENT_RUNTIME_CMD not set");
-    process.exit(1);
-  }
-
-  // Parse runtime command into command + args
-  const cmdParts = runtimeCmd.split(/\s+/);
-  const command = cmdParts[0];
-  const args = cmdParts.slice(1);
+  const credentialKeys = credentialConfigs.map((c) => c.key);
 
   try {
-    // 2. Connect to proxy
+    // 3. Connect to proxy
     console.error("[agent-entry] Connecting to proxy...");
     const { sessionToken } = await connectToProxy(proxyUrl, proxyToken);
     console.error("[agent-entry] Connected. Session established.");
 
-    // 3. Request credentials
+    // 4. Request credentials
+    let credentialEnv: Record<string, string> = {};
     if (credentialKeys.length > 0) {
       console.error(`[agent-entry] Requesting ${credentialKeys.length} credential(s)...`);
-      const credentials = await requestCredentials(proxyUrl, proxyToken, sessionToken, credentialKeys);
+      const credentialValues = await requestCredentials(proxyUrl, proxyToken, sessionToken, credentialKeys);
       console.error("[agent-entry] All credentials received.");
 
-      // 4. Launch runtime with credentials
-      console.error(`[agent-entry] Launching runtime: ${runtimeCmd}`);
-      const exitCode = await launchRuntime(command, args, credentials);
-      process.exit(exitCode);
+      // 5. Install credentials (write files, build env vars)
+      credentialEnv = installCredentials(credentialConfigs, credentialValues);
     } else {
-      // No credentials needed, just launch
-      console.error(`[agent-entry] No credentials requested. Launching runtime: ${runtimeCmd}`);
-      const exitCode = await launchRuntime(command, args, {});
-      process.exit(exitCode);
+      console.error("[agent-entry] No credentials requested.");
     }
+
+    // 6. Launch runtime
+    console.error(`[agent-entry] Launching runtime: ${command} ${args.join(" ")}`);
+    const exitCode = await launchRuntime(command, args, credentialEnv);
+    process.exit(exitCode);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[agent-entry] Fatal: ${message}`);
