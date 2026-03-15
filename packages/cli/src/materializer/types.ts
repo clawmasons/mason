@@ -35,4 +35,15 @@ export interface RuntimeMaterializer {
     proxyToken?: string,
     options?: MaterializeOptions,
   ): MaterializationResult;
+
+  /**
+   * Materialize host configuration into the agent's home directory.
+   * Writes directly to disk (copies directory trees, binary files).
+   * Optional — agents without home materialization simply omit this method.
+   *
+   * @param projectDir - Absolute path to the project root on the host
+   * @param homePath - Absolute path to the target home directory
+   *                   (e.g., {projectDir}/.mason/docker/{role}/{agent}/home/)
+   */
+  materializeHome?(projectDir: string, homePath: string): void;
 }

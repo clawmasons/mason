@@ -13,9 +13,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
+import * as os from "node:os";
 import type { RoleType } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
-import { materializeForAgent } from "./role-materializer.js";
+import { materializeForAgent, getMaterializer } from "./role-materializer.js";
 import { generateAgentDockerfile } from "../generator/agent-dockerfile.js";
 import { generateProxyDockerfile } from "../generator/proxy-dockerfile.js";
 import { adaptRoleToResolvedAgent } from "@clawmasons/shared";
@@ -30,6 +31,15 @@ const SENTINEL_RELATIVE_PATH = ".mason/empty-file";
 
 /** Container path where the project is mounted read-only. */
 const PROJECT_MOUNT_PATH = "/home/mason/workspace/project";
+
+/**
+ * Get the current host user's UID and GID.
+ * Returns string values suitable for Docker build args.
+ */
+export function getHostIds(): { uid: string; gid: string } {
+  const info = os.userInfo();
+  return { uid: String(info.uid), gid: String(info.gid) };
+}
 
 // ---------------------------------------------------------------------------
 // Volume Masking Types
@@ -205,13 +215,23 @@ export function generateRoleDockerBuildDir(
   const agentDir = path.join(buildDir, agentType);
   deps.mkdirSync(agentDir, { recursive: true });
 
+  // Home directory materialization (if the materializer supports it)
+  // Skip when fsDeps is provided (test mode) since materializeHome uses real fs
+  const materializer = getMaterializer(agentType);
+  let hasHome = false;
+  if (!fsDeps && materializer?.materializeHome) {
+    const homePath = path.join(agentDir, "home");
+    materializer.materializeHome(projectDir, homePath);
+    hasHome = true;
+  }
+
   // Agent Dockerfile
   const resolvedAgent = adaptRoleToResolvedAgent(role, agentType);
   const agentRole = resolvedAgent.roles[0];
   if (!agentRole) {
     throw new Error(`adaptRoleToResolvedAgent produced no roles for "${role.metadata.name}"`);
   }
-  const agentDockerfile = generateAgentDockerfile(resolvedAgent, agentRole);
+  const agentDockerfile = generateAgentDockerfile(resolvedAgent, agentRole, { hasHome });
   deps.writeFileSync(path.join(agentDir, "Dockerfile"), agentDockerfile);
 
   // Workspace files
@@ -312,6 +332,12 @@ export interface SessionComposeOptions {
   sessionDir: string;
   /** Absolute path to logs directory. */
   logsDir: string;
+  /** Absolute path to the materialized agent home directory (if exists). */
+  homePath?: string;
+  /** Host user UID for container user matching. */
+  hostUid?: string;
+  /** Host user GID for container user matching. */
+  hostGid?: string;
 }
 
 /**
@@ -343,6 +369,9 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
     acpCommand,
     sessionDir,
     logsDir,
+    homePath,
+    hostUid,
+    hostGid,
   } = opts;
 
   // Unique compose project name derived from project directory
@@ -387,6 +416,12 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
   // Role-declared extra mounts
   for (const vol of resolveRoleMountVolumes(roleMounts)) {
     agentVolumeLines.push(`      - ${vol}`);
+  }
+
+  // Home directory mount (materialized host config)
+  if (homePath) {
+    const relHomePath = path.relative(sessionDir, homePath);
+    agentVolumeLines.push(`      - ${relHomePath}:/home/mason`);
   }
 
   // --- Agent environment ---
@@ -435,6 +470,9 @@ ${proxyEnvLines.join("\n")}
     build:
       context: ${relDockerDir}
       dockerfile: ${path.relative(dockerDir, path.join(dockerBuildDir, agentType, "Dockerfile"))}
+      args:
+        HOST_UID: "${hostUid ?? "1000"}"
+        HOST_GID: "${hostGid ?? "1000"}"
     volumes:
 ${agentVolumeLines.join("\n")}
     depends_on:
@@ -475,6 +513,10 @@ export interface CreateSessionOptions {
   sessionType?: string;
   /** ACP command args. */
   acpCommand?: string[];
+  /** Host user UID for container user matching. */
+  hostUid?: string;
+  /** Host user GID for container user matching. */
+  hostGid?: string;
 }
 
 export interface SessionResult {
@@ -545,6 +587,10 @@ export function createSessionDirectory(
   const ignorePaths = role.container?.ignore?.paths ?? [];
   const volumeMasks = generateVolumeMasks(ignorePaths);
 
+  // Detect materialized home directory
+  const homePath = path.join(opts.dockerBuildDir, opts.agentType, "home");
+  const homeExists = fsDeps ? false : fs.existsSync(homePath);
+
   // Generate compose file
   const composeContent = generateSessionComposeYml({
     ...opts,
@@ -554,6 +600,7 @@ export function createSessionDirectory(
     volumeMasks,
     sessionDir,
     logsDir,
+    homePath: homeExists ? homePath : undefined,
   });
 
   const composeFile = path.join(sessionDir, "docker-compose.yaml");

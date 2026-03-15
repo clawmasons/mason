@@ -143,12 +143,17 @@ describe("generateAgentDockerfile", () => {
     expect(result).toContain("USER mason");
   });
 
-  it("creates mason user with home directory", () => {
+  it("creates mason user with host-matching UID/GID", () => {
     const agent = makeNoteTakerAgent();
     const result = generateAgentDockerfile(agent, agent.roles[0]);
 
-    expect(result).toContain("groupadd -r mason");
-    expect(result).toContain("useradd -r -g mason -m mason");
+    expect(result).toContain("ARG HOST_UID=1000");
+    expect(result).toContain("ARG HOST_GID=1000");
+    expect(result).toContain("groupadd -g $HOST_GID mason");
+    expect(result).toContain("useradd -m -u $HOST_UID -g $HOST_GID mason");
+    // Handles pre-existing GID/UID (e.g., node:22-slim ships with GID 1000)
+    expect(result).toContain("getent group $HOST_GID");
+    expect(result).toContain("getent passwd $HOST_UID");
   });
 
   it("sets up workspace/project directory structure", () => {
@@ -324,6 +329,39 @@ describe("generateAgentDockerfile", () => {
     expect(result).toContain("FROM ubuntu:24.04");
     expect(result).toContain("apt-get install -y --no-install-recommends python3 make");
   });
+
+  // ── Home Directory Tests ────────────────────────────────────────────
+
+  it("does not include home COPY when hasHome is false", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0], { hasHome: false });
+
+    expect(result).not.toContain("COPY writer/claude-code/home/");
+    expect(result).not.toContain("mason-from-build");
+  });
+
+  it("does not include home COPY when options omitted", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).not.toContain("mason-from-build");
+  });
+
+  it("includes home COPY and backup when hasHome is true", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0], { hasHome: true });
+
+    expect(result).toContain("COPY writer/claude-code/home/ /home/mason/");
+    expect(result).toContain("chown -R mason:mason /home/mason");
+    expect(result).toContain("cp -a /home/mason /home/mason-from-build");
+  });
+
+  it("uses correct role/runtime path for home COPY", () => {
+    const agent = makeNoteTakerAgent();
+    const reviewerResult = generateAgentDockerfile(agent, agent.roles[1], { hasHome: true });
+
+    expect(reviewerResult).toContain("COPY reviewer/claude-code/home/ /home/mason/");
+  });
 });
 
 // ── Proxy Dockerfile Tests ─────────────────────────────────────────────
@@ -351,12 +389,15 @@ describe("generateProxyDockerfile", () => {
     expect(result).toContain("USER mason");
   });
 
-  it("creates mason user", () => {
+  it("creates mason user with host-matching UID/GID", () => {
     const agent = makeNoteTakerAgent();
     const result = generateProxyDockerfile(agent.roles[0], agent.name);
 
-    expect(result).toContain("groupadd -r mason");
-    expect(result).toContain("useradd -r -g mason -m mason");
+    expect(result).toContain("ARG HOST_UID=1000");
+    expect(result).toContain("ARG HOST_GID=1000");
+    expect(result).toContain("groupadd -g $HOST_GID mason");
+    expect(result).toContain("useradd -m -u $HOST_UID -g $HOST_GID mason");
+    expect(result).toContain("getent group $HOST_GID");
   });
 
   it("installs build tools for native addons", () => {

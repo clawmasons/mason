@@ -27,8 +27,12 @@ COPY node_modules/ ./node_modules/
 # Rebuild native addons for the container platform
 RUN npm rebuild better-sqlite3
 
-# Create mason user and set up directories
-RUN groupadd -r mason && useradd -r -g mason -m mason \\
+# Create mason user with host-matching UID/GID
+ARG HOST_UID=1000
+ARG HOST_GID=1000
+RUN (getent group $HOST_GID | cut -d: -f1 | xargs -r groupdel 2>/dev/null || true) \\
+    && (getent passwd $HOST_UID | cut -d: -f1 | xargs -r userdel 2>/dev/null || true) \\
+    && groupadd -g $HOST_GID mason && useradd -m -u $HOST_UID -g $HOST_GID mason \\
     && mkdir -p /home/mason/data /logs \\
     && chown -R mason:mason /app /home/mason/data /logs
 

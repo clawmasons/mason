@@ -191,7 +191,7 @@ export const RUNTIME_CREDENTIALS: Record<string, LaunchCredentialConfig[]> = {
  * Default runtime commands for each agent type.
  */
 export const RUNTIME_COMMANDS: Record<string, { command: string; args?: string[] }> = {
-  "claude-code": { command: "claude" },
+  "claude-code": { command: "claude", args: ["--effort", "max"] },
   "pi-coding-agent": { command: "pi" },
   "mcp-agent": { command: "mcp-agent" },
 };
