@@ -1,7 +1,6 @@
 // Re-export helpers from the agent SDK for backward compatibility
 export {
   PROVIDER_ENV_VARS,
-  generateAcpConfigJson,
   formatPermittedTools,
   findRolesForTask,
   collectAllSkills,

@@ -7,7 +7,6 @@ import {
   collectAllTasks,
   generateAgentsMd,
   generateSkillReadme,
-  generateAcpConfigJson,
   generateAgentLaunchJson,
 } from "@clawmasons/agent-sdk";
 
@@ -214,11 +213,6 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
       "agent-launch.json",
       generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode),
     );
-
-    // ACP mode: generate .chapter/acp.json with command
-    if (options?.acpMode && _agentPkg.acp) {
-      result.set(".chapter/acp.json", generateAcpConfigJson(_agentPkg.acp.command));
-    }
 
     return result;
   },

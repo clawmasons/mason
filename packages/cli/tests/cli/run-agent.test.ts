@@ -407,8 +407,9 @@ describe("generateComposeYml", () => {
     const volumeSection = agentSection.split("volumes:")[1]!.split("depends_on:")[0]!;
 
     const mountLines = volumeSection.split("\n").filter((l) => l.includes("- \""));
-    expect(mountLines).toHaveLength(1);
-    expect(mountLines[0]).toContain("/home/mason/workspace/project");
+    expect(mountLines).toHaveLength(2);
+    expect(mountLines[0]).toContain("/home/mason/workspace");
+    expect(mountLines[1]).toContain("/home/mason/workspace/project");
   });
 
   it("mounts per-role cache directory into proxy at /app/.cache", () => {

@@ -235,8 +235,21 @@ export function generateAcpComposeYml(opts: {
     agentEnvLines.push(`      - AGENT_CREDENTIALS=${JSON.stringify(credentialKeys)}`);
   }
 
-  // Build agent volume lines (workspace gets overridden at run time)
+  // Build agent volume lines
   const agentVolumeLines: string[] = [];
+
+  // Workspace mount — provides agent-launch.json at /home/mason/workspace/agent-launch.json
+  const workspacePath = path.join(dockerBuildDir, agent, "workspace");
+  agentVolumeLines.push(`      - "${workspacePath}:/home/mason/workspace"`);
+
+  // Per-file overlay mounts — inject config files into /home/mason/workspace/project/
+  const buildWorkspaceProjectDir = path.join(dockerBuildDir, agent, "build", "workspace", "project");
+  if (fs.existsSync(buildWorkspaceProjectDir)) {
+    for (const entry of fs.readdirSync(buildWorkspaceProjectDir)) {
+      agentVolumeLines.push(`      - "${path.join(buildWorkspaceProjectDir, entry)}:/home/mason/workspace/project/${entry}"`);
+    }
+  }
+
   for (const vol of resolveRoleMountVolumes(roleMounts)) {
     agentVolumeLines.push(`      - "${vol}"`);
   }

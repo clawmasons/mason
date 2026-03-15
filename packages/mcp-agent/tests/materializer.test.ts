@@ -174,29 +174,19 @@ describe("mcpAgentMaterializer", () => {
     });
 
     describe("ACP mode", () => {
-      it("does not generate .chapter/acp.json when acpMode is false", () => {
+      it("does not generate .chapter/acp.json even in ACP mode", () => {
         const agent = makeMcpTestAgent();
-        const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000");
+        const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000", undefined, { acpMode: true });
 
         expect(result.has(".chapter/acp.json")).toBe(false);
       });
 
-      it("generates .chapter/acp.json when acpMode is true", () => {
-        const agent = makeMcpTestAgent();
-        const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000", undefined, { acpMode: true });
-
-        expect(result.has(".chapter/acp.json")).toBe(true);
-        const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
-        expect(acpConfig.command).toBe("mcp-agent --acp");
-        expect(acpConfig.port).toBeUndefined();
-      });
-
-      it("includes .chapter/acp.json and agent-launch.json in result when in ACP mode", () => {
+      it("result completeness in ACP mode — no .chapter/acp.json", () => {
         const agent = makeMcpTestAgent();
         const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000", undefined, { acpMode: true });
 
         const keys = [...result.keys()].sort();
-        expect(keys).toEqual([".chapter/acp.json", ".mcp.json", "AGENTS.md", "agent-launch.json"]);
+        expect(keys).toEqual([".mcp.json", "AGENTS.md", "agent-launch.json"]);
       });
     });
   });

@@ -254,11 +254,22 @@ describe("generateRoleDockerBuildDir", () => {
     const composeFile = path.join(result.buildDir, "docker-compose.yaml");
     expect(writtenFiles.has(composeFile)).toBe(true);
 
-    // Workspace files exist
-    const workspaceFiles = [...writtenFiles.keys()].filter((k) =>
-      k.includes(path.join("claude-code", "workspace")),
+    // agent-launch.json lands in workspace/
+    const agentLaunchFile = path.join(result.buildDir, "claude-code", "workspace", "agent-launch.json");
+    expect(writtenFiles.has(agentLaunchFile)).toBe(true);
+
+    // Other workspace files land in build/workspace/project/
+    const buildWorkspaceFiles = [...writtenFiles.keys()].filter((k) =>
+      k.includes(path.join("claude-code", "build", "workspace", "project")),
     );
-    expect(workspaceFiles.length).toBeGreaterThan(0);
+    expect(buildWorkspaceFiles.length).toBeGreaterThan(0);
+
+    // No other files should land directly in workspace/ (only agent-launch.json)
+    const workspaceFiles = [...writtenFiles.keys()].filter((k) =>
+      k.includes(path.join("claude-code", "workspace")) &&
+      !k.includes(path.join("claude-code", "build", "workspace")),
+    );
+    expect(workspaceFiles).toEqual([agentLaunchFile]);
   });
 
   it("returns correct relative paths", () => {
@@ -304,7 +315,7 @@ describe("generateRoleDockerBuildDir", () => {
     expect(proxyDockerfile![1]).toContain("proxy");
   });
 
-  it("generates workspace files including .mcp.json and AGENTS.md", () => {
+  it("generates workspace files including .mcp.json and AGENTS.md in build/workspace/project/", () => {
     const writtenFiles = new Map<string, string>();
 
     generateRoleDockerBuildDir(
@@ -320,12 +331,12 @@ describe("generateRoleDockerBuildDir", () => {
       },
     );
 
-    const workspaceKeys = [...writtenFiles.keys()].filter((k) =>
-      k.includes("workspace"),
+    const buildWorkspaceKeys = [...writtenFiles.keys()].filter((k) =>
+      k.includes(path.join("claude-code", "build", "workspace", "project")),
     );
 
-    const hasMcpJson = workspaceKeys.some((k) => k.endsWith(".mcp.json"));
-    const hasAgentsMd = workspaceKeys.some((k) => k.endsWith("AGENTS.md"));
+    const hasMcpJson = buildWorkspaceKeys.some((k) => k.endsWith(".mcp.json"));
+    const hasAgentsMd = buildWorkspaceKeys.some((k) => k.endsWith("AGENTS.md"));
 
     expect(hasMcpJson).toBe(true);
     expect(hasAgentsMd).toBe(true);
@@ -350,6 +361,9 @@ describe("generateSessionComposeYml", () => {
     volumeMasks: generateVolumeMasks([".mason/", ".claude/", ".env"]),
     sessionDir: "/project/.mason/sessions/abc12345",
     logsDir: "/project/.mason/sessions/abc12345/logs",
+    workspacePath: "/project/.mason/docker/create-prd/claude-code/workspace",
+    buildWorkspaceProjectPath: "/project/.mason/docker/create-prd/claude-code/build/workspace/project",
+    buildWorkspaceProjectEntries: [".mcp.json", ".claude", "AGENTS.md"],
   };
 
   it("generates valid YAML with proxy and agent services", () => {
@@ -386,6 +400,30 @@ describe("generateSessionComposeYml", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
     expect(yml).toContain("/home/mason/workspace/project:ro");
+  });
+
+  it("mounts workspace path to /home/mason/workspace when workspacePath provided", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+
+    expect(yml).toContain(":/home/mason/workspace\n");
+  });
+
+  it("emits per-entry overlay mounts for build workspace project entries", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+
+    expect(yml).toContain(":/home/mason/workspace/project/.mcp.json");
+    expect(yml).toContain(":/home/mason/workspace/project/.claude");
+    expect(yml).toContain(":/home/mason/workspace/project/AGENTS.md");
+  });
+
+  it("does not emit overlay mounts when buildWorkspaceProjectEntries is empty", () => {
+    const yml = generateSessionComposeYml({
+      ...baseOpts,
+      buildWorkspaceProjectEntries: [],
+    });
+
+    // Should have workspace mount but no overlay mounts for specific files
+    expect(yml).not.toContain(":/home/mason/workspace/project/.mcp.json");
   });
 
   it("uses relative paths from session directory", () => {

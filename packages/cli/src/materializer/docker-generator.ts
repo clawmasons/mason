@@ -238,12 +238,16 @@ export function generateRoleDockerBuildDir(
   });
   deps.writeFileSync(path.join(agentDir, "Dockerfile"), agentDockerfile);
 
-  // Workspace files
+  // Workspace files — split into two output buckets:
+  // - agent-launch.json → {agentDir}/workspace/ (live-mounted to /home/mason/workspace/)
+  // - everything else   → {agentDir}/build/workspace/project/ (per-file overlay mounts)
   const proxyEp = proxyEndpoint ?? `http://proxy-${roleName}:9090`;
   const workspace = materializeForAgent(role, agentType, proxyEp);
   const workspaceDir = path.join(agentDir, "workspace");
+  const buildWorkspaceProjectDir = path.join(agentDir, "build", "workspace", "project");
   for (const [filePath, content] of workspace) {
-    const fullPath = path.join(workspaceDir, filePath);
+    const targetDir = filePath === "agent-launch.json" ? workspaceDir : buildWorkspaceProjectDir;
+    const fullPath = path.join(targetDir, filePath);
     deps.mkdirSync(path.dirname(fullPath), { recursive: true });
     deps.writeFileSync(fullPath, content);
   }
@@ -342,6 +346,12 @@ export interface SessionComposeOptions {
   hostUid?: string;
   /** Host user GID for container user matching. */
   hostGid?: string;
+  /** Absolute path to {agentDir}/workspace/ — live-mounted to /home/mason/workspace/. */
+  workspacePath?: string;
+  /** Absolute path to {agentDir}/build/workspace/project/ — files here get per-entry overlay mounts. */
+  buildWorkspaceProjectPath?: string;
+  /** Names of files/dirs inside buildWorkspaceProjectPath to mount as overlays. */
+  buildWorkspaceProjectEntries?: string[];
 }
 
 /**
@@ -376,6 +386,9 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
     homePath,
     hostUid,
     hostGid,
+    workspacePath,
+    buildWorkspaceProjectPath,
+    buildWorkspaceProjectEntries = [],
   } = opts;
 
   // Unique compose project name derived from project directory
@@ -420,6 +433,21 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
   // Role-declared extra mounts
   for (const vol of resolveRoleMountVolumes(roleMounts)) {
     agentVolumeLines.push(`      - ${vol}`);
+  }
+
+  // Workspace directory mount (live bind mount for agent-launch.json)
+  if (workspacePath) {
+    const relWorkspacePath = path.relative(sessionDir, workspacePath);
+    agentVolumeLines.push(`      - ${relWorkspacePath}:/home/mason/workspace`);
+  }
+
+  // Build workspace overlay mounts (per-file mounts into /home/mason/workspace/project/)
+  if (buildWorkspaceProjectPath && buildWorkspaceProjectEntries.length > 0) {
+    for (const entry of buildWorkspaceProjectEntries) {
+      const hostEntryPath = path.join(buildWorkspaceProjectPath, entry);
+      const relEntryPath = path.relative(sessionDir, hostEntryPath);
+      agentVolumeLines.push(`      - ${relEntryPath}:/home/mason/workspace/project/${entry}`);
+    }
   }
 
   // Home directory mount (materialized host config)
@@ -595,6 +623,16 @@ export function createSessionDirectory(
   const homePath = path.join(opts.dockerBuildDir, opts.agentType, "home");
   const homeExists = fsDeps ? false : fs.existsSync(homePath);
 
+  // Compute workspace and build overlay paths
+  const workspacePath = path.join(opts.dockerBuildDir, opts.agentType, "workspace");
+  const buildWorkspaceProjectPath = path.join(opts.dockerBuildDir, opts.agentType, "build", "workspace", "project");
+
+  // Enumerate build workspace project entries (skip in test mode — fsDeps means no real FS)
+  let buildWorkspaceProjectEntries: string[] = [];
+  if (!fsDeps && fs.existsSync(buildWorkspaceProjectPath)) {
+    buildWorkspaceProjectEntries = fs.readdirSync(buildWorkspaceProjectPath);
+  }
+
   // Generate compose file
   const composeContent = generateSessionComposeYml({
     ...opts,
@@ -605,6 +643,9 @@ export function createSessionDirectory(
     sessionDir,
     logsDir,
     homePath: homeExists ? homePath : undefined,
+    workspacePath,
+    buildWorkspaceProjectPath,
+    buildWorkspaceProjectEntries,
   });
 
   const composeFile = path.join(sessionDir, "docker-compose.yaml");

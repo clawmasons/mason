@@ -469,36 +469,11 @@ describe("claudeCodeMaterializer", () => {
     });
 
     describe("ACP mode", () => {
-      it("does not generate .chapter/acp.json when acpMode is false", () => {
-        const agent = makeRepoOpsAgent();
-        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        expect(result.has(".chapter/acp.json")).toBe(false);
-      });
-
-      it("does not generate .chapter/acp.json when options is undefined", () => {
-        const agent = makeRepoOpsAgent();
-        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, undefined);
-
-        expect(result.has(".chapter/acp.json")).toBe(false);
-      });
-
-      it("generates .chapter/acp.json when acpMode is true", () => {
+      it("does not generate .chapter/acp.json even in ACP mode", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
 
-        expect(result.has(".chapter/acp.json")).toBe(true);
-        const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
-        expect(acpConfig.command).toBe("claude-agent-acp");
-        expect(acpConfig.port).toBeUndefined();
-      });
-
-      it("maps claude-code runtime to claude-agent-acp command", () => {
-        const agent = makeRepoOpsAgent();
-        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
-
-        const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
-        expect(acpConfig.command).toBe("claude-agent-acp");
+        expect(result.has(".chapter/acp.json")).toBe(false);
       });
 
       it("still generates all standard workspace files in ACP mode", () => {
@@ -509,23 +484,6 @@ describe("claudeCodeMaterializer", () => {
         expect(result.has(".claude/settings.json")).toBe(true);
         expect(result.has("AGENTS.md")).toBe(true);
         expect(result.has(".claude/commands/triage-issue.md")).toBe(true);
-      });
-
-      it("includes .chapter/acp.json and agent-launch.json in result completeness", () => {
-        const agent = makeRepoOpsAgent();
-        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
-
-        const keys = [...result.keys()].sort();
-        expect(keys).toEqual([
-          ".chapter/acp.json",
-          ".claude/commands/review-pr.md",
-          ".claude/commands/triage-issue.md",
-          ".claude/settings.json",
-          ".mcp.json",
-          "AGENTS.md",
-          "agent-launch.json",
-          "skills/labeling/README.md",
-        ]);
       });
     });
   });

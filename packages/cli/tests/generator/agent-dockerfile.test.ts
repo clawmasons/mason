@@ -178,8 +178,9 @@ describe("generateAgentDockerfile", () => {
     const writerRole = agent.roles[0];
     const result = generateAgentDockerfile(agent, writerRole);
 
-    expect(result).toContain("COPY writer/claude-code/workspace/");
+    expect(result).toContain("COPY writer/claude-code/build/workspace/");
     expect(result).toContain("/home/mason/workspace/");
+    expect(result).not.toContain("COPY writer/claude-code/workspace/");
   });
 
   it("installs claude-code runtime and uses agent-entry entrypoint", () => {
@@ -253,8 +254,8 @@ describe("generateAgentDockerfile", () => {
     const reviewerResult = generateAgentDockerfile(agent, agent.roles[1]);
 
     // They should differ in workspace COPY paths
-    expect(writerResult).toContain("writer/claude-code/workspace/");
-    expect(reviewerResult).toContain("reviewer/claude-code/workspace/");
+    expect(writerResult).toContain("writer/claude-code/build/workspace/");
+    expect(reviewerResult).toContain("reviewer/claude-code/build/workspace/");
   });
 
   // ── Base Image Tests ──────────────────────────────────────────────────

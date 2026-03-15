@@ -12,7 +12,6 @@ export type {
 // Helpers
 export {
   PROVIDER_ENV_VARS,
-  generateAcpConfigJson,
   formatPermittedTools,
   findRolesForTask,
   collectAllSkills,

@@ -42,9 +42,12 @@ The `AgentPackage.dockerfile` field SHALL be a `DockerfileConfig` object with:
 The `AgentPackage.acp` field SHALL be an `AcpConfig` object with:
 - `command: string` — the command to start the agent in ACP mode (e.g., `"claude-agent-acp"`)
 
-#### Scenario: Agent declares ACP command
+The `acp.command` value SHALL be used when generating `agent-launch.json` for ACP mode sessions. It SHALL NOT be used to generate any `.chapter/acp.json` file.
+
+#### Scenario: Agent declares ACP command used in agent-launch.json
 - **WHEN** an agent package sets `acp.command` to `"claude-agent-acp"`
-- **THEN** the materializer SHALL use this command when generating `.chapter/acp.json` in ACP mode
+- **AND** `generateAgentLaunchJson` is called with `acpMode: true`
+- **THEN** the generated `agent-launch.json` SHALL use `"claude-agent-acp"` as the runtime command
 
 #### Scenario: Agent omits ACP config
 - **WHEN** an agent package does not set the `acp` field
@@ -87,7 +90,6 @@ The `@clawmasons/agent-sdk` package SHALL export the following helper functions 
 - `generateAgentsMd(agent: ResolvedAgent): string`
 - `generateSkillReadme(skill: ResolvedSkill): string`
 - `generateAgentLaunchJson(runtime: string, roleCredentials: string[], acpMode?: boolean): string`
-- `generateAcpConfigJson(acpCommand: string): string`
 - `formatPermittedTools(permissions): string`
 - `collectAllSkills(roles: ResolvedRole[]): Map<string, ResolvedSkill>`
 - `collectAllTasks(roles: ResolvedRole[]): Array<[ResolvedTask, ResolvedRole[]]>`
@@ -111,3 +113,9 @@ The `@clawmasons/agent-sdk` package SHALL re-export the following types from `@c
 #### Scenario: Agent package imports types from SDK only
 - **WHEN** an agent package needs `ResolvedAgent` and `RuntimeMaterializer`
 - **THEN** it SHALL be able to import both from `@clawmasons/agent-sdk` without a direct `@clawmasons/shared` dependency
+
+## REMOVED Requirements
+
+### Requirement: generateAcpConfigJson generates .chapter/acp.json content
+**Reason**: `.chapter/acp.json` has no consumer in the codebase. The helper function was exported and used by materializers but the generated file was never read at runtime.
+**Migration**: Remove all calls to `generateAcpConfigJson`. Remove the function from `agent-sdk/src/helpers.ts` and its export from `agent-sdk/src/index.ts` and any re-exports in `cli/src/materializer/common.ts`.
