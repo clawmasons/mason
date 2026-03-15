@@ -52,7 +52,7 @@ export function generateAgentDockerfile(
 `;
 
   // Workspace files are COPY'd from a pre-generated directory
-  const workspaceCopyLine = `COPY ${roleShortName}/${primaryRuntime}/workspace/ /home/mason/workspace/`;
+  const workspaceCopyLine = `COPY ${roleShortName}/${primaryRuntime}/build/workspace/ /home/mason/workspace/`;
 
   // Base image: role overrides agent, agent overrides default
   const baseImage = role.baseImage ?? dockerfileConfig?.baseImage ?? "node:22-slim";

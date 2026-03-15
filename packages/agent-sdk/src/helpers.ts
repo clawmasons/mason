@@ -21,16 +21,6 @@ export const PROVIDER_ENV_VARS: Record<string, string> = {
 };
 
 /**
- * Generate .chapter/acp.json content for ACP agent mode.
- *
- * Contains the ACP command so the container entrypoint
- * knows how to start the agent in ACP mode.
- */
-export function generateAcpConfigJson(acpCommand: string): string {
-  return JSON.stringify({ command: acpCommand }, null, 2);
-}
-
-/**
  * Format a role's permitted tools as a readable list.
  * Each line: "  - {appShortName}: tool1, tool2, tool3"
  */

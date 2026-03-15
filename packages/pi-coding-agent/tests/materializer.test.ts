@@ -450,29 +450,11 @@ describe("piCodingAgentMaterializer", () => {
     });
 
     describe("ACP mode", () => {
-      it("does not generate .chapter/acp.json when acpMode is false", () => {
+      it("does not generate .chapter/acp.json even in ACP mode", () => {
         const agent = makePiAgent();
-        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
 
         expect(result.has(".chapter/acp.json")).toBe(false);
-      });
-
-      it("generates .chapter/acp.json when acpMode is true", () => {
-        const agent = makePiAgent();
-        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
-
-        expect(result.has(".chapter/acp.json")).toBe(true);
-        const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
-        expect(acpConfig.command).toBe("pi-agent-acp");
-        expect(acpConfig.port).toBeUndefined();
-      });
-
-      it("maps pi-coding-agent runtime to pi-agent-acp command", () => {
-        const agent = makePiAgent();
-        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
-
-        const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
-        expect(acpConfig.command).toBe("pi-agent-acp");
       });
 
       it("still generates all standard workspace files in ACP mode", () => {

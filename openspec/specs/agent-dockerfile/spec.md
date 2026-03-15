@@ -9,6 +9,7 @@ When generating the Dockerfile:
 - If `agentPackage.dockerfile.installSteps` is not provided, no agent-specific install step SHALL be emitted
 - If `agentPackage.dockerfile.baseImage` is provided and the role does not declare its own `baseImage`, the agent's base image SHALL be used
 - If `agentPackage.dockerfile.aptPackages` is provided, those packages SHALL be merged with any role-declared `aptPackages`
+- The Dockerfile SHALL COPY from `{roleShortName}/{agentType}/build/workspace/` to `/home/mason/workspace/` (not from `workspace/` directly)
 
 #### Scenario: Agent provides install steps
 - **WHEN** `generateAgentDockerfile()` is called with an `AgentPackage` whose `dockerfile.installSteps` is `"RUN npm install -g @anthropic-ai/claude-code"`
@@ -34,33 +35,7 @@ When generating the Dockerfile:
 - **THEN** the Dockerfile SHALL install both `git` and `curl` via `apt-get install`
 - **AND** duplicates SHALL be deduplicated
 
-## ADDED Requirements
-
-### Requirement: Agent Dockerfile copies home directory and creates backup
-
-The `generateAgentDockerfile()` function SHALL emit lines to:
-1. COPY the materialized home directory into `/home/mason/`
-2. Copy `/home/mason` to `/home/mason-from-build` as a backup before the mount overlay
-
-The COPY line SHALL use the path `{roleShortName}/{agentType}/home/` relative to the build context. The backup step SHALL use `cp -a` to preserve permissions and ownership.
-
-#### Scenario: Dockerfile includes home COPY and backup
+#### Scenario: Workspace COPY uses build/ path
 - **WHEN** `generateAgentDockerfile()` is called for a claude-code agent in role "writer"
-- **THEN** the output SHALL contain `COPY writer/claude-code/home/ /home/mason/`
-- **AND** `RUN cp -a /home/mason /home/mason-from-build`
-
-#### Scenario: Home backup preserves OS files
-- **WHEN** the Dockerfile is built and the base image created `.bashrc` and `.profile` in `/home/mason/`
-- **THEN** `/home/mason-from-build/` SHALL contain those files plus the materialized home content
-
-### Requirement: Agent Dockerfile emits home COPY only when home directory exists
-
-The `generateAgentDockerfile()` function SHALL accept an option indicating whether a home directory was materialized. When no home directory exists (e.g., agent type without `materializeHome`), the COPY and backup lines SHALL be omitted.
-
-#### Scenario: No home directory materialized
-- **WHEN** `generateAgentDockerfile()` is called with `hasHome: false`
-- **THEN** the output SHALL NOT contain the home COPY line or the backup step
-
-#### Scenario: Home directory materialized
-- **WHEN** `generateAgentDockerfile()` is called with `hasHome: true`
-- **THEN** the output SHALL contain both the home COPY and backup lines
+- **THEN** the output Dockerfile SHALL contain `COPY writer/claude-code/build/workspace/ /home/mason/workspace/`
+- **AND** SHALL NOT contain `COPY writer/claude-code/workspace/ /home/mason/workspace/`

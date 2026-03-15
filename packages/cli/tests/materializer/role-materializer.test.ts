@@ -178,13 +178,13 @@ describe("materializeForAgent", () => {
       expect(mcp.mcpServers.chapter.headers.Authorization).toBe("Bearer test-token-123");
     });
 
-    it("supports ACP mode", () => {
+    it("supports ACP mode (uses ACP command in agent-launch.json, no .chapter/acp.json)", () => {
       const role = makeTestRole();
       const result = materializeForAgent(role, "claude-code", undefined, undefined, { acpMode: true });
 
-      expect(result.has(".chapter/acp.json")).toBe(true);
-      const acpConfig = JSON.parse(result.get(".chapter/acp.json")!);
-      expect(acpConfig.command).toBe("claude-agent-acp");
+      expect(result.has(".chapter/acp.json")).toBe(false);
+      const launchConfig = JSON.parse(result.get("agent-launch.json")!);
+      expect(launchConfig.command).toBe("claude-agent-acp");
     });
   });
 

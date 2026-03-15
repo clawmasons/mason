@@ -206,8 +206,23 @@ export function generateComposeYml(opts: {
   const projectHash = crypto.createHash("sha256").update(projectDir).digest("hex").slice(0, 8);
   const composeName = `mason-${projectHash}`;
 
-  // Build agent volume lines: workspace mount + role-declared mounts
-  const agentVolumeLines = [`      - "${projectDir}:/home/mason/workspace/project"`];
+  // Build agent volume lines
+  // 1. Workspace mount — provides agent-launch.json at /home/mason/workspace/agent-launch.json
+  const workspacePath = path.join(dockerBuildDir, agent, "workspace");
+  const agentVolumeLines = [`      - "${workspacePath}:/home/mason/workspace"`];
+
+  // 2. Project dir mount (read-only)
+  agentVolumeLines.push(`      - "${projectDir}:/home/mason/workspace/project"`);
+
+  // 3. Per-file overlay mounts — inject config files into /home/mason/workspace/project/
+  const buildWorkspaceProjectDir = path.join(dockerBuildDir, agent, "build", "workspace", "project");
+  if (fs.existsSync(buildWorkspaceProjectDir)) {
+    for (const entry of fs.readdirSync(buildWorkspaceProjectDir)) {
+      agentVolumeLines.push(`      - "${path.join(buildWorkspaceProjectDir, entry)}:/home/mason/workspace/project/${entry}"`);
+    }
+  }
+
+  // 4. Role-declared extra mounts
   for (const vol of resolveRoleMountVolumes(roleMounts)) {
     agentVolumeLines.push(`      - "${vol}"`);
   }

@@ -6,7 +6,6 @@ import {
   collectAllTasks,
   findRolesForTask,
   formatPermittedTools,
-  generateAcpConfigJson,
   generateAgentLaunchJson,
   generateAgentsMd,
   generateSkillReadme,
@@ -124,26 +123,6 @@ describe("PROVIDER_ENV_VARS", () => {
 
   it("contains exactly 8 providers", () => {
     expect(Object.keys(PROVIDER_ENV_VARS)).toHaveLength(8);
-  });
-});
-
-// ── generateAcpConfigJson ─────────────────────────────────────────────────────
-
-describe("generateAcpConfigJson", () => {
-  it("returns JSON with command field", () => {
-    const result = generateAcpConfigJson("my-acp-cmd");
-    const parsed = JSON.parse(result);
-    expect(parsed.command).toBe("my-acp-cmd");
-  });
-
-  it("does not include extra fields", () => {
-    const parsed = JSON.parse(generateAcpConfigJson("cmd"));
-    expect(Object.keys(parsed)).toEqual(["command"]);
-  });
-
-  it("handles commands with spaces and flags", () => {
-    const parsed = JSON.parse(generateAcpConfigJson("mcp-agent --acp"));
-    expect(parsed.command).toBe("mcp-agent --acp");
   });
 });
 

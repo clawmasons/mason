@@ -149,22 +149,8 @@ The materializer SHALL provide a `generateConfigJson()` method that returns the 
 - **WHEN** `generateConfigJson()` is called
 - **THEN** the result SHALL be valid JSON containing `hasCompletedOnboarding: true` and `hasTrustDialogAccepted: true` for `/home/node/workspace`
 
+## REMOVED Requirements
+
 ### Requirement: Claude Code materializer supports ACP mode
-
-When `materializeWorkspace` is called with `options.acpMode = true`, the materializer SHALL generate an additional `.chapter/acp.json` file containing `{ "port": <acp-port>, "command": "<acp-command>" }`. The ACP port defaults to 3002 (from agent's `acp.port` field). The ACP command is resolved from `ACP_RUNTIME_COMMANDS` using the agent's primary runtime.
-
-#### Scenario: ACP mode generates .chapter/acp.json
-- **WHEN** `materializeWorkspace` is called with `options.acpMode = true` for a Claude Code agent
-- **THEN** the result SHALL contain `.chapter/acp.json` with `port: 3002` and `command: "claude-agent-acp"`
-
-#### Scenario: ACP mode uses custom port from agent schema
-- **WHEN** the agent has `acp.port = 4000` and `options.acpMode = true`
-- **THEN** `.chapter/acp.json` SHALL have `port: 4000`
-
-#### Scenario: Standard files still generated in ACP mode
-- **WHEN** `options.acpMode = true`
-- **THEN** the result SHALL still contain `.mcp.json`, `.claude/settings.json`, `AGENTS.md`, and slash commands
-
-#### Scenario: No ACP config when acpMode is false or undefined
-- **WHEN** `options.acpMode` is false or `options` is undefined
-- **THEN** the result SHALL NOT contain `.chapter/acp.json`
+**Reason**: `.chapter/acp.json` has no consumer in the codebase. The file was generated but never read at runtime by any agent, bootstrap, or CLI code.
+**Migration**: Remove any code that reads `.chapter/acp.json`. The `acpMode` flag on `MaterializeOptions` is retained and still controls ACP runtime command selection in `agent-launch.json`; only the `.chapter/acp.json` file output is removed.
