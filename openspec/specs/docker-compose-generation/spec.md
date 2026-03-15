@@ -1,54 +1,47 @@
 ## ADDED Requirements
 
-### Requirement: generateDockerCompose produces a valid docker-compose.yml string
+### Requirement: Session compose mounts agent home directory
 
-The system SHALL provide a `generateDockerCompose(agent, runtimeServices)` function that returns a YAML string for `docker-compose.yml`. The generated compose file SHALL contain:
-- An `mcp-proxy` service built from `./chapter-proxy` that runs the native chapter proxy
-- One service per runtime, as provided by `runtimeServices` (a map of runtime name to `ComposeServiceDef`)
-- An `chapter-net` bridge network connecting all services
+The `generateSessionComposeYml()` function SHALL accept an optional `homePath` in `SessionComposeOptions`. When provided, the agent service SHALL include a volume mount mapping the materialized home directory to `/home/mason`:
 
-#### Scenario: Basic agent with one runtime produces valid compose
-- **WHEN** `generateDockerCompose()` is called with a resolved agent having `runtimes: ["claude-code"]` and one `ComposeServiceDef` for claude-code
-- **THEN** the output SHALL contain an `mcp-proxy` service and a `claude-code` service, both on the `chapter-net` network
+```yaml
+volumes:
+  - {relHomePath}:/home/mason
+```
 
-### Requirement: mcp-proxy service uses native chapter proxy
+The path SHALL be relative from the session directory to the home directory.
 
-The `mcp-proxy` service SHALL include:
-- `build: ./proxy` (always builds from the per-member proxy Dockerfile)
-- `restart: unless-stopped`
-- Port mapping `${CHAPTER_PROXY_PORT:-<port>}:<port>` where port comes from `member.proxy.port` (default: 9090)
-- Volume mount `./proxy/logs:/logs` for log persistence
-- `CHAPTER_PROXY_TOKEN=${CHAPTER_PROXY_TOKEN}` always present in environment
-- Environment variables for all app credentials collected from resolved apps' `env` fields
-- `networks: [chapter-net]`
-- JSON logging driver with `max-size: 10m` and `max-file: 5`
-- No `entrypoint:` or `command:` directives (uses Dockerfile ENTRYPOINT/CMD)
-- No `config.json` mount (chapter proxy reads from workspace)
+#### Scenario: Home directory mount included
+- **WHEN** `generateSessionComposeYml()` is called with `homePath` pointing to `{dockerBuildDir}/{agentType}/home/`
+- **THEN** the agent service volumes SHALL include a bind mount of that path to `/home/mason`
 
-#### Scenario: Proxy service has correct port and build
-- **WHEN** the member has `proxy: { port: 8080 }`
-- **THEN** the proxy service SHALL use `build: ./proxy` and port mapping `${CHAPTER_PROXY_PORT:-8080}:8080`
+#### Scenario: No home directory
+- **WHEN** `generateSessionComposeYml()` is called without `homePath`
+- **THEN** no `/home/mason` volume mount SHALL be added to the agent service
 
-#### Scenario: Proxy service always includes CHAPTER_PROXY_TOKEN
-- **WHEN** `generateDockerCompose()` is called
-- **THEN** the mcp-proxy service environment SHALL always include `CHAPTER_PROXY_TOKEN=${CHAPTER_PROXY_TOKEN}`
+#### Scenario: Home mount coexists with project mount
+- **WHEN** both home mount and project mount are configured
+- **THEN** the agent service SHALL have both volume mounts: the home mount at `/home/mason` and the project mount at `/home/mason/workspace/project:ro`
 
-#### Scenario: Proxy service collects app environment variables
-- **WHEN** apps declare `env: { "GITHUB_TOKEN": "${GITHUB_TOKEN}", "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}" }`
-- **THEN** the proxy service environment SHALL include `GITHUB_TOKEN=${GITHUB_TOKEN}` and `SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}`
+### Requirement: Build args pass host UID/GID to agent Dockerfile
 
-### Requirement: Runtime services are included as declared
+The `generateSessionComposeYml()` function SHALL include `HOST_UID` and `HOST_GID` build args in the agent service's build section:
 
-Each entry in `runtimeServices` SHALL be rendered as a docker-compose service. The service name is the runtime name (e.g., `claude-code`). All fields from `ComposeServiceDef` SHALL be included: `build`, `restart`, `volumes`, `working_dir`, `environment`, `depends_on`, `stdin_open`, `tty`, `networks`.
+```yaml
+build:
+  context: ...
+  dockerfile: ...
+  args:
+    HOST_UID: "<host-uid>"
+    HOST_GID: "<host-gid>"
+```
 
-#### Scenario: Multiple runtimes produce multiple services
-- **WHEN** `runtimeServices` contains entries for `claude-code` and `codex`
-- **THEN** the compose file SHALL contain both `claude-code` and `codex` services with their respective configurations
+The values SHALL be determined at build time from the host system.
 
-### Requirement: Network section declares chapter-net bridge
+#### Scenario: Build args in compose
+- **WHEN** `generateSessionComposeYml()` is called with `hostUid` and `hostGid` options
+- **THEN** the agent service build section SHALL include `args` with `HOST_UID` and `HOST_GID`
 
-The compose file SHALL include a `networks` section declaring `chapter-net` with `driver: bridge`.
-
-#### Scenario: Network is always present
-- **WHEN** `generateDockerCompose()` is called
-- **THEN** the output SHALL contain `networks:` with `chapter-net:` and `driver: bridge`
+#### Scenario: Default UID/GID when not provided
+- **WHEN** `generateSessionComposeYml()` is called without `hostUid`/`hostGid`
+- **THEN** the build args SHALL default to `"1000"` for both
