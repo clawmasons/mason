@@ -40,7 +40,7 @@ describe("CLI entry point", () => {
     }
   });
 
-  it("chapter subcommand contains build, list, validate, add, permissions, pack, proxy", () => {
+  it("chapter subcommand contains build, list, validate, permissions, proxy", () => {
     const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
     expect(chapterCmd).toBeDefined();
     if (chapterCmd) {
@@ -48,14 +48,22 @@ describe("CLI entry point", () => {
       expect(subcommandNames).toContain("build");
       expect(subcommandNames).toContain("list");
       expect(subcommandNames).toContain("validate");
-      expect(subcommandNames).toContain("add");
       expect(subcommandNames).toContain("permissions");
-      expect(subcommandNames).toContain("pack");
       expect(subcommandNames).toContain("proxy");
-      // Removed commands: remove, init-role, init
+      // Removed commands
+      expect(subcommandNames).not.toContain("add");
+      expect(subcommandNames).not.toContain("pack");
       expect(subcommandNames).not.toContain("remove");
       expect(subcommandNames).not.toContain("init-role");
       expect(subcommandNames).not.toContain("init");
+    }
+  });
+
+  it("has top-level package command registered", () => {
+    const packageCmd = program.commands.find((cmd) => cmd.name() === "package");
+    expect(packageCmd).toBeDefined();
+    if (packageCmd) {
+      expect(packageCmd.description()).toContain("pack");
     }
   });
 

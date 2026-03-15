@@ -54,8 +54,8 @@ describe("runValidate", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function writeRoleMd(agentDir: string, roleName: string, frontmatter: string, body: string): void {
-    const roleDir = path.join(tmpDir, `.${agentDir}`, "roles", roleName);
+  function writeRoleMd(roleName: string, frontmatter: string, body: string): void {
+    const roleDir = path.join(tmpDir, ".mason", "roles", roleName);
     fs.mkdirSync(roleDir, { recursive: true });
     fs.writeFileSync(
       path.join(roleDir, "ROLE.md"),
@@ -66,7 +66,7 @@ describe("runValidate", () => {
   // ── Role-based validation ──────────────────────────────────────────────
 
   it("validates a local role successfully", async () => {
-    writeRoleMd("claude", "test-role", `name: test-role\ndescription: A test role\ncommands: []\nskills: []`, "You are a test role.");
+    writeRoleMd("test-role", `name: test-role\ndescription: A test role\ntasks: []\nskills: []`, "You are a test role.");
 
     await runValidate(tmpDir, "test-role", {});
 
@@ -76,7 +76,7 @@ describe("runValidate", () => {
   });
 
   it("outputs JSON for valid role with --json flag", async () => {
-    writeRoleMd("claude", "test-role", `name: test-role\ndescription: A test role\ncommands: []\nskills: []`, "You are a test role.");
+    writeRoleMd("test-role", `name: test-role\ndescription: A test role\ntasks: []\nskills: []`, "You are a test role.");
 
     await runValidate(tmpDir, "test-role", { json: true });
 

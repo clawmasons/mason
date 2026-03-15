@@ -57,7 +57,7 @@ describe("runPermissions", () => {
   });
 
   function writeRole(name: string, frontmatterYaml: string, body = "Role instructions."): void {
-    const roleDir = path.join(tmpDir, ".claude", "roles", name);
+    const roleDir = path.join(tmpDir, ".mason", "roles", name);
     fs.mkdirSync(roleDir, { recursive: true });
     const content = `---\n${frontmatterYaml}\n---\n\n${body}\n`;
     fs.writeFileSync(path.join(roleDir, "ROLE.md"), content);

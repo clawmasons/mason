@@ -1,8 +1,8 @@
 /**
  * E2E Test: Cross-Agent Materialization
  *
- * Verifies that a role defined in the Claude dialect (.claude/roles/) can be
- * discovered and validated for use by different agent runtimes.
+ * Verifies that a role defined in .mason/roles/ can be discovered and
+ * validated for use by different agent runtimes.
  *
  * This test does NOT require Docker -- it validates the role discovery and
  * validation pipeline across agent types.
@@ -23,7 +23,7 @@ describe("cross-agent materialization", () => {
   let workspaceDir: string;
 
   beforeAll(() => {
-    // Create temp workspace with Claude-dialect local role
+    // Create temp workspace with mason local role
     workspaceDir = copyFixtureWorkspace("cross-agent", {
       excludePaths: ["agents/mcp-test", "roles/mcp-test"],
     });
@@ -35,7 +35,7 @@ describe("cross-agent materialization", () => {
     }
   });
 
-  it("Claude-dialect local role is discovered", () => {
+  it("mason local role is discovered from .mason/roles/", () => {
     const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
@@ -48,10 +48,10 @@ describe("cross-agent materialization", () => {
     expect(localRole).toBeDefined();
     expect(
       (localRole!.source as Record<string, unknown>).agentDialect,
-    ).toBe("claude-code");
+    ).toBe("mason");
   });
 
-  it("Claude-dialect role has correct metadata from ROLE.md frontmatter", () => {
+  it("mason local role has correct metadata from ROLE.md frontmatter", () => {
     const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
@@ -68,7 +68,7 @@ describe("cross-agent materialization", () => {
     expect(metadata.version).toBe("1.0.0");
   });
 
-  it("Claude-dialect role has tasks normalized from commands field", () => {
+  it("mason local role has tasks from tasks field", () => {
     const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
@@ -88,7 +88,7 @@ describe("cross-agent materialization", () => {
     );
   });
 
-  it("Claude-dialect role has empty apps when no mcp_servers specified", () => {
+  it("mason local role has empty apps when no mcp_servers specified", () => {
     const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
@@ -105,12 +105,12 @@ describe("cross-agent materialization", () => {
     expect(apps).toEqual([]);
   });
 
-  it("Claude-dialect role validates successfully", () => {
+  it("mason local role validates successfully", () => {
     // Should not throw
     masonExec(["chapter", "validate", "test-writer"], workspaceDir);
   });
 
-  it("Claude-dialect role contains container requirements from ROLE.md", () => {
+  it("mason local role contains container requirements from ROLE.md", () => {
     const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,
@@ -130,7 +130,7 @@ describe("cross-agent materialization", () => {
     expect(packages.apt).toEqual(expect.arrayContaining(["curl"]));
   });
 
-  it("Claude-dialect role contains governance config from ROLE.md", () => {
+  it("mason local role contains governance config from ROLE.md", () => {
     const roles = masonExecJson<Array<Record<string, unknown>>>(
       ["chapter", "list", "--json"],
       workspaceDir,

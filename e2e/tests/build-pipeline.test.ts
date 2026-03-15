@@ -29,8 +29,7 @@ describe("full chapter build → run validation flow", () => {
   let workspaceDir: string;
   let dockerDir: string;
 
-  // The local role "test-writer" is in .claude/roles/test-writer/ROLE.md
-  // Agent type inferred from .claude/ directory → "claude-code"
+  // The local role "test-writer" is in .mason/roles/test-writer/ROLE.md
   const ROLE_NAME = "test-writer";
   const AGENT_TYPE = "claude-code";
 

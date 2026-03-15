@@ -12,7 +12,6 @@
 
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { getKnownDirectories } from "./dialect-registry.js";
 import { readMaterializedRole } from "./parser.js";
 import { readPackagedRole } from "./package-reader.js";
 import type { RoleType } from "../types/role-types.js";
@@ -86,41 +85,37 @@ export async function resolveRole(
 // ---------------------------------------------------------------------------
 
 /**
- * Scan all known agent directories for local ROLE.md files.
- * Silently skips directories that don't exist.
+ * Scan .mason/roles/ for local ROLE.md files.
+ * Silently skips the directory if it doesn't exist.
  */
 async function discoverLocalRoles(projectDir: string): Promise<RoleType[]> {
   const roles: RoleType[] = [];
-  const knownDirs = getKnownDirectories();
+  const rolesDir = join(projectDir, ".mason", "roles");
 
-  for (const dir of knownDirs) {
-    const rolesDir = join(projectDir, `.${dir}`, "roles");
+  let entries: string[];
+  try {
+    entries = await readdir(rolesDir);
+  } catch {
+    // .mason/roles/ doesn't exist — no local roles
+    return roles;
+  }
 
-    let entries: string[];
+  for (const entry of entries) {
+    const roleMdPath = join(rolesDir, entry, "ROLE.md");
     try {
-      entries = await readdir(rolesDir);
+      const s = await stat(roleMdPath);
+      if (!s.isFile()) continue;
     } catch {
-      // Directory doesn't exist — expected for projects that don't use this agent
+      // No ROLE.md in this subdirectory — skip
       continue;
     }
 
-    for (const entry of entries) {
-      const roleMdPath = join(rolesDir, entry, "ROLE.md");
-      try {
-        const s = await stat(roleMdPath);
-        if (!s.isFile()) continue;
-      } catch {
-        // No ROLE.md in this subdirectory — skip
-        continue;
-      }
-
-      try {
-        const role = await readMaterializedRole(roleMdPath);
-        roles.push(role);
-      } catch {
-        // Malformed ROLE.md — skip during discovery (log would go here)
-        continue;
-      }
+    try {
+      const role = await readMaterializedRole(roleMdPath);
+      roles.push(role);
+    } catch {
+      // Malformed ROLE.md — skip during discovery (log would go here)
+      continue;
     }
   }
 
@@ -128,32 +123,25 @@ async function discoverLocalRoles(projectDir: string): Promise<RoleType[]> {
 }
 
 /**
- * Find a specific local role by name across all agent directories.
+ * Find a specific local role by name in .mason/roles/.
  */
 async function findLocalRole(
   name: string,
   projectDir: string,
 ): Promise<RoleType | undefined> {
-  const knownDirs = getKnownDirectories();
-
-  for (const dir of knownDirs) {
-    const roleMdPath = join(projectDir, `.${dir}`, "roles", name, "ROLE.md");
-    try {
-      const s = await stat(roleMdPath);
-      if (!s.isFile()) continue;
-    } catch {
-      continue;
-    }
-
-    try {
-      return await readMaterializedRole(roleMdPath);
-    } catch {
-      // Malformed ROLE.md — continue searching other directories
-      continue;
-    }
+  const roleMdPath = join(projectDir, ".mason", "roles", name, "ROLE.md");
+  try {
+    const s = await stat(roleMdPath);
+    if (!s.isFile()) return undefined;
+  } catch {
+    return undefined;
   }
 
-  return undefined;
+  try {
+    return await readMaterializedRole(roleMdPath);
+  } catch {
+    return undefined;
+  }
 }
 
 // ---------------------------------------------------------------------------

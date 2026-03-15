@@ -116,3 +116,14 @@ registerDialect({
   },
 });
 
+// The canonical mason location (.mason/roles/) uses generic field names
+registerDialect({
+  name: "mason",
+  directory: "mason",
+  fieldMapping: {
+    tasks: "tasks",
+    apps: "mcp_servers",
+    skills: "skills",
+  },
+});
+

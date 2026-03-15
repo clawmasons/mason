@@ -60,7 +60,7 @@ describe("mcp-proxy with claude-native project", () => {
   // -- Role Discovery ---------------------------------------------------------
 
   describe("role discovery", () => {
-    it("discovers writer role from .claude/roles/", () => {
+    it("discovers writer role from .mason/roles/", () => {
       const roles = masonExecJson<Array<Record<string, unknown>>>(
         ["chapter", "list", "--json"],
         workspaceDir,
@@ -72,7 +72,7 @@ describe("mcp-proxy with claude-native project", () => {
       expect(writer).toBeDefined();
       expect(
         (writer!.source as Record<string, unknown>).agentDialect,
-      ).toBe("claude-code");
+      ).toBe("mason");
     });
 
     it("writer role has inline mcp_servers parsed as apps", () => {
@@ -155,7 +155,7 @@ describe("mcp-proxy with claude-native project", () => {
 
     it("generates mcp-agent workspace with .mcp.json", () => {
       const mcpJsonPath = path.join(
-        dockerDir, "writer", "mcp-agent", "workspace", ".mcp.json",
+        dockerDir, "writer", "mcp-agent", "build", "workspace", "project", ".mcp.json",
       );
       expect(fs.existsSync(mcpJsonPath)).toBe(true);
 

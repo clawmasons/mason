@@ -1,30 +1,26 @@
 import { Command, type ParseOptions } from "commander";
-import { registerAddCommand } from "./add.js";
 import { registerBuildCommand } from "./build.js";
 import { registerListCommand } from "./list.js";
-import { registerPackCommand } from "./pack.js";
+import { registerPackageCommand } from "./package.js";
 import { registerPermissionsCommand } from "./permissions.js";
 import { registerProxyCommand } from "./proxy.js";
 import { registerRunCommand, isKnownAgentType } from "./run-agent.js";
-import { registerMasonInitRepoCommand } from "./mason-init-repo.js";
 import { registerValidateCommand } from "./validate.js";
 
 /**
  * Register all chapter workspace subcommands under the `chapter` subcommand group,
- * and register top-level commands (`init`, `run`).
+ * and register top-level commands (`run`, `package`).
  *
  * Also installs shorthand detection: if the first positional argument is a known
  * agent type (e.g., `mason claude --role x`), it is treated as
  * `mason run claude --role x`.
  */
 export function registerCommands(program: Command): void {
-  // ── Top-level commands ──────────────────────────────────────────────
-
-  // `run` — run a role on an agent runtime
+  // Top-level commands
   registerRunCommand(program);
+  registerPackageCommand(program);
 
-  // ── `chapter` subcommand group ──────────────────────────────────────
-
+  // `chapter` subcommand group
   const chapter = program
     .command("chapter")
     .description("Chapter workspace management commands");
@@ -32,22 +28,10 @@ export function registerCommands(program: Command): void {
   registerListCommand(chapter);
   registerValidateCommand(chapter);
   registerPermissionsCommand(chapter);
-  registerPackCommand(chapter);
-  registerAddCommand(chapter);
   registerBuildCommand(chapter);
   registerProxyCommand(chapter);
 
-  // ── `mason` subcommand group ──────────────────────────────────────────
-
-  const mason = program
-    .command("mason")
-    .description("Mason role management commands");
-
-  registerMasonInitRepoCommand(mason);
-
-  // ── Shorthand detection ─────────────────────────────────────────────
-  // If the first argument is a known agent type but not a registered command,
-  // rewrite `mason <agent-type> ...` to `mason run <agent-type> ...`
+  // Shorthand detection: rewrite `mason <agent-type> ...` to `mason run <agent-type> ...`
   installAgentTypeShorthand(program);
 }
 
