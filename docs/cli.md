@@ -37,7 +37,7 @@ mason run <agent-type> --role <name> [options]
 
 | Argument | Description |
 |----------|-------------|
-| `<agent-type>` | Agent runtime to use (e.g., `claude`, `codex`, `aider`, `mcp-agent`) |
+| `<agent-type>` | Agent runtime to use (e.g., `claude` → `claude-code`, `pi` → `pi-coding-agent`, `mcp-agent`) |
 
 | Option | Description |
 |--------|-------------|

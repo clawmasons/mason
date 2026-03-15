@@ -1,23 +1,38 @@
 ## MODIFIED Requirements
 
-### Requirement: Agent Dockerfile creates mason user with host UID/GID
+### Requirement: Agent Dockerfile uses pluggable runtime install steps
 
-The `generateAgentDockerfile()` function SHALL emit `ARG HOST_UID=1000` and `ARG HOST_GID=1000` build args, and create the `mason` user and group with those IDs:
-```dockerfile
-ARG HOST_UID=1000
-ARG HOST_GID=1000
-RUN groupadd -g $HOST_GID mason && useradd -m -u $HOST_UID -g $HOST_GID mason
-```
+The `generateAgentDockerfile()` function SHALL accept an `AgentPackage` (or its `dockerfile` config) to determine runtime-specific Dockerfile instructions. The hardcoded `getRuntimeInstall()` switch statement SHALL be removed.
 
-The `-r` (system user) flag SHALL be removed. Default values of 1000 provide a fallback when build args are not explicitly passed.
+When generating the Dockerfile:
+- If `agentPackage.dockerfile.installSteps` is provided, those lines SHALL be included in the Dockerfile
+- If `agentPackage.dockerfile.installSteps` is not provided, no agent-specific install step SHALL be emitted
+- If `agentPackage.dockerfile.baseImage` is provided and the role does not declare its own `baseImage`, the agent's base image SHALL be used
+- If `agentPackage.dockerfile.aptPackages` is provided, those packages SHALL be merged with any role-declared `aptPackages`
 
-#### Scenario: Dockerfile with default UID/GID
-- **WHEN** `generateAgentDockerfile()` is called without explicit HOST_UID/HOST_GID build args
-- **THEN** the Dockerfile SHALL create mason with UID=1000 and GID=1000
+#### Scenario: Agent provides install steps
+- **WHEN** `generateAgentDockerfile()` is called with an `AgentPackage` whose `dockerfile.installSteps` is `"RUN npm install -g @anthropic-ai/claude-code"`
+- **THEN** the output Dockerfile SHALL contain that RUN instruction
 
-#### Scenario: Dockerfile with custom UID/GID
-- **WHEN** the image is built with `--build-arg HOST_UID=501 --build-arg HOST_GID=20`
-- **THEN** the mason user SHALL have UID=501 and GID=20
+#### Scenario: Agent provides no install steps
+- **WHEN** `generateAgentDockerfile()` is called with an `AgentPackage` whose `dockerfile` is undefined
+- **THEN** the output Dockerfile SHALL contain no agent-specific install step (only the standard mason user setup, workspace copy, etc.)
+
+#### Scenario: Base image precedence
+- **WHEN** `generateAgentDockerfile()` is called with an `AgentPackage` whose `dockerfile.baseImage` is `"python:3.12-slim"`
+- **AND** the role does not declare `baseImage`
+- **THEN** the Dockerfile SHALL use `FROM python:3.12-slim`
+
+#### Scenario: Role base image overrides agent base image
+- **WHEN** the role declares `baseImage: "ubuntu:22.04"`
+- **AND** the agent declares `dockerfile.baseImage: "node:22-slim"`
+- **THEN** the Dockerfile SHALL use `FROM ubuntu:22.04` (role takes precedence)
+
+#### Scenario: Apt packages merged from agent and role
+- **WHEN** the agent declares `dockerfile.aptPackages: ["git"]`
+- **AND** the role declares `aptPackages: ["curl"]`
+- **THEN** the Dockerfile SHALL install both `git` and `curl` via `apt-get install`
+- **AND** duplicates SHALL be deduplicated
 
 ## ADDED Requirements
 

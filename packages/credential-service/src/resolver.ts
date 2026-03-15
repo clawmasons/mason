@@ -1,6 +1,4 @@
 import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
 import { loadEnvFile } from "./env-file.js";
 import { queryKeychain, queryKeychainByService } from "./keychain.js";
 
@@ -33,13 +31,11 @@ export interface CredentialResolverConfig {
  *
  * Only keys in this map can be resolved via the security.* prefix.
  * Any other security.* key is rejected with ACCESS_DENIED.
+ *
+ * Currently empty — reserved for future security-sensitive credentials
+ * that require keychain lookup rather than plain env var resolution.
  */
-const SECURITY_KEY_ALLOWLIST: Record<string, { keychainService: string; fallbackFile: string }> = {
-  "security.CLAUDE_CODE_CREDENTIALS": {
-    keychainService: "Claude Code-credentials",
-    fallbackFile: path.join(os.homedir(), ".claude", ".credentials.json"),
-  },
-};
+const SECURITY_KEY_ALLOWLIST: Record<string, { keychainService: string; fallbackFile: string }> = {};
 
 /**
  * Resolves credential values from multiple sources in priority order:

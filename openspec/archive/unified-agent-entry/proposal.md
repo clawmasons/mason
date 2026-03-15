@@ -8,7 +8,7 @@ We need a single, configurable entry command (`agent-entry`) for all agent conta
 - Pipes stdin/stdout correctly to the launched agent process
 - Has SSE parsing fixes from mcp-agent's MCP client
 
-The credential service also needs to handle `security.CLAUDE_CODE_CREDENTIALS` — looking up `Claude Code-credentials` in macOS Keychain, or reading `~/.claude/.credentials.json` on other platforms. This must be a hardcoded allowlist, not arbitrary keychain access.
+The credential service also needs to handle `security.*` keys via a hardcoded allowlist, rejecting anything not explicitly permitted — not arbitrary keychain access.
 
 ## What Changes
 
@@ -24,21 +24,19 @@ The credential service also needs to handle `security.CLAUDE_CODE_CREDENTIALS` �
 - Add `Accept: "application/json, text/event-stream"` header
 - Handle SSE responses in `initializeMcpSession()` and `callTool()`
 
-### 3. Credential service: `security.CLAUDE_CODE_CREDENTIALS` support
+### 3. Credential service: `security.*` allowlist support
 - Add allowlisted `security.*` credential key handling in the resolver
-- On macOS: `security find-generic-password -s "Claude Code-credentials" -w`
-- On other OS: read from `~/.claude/.credentials.json`
-- Reject any `security.*` key not in the allowlist
+- Reject any `security.*` key not in the allowlist with ACCESS_DENIED
 
 ### 4. Materializers: generate `agent-launch.json`
 - Each materializer generates an `agent-launch.json` in workspace
-- Claude Code: credential `security.CLAUDE_CODE_CREDENTIALS` as file at `/home/mason/.claude/.credentials.json`, command `claude`
+- Claude Code: credential `CLAUDE_CODE_OAUTH_TOKEN` as env, command `claude`
 - Pi Coding Agent: credential `OPENROUTER_API_KEY` as env, command `pi`
 - MCP Agent: credential `TEST_TOKEN` as env, command `mcp-agent`
 - All agent Dockerfiles use `agent-entry` as ENTRYPOINT
 
 ### 5. New agent type: bash-agent
-- Materializer that generates `agent-launch.json` with `security.CLAUDE_CODE_CREDENTIALS` as file credential
+- Materializer that generates `agent-launch.json` with `CLAUDE_CODE_OAUTH_TOKEN` as env credential
 - Command: `bash` (interactive shell)
 - Register in materializer registry
 

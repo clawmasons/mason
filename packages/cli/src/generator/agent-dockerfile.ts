@@ -1,9 +1,12 @@
 import type { ResolvedAgent, ResolvedRole } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
+import type { DockerfileConfig } from "@clawmasons/agent-sdk";
 
 export interface AgentDockerfileOptions {
   /** Whether a materialized home directory exists for this agent. */
   hasHome?: boolean;
+  /** Dockerfile config from the AgentPackage. */
+  dockerfileConfig?: DockerfileConfig;
 }
 
 /**
@@ -38,26 +41,32 @@ export function generateAgentDockerfile(
   const agentShortName = getAppShortName(agent.name);
   const roleShortName = getAppShortName(role.name);
   const hasHome = options?.hasHome ?? false;
+  const dockerfileConfig = options?.dockerfileConfig;
 
   // Determine the runtime — first runtime is the primary one
   const primaryRuntime = agent.runtimes[0] ?? "claude-code";
 
-  // Build runtime-specific install step (entrypoint is always agent-entry)
-  const runtimeInstall = getRuntimeInstall(primaryRuntime);
+  // Build runtime-specific install step from AgentPackage config
+  const runtimeInstall = dockerfileConfig?.installSteps ?? `
+# Runtime: ${primaryRuntime} (no specific install)
+`;
 
   // Workspace files are COPY'd from a pre-generated directory
-  // The workspace dir is created by docker-init at:
-  //   docker/<role-short-name>/<agent-type>/workspace/
-  // Build context is docker/ (the parent containing node_modules)
   const workspaceCopyLine = `COPY ${roleShortName}/${primaryRuntime}/workspace/ /home/mason/workspace/`;
 
-  // Use role's baseImage if specified, otherwise default to node:22-slim
-  const baseImage = role.baseImage ?? "node:22-slim";
+  // Base image: role overrides agent, agent overrides default
+  const baseImage = role.baseImage ?? dockerfileConfig?.baseImage ?? "node:22-slim";
 
-  // Build apt-get install step if role declares aptPackages
+  // Merge apt packages from agent and role, deduplicate
+  const allAptPackages = [
+    ...(dockerfileConfig?.aptPackages ?? []),
+    ...(role.aptPackages ?? []),
+  ];
+  const uniqueAptPackages = [...new Set(allAptPackages)];
+
   const aptInstallStep =
-    role.aptPackages && role.aptPackages.length > 0
-      ? `\n# Install role-declared apt packages\nRUN apt-get update && apt-get install -y --no-install-recommends ${role.aptPackages.join(" ")} && rm -rf /var/lib/apt/lists/*\n`
+    uniqueAptPackages.length > 0
+      ? `\n# Install apt packages\nRUN apt-get update && apt-get install -y --no-install-recommends ${uniqueAptPackages.join(" ")} && rm -rf /var/lib/apt/lists/*\n`
       : "";
 
   // Home directory COPY and backup (when materialized home exists)
@@ -104,37 +113,4 @@ WORKDIR /home/mason/workspace/project
 # Unified entrypoint — reads agent-launch.json for runtime config
 ENTRYPOINT ["agent-entry"]
 `;
-}
-
-/**
- * Get runtime-specific Dockerfile install instructions.
- *
- * Each runtime may need its own install step (e.g., npm install -g),
- * but the entrypoint is always `agent-entry` which reads
- * `agent-launch.json` to know what command to run.
- */
-function getRuntimeInstall(runtime: string): string {
-  switch (runtime) {
-    case "claude-code":
-      return `
-# Install claude-code runtime
-RUN npm install -g @anthropic-ai/claude-code
-`;
-
-    case "pi-coding-agent":
-      return `
-# Install pi-coding-agent runtime
-RUN npm install -g @mariozechner/pi-coding-agent
-`;
-
-    case "mcp-agent":
-      return `
-# Runtime: mcp-agent (uses @clawmasons/mcp-agent from node_modules)
-`;
-
-    default:
-      return `
-# Runtime: ${runtime} (no specific install)
-`;
-  }
 }

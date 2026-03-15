@@ -5,15 +5,17 @@ TBD - created by archiving change claude-code-materializer. Update Purpose after
 ## Requirements
 ### Requirement: RuntimeMaterializer interface defines the contract for all materializers
 
-The system SHALL define a `RuntimeMaterializer` interface with the following properties and methods:
-- `name: string` — the runtime identifier (e.g., `"claude-code"`, `"codex"`)
-- `materializeWorkspace(agent: ResolvedMember, proxyEndpoint: string, proxyToken?: string): MaterializationResult` — generates workspace file content. When `proxyToken` is provided, the actual token value SHALL be baked into configuration files instead of using environment variable placeholders.
-- `generateDockerfile(agent: ResolvedMember): string` — generates a Dockerfile string
-- `generateComposeService(agent: ResolvedMember): ComposeServiceDef` — generates a docker-compose service definition
+The `RuntimeMaterializer` interface SHALL be defined in the `@clawmasons/agent-sdk` package (moved from `packages/cli/src/materializer/types.ts`). The interface SHALL include:
+- `name: string` — the runtime identifier (e.g., `"claude-code"`, `"mcp-agent"`)
+- `materializeWorkspace(agent: ResolvedAgent, proxyEndpoint: string, proxyToken?: string, options?: MaterializeOptions): MaterializationResult` — generates workspace file content
+- `materializeHome?(projectDir: string, homePath: string): void` — optional home directory materialization
+
+The `generateDockerfile` and `generateComposeService` methods SHALL be removed from the interface. Dockerfile configuration is now provided via `AgentPackage.dockerfile` declarative config. Compose generation is handled by the CLI using `AgentPackage` metadata.
 
 #### Scenario: Interface has correct shape
 - **WHEN** a materializer implements the RuntimeMaterializer interface
-- **THEN** it MUST provide `name`, `materializeWorkspace`, `generateDockerfile`, and `generateComposeService`
+- **THEN** it MUST provide `name` and `materializeWorkspace`
+- **AND** it MAY optionally provide `materializeHome`
 
 ### Requirement: MaterializationResult is a map of relative paths to file content
 
@@ -35,14 +37,6 @@ The `materializeWorkspace` method SHALL accept an optional fourth parameter `opt
 - **WHEN** `materializeWorkspace()` is called with `{ acpMode: true }`
 - **THEN** the result SHALL contain `.chapter/acp.json` with port and command fields
 
-### Requirement: ComposeServiceDef captures docker-compose service fields
-
-The `ComposeServiceDef` type SHALL include fields for a docker-compose service: `build`, `restart`, `volumes`, `working_dir`, `environment`, `depends_on`, `stdin_open`, `tty`, and `networks`.
-
-#### Scenario: ComposeServiceDef has required fields
-- **WHEN** `generateComposeService()` is called
-- **THEN** the result SHALL include `build`, `volumes`, `working_dir`, `depends_on`, and `networks` at minimum
-
 ### Requirement: materializeForAgent accepts RoleType input
 
 The system SHALL provide a `materializeForAgent(role: RoleType, agentType: string, proxyEndpoint?: string, proxyToken?: string, options?: MaterializeOptions): MaterializationResult` function that accepts a `RoleType` from the ROLE_TYPES pipeline and produces workspace files for the specified agent runtime.
@@ -59,17 +53,18 @@ The system SHALL provide a `materializeForAgent(role: RoleType, agentType: strin
 - **WHEN** `materializeForAgent()` is called with an unregistered `agentType`
 - **THEN** it SHALL throw a `MaterializerError` listing the registered agent types
 
-#### Scenario: Output equivalence between old and new pipeline
-- **WHEN** a `RoleType` and its equivalent `ResolvedAgent` are materialized for the same agent type
-- **THEN** the output `MaterializationResult` SHALL be identical
-
 ### Requirement: Materializer registry provides agent type lookup
 
-The system SHALL maintain a materializer registry mapping agent type strings to `RuntimeMaterializer` instances, with the following public functions:
-- `getMaterializer(agentType: string): RuntimeMaterializer | undefined` — look up by agent type
-- `getRegisteredAgentTypes(): string[]` — list all registered agent types
+The materializer registry SHALL be backed by the agent discovery module. `getMaterializer(agentType)` SHALL look up the `AgentPackage` from the agent registry and return its `materializer` field. `getRegisteredAgentTypes()` SHALL delegate to the agent registry.
+
+The registry SHALL no longer be a hardcoded `Map` with static imports. It SHALL be dynamically populated from discovered `AgentPackage` instances.
 
 #### Scenario: Registry contains built-in materializers
 - **WHEN** `getRegisteredAgentTypes()` is called
-- **THEN** it SHALL return `["claude-code", "pi-coding-agent", "mcp-agent"]`
+- **THEN** it SHALL return at minimum `["claude-code", "pi-coding-agent", "mcp-agent"]`
+- **AND** it SHALL also include any agents loaded from `.mason/config.json`
+
+#### Scenario: getMaterializer returns materializer from AgentPackage
+- **WHEN** `getMaterializer("claude-code")` is called
+- **THEN** it SHALL return the `RuntimeMaterializer` from the `@clawmasons/claude-code` package's `AgentPackage.materializer` field
 

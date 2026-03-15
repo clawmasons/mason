@@ -13,7 +13,7 @@ Mason uses a two-container model for agent execution: an **MCP Proxy** for tool 
 graph TB
     CLI["mason run"]
     CLI -->|docker compose up| Proxy["MCP Proxy<br/>(tool filtering + audit)"]
-    CLI -->|docker compose run| Agent["Agent Container<br/>(Claude Code / Codex / Aider)"]
+    CLI -->|docker compose run| Agent["Agent Container<br/>(Claude Code / pi-coding-agent / MCP Agent)"]
     CLI -.-|in-process| CredSvc["Credential Service<br/>(secret resolution)"]
 
     Agent -->|MCP protocol| Proxy
@@ -154,16 +154,15 @@ sequenceDiagram
 
 ## Materializer Pattern
 
-The same role definition is translated into runtime-specific configurations via the ROLE_TYPES pipeline and dialect registry:
+The same role definition is translated into runtime-specific configurations via the **Agent Package SDK**. Each agent runtime is an npm module (`@clawmasons/<agent>`) that exports an `AgentPackage` with a `RuntimeMaterializer`. The CLI discovers and loads them at runtime via the `AgentRegistry`.
 
-| Runtime | Generated Artifacts |
-|---------|-------------------|
-| **Claude Code** | `.claude/` directory, `AGENTS.md`, `settings.json`, slash commands, skill files, Dockerfile |
-| **Codex** | Codex-native configuration, instruction files, Dockerfile |
-| **Aider** | Aider-native configuration, convention files, Dockerfile |
-| **MCP Agent** | Minimal config for testing (no LLM required) |
+| Runtime | Aliases | Generated Artifacts |
+|---------|---------|-------------------|
+| **claude-code** | `claude` | `.claude/` directory, `AGENTS.md`, `settings.json`, slash commands, skill files, Dockerfile |
+| **pi-coding-agent** | `pi` | pi-coding-agent configuration, instruction files, Dockerfile |
+| **mcp-agent** | `mcp` | Minimal config for testing (no LLM required) |
 
-The materializer reads the resolved role graph (ROLE_TYPES representation) and produces everything the runtime needs, including Dockerfiles, configuration files, and mounted skill/prompt content.
+The materializer reads the resolved role graph and produces everything the runtime needs, including Dockerfiles, configuration files, and mounted skill/prompt content. Custom agents can be registered in `.mason/config.json` by pointing to any npm package that implements the Agent Package SDK.
 
 ## Related
 

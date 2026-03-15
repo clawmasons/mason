@@ -9,8 +9,7 @@ import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import { resolveRoleMountVolumes, type RoleMount } from "../../generator/mount-volumes.js";
 import type { ResolvedAgent, RoleType } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName } from "@clawmasons/shared";
-import { ACP_RUNTIME_COMMANDS } from "../../materializer/common.js";
-import { getRegisteredAgentTypes } from "../../materializer/role-materializer.js";
+import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../../materializer/role-materializer.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
 import { CredentialService, CredentialWSClient } from "@clawmasons/credential-service";
@@ -66,7 +65,8 @@ export function generateSessionId(): string {
 // ── Agent Type Aliases ────────────────────────────────────────────────
 
 /**
- * Map user-friendly agent type names to internal materializer registry names.
+ * Legacy alias map kept for backward compatibility.
+ * @deprecated Aliases are now declared by AgentPackage.aliases in agent packages.
  */
 export const AGENT_TYPE_ALIASES: Record<string, string> = {
   claude: "claude-code",
@@ -78,18 +78,19 @@ export const AGENT_TYPE_ALIASES: Record<string, string> = {
 
 /**
  * Resolve a user-provided agent type string to the internal materializer name.
- * Checks aliases first, then the raw value against registered agent types.
+ * Checks the agent registry (which includes aliases from AgentPackage),
+ * then falls back to the legacy alias map, then checks direct registered types.
  *
  * @returns The resolved agent type, or undefined if not recognized
  */
 export function resolveAgentType(input: string): string | undefined {
-  // Check alias first
+  // Check registry (includes aliases from AgentPackage)
+  const agentPkg = getAgentFromRegistry(input);
+  if (agentPkg) return agentPkg.name;
+
+  // Legacy fallback: check hardcoded aliases for agents not yet packaged (codex, aider)
   const aliased = AGENT_TYPE_ALIASES[input];
   if (aliased) return aliased;
-
-  // Check if it's a direct registered agent type
-  const registered = getRegisteredAgentTypes();
-  if (registered.includes(input)) return input;
 
   return undefined;
 }
@@ -551,6 +552,9 @@ export async function runAgent(
     verbose?: boolean;
   },
 ): Promise<void> {
+  // Initialize agent registry with config-declared agents from .mason/config.json
+  await initRegistry(projectDir);
+
   const isAcpMode = acpOptions?.acp === true;
   const proxyPort = acpOptions?.proxyPort ?? 3000;
   const bashMode = acpOptions?.bash === true;
@@ -975,7 +979,8 @@ async function runAgentAcpMode(
 
     // ── Step 6: Create session and start infrastructure ──────────────
     const runtime = resolvedAgent.runtimes[0] ?? "node";
-    const acpRuntimeCmd = ACP_RUNTIME_COMMANDS[runtime];
+    const agentPkg = getAgentFromRegistry(runtime);
+    const acpRuntimeCmd = agentPkg?.acp?.command;
     const acpCommand = acpRuntimeCmd
       ? [...acpRuntimeCmd.split(" ").slice(1)]
       : undefined;
