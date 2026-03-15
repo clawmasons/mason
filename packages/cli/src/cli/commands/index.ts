@@ -1,7 +1,6 @@
 import { Command, type ParseOptions } from "commander";
 import { registerAddCommand } from "./add.js";
 import { registerBuildCommand } from "./build.js";
-import { registerInitCommand } from "./init.js";
 import { registerListCommand } from "./list.js";
 import { registerPackCommand } from "./pack.js";
 import { registerPermissionsCommand } from "./permissions.js";
@@ -30,7 +29,6 @@ export function registerCommands(program: Command): void {
     .command("chapter")
     .description("Chapter workspace management commands");
 
-  registerInitCommand(chapter);
   registerListCommand(chapter);
   registerValidateCommand(chapter);
   registerPermissionsCommand(chapter);

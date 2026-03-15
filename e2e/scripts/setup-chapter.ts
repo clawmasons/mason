@@ -10,7 +10,7 @@
  *
  * This script:
  * 1. Creates a temp workspace directory from fixtures
- * 2. Runs `chapter init --name test.chapter` if needed
+ * 2. Copies fixtures into the temp workspace directory
  * 3. Runs `chapter build @test/agent-test-note-taker`
  * 4. Saves the workspace path for teardown and tests
  */
