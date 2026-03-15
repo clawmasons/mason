@@ -7,15 +7,15 @@
 - [x] 1.5 Add re-exports of `ResolvedAgent`, `ResolvedRole`, `ResolvedTask`, `ResolvedSkill` from `@clawmasons/shared` in `src/index.ts`
 - [x] 1.6 Implement `createAgentRegistry()`, `loadConfigAgents()` in `src/discovery.ts`
 - [x] 1.7 Add `packages/agent-sdk` to monorepo workspace config
-- [ ] 1.8 Write unit tests for discovery module (`packages/agent-sdk/tests/discovery.test.ts`)
-- [ ] 1.9 Write unit tests for helpers (`packages/agent-sdk/tests/helpers.test.ts`)
+- [x] 1.8 Write unit tests for discovery module (`packages/agent-sdk/tests/discovery.test.ts`)
+- [x] 1.9 Write unit tests for helpers (`packages/agent-sdk/tests/helpers.test.ts`)
 
 ## 2. Create `@clawmasons/claude-code` Agent Package
 
 - [x] 2.1 Scaffold `packages/claude-code/` with `package.json`, `tsconfig.json`, and `src/index.ts`
 - [x] 2.2 Move materializer from `packages/cli/src/materializer/claude-code.ts` to `packages/claude-code/src/materializer.ts`, update imports to use `@clawmasons/agent-sdk`
 - [x] 2.3 Create default `AgentPackage` export in `src/index.ts` with name `"claude-code"`, aliases `["claude"]`, dockerfile install steps, ACP command, and runtime config
-- [ ] 2.4 Move tests from `packages/cli/tests/materializer/claude-code.test.ts` to `packages/claude-code/tests/materializer.test.ts`, update imports
+- [x] 2.4 Move tests from `packages/cli/tests/materializer/claude-code.test.ts` to `packages/claude-code/tests/materializer.test.ts`, update imports
 - [x] 2.5 Add `packages/claude-code` to monorepo workspace config
 
 ## 3. Create `@clawmasons/pi-coding-agent` Agent Package
@@ -23,14 +23,14 @@
 - [x] 3.1 Scaffold `packages/pi-coding-agent/` with `package.json`, `tsconfig.json`, and `src/index.ts`
 - [x] 3.2 Move materializer from `packages/cli/src/materializer/pi-coding-agent.ts` to `packages/pi-coding-agent/src/materializer.ts`, update imports to use `@clawmasons/agent-sdk`
 - [x] 3.3 Create default `AgentPackage` export in `src/index.ts` with name `"pi-coding-agent"`, aliases `["pi"]`, dockerfile install steps, ACP command, and runtime config
-- [ ] 3.4 Move tests from `packages/cli/tests/materializer/pi-coding-agent.test.ts` to `packages/pi-coding-agent/tests/materializer.test.ts`, update imports
+- [x] 3.4 Move tests from `packages/cli/tests/materializer/pi-coding-agent.test.ts` to `packages/pi-coding-agent/tests/materializer.test.ts`, update imports
 - [x] 3.5 Add `packages/pi-coding-agent` to monorepo workspace config
 
 ## 4. Add Materializer to Existing `@clawmasons/mcp-agent` Package
 
 - [x] 4.1 Move materializer from `packages/cli/src/materializer/mcp-agent.ts` to `packages/mcp-agent/src/materializer.ts`, update imports to use `@clawmasons/agent-sdk`
 - [x] 4.2 Create default `AgentPackage` export in `packages/mcp-agent/src/index.ts` with name `"mcp-agent"`, aliases `["mcp"]`, ACP command, and runtime config
-- [ ] 4.3 Move tests from `packages/cli/tests/materializer/mcp-agent.test.ts` to `packages/mcp-agent/tests/materializer.test.ts`, update imports
+- [x] 4.3 Move tests from `packages/cli/tests/materializer/mcp-agent.test.ts` to `packages/mcp-agent/tests/materializer.test.ts`, update imports
 - [x] 4.4 Add `@clawmasons/agent-sdk` as dependency in `packages/mcp-agent/package.json`
 
 ## 5. Refactor CLI to Use Agent SDK
