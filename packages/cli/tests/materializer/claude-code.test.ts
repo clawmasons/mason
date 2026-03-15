@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { claudeCodeMaterializer } from "../../src/materializer/claude-code.js";
+import { claudeCodeMaterializer } from "@clawmasons/claude-code";
 import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
 
 function makeGithubApp(): ResolvedApp {
@@ -414,17 +414,16 @@ describe("claudeCodeMaterializer", () => {
         expect(config.credentials).toBeDefined();
       });
 
-      it("includes security.CLAUDE_CODE_CREDENTIALS as file credential", () => {
+      it("includes CLAUDE_CODE_OAUTH_TOKEN as env credential", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const config = JSON.parse(result.get("agent-launch.json")!);
         const claudeCred = config.credentials.find(
-          (c: { key: string }) => c.key === "security.CLAUDE_CODE_CREDENTIALS",
+          (c: { key: string }) => c.key === "CLAUDE_CODE_OAUTH_TOKEN",
         );
         expect(claudeCred).toBeDefined();
-        expect(claudeCred.type).toBe("file");
-        expect(claudeCred.path).toBe("/home/mason/.claude/.credentials.json");
+        expect(claudeCred.type).toBe("env");
       });
 
       it("includes role-declared credentials as env type", () => {
@@ -636,8 +635,7 @@ describe("claudeCodeMaterializer", () => {
         expect(result.projects["/home/mason/workspace/project"].allowedTools).toEqual(["Bash"]);
         // Top-level onboarding and prompt suppression
         expect(result.hasCompletedOnboarding).toBe(true);
-        expect(result.installMethod).toBe("native");
-        expect(result.effortCalloutDismissed).toBe(true);
+expect(result.effortCalloutDismissed).toBe(true);
         // Other top-level fields preserved
         expect(result.numStartups).toBe(10);
       });

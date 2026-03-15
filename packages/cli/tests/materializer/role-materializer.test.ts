@@ -7,9 +7,9 @@ import {
   getRegisteredAgentTypes,
   MaterializerError,
 } from "../../src/materializer/role-materializer.js";
-import { claudeCodeMaterializer } from "../../src/materializer/claude-code.js";
-import { mcpAgentMaterializer } from "../../src/materializer/mcp-agent.js";
-import { piCodingAgentMaterializer } from "../../src/materializer/pi-coding-agent.js";
+import { claudeCodeMaterializer } from "@clawmasons/claude-code";
+import { mcpAgentMaterializer } from "@clawmasons/mcp-agent/agent-package";
+import { piCodingAgentMaterializer } from "@clawmasons/pi-coding-agent";
 
 // ---------------------------------------------------------------------------
 // Test fixture: a representative RoleType

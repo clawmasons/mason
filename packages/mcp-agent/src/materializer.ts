@@ -1,11 +1,10 @@
 import type { ResolvedAgent } from "@clawmasons/shared";
-import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions } from "./types.js";
+import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage } from "@clawmasons/agent-sdk";
 import {
   generateAgentsMd,
-  ACP_RUNTIME_COMMANDS,
   generateAcpConfigJson,
   generateAgentLaunchJson,
-} from "./common.js";
+} from "@clawmasons/agent-sdk";
 
 /**
  * Generate .mcp.json content for the mcp-agent.
@@ -37,6 +36,9 @@ function generateMcpJson(
 
   return JSON.stringify(mcpConfig, null, 2);
 }
+
+/** Reference to the parent AgentPackage — set after construction. */
+let _agentPkg: AgentPackage;
 
 /**
  * MCP Agent runtime materializer.
@@ -72,15 +74,22 @@ export const mcpAgentMaterializer: RuntimeMaterializer = {
     // agent-launch.json — tells agent-entry how to bootstrap this agent
     result.set(
       "agent-launch.json",
-      generateAgentLaunchJson("mcp-agent", agent.credentials, options?.acpMode),
+      generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode),
     );
 
     // ACP mode: generate .chapter/acp.json with command
-    if (options?.acpMode) {
-      const acpCommand = ACP_RUNTIME_COMMANDS["mcp-agent"] ?? "mcp-agent --acp";
-      result.set(".chapter/acp.json", generateAcpConfigJson(acpCommand));
+    if (options?.acpMode && _agentPkg.acp) {
+      result.set(".chapter/acp.json", generateAcpConfigJson(_agentPkg.acp.command));
     }
 
     return result;
   },
 };
+
+/**
+ * Set the parent AgentPackage reference (called during package initialization).
+ * @internal
+ */
+export function _setAgentPackage(pkg: AgentPackage): void {
+  _agentPkg = pkg;
+}

@@ -3,17 +3,16 @@ import { getAppShortName } from "@clawmasons/shared";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions } from "./types.js";
+import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage } from "@clawmasons/agent-sdk";
 import {
   formatPermittedTools,
   collectAllSkills,
   collectAllTasks,
   generateAgentsMd,
   generateSkillReadme,
-  ACP_RUNTIME_COMMANDS,
   generateAcpConfigJson,
   generateAgentLaunchJson,
-} from "./common.js";
+} from "@clawmasons/agent-sdk";
 
 /**
  * Generate .mcp.json content.
@@ -104,16 +103,6 @@ function generateSlashCommand(
   return lines.join("\n");
 }
 
-/**
- * Claude Code runtime materializer.
- *
- * Generates a workspace directory optimized for the Claude Code CLI:
- * - .mcp.json — MCP server config pointing to chapter-proxy
- * - .claude/settings.json — permissions (allow/deny)
- * - .claude/commands/*.md — slash commands scoped to roles
- * - AGENTS.md — agent identity and role documentation
- * - skills/{name}/README.md — skill artifact manifests
- */
 /**
  * Copy a file or directory from host to target, silently skipping if source doesn't exist.
  */
@@ -206,8 +195,7 @@ function transformClaudeJson(targetPath: string, projectDir: string): void {
 
   // Mark top-level onboarding as complete and suppress interactive prompts
   data.hasCompletedOnboarding = true;
-  data.installMethod = "native";
-  data.effortCalloutDismissed = true;
+data.effortCalloutDismissed = true;
 
   // Transform githubRepoPaths: keep only repos that reference projectDir, rewrite paths
   const repoPaths = data.githubRepoPaths as Record<string, string[]> | undefined;
@@ -223,6 +211,9 @@ function transformClaudeJson(targetPath: string, projectDir: string): void {
 
   fs.writeFileSync(targetPath, JSON.stringify(data, null, 2));
 }
+
+/** Reference to the parent AgentPackage — set after construction. */
+let _agentPkg: AgentPackage;
 
 export const claudeCodeMaterializer: RuntimeMaterializer = {
   name: "claude-code",
@@ -312,18 +303,24 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     }
 
     // agent-launch.json — tells agent-entry how to bootstrap this agent
-    const primaryRuntime = agent.runtimes[0] ?? "claude-code";
     result.set(
       "agent-launch.json",
-      generateAgentLaunchJson(primaryRuntime, agent.credentials, options?.acpMode),
+      generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode),
     );
 
     // ACP mode: generate .chapter/acp.json with command
-    if (options?.acpMode) {
-      const acpCommand = ACP_RUNTIME_COMMANDS[primaryRuntime] ?? primaryRuntime;
-      result.set(".chapter/acp.json", generateAcpConfigJson(acpCommand));
+    if (options?.acpMode && _agentPkg.acp) {
+      result.set(".chapter/acp.json", generateAcpConfigJson(_agentPkg.acp.command));
     }
 
     return result;
   },
 };
+
+/**
+ * Set the parent AgentPackage reference (called during package initialization).
+ * @internal
+ */
+export function _setAgentPackage(pkg: AgentPackage): void {
+  _agentPkg = pkg;
+}

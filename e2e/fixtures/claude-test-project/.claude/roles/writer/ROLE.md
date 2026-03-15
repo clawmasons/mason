@@ -35,6 +35,7 @@ container:
       - '.env'
 
 risk: LOW
+    
 credentials:
   - TEST_TOKEN
 ---

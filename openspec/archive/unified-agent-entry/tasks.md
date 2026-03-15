@@ -4,12 +4,12 @@
 - [x] Add `agent-launch.json` schema and loader to `agent-entry/src/index.ts` — read from `/home/mason/workspace/agent-launch.json` (or cwd), parse credentials config and command
 - [x] Update `agent-entry/src/index.ts` bootstrap: support `type: "file"` credentials (mkdir + writeFile before launch), keep `type: "env"` behavior
 - [x] Update `agent-entry/src/index.ts` bootstrap: read command/args from `agent-launch.json`, fall back to `AGENT_RUNTIME_CMD` env var
-- [x] Add `security.CLAUDE_CODE_CREDENTIALS` resolver to credential service — allowlisted key, macOS keychain lookup via `security find-generic-password -s "Claude Code-credentials" -w`, non-macOS reads `~/.claude/.credentials.json`
+- [x] Add `security.*` allowlist resolver to credential service — rejects any `security.*` key not in allowlist with ACCESS_DENIED
 - [x] Update credential service resolver to reject unknown `security.*` keys with ACCESS_DENIED
-- [x] Add `agent-launch.json` generation to claude-code materializer: credential `security.CLAUDE_CODE_CREDENTIALS` type file path `/home/mason/.claude/.credentials.json`, command `claude`
+- [x] Add `agent-launch.json` generation to claude-code materializer: credential `CLAUDE_CODE_OAUTH_TOKEN` type env, command `claude`
 - [x] Add `agent-launch.json` generation to pi-coding-agent materializer: credential `OPENROUTER_API_KEY` type env, command `pi`
 - [x] Add `agent-launch.json` generation to mcp-agent materializer: credential `TEST_TOKEN` type env, command `mcp-agent`
-- [x] Create bash-agent materializer: generates `agent-launch.json` with `security.CLAUDE_CODE_CREDENTIALS` file credential, command `bash`, plus `AGENTS.md`
+- [x] Create bash-agent materializer: generates `agent-launch.json` with `CLAUDE_CODE_OAUTH_TOKEN` env credential, command `bash`, plus `AGENTS.md`
 - [x] Register bash-agent in materializer registry
 - [x] Update agent Dockerfile generator: all agent types use `ENTRYPOINT ["agent-entry"]`, remove per-runtime entrypoint switching
 - [x] Update ACP mode: generate ACP-specific `agent-launch.json` (command from `ACP_RUNTIME_COMMANDS`)

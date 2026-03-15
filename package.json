@@ -5,7 +5,7 @@
   "description": "Mason — npm-native packaging, governance, and runtime portability for AI agents",
   "type": "module",
   "scripts": {
-    "build": "tsc -b packages/shared packages/proxy packages/cli && npm run build --workspace=packages/mcp-agent && npm run build --workspace=packages/agent-entry && npm run build:proxy --workspace=packages/cli",
+    "build": "tsc -b packages/shared packages/proxy packages/cli && npm run build --workspace=packages/agent-sdk && npm run build --workspace=packages/mcp-agent && npm run build --workspace=packages/agent-entry && npm run build --workspace=packages/claude-code && npm run build --workspace=packages/pi-coding-agent && npm run build:proxy --workspace=packages/cli",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint packages/*/src/ packages/*/tests/",

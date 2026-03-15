@@ -9,6 +9,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./agent-package": {
+      "import": "./dist/agent-package.js",
+      "types": "./dist/agent-package.d.ts"
     }
   },
   "bin": {
@@ -21,7 +25,9 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@agentclientprotocol/sdk": "^0.16.0"
+    "@agentclientprotocol/sdk": "^0.16.0",
+    "@clawmasons/agent-sdk": "*",
+    "@clawmasons/shared": "*"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",

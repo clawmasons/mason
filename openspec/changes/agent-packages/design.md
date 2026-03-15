@@ -109,7 +109,7 @@ const claudeCodeAgent: AgentPackage = {
     command: "claude",
     args: ["--effort", "max"],
     credentials: [
-      { key: "security.CLAUDE_CODE_CREDENTIALS", type: "file", path: "/home/mason/.claude/.credentials.json" },
+      { key: "CLAUDE_CODE_OAUTH_TOKEN", type: "env" },
     ],
   },
 };

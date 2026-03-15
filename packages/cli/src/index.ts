@@ -48,3 +48,8 @@ export {
   type MaterializationResult,
   type MaterializeOptions,
 } from "./materializer/index.js";
+
+// Re-export agent packages for consumers
+export { default as claudeCodeAgent } from "@clawmasons/claude-code";
+export { default as piCodingAgentPkg } from "@clawmasons/pi-coding-agent";
+export type { AgentPackage } from "@clawmasons/agent-sdk";

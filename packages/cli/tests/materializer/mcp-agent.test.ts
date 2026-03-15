@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mcpAgentMaterializer } from "../../src/materializer/mcp-agent.js";
+import { mcpAgentMaterializer } from "@clawmasons/mcp-agent/agent-package";
 import { ACP_RUNTIME_COMMANDS } from "../../src/materializer/common.js";
 import type { ResolvedAgent, ResolvedApp, ResolvedRole } from "@clawmasons/shared";
 

@@ -1,16 +1,15 @@
 import type { ResolvedAgent, ResolvedRole, ResolvedTask } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
-import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions } from "./types.js";
+import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage } from "@clawmasons/agent-sdk";
 import {
   formatPermittedTools,
   collectAllSkills,
   collectAllTasks,
   generateAgentsMd,
   generateSkillReadme,
-  ACP_RUNTIME_COMMANDS,
   generateAcpConfigJson,
   generateAgentLaunchJson,
-} from "./common.js";
+} from "@clawmasons/agent-sdk";
 
 /**
  * Generate the command prompt for a pi `registerCommand()` call.
@@ -161,15 +160,9 @@ function generateExtensionIndexTs(
   return lines.join("\n");
 }
 
-/**
- * Pi Coding Agent runtime materializer.
- *
- * Generates a workspace directory for pi-coding-agent:
- * - AGENTS.md — agent identity and role documentation
- * - .pi/settings.json — model configuration
- * - .pi/extensions/chapter-mcp/ — MCP proxy bridge extension
- * - skills/{name}/README.md — skill artifact manifests
- */
+/** Reference to the parent AgentPackage — set after construction. */
+let _agentPkg: AgentPackage;
+
 export const piCodingAgentMaterializer: RuntimeMaterializer = {
   name: "pi-coding-agent",
 
@@ -217,18 +210,24 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
     }
 
     // agent-launch.json — tells agent-entry how to bootstrap this agent
-    const primaryRuntime = agent.runtimes[0] ?? "pi-coding-agent";
     result.set(
       "agent-launch.json",
-      generateAgentLaunchJson(primaryRuntime, agent.credentials, options?.acpMode),
+      generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode),
     );
 
     // ACP mode: generate .chapter/acp.json with command
-    if (options?.acpMode) {
-      const acpCommand = ACP_RUNTIME_COMMANDS[primaryRuntime] ?? primaryRuntime;
-      result.set(".chapter/acp.json", generateAcpConfigJson(acpCommand));
+    if (options?.acpMode && _agentPkg.acp) {
+      result.set(".chapter/acp.json", generateAcpConfigJson(_agentPkg.acp.command));
     }
 
     return result;
   },
 };
+
+/**
+ * Set the parent AgentPackage reference (called during package initialization).
+ * @internal
+ */
+export function _setAgentPackage(pkg: AgentPackage): void {
+  _agentPkg = pkg;
+}

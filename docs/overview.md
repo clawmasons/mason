@@ -33,6 +33,8 @@ The same agent definition works across multiple runtimes:
 - **pi-coding-agent** — Supports any LLM provider (OpenRouter, Anthropic, OpenAI, Google, Mistral, Groq, xAI, Azure)
 - **MCP Agent** — Lightweight test runtime (no LLM required)
 
+Custom agents can be registered in `.mason/config.json` by pointing to any npm package that implements the Agent Package SDK.
+
 ### npm-Native Packaging
 
 Everything is a `package.json`. Roles, tasks, skills, and apps are standard npm packages with a `chapter` metadata field. Use npm workspaces, publish to registries, and compose roles from reusable components.

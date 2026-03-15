@@ -16,7 +16,7 @@ import * as crypto from "node:crypto";
 import * as os from "node:os";
 import type { RoleType } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
-import { materializeForAgent, getMaterializer } from "./role-materializer.js";
+import { materializeForAgent, getMaterializer, getAgentFromRegistry } from "./role-materializer.js";
 import { generateAgentDockerfile } from "../generator/agent-dockerfile.js";
 import { generateProxyDockerfile } from "../generator/proxy-dockerfile.js";
 import { adaptRoleToResolvedAgent } from "@clawmasons/shared";
@@ -231,7 +231,11 @@ export function generateRoleDockerBuildDir(
   if (!agentRole) {
     throw new Error(`adaptRoleToResolvedAgent produced no roles for "${role.metadata.name}"`);
   }
-  const agentDockerfile = generateAgentDockerfile(resolvedAgent, agentRole, { hasHome });
+  const agentPkg = getAgentFromRegistry(agentType);
+  const agentDockerfile = generateAgentDockerfile(resolvedAgent, agentRole, {
+    hasHome,
+    dockerfileConfig: agentPkg?.dockerfile,
+  });
   deps.writeFileSync(path.join(agentDir, "Dockerfile"), agentDockerfile);
 
   // Workspace files

@@ -2,21 +2,22 @@
  * Role-based materializer orchestration.
  *
  * Provides `materializeForAgent()` — the primary entry point for the
- * ROLE_TYPES pipeline to invoke existing materializers. Internally
- * converts a RoleType to a ResolvedAgent via the adapter (Change 4)
- * and delegates to the appropriate RuntimeMaterializer.
- *
- * Also provides a materializer registry for looking up materializers
- * by agent type string.
+ * ROLE_TYPES pipeline to invoke materializers. Uses the agent discovery
+ * registry to look up AgentPackage instances dynamically.
  */
 
 import type { RoleType } from "@clawmasons/shared";
 import { adaptRoleToResolvedAgent } from "@clawmasons/shared";
-import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions } from "./types.js";
-import { claudeCodeMaterializer } from "./claude-code.js";
-import { piCodingAgentMaterializer } from "./pi-coding-agent.js";
-import { mcpAgentMaterializer } from "./mcp-agent.js";
+import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage, AgentRegistry } from "@clawmasons/agent-sdk";
+import { createAgentRegistry, getAgent, getRegisteredAgentNames } from "@clawmasons/agent-sdk";
 
+// Built-in agent packages
+import claudeCodeAgent from "@clawmasons/claude-code";
+import piCodingAgent from "@clawmasons/pi-coding-agent";
+import { default as mcpAgent } from "@clawmasons/mcp-agent/agent-package";
+
+/** Built-in agent packages list. */
+const BUILTIN_AGENTS: AgentPackage[] = [claudeCodeAgent, piCodingAgent, mcpAgent];
 
 /** Default proxy endpoint used when none is provided. */
 const DEFAULT_PROXY_ENDPOINT = "http://mcp-proxy:9090";
@@ -32,14 +33,43 @@ export class MaterializerError extends Error {
 }
 
 // ---------------------------------------------------------------------------
-// Materializer Registry
+// Agent Registry (lazy-initialized)
 // ---------------------------------------------------------------------------
 
-const materializerRegistry: Map<string, RuntimeMaterializer> = new Map([
-  ["claude-code", claudeCodeMaterializer],
-  ["pi-coding-agent", piCodingAgentMaterializer],
-  ["mcp-agent", mcpAgentMaterializer],
-]);
+let _registry: AgentRegistry | null = null;
+
+/**
+ * Get the agent registry, initializing it with built-in agents if needed.
+ */
+function getRegistry(): AgentRegistry {
+  if (!_registry) {
+    _registry = new Map();
+    for (const agent of BUILTIN_AGENTS) {
+      _registry.set(agent.name, agent);
+      if (agent.aliases) {
+        for (const alias of agent.aliases) {
+          _registry.set(alias, agent);
+        }
+      }
+    }
+  }
+  return _registry;
+}
+
+/**
+ * Initialize the registry with config-declared agents from a project directory.
+ * Call this at CLI startup before any materialization.
+ */
+export async function initRegistry(projectDir?: string): Promise<void> {
+  _registry = await createAgentRegistry(BUILTIN_AGENTS, projectDir);
+}
+
+/**
+ * Look up an AgentPackage by agent type name or alias.
+ */
+export function getAgentFromRegistry(agentType: string): AgentPackage | undefined {
+  return getAgent(getRegistry(), agentType);
+}
 
 /**
  * Look up a materializer by agent type.
@@ -48,16 +78,17 @@ const materializerRegistry: Map<string, RuntimeMaterializer> = new Map([
  * @returns The RuntimeMaterializer for that type, or undefined if not registered
  */
 export function getMaterializer(agentType: string): RuntimeMaterializer | undefined {
-  return materializerRegistry.get(agentType);
+  const agent = getAgent(getRegistry(), agentType);
+  return agent?.materializer;
 }
 
 /**
- * Get all registered agent types.
+ * Get all registered agent types (excluding aliases).
  *
  * @returns Array of agent type strings that have materializers registered
  */
 export function getRegisteredAgentTypes(): string[] {
-  return [...materializerRegistry.keys()];
+  return getRegisteredAgentNames(getRegistry());
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +119,7 @@ export function materializeForAgent(
   proxyToken?: string,
   options?: MaterializeOptions,
 ): MaterializationResult {
-  const materializer = materializerRegistry.get(agentType);
+  const materializer = getMaterializer(agentType);
   if (!materializer) {
     const knownTypes = getRegisteredAgentTypes().join(", ");
     throw new MaterializerError(
@@ -98,7 +129,6 @@ export function materializeForAgent(
   }
 
   // Convert RoleType to ResolvedAgent via the adapter.
-  // This may throw AdapterError if the agentType is not a registered dialect.
   const resolvedAgent = adaptRoleToResolvedAgent(role, agentType);
 
   const endpoint = proxyEndpoint ?? DEFAULT_PROXY_ENDPOINT;
