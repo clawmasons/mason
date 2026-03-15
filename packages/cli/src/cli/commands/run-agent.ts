@@ -215,7 +215,15 @@ export function generateComposeYml(opts: {
   const buildWorkspaceProjectDir = path.join(dockerBuildDir, agent, "build", "workspace", "project");
   if (fs.existsSync(buildWorkspaceProjectDir)) {
     for (const entry of fs.readdirSync(buildWorkspaceProjectDir)) {
-      agentVolumeLines.push(`      - "${path.join(buildWorkspaceProjectDir, entry)}:/home/mason/workspace/project/${entry}"`);
+      const srcPath = path.join(buildWorkspaceProjectDir, entry);
+      const projectEntryPath = path.join(projectDir, entry);
+      // On macOS with virtiofs, bind-mounting a file on top of an existing project file
+      // fails ("mountpoint is outside of rootfs"). Write the generated content directly instead.
+      if (fs.statSync(srcPath).isFile() && fs.existsSync(projectEntryPath)) {
+        fs.copyFileSync(srcPath, projectEntryPath);
+      } else {
+        agentVolumeLines.push(`      - "${srcPath}:/home/mason/workspace/project/${entry}"`);
+      }
     }
   }
 
