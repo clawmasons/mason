@@ -44,7 +44,10 @@ function defaultAdaptRole(
  * Falls back to "claude-code" if not determinable.
  */
 export function inferAgentType(roleType: RoleType): string {
-  return roleType.source.agentDialect ?? "claude-code";
+  const dialect = roleType.source.agentDialect;
+  // "mason" is the agent-agnostic canonical location — default to claude-code
+  if (!dialect || dialect === "mason") return "claude-code";
+  return dialect;
 }
 
 // ── Types ──────────────────────────────────────────────────────────────

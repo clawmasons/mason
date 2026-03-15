@@ -45,8 +45,8 @@ describe("runList", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function writeRoleMd(agentDir: string, roleName: string, frontmatter: string, body: string): void {
-    const roleDir = path.join(tmpDir, `.${agentDir}`, "roles", roleName);
+  function writeRoleMd(roleName: string, frontmatter: string, body: string): void {
+    const roleDir = path.join(tmpDir, ".mason", "roles", roleName);
     fs.mkdirSync(roleDir, { recursive: true });
     fs.writeFileSync(
       path.join(roleDir, "ROLE.md"),
@@ -55,7 +55,7 @@ describe("runList", () => {
   }
 
   it("shows roles from local ROLE.md files", async () => {
-    writeRoleMd("claude", "create-prd", `name: create-prd\ndescription: Creates PRDs\ncommands: []\nskills: []`, "You are a PRD author.");
+    writeRoleMd("create-prd", `name: create-prd\ndescription: Creates PRDs\ntasks: []\nskills: []`, "You are a PRD author.");
 
     await runList(tmpDir, {});
 
@@ -65,9 +65,9 @@ describe("runList", () => {
     expect(logOutput).toContain("Creates PRDs");
   });
 
-  it("shows multiple roles from different agent directories", async () => {
-    writeRoleMd("claude", "create-prd", `name: create-prd\ndescription: Creates PRDs\ncommands: []\nskills: []`, "PRD author.");
-    writeRoleMd("codex", "code-review", `name: code-review\ndescription: Reviews code\ninstructions: []\nskills: []`, "Code reviewer.");
+  it("shows multiple roles from .mason/roles/", async () => {
+    writeRoleMd("create-prd", `name: create-prd\ndescription: Creates PRDs\ntasks: []\nskills: []`, "PRD author.");
+    writeRoleMd("code-review", `name: code-review\ndescription: Reviews code\ntasks: []\nskills: []`, "Code reviewer.");
 
     await runList(tmpDir, {});
 
@@ -86,7 +86,7 @@ describe("runList", () => {
   });
 
   it("outputs JSON array with --json flag", async () => {
-    writeRoleMd("claude", "create-prd", `name: create-prd\ndescription: Creates PRDs\ncommands: []\nskills: []`, "You are a PRD author.");
+    writeRoleMd("create-prd", `name: create-prd\ndescription: Creates PRDs\ntasks: []\nskills: []`, "You are a PRD author.");
 
     await runList(tmpDir, { json: true });
 
@@ -100,7 +100,7 @@ describe("runList", () => {
   });
 
   it("shows source type for local roles", async () => {
-    writeRoleMd("claude", "create-prd", `name: create-prd\ndescription: Creates PRDs\ncommands: []\nskills: []`, "PRD author.");
+    writeRoleMd("create-prd", `name: create-prd\ndescription: Creates PRDs\ntasks: []\nskills: []`, "PRD author.");
 
     await runList(tmpDir, {});
 

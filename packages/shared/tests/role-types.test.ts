@@ -332,12 +332,31 @@ describe("roleTypeSchema", () => {
     expect(result.tasks).toEqual([]);
     expect(result.apps).toEqual([]);
     expect(result.skills).toEqual([]);
+    expect(result.sources).toEqual([]);
     expect(result.resources).toEqual([]);
     expect(result.governance.risk).toBe("LOW");
     expect(result.governance.credentials).toEqual([]);
     expect(result.container.packages).toEqual({ apt: [], npm: [], pip: [] });
     expect(result.container.ignore).toEqual({ paths: [] });
     expect(result.container.mounts).toEqual([]);
+  });
+
+  it("accepts sources as a string array", () => {
+    const result = roleTypeSchema.parse({
+      ...minimalRole,
+      sources: [".claude/", ".codex/"],
+    });
+    expect(result.sources).toEqual([".claude/", ".codex/"]);
+  });
+
+  it("accepts empty sources array", () => {
+    const result = roleTypeSchema.parse({ ...minimalRole, sources: [] });
+    expect(result.sources).toEqual([]);
+  });
+
+  it("defaults sources to empty array when omitted", () => {
+    const result = roleTypeSchema.parse(minimalRole);
+    expect(result.sources).toEqual([]);
   });
 
   it("accepts a full RoleType", () => {

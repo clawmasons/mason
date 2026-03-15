@@ -80,6 +80,11 @@ export async function readMaterializedRole(rolePath: string): Promise<RoleType> 
   // Scan bundled resources
   const resources = await scanBundledResources(roleDir);
 
+  // Extract sources (canonical mason field)
+  const sources = Array.isArray(frontmatter.sources)
+    ? (frontmatter.sources as string[])
+    : [];
+
   // Build the role object and validate through Zod
   const roleData = {
     metadata,
@@ -87,6 +92,7 @@ export async function readMaterializedRole(rolePath: string): Promise<RoleType> 
     tasks,
     apps,
     skills,
+    sources,
     container,
     governance,
     resources,

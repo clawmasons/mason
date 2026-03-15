@@ -95,6 +95,7 @@ export const roleTypeSchema = z.object({
   tasks: z.array(taskRefSchema).optional().default([]),
   apps: z.array(appConfigSchema).optional().default([]),
   skills: z.array(skillRefSchema).optional().default([]),
+  sources: z.array(z.string()).optional().default([]),
   container: containerRequirementsSchema.optional().default({}),
   governance: governanceConfigSchema.optional().default({}),
   resources: z.array(resourceFileSchema).optional().default([]),

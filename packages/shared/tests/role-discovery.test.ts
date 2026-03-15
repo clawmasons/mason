@@ -26,29 +26,20 @@ afterEach(async () => {
   await rm(testDir, { recursive: true, force: true });
 });
 
-/** Create a local role in the given agent directory. */
+/** Create a local role in .mason/roles/. */
 async function createLocalRole(opts: {
-  agent: string;
   name: string;
   description?: string;
   extraFrontmatter?: string;
   body?: string;
 }): Promise<string> {
-  const roleDir = join(testDir, `.${opts.agent}`, "roles", opts.name);
+  const roleDir = join(testDir, ".mason", "roles", opts.name);
   await mkdir(roleDir, { recursive: true });
-
-  // Use the agent-specific task field name for realism
-  const taskField =
-    opts.agent === "claude"
-      ? "commands"
-      : opts.agent === "codex"
-        ? "instructions"
-        : "conventions";
 
   const roleMd = `---
 name: ${opts.name}
 description: ${opts.description ?? `${opts.name} role`}
-${taskField}:
+tasks:
   - task-one
 ${opts.extraFrontmatter ?? ""}
 ---
@@ -107,55 +98,50 @@ async function createNonRolePackage(packageName: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 describe("discoverRoles — local roles", () => {
-  it("discovers a local role from .claude/roles/", async () => {
-    await createLocalRole({ agent: "claude", name: "my-role" });
+  it("discovers a local role from .mason/roles/", async () => {
+    await createLocalRole({ name: "my-role" });
 
     const roles = await discoverRoles(testDir);
     expect(roles).toHaveLength(1);
     expect(roles[0].metadata.name).toBe("my-role");
     expect(roles[0].source.type).toBe("local");
-    expect(roles[0].source.agentDialect).toBe("claude-code");
+    expect(roles[0].source.agentDialect).toBe("mason");
   });
 
-  it("discovers local roles from .codex/roles/", async () => {
-    await createLocalRole({ agent: "codex", name: "codex-role" });
-
-    const roles = await discoverRoles(testDir);
-    expect(roles).toHaveLength(1);
-    expect(roles[0].metadata.name).toBe("codex-role");
-    expect(roles[0].source.agentDialect).toBe("codex");
-  });
-
-  it("discovers local roles from .aider/roles/", async () => {
-    await createLocalRole({ agent: "aider", name: "aider-role" });
-
-    const roles = await discoverRoles(testDir);
-    expect(roles).toHaveLength(1);
-    expect(roles[0].metadata.name).toBe("aider-role");
-    expect(roles[0].source.agentDialect).toBe("aider");
-  });
-
-  it("discovers roles across multiple agent directories", async () => {
-    await createLocalRole({ agent: "claude", name: "claude-role" });
-    await createLocalRole({ agent: "codex", name: "codex-role" });
-    await createLocalRole({ agent: "aider", name: "aider-role" });
-
-    const roles = await discoverRoles(testDir);
-    expect(roles).toHaveLength(3);
-
-    const names = roles.map((r) => r.metadata.name).sort();
-    expect(names).toEqual(["aider-role", "claude-role", "codex-role"]);
-  });
-
-  it("discovers multiple roles in the same agent directory", async () => {
-    await createLocalRole({ agent: "claude", name: "role-a" });
-    await createLocalRole({ agent: "claude", name: "role-b" });
+  it("discovers multiple roles in .mason/roles/", async () => {
+    await createLocalRole({ name: "role-a" });
+    await createLocalRole({ name: "role-b" });
 
     const roles = await discoverRoles(testDir);
     expect(roles).toHaveLength(2);
 
     const names = roles.map((r) => r.metadata.name).sort();
     expect(names).toEqual(["role-a", "role-b"]);
+  });
+
+  it("does not discover roles from .claude/roles/", async () => {
+    // Place a ROLE.md in the old location — should NOT be discovered
+    const claudeRoleDir = join(testDir, ".claude", "roles", "old-role");
+    await mkdir(claudeRoleDir, { recursive: true });
+    await writeFile(
+      join(claudeRoleDir, "ROLE.md"),
+      "---\nname: old-role\ndescription: Old role\n---\n\nInstructions.",
+    );
+
+    const roles = await discoverRoles(testDir);
+    expect(roles).toEqual([]);
+  });
+
+  it("does not discover roles from .codex/roles/", async () => {
+    const codexRoleDir = join(testDir, ".codex", "roles", "codex-role");
+    await mkdir(codexRoleDir, { recursive: true });
+    await writeFile(
+      join(codexRoleDir, "ROLE.md"),
+      "---\nname: codex-role\ndescription: Codex role\n---\n\nInstructions.",
+    );
+
+    const roles = await discoverRoles(testDir);
+    expect(roles).toEqual([]);
   });
 });
 
@@ -223,9 +209,7 @@ describe("discoverRoles — packaged roles", () => {
 
 describe("discoverRoles — local-over-package precedence", () => {
   it("local role shadows packaged role with the same name", async () => {
-    // Both have the same name "my-role" — local should win
     await createLocalRole({
-      agent: "claude",
       name: "my-role",
       description: "Local version",
     });
@@ -243,10 +227,7 @@ describe("discoverRoles — local-over-package precedence", () => {
   });
 
   it("includes both local and packaged roles with different names", async () => {
-    await createLocalRole({
-      agent: "claude",
-      name: "local-only",
-    });
+    await createLocalRole({ name: "local-only" });
     await createPackagedRole({
       packageName: "role-pkg-only",
       roleName: "pkg-only",
@@ -261,7 +242,7 @@ describe("discoverRoles — local-over-package precedence", () => {
 });
 
 // ---------------------------------------------------------------------------
-// discoverRoles — no roles found
+// discoverRoles — edge cases
 // ---------------------------------------------------------------------------
 
 describe("discoverRoles — edge cases", () => {
@@ -270,17 +251,15 @@ describe("discoverRoles — edge cases", () => {
     expect(roles).toEqual([]);
   });
 
-  it("returns empty array when agent directories have no roles subdirectory", async () => {
-    // Create .claude/ but no roles/ under it
-    await mkdir(join(testDir, ".claude"), { recursive: true });
+  it("returns empty array when .mason/roles/ does not exist", async () => {
+    await mkdir(join(testDir, ".mason"), { recursive: true });
 
     const roles = await discoverRoles(testDir);
     expect(roles).toEqual([]);
   });
 
   it("skips directories without ROLE.md", async () => {
-    // Create a roles directory entry that has no ROLE.md
-    const emptyRoleDir = join(testDir, ".claude", "roles", "empty-role");
+    const emptyRoleDir = join(testDir, ".mason", "roles", "empty-role");
     await mkdir(emptyRoleDir, { recursive: true });
     await writeFile(join(emptyRoleDir, "README.md"), "Not a ROLE.md");
 
@@ -289,10 +268,9 @@ describe("discoverRoles — edge cases", () => {
   });
 
   it("skips malformed ROLE.md files during discovery", async () => {
-    // Create one valid and one malformed role
-    await createLocalRole({ agent: "claude", name: "valid-role" });
+    await createLocalRole({ name: "valid-role" });
 
-    const badRoleDir = join(testDir, ".claude", "roles", "bad-role");
+    const badRoleDir = join(testDir, ".mason", "roles", "bad-role");
     await mkdir(badRoleDir, { recursive: true });
     await writeFile(join(badRoleDir, "ROLE.md"), "not valid frontmatter at all");
 
@@ -302,8 +280,7 @@ describe("discoverRoles — edge cases", () => {
   });
 
   it("handles no node_modules directory gracefully", async () => {
-    // Only local roles, no node_modules
-    await createLocalRole({ agent: "claude", name: "local-role" });
+    await createLocalRole({ name: "local-role" });
 
     const roles = await discoverRoles(testDir);
     expect(roles).toHaveLength(1);
@@ -316,8 +293,8 @@ describe("discoverRoles — edge cases", () => {
 // ---------------------------------------------------------------------------
 
 describe("resolveRole", () => {
-  it("resolves a local role by name", async () => {
-    await createLocalRole({ agent: "claude", name: "target-role" });
+  it("resolves a local role by name from .mason/roles/", async () => {
+    await createLocalRole({ name: "target-role" });
 
     const role = await resolveRole("target-role", testDir);
     expect(role.metadata.name).toBe("target-role");
@@ -337,7 +314,6 @@ describe("resolveRole", () => {
 
   it("prefers local role over packaged role with the same name", async () => {
     await createLocalRole({
-      agent: "claude",
       name: "shared-name",
       description: "Local version",
     });
@@ -361,11 +337,16 @@ describe("resolveRole", () => {
     ).rejects.toThrow('Role "nonexistent" not found');
   });
 
-  it("resolves a local role from any agent directory", async () => {
-    await createLocalRole({ agent: "codex", name: "codex-role" });
+  it("does not resolve a role from .claude/roles/", async () => {
+    const claudeRoleDir = join(testDir, ".claude", "roles", "old-role");
+    await mkdir(claudeRoleDir, { recursive: true });
+    await writeFile(
+      join(claudeRoleDir, "ROLE.md"),
+      "---\nname: old-role\ndescription: Old role\n---\n\nInstructions.",
+    );
 
-    const role = await resolveRole("codex-role", testDir);
-    expect(role.metadata.name).toBe("codex-role");
-    expect(role.source.agentDialect).toBe("codex");
+    await expect(
+      resolveRole("old-role", testDir),
+    ).rejects.toThrow(RoleDiscoveryError);
   });
 });

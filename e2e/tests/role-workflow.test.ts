@@ -7,8 +7,8 @@
  *   3. Verify `chapter validate` passes for the local role
  *   4. Verify `chapter build` generates Docker artifacts for the role
  *
- * Uses the local ROLE.md at .claude/roles/test-writer/ROLE.md
- * (Claude dialect) plus the existing packaged roles from the fixture.
+ * Uses the local ROLE.md at .mason/roles/test-writer/ROLE.md
+ * plus the existing packaged roles from the fixture.
  *
  * PRD refs: UC-1 (Local Role Development), §9.2 (CLI Commands)
  */
@@ -27,7 +27,7 @@ describe("role-based workflow", () => {
   let workspaceDir: string;
 
   beforeAll(() => {
-    // Create temp workspace from fixtures (includes .claude/roles/test-writer/ROLE.md)
+    // Create temp workspace from fixtures (includes .mason/roles/test-writer/ROLE.md)
     workspaceDir = copyFixtureWorkspace("role-workflow", {
       excludePaths: ["agents/mcp-test", "roles/mcp-test"],
     });
@@ -48,7 +48,7 @@ describe("role-based workflow", () => {
         workspaceDir,
       );
 
-      // Should find the local role from .claude/roles/test-writer/ROLE.md
+      // Should find the local role from .mason/roles/test-writer/ROLE.md
       expect(roles).toEqual(
         expect.arrayContaining([
           expect.objectContaining({

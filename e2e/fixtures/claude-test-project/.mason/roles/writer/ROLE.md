@@ -1,10 +1,28 @@
 ---
-name: test-writer
-description: E2E test writer role -- manages notes on the filesystem
+name: writer
+description: Manages notes on the filesystem using inline MCP server config
 version: 1.0.0
 
-commands:
+tasks:
   - take-notes
+
+skills:
+  - ./.claude/skills/markdown-conventions
+
+mcp_servers:
+  - name: filesystem
+    transport: stdio
+    command: npx
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-filesystem"
+      - "./notes"
+    tools:
+      allow:
+        - read_file
+        - write_file
+        - list_directory
+        - create_directory
 
 container:
   packages:
@@ -17,6 +35,7 @@ container:
       - '.env'
 
 risk: LOW
+    
 credentials:
   - TEST_TOKEN
 ---
