@@ -49,12 +49,6 @@ export function inferAgentType(roleType: RoleType): string {
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-export interface RunAcpAgentOptions {
-  agent?: string;
-  role: string;
-  proxyPort?: number;
-}
-
 /**
  * Generate a short unique session ID (8 hex characters).
  */
@@ -537,21 +531,6 @@ export function registerRunCommand(program: Command): void {
     .action(createRunAction());
 }
 
-/**
- * @deprecated Use registerRunCommand instead.
- */
-export function registerRunAgentCommand(program: Command): void {
-  registerRunCommand(program);
-}
-
-/**
- * @deprecated Use registerRunAgentCommand instead.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function registerRunAcpAgentCommand(_program: Command): void {
-  // No-op: kept for backward compatibility.
-}
-
 // ── Main Orchestrator ─────────────────────────────────────────────────
 
 export async function runAgent(
@@ -581,22 +560,6 @@ export async function runAgent(
     const verbose = acpOptions?.verbose === true;
     return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose);
   }
-}
-
-// ── Backward-compat alias ─────────────────────────────────────────────
-
-/**
- * @deprecated Use `runAgent` with `acpOptions: { acp: true }` instead.
- */
-export async function runAcpAgent(
-  rootDir: string,
-  options: RunAcpAgentOptions,
-  deps?: RunAgentDeps,
-): Promise<void> {
-  return runAgent(rootDir, options.agent, options.role, deps, {
-    acp: true,
-    proxyPort: options.proxyPort,
-  });
 }
 
 // ── Interactive Mode ──────────────────────────────────────────────────
