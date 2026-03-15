@@ -452,6 +452,43 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain('command: ["--acp","--port","3002"]');
   });
 
+  it("includes home directory mount when homePath is provided", () => {
+    const yml = generateSessionComposeYml({
+      ...baseOpts,
+      homePath: "/project/.mason/docker/create-prd/claude-code/home",
+    });
+
+    expect(yml).toContain(":/home/mason");
+    // Should use relative path from session dir
+    expect(yml).not.toContain("/project/.mason/docker/create-prd/claude-code/home");
+  });
+
+  it("does not include home mount when homePath is omitted", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+    const lines = yml.split("\n");
+    // No volume line should mount directly to /home/mason (only /home/mason/workspace/project)
+    const homeMountLines = lines.filter((l) => l.includes(":/home/mason") && !l.includes(":/home/mason/workspace"));
+    expect(homeMountLines).toHaveLength(0);
+  });
+
+  it("includes HOST_UID and HOST_GID build args with provided values", () => {
+    const yml = generateSessionComposeYml({
+      ...baseOpts,
+      hostUid: "501",
+      hostGid: "20",
+    });
+
+    expect(yml).toContain('HOST_UID: "501"');
+    expect(yml).toContain('HOST_GID: "20"');
+  });
+
+  it("defaults HOST_UID and HOST_GID to 1000 when not provided", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+
+    expect(yml).toContain('HOST_UID: "1000"');
+    expect(yml).toContain('HOST_GID: "1000"');
+  });
+
   it("masking only applies to project mount paths (not /home/mason/workspace/)", () => {
     const yml = generateSessionComposeYml(baseOpts);
 

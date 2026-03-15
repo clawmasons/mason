@@ -12,7 +12,7 @@
  * 8. Pipe stdio, propagate exit code
  */
 
-import { spawn } from "node:child_process";
+import { spawn, execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { initializeMcpSession, callTool } from "./mcp-client.js";
@@ -310,6 +310,28 @@ export async function launchRuntime(
 }
 
 /**
+ * Merge build-time home files into the (now-mounted) home directory.
+ *
+ * The Dockerfile copies /home/mason to /home/mason-from-build before the
+ * mount overlay. This function restores those files (like .bashrc) into
+ * the mounted /home/mason without overwriting files that came from the mount.
+ */
+export function mergeHomeBuild(): void {
+  const backupDir = "/home/mason-from-build";
+  if (!fs.existsSync(backupDir)) return;
+
+  try {
+    // cp -rn: recursive, no-clobber (don't overwrite existing files)
+    execSync(`cp -rn ${backupDir}/. /home/mason/`, { stdio: "pipe" });
+    console.error("[agent-entry] Merged build-time home files");
+  } catch {
+    // cp -rn may exit non-zero on some systems when skipping existing files
+    // This is expected behavior, not an error
+    console.error("[agent-entry] Merged build-time home files (some skipped)");
+  }
+}
+
+/**
  * Main bootstrap function — orchestrates the full agent-entry flow.
  */
 export async function bootstrap(): Promise<never> {
@@ -320,6 +342,9 @@ export async function bootstrap(): Promise<never> {
     console.error(`[agent-entry] argv: ${JSON.stringify(process.argv)}`);
     console.error(`[agent-entry] cwd: ${process.cwd()}`);
   }
+
+  // 0. Merge build-time home files before anything else
+  mergeHomeBuild();
 
   // 1. Read configuration from environment
   const proxyToken = process.env.MCP_PROXY_TOKEN;

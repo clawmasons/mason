@@ -21,11 +21,14 @@ describe("generateCredentialServiceDockerfile", () => {
     expect(result).toContain("USER mason");
   });
 
-  it("creates mason user with home directory", () => {
+  it("creates mason user with host-matching UID/GID", () => {
     const result = generateCredentialServiceDockerfile();
 
-    expect(result).toContain("groupadd -r mason");
-    expect(result).toContain("useradd -r -g mason -m mason");
+    expect(result).toContain("ARG HOST_UID=1000");
+    expect(result).toContain("ARG HOST_GID=1000");
+    expect(result).toContain("groupadd -g $HOST_GID mason");
+    expect(result).toContain("useradd -m -u $HOST_UID -g $HOST_GID mason");
+    expect(result).toContain("getent group $HOST_GID");
   });
 
   it("installs build tools for native addons", () => {

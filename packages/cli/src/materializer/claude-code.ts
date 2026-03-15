@@ -1,5 +1,8 @@
 import type { ResolvedAgent, ResolvedRole, ResolvedTask } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions } from "./types.js";
 import {
   formatPermittedTools,
@@ -111,8 +114,158 @@ function generateSlashCommand(
  * - AGENTS.md — agent identity and role documentation
  * - skills/{name}/README.md — skill artifact manifests
  */
+/**
+ * Copy a file or directory from host to target, silently skipping if source doesn't exist.
+ */
+function copyIfExists(src: string, dest: string): void {
+  if (!fs.existsSync(src)) return;
+  const stat = fs.statSync(src);
+  if (stat.isDirectory()) {
+    fs.cpSync(src, dest, { recursive: true });
+  } else {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.cpSync(src, dest);
+  }
+}
+
+/**
+ * Transform the ~/.claude/projects/ directory for container use.
+ *
+ * 1. Copy entire projects dir to homePath/.claude/projects/
+ * 2. Flatten projectDir path (/ → -) to find the matching project subdir
+ * 3. Delete all other project subdirs
+ * 4. Rename the matching dir to -home-mason-workspace-project
+ */
+function transformProjectsDir(
+  hostProjectsDir: string,
+  targetProjectsDir: string,
+  projectDir: string,
+): void {
+  if (!fs.existsSync(hostProjectsDir)) return;
+
+  // Copy entire projects dir
+  fs.cpSync(hostProjectsDir, targetProjectsDir, { recursive: true });
+
+  // Flatten project path: /Users/greff/Projects/foo → -Users-greff-Projects-foo
+  const flattenedPath = projectDir.replace(/\//g, "-");
+  const containerProjectName = "-home-mason-workspace-project";
+
+  // Read project subdirs and filter
+  const entries = fs.readdirSync(targetProjectsDir, { withFileTypes: true });
+  let foundMatch = false;
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name === flattenedPath) {
+      foundMatch = true;
+    } else {
+      // Delete non-matching project dirs
+      fs.rmSync(path.join(targetProjectsDir, entry.name), { recursive: true, force: true });
+    }
+  }
+
+  if (foundMatch) {
+    // Rename matching dir to container path
+    fs.renameSync(
+      path.join(targetProjectsDir, flattenedPath),
+      path.join(targetProjectsDir, containerProjectName),
+    );
+  } else {
+    // No match — create empty dir
+    fs.mkdirSync(path.join(targetProjectsDir, containerProjectName), { recursive: true });
+  }
+}
+
+const CONTAINER_PROJECT_PATH = "/home/mason/workspace/project";
+
+/**
+ * Transform ~/.claude.json for container use.
+ *
+ * The `projects` map is keyed by host filesystem paths. We need to:
+ * 1. Find the entry matching projectDir
+ * 2. Remap it to the container mount path (/home/mason/workspace/project)
+ * 3. Remove all other project entries
+ * 4. Ensure trust dialog and onboarding are marked as completed
+ */
+function transformClaudeJson(targetPath: string, projectDir: string): void {
+  if (!fs.existsSync(targetPath)) return;
+
+  const raw = fs.readFileSync(targetPath, "utf-8");
+  const data = JSON.parse(raw) as Record<string, unknown>;
+
+  // Transform projects map
+  const projects = (data.projects ?? {}) as Record<string, Record<string, unknown>>;
+  const matchingEntry = projects[projectDir] ?? {};
+
+  // Ensure trust and onboarding are accepted
+  matchingEntry.hasTrustDialogAccepted = true;
+  matchingEntry.hasCompletedProjectOnboarding = true;
+
+  // Replace all projects with just the container-path entry
+  data.projects = { [CONTAINER_PROJECT_PATH]: matchingEntry };
+
+  // Mark top-level onboarding as complete and suppress interactive prompts
+  data.hasCompletedOnboarding = true;
+  data.installMethod = "native";
+  data.effortCalloutDismissed = true;
+
+  // Transform githubRepoPaths: keep only repos that reference projectDir, rewrite paths
+  const repoPaths = data.githubRepoPaths as Record<string, string[]> | undefined;
+  if (repoPaths) {
+    const cleaned: Record<string, string[]> = {};
+    for (const [repo, paths] of Object.entries(repoPaths)) {
+      if (paths.some((p) => p === projectDir || p.startsWith(projectDir + "/"))) {
+        cleaned[repo] = [CONTAINER_PROJECT_PATH];
+      }
+    }
+    data.githubRepoPaths = cleaned;
+  }
+
+  fs.writeFileSync(targetPath, JSON.stringify(data, null, 2));
+}
+
 export const claudeCodeMaterializer: RuntimeMaterializer = {
   name: "claude-code",
+
+  materializeHome(projectDir: string, homePath: string): void {
+    const hostHome = os.homedir();
+    const hostClaudeDir = path.join(hostHome, ".claude");
+
+    // Ensure target directories exist
+    fs.mkdirSync(path.join(homePath, ".claude"), { recursive: true });
+
+    // Copy directories (recursive)
+    const dirs = ["statsig", "plans", "plugins", "skills"];
+    for (const dir of dirs) {
+      copyIfExists(
+        path.join(hostClaudeDir, dir),
+        path.join(homePath, ".claude", dir),
+      );
+    }
+
+    // Copy individual files
+    const files = ["settings.json", "stats-cache.json"];
+    for (const file of files) {
+      copyIfExists(
+        path.join(hostClaudeDir, file),
+        path.join(homePath, ".claude", file),
+      );
+    }
+
+    // Copy ~/.claude.json → homePath/.claude.json, then transform for container
+    copyIfExists(
+      path.join(hostHome, ".claude.json"),
+      path.join(homePath, ".claude.json"),
+    );
+    transformClaudeJson(path.join(homePath, ".claude.json"), projectDir);
+
+    // Projects directory with path transformation
+    transformProjectsDir(
+      path.join(hostClaudeDir, "projects"),
+      path.join(homePath, ".claude", "projects"),
+      projectDir,
+    );
+  },
 
   materializeWorkspace(
     agent: ResolvedAgent,

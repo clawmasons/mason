@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 import { claudeCodeMaterializer } from "../../src/materializer/claude-code.js";
 import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
 
@@ -524,6 +527,204 @@ describe("claudeCodeMaterializer", () => {
           "agent-launch.json",
           "skills/labeling/README.md",
         ]);
+      });
+    });
+  });
+
+  describe("materializeHome", () => {
+    let tmpDir: string;
+    let fakeHostHome: string;
+    let homePath: string;
+    const projectDir = "/Users/greff/Projects/clawmasons/chapter";
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "materialize-home-test-"));
+      fakeHostHome = path.join(tmpDir, "host-home");
+      homePath = path.join(tmpDir, "agent-home");
+
+      // Create fake host home with .claude directory
+      fs.mkdirSync(path.join(fakeHostHome, ".claude"), { recursive: true });
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    /**
+     * Helper: run materializeHome with a fake HOME override.
+     * We temporarily override os.homedir() by setting HOME env var.
+     */
+    function runMaterializeHome(projDir?: string): void {
+      const originalHome = process.env.HOME;
+      try {
+        process.env.HOME = fakeHostHome;
+        claudeCodeMaterializer.materializeHome!(projDir ?? projectDir, homePath);
+      } finally {
+        process.env.HOME = originalHome;
+      }
+    }
+
+    it("copies all claude config directories when they exist", () => {
+      // Create source dirs and files
+      fs.mkdirSync(path.join(fakeHostHome, ".claude", "statsig"), { recursive: true });
+      fs.writeFileSync(path.join(fakeHostHome, ".claude", "statsig", "data.json"), '{"flags": true}');
+      fs.mkdirSync(path.join(fakeHostHome, ".claude", "plans"), { recursive: true });
+      fs.writeFileSync(path.join(fakeHostHome, ".claude", "plans", "plan1.md"), "# Plan 1");
+      fs.mkdirSync(path.join(fakeHostHome, ".claude", "plugins"), { recursive: true });
+      fs.writeFileSync(path.join(fakeHostHome, ".claude", "plugins", "plugin.js"), "module.exports = {}");
+      fs.mkdirSync(path.join(fakeHostHome, ".claude", "skills"), { recursive: true });
+      fs.writeFileSync(path.join(fakeHostHome, ".claude", "skills", "skill.md"), "# Skill");
+
+      runMaterializeHome();
+
+      expect(fs.existsSync(path.join(homePath, ".claude", "statsig", "data.json"))).toBe(true);
+      expect(fs.existsSync(path.join(homePath, ".claude", "plans", "plan1.md"))).toBe(true);
+      expect(fs.existsSync(path.join(homePath, ".claude", "plugins", "plugin.js"))).toBe(true);
+      expect(fs.existsSync(path.join(homePath, ".claude", "skills", "skill.md"))).toBe(true);
+    });
+
+    it("copies individual config files", () => {
+      fs.writeFileSync(path.join(fakeHostHome, ".claude", "settings.json"), '{"theme":"dark"}');
+      fs.writeFileSync(path.join(fakeHostHome, ".claude", "stats-cache.json"), '{"stats":1}');
+      fs.writeFileSync(path.join(fakeHostHome, ".claude.json"), '{"version":1}');
+
+      runMaterializeHome();
+
+      expect(fs.readFileSync(path.join(homePath, ".claude", "settings.json"), "utf-8")).toBe('{"theme":"dark"}');
+      expect(fs.readFileSync(path.join(homePath, ".claude", "stats-cache.json"), "utf-8")).toBe('{"stats":1}');
+      // .claude.json is transformed (project paths remapped, onboarding flags set)
+      const claudeJson = JSON.parse(fs.readFileSync(path.join(homePath, ".claude.json"), "utf-8"));
+      expect(claudeJson.version).toBe(1);
+      expect(claudeJson.hasCompletedOnboarding).toBe(true);
+    });
+
+    it("silently skips missing source paths", () => {
+      // Don't create any source files — should not throw
+      runMaterializeHome();
+
+      // homePath should still be created
+      expect(fs.existsSync(path.join(homePath, ".claude"))).toBe(true);
+    });
+
+    it("creates homePath if it does not exist", () => {
+      expect(fs.existsSync(homePath)).toBe(false);
+
+      runMaterializeHome();
+
+      expect(fs.existsSync(homePath)).toBe(true);
+    });
+
+    describe(".claude.json transformation", () => {
+      it("remaps project entry to container path and sets trust flags", () => {
+        fs.writeFileSync(path.join(fakeHostHome, ".claude.json"), JSON.stringify({
+          numStartups: 10,
+          projects: {
+            [projectDir]: { allowedTools: ["Bash"], hasTrustDialogAccepted: false },
+            "/some/other/project": { allowedTools: [] },
+          },
+        }));
+
+        runMaterializeHome();
+
+        const result = JSON.parse(fs.readFileSync(path.join(homePath, ".claude.json"), "utf-8"));
+        // Only the container path entry should remain
+        expect(Object.keys(result.projects)).toEqual(["/home/mason/workspace/project"]);
+        // Trust and onboarding flags must be set
+        expect(result.projects["/home/mason/workspace/project"].hasTrustDialogAccepted).toBe(true);
+        expect(result.projects["/home/mason/workspace/project"].hasCompletedProjectOnboarding).toBe(true);
+        // Original settings preserved
+        expect(result.projects["/home/mason/workspace/project"].allowedTools).toEqual(["Bash"]);
+        // Top-level onboarding and prompt suppression
+        expect(result.hasCompletedOnboarding).toBe(true);
+        expect(result.installMethod).toBe("native");
+        expect(result.effortCalloutDismissed).toBe(true);
+        // Other top-level fields preserved
+        expect(result.numStartups).toBe(10);
+      });
+
+      it("creates project entry when source has no matching project", () => {
+        fs.writeFileSync(path.join(fakeHostHome, ".claude.json"), JSON.stringify({
+          numStartups: 5,
+          projects: {},
+        }));
+
+        runMaterializeHome();
+
+        const result = JSON.parse(fs.readFileSync(path.join(homePath, ".claude.json"), "utf-8"));
+        expect(result.projects["/home/mason/workspace/project"].hasTrustDialogAccepted).toBe(true);
+        expect(result.projects["/home/mason/workspace/project"].hasCompletedProjectOnboarding).toBe(true);
+      });
+
+      it("handles missing .claude.json gracefully", () => {
+        // No .claude.json on host — should not throw
+        runMaterializeHome();
+        expect(fs.existsSync(path.join(homePath, ".claude.json"))).toBe(false);
+      });
+
+      it("filters and rewrites githubRepoPaths to container path", () => {
+        fs.writeFileSync(path.join(fakeHostHome, ".claude.json"), JSON.stringify({
+          githubRepoPaths: {
+            "clawmasons/chapter": [projectDir, `${projectDir}/e2e`],
+            "clawmasons/other": ["/Users/greff/Projects/clawmasons/other"],
+            "clawmasons/multi": ["/some/path", projectDir],
+          },
+        }));
+
+        runMaterializeHome();
+
+        const result = JSON.parse(fs.readFileSync(path.join(homePath, ".claude.json"), "utf-8"));
+        // Matching repos rewritten to container path
+        expect(result.githubRepoPaths["clawmasons/chapter"]).toEqual(["/home/mason/workspace/project"]);
+        // Repo with mixed paths kept (one path matched)
+        expect(result.githubRepoPaths["clawmasons/multi"]).toEqual(["/home/mason/workspace/project"]);
+        // Non-matching repo removed
+        expect(result.githubRepoPaths["clawmasons/other"]).toBeUndefined();
+      });
+    });
+
+    describe("projects directory path transformation", () => {
+      const flattenedPath = "-Users-greff-Projects-clawmasons-chapter";
+
+      beforeEach(() => {
+        // Create projects dir with multiple project subdirs
+        const projectsDir = path.join(fakeHostHome, ".claude", "projects");
+        fs.mkdirSync(path.join(projectsDir, flattenedPath), { recursive: true });
+        fs.writeFileSync(path.join(projectsDir, flattenedPath, "context.md"), "# Project context");
+        fs.mkdirSync(path.join(projectsDir, "-Users-greff-Projects-other-project"), { recursive: true });
+        fs.writeFileSync(path.join(projectsDir, "-Users-greff-Projects-other-project", "other.md"), "# Other");
+        fs.mkdirSync(path.join(projectsDir, "-Users-greff-Projects-third"), { recursive: true });
+      });
+
+      it("keeps only the matching project directory and renames it", () => {
+        runMaterializeHome();
+
+        const targetProjects = path.join(homePath, ".claude", "projects");
+        const entries = fs.readdirSync(targetProjects);
+
+        expect(entries).toEqual(["-home-mason-workspace-project"]);
+        expect(
+          fs.readFileSync(path.join(targetProjects, "-home-mason-workspace-project", "context.md"), "utf-8"),
+        ).toBe("# Project context");
+      });
+
+      it("deletes non-matching project directories", () => {
+        runMaterializeHome();
+
+        const targetProjects = path.join(homePath, ".claude", "projects");
+        expect(fs.existsSync(path.join(targetProjects, "-Users-greff-Projects-other-project"))).toBe(false);
+        expect(fs.existsSync(path.join(targetProjects, "-Users-greff-Projects-third"))).toBe(false);
+      });
+
+      it("creates empty dir when no matching project found", () => {
+        runMaterializeHome("/some/other/path");
+
+        const targetProjects = path.join(homePath, ".claude", "projects");
+        const entries = fs.readdirSync(targetProjects);
+        expect(entries).toEqual(["-home-mason-workspace-project"]);
+
+        // Should be empty
+        const innerEntries = fs.readdirSync(path.join(targetProjects, "-home-mason-workspace-project"));
+        expect(innerEntries).toEqual([]);
       });
     });
   });
