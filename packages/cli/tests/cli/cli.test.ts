@@ -14,11 +14,6 @@ describe("CLI entry point", () => {
     expect(program.description()).toContain("Mason");
   });
 
-  it("does not have top-level init command (lodge-init removed)", () => {
-    const initCmd = program.commands.find((cmd) => cmd.name() === "init");
-    expect(initCmd).toBeUndefined();
-  });
-
   it("has top-level run command registered", () => {
     const runCmd = program.commands.find((cmd) => cmd.name() === "run");
     expect(runCmd).toBeDefined();
@@ -45,31 +40,6 @@ describe("CLI entry point", () => {
     }
   });
 
-  it("chapter subcommand contains init", () => {
-    const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
-    expect(chapterCmd).toBeDefined();
-    if (chapterCmd) {
-      const initCmd = chapterCmd.commands.find((cmd) => cmd.name() === "init");
-      expect(initCmd).toBeDefined();
-      if (initCmd) {
-        expect(initCmd.description()).toContain("Initialize");
-      }
-    }
-  });
-
-  it("chapter init has --name option", () => {
-    const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
-    expect(chapterCmd).toBeDefined();
-    if (chapterCmd) {
-      const initCmd = chapterCmd.commands.find((cmd) => cmd.name() === "init");
-      expect(initCmd).toBeDefined();
-      if (initCmd) {
-        const nameOption = initCmd.options.find((opt) => opt.long === "--name");
-        expect(nameOption).toBeDefined();
-      }
-    }
-  });
-
   it("chapter subcommand contains build, list, validate, add, permissions, pack, proxy", () => {
     const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
     expect(chapterCmd).toBeDefined();
@@ -82,9 +52,10 @@ describe("CLI entry point", () => {
       expect(subcommandNames).toContain("permissions");
       expect(subcommandNames).toContain("pack");
       expect(subcommandNames).toContain("proxy");
-      // Removed commands: remove, init-role
+      // Removed commands: remove, init-role, init
       expect(subcommandNames).not.toContain("remove");
       expect(subcommandNames).not.toContain("init-role");
+      expect(subcommandNames).not.toContain("init");
     }
   });
 

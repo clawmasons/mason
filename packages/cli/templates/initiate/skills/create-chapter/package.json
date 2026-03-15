@@ -1,9 +1,0 @@
-{
-  "name": "@{{projectScope}}/skill-create-chapter",
-  "version": "1.0.0",
-  "chapter": {
-    "type": "skill",
-    "artifacts": ["./SKILL.md"],
-    "description": "Knowledge for analyzing projects and creating chapter artifacts"
-  }
-}
