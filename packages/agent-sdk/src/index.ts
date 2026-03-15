@@ -26,10 +26,12 @@ export type { LaunchCredentialConfig } from "./helpers.js";
 export {
   createAgentRegistry,
   loadConfigAgents,
+  loadConfigAgentEntry,
+  readConfigAgentNames,
   getAgent,
   getRegisteredAgentNames,
 } from "./discovery.js";
-export type { AgentRegistry } from "./discovery.js";
+export type { AgentRegistry, AgentEntryConfig } from "./discovery.js";
 
 // Re-exports from @clawmasons/shared for convenience
 export type {

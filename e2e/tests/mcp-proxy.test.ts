@@ -217,7 +217,7 @@ describe("mcp-proxy with claude-native project", () => {
 
       // Use the CLI to build, generate compose, and start the proxy — just like a user would
       const output = masonExec(
-        ["run", "--role", "writer", "--agent-type", "mcp", "--proxy-only", "--proxy-port", String(PROXY_PORT)],
+        ["run", "--role", "writer", "--agent", "mcp", "--proxy-only", "--proxy-port", String(PROXY_PORT)],
         workspaceDir,
         { timeout: 240_000 },
       );

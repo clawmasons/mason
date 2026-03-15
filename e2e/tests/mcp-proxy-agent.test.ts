@@ -3,7 +3,7 @@
  *
  * Validates the full agent→proxy pipeline by:
  *   1. Copying the claude-test-project fixture
- *   2. Spawning `mason run --role writer --agent-type mcp` with piped stdio
+ *   2. Spawning `mason run --role writer --agent mcp` with piped stdio
  *   3. Interacting with the mcp-agent REPL to list and call tools
  *
  * The test does NOT manually orchestrate Docker containers — the CLI handles
@@ -135,7 +135,7 @@ describe("mcp-proxy-agent: agent↔proxy via CLI", () => {
     // auto-build, proxy startup, credential service, agent container
     cliProcess = spawn(
       "node",
-      [MASON_BIN, "run", "--role", "writer", "--agent-type", "mcp", "--proxy-port", "19702"],
+      [MASON_BIN, "run", "--role", "writer", "--agent", "mcp", "--proxy-port", "19702"],
       {
         cwd: workspaceDir,
         stdio: ["pipe", "pipe", "pipe"],

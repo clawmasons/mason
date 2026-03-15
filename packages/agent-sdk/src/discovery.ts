@@ -8,10 +8,83 @@ import type { AgentPackage } from "./types.js";
 export type AgentRegistry = Map<string, AgentPackage>;
 
 /**
- * Config file schema for .mason/config.json agents field.
+ * Per-agent launch profile declared in .mason/config.json.
+ */
+export interface AgentEntryConfig {
+  /** npm package name implementing the agent SDK */
+  package: string;
+  /** Host path to bind-mount over /home/mason/ in the agent container */
+  home?: string;
+  /** Default startup mode (overridable by CLI flags) */
+  mode?: "terminal" | "acp" | "bash";
+  /** Default role name to use when --role is not supplied */
+  role?: string;
+}
+
+/**
+ * Config file schema for .mason/config.json.
  */
 interface MasonConfig {
-  agents?: Record<string, { package: string }>;
+  agents?: Record<string, unknown>;
+}
+
+const VALID_MODES = new Set<string>(["terminal", "acp", "bash"]);
+
+/**
+ * Parse and validate a raw config entry. Returns null if the entry is invalid (missing package).
+ * Warns and normalises invalid mode values.
+ */
+function parseEntryConfig(name: string, raw: unknown): AgentEntryConfig | null {
+  if (!raw || typeof raw !== "object") {
+    console.warn(`[agent-sdk] Invalid agent config for "${name}": missing "package" field`);
+    return null;
+  }
+  const obj = raw as Record<string, unknown>;
+
+  if (typeof obj.package !== "string") {
+    console.warn(`[agent-sdk] Invalid agent config for "${name}": missing "package" field`);
+    return null;
+  }
+
+  const entry: AgentEntryConfig = { package: obj.package };
+
+  if (obj.home !== undefined && typeof obj.home === "string") {
+    entry.home = obj.home;
+  }
+
+  if (obj.mode !== undefined) {
+    if (typeof obj.mode === "string" && VALID_MODES.has(obj.mode)) {
+      entry.mode = obj.mode as "terminal" | "acp" | "bash";
+    } else {
+      console.warn(
+        `[agent-sdk] Agent "${name}" has invalid mode "${String(obj.mode)}" (expected terminal, acp, or bash). Defaulting to terminal.`,
+      );
+      entry.mode = "terminal";
+    }
+  }
+
+  if (obj.role !== undefined && typeof obj.role === "string") {
+    entry.role = obj.role;
+  }
+
+  return entry;
+}
+
+/**
+ * Read and parse .mason/config.json from the given project directory.
+ * Returns null if the file does not exist or cannot be parsed.
+ */
+function readMasonConfig(projectDir: string): MasonConfig | null {
+  const configPath = path.join(projectDir, ".mason", "config.json");
+  if (!fs.existsSync(configPath)) return null;
+
+  try {
+    const raw = fs.readFileSync(configPath, "utf-8");
+    return JSON.parse(raw) as MasonConfig;
+  } catch {
+    console.warn(`[agent-sdk] Failed to parse .mason/config.json`);
+    return null;
+  }
 }
 
 /**
@@ -48,32 +121,16 @@ function isValidAgentPackage(value: unknown): value is AgentPackage {
  * @returns Array of loaded AgentPackage objects (invalid entries are skipped with warnings)
  */
 export async function loadConfigAgents(projectDir: string): Promise<AgentPackage[]> {
-  const configPath = path.join(projectDir, ".mason", "config.json");
-
-  if (!fs.existsSync(configPath)) {
-    return [];
-  }
-
-  let config: MasonConfig;
-  try {
-    const raw = fs.readFileSync(configPath, "utf-8");
-    config = JSON.parse(raw) as MasonConfig;
-  } catch {
-    console.warn(`[agent-sdk] Failed to parse .mason/config.json`);
-    return [];
-  }
-
-  if (!config.agents || typeof config.agents !== "object") {
+  const config = readMasonConfig(projectDir);
+  if (!config || !config.agents || typeof config.agents !== "object") {
     return [];
   }
 
   const agents: AgentPackage[] = [];
 
-  for (const [name, entry] of Object.entries(config.agents)) {
-    if (!entry || typeof entry.package !== "string") {
-      console.warn(`[agent-sdk] Invalid agent config for "${name}": missing "package" field`);
-      continue;
-    }
+  for (const [name, raw] of Object.entries(config.agents)) {
+    const entry = parseEntryConfig(name, raw);
+    if (!entry) continue;
 
     try {
       const mod = await import(entry.package) as { default?: unknown };
@@ -95,6 +152,35 @@ export async function loadConfigAgents(projectDir: string): Promise<AgentPackage
   }
 
   return agents;
+}
+
+/**
+ * Return the raw (validated) config entry for a named agent from .mason/config.json.
+ * Synchronous — no dynamic imports. Safe to call before the async registry is initialised.
+ *
+ * @returns The AgentEntryConfig, or undefined if the file is absent or the agent is not declared.
+ */
+export function loadConfigAgentEntry(projectDir: string, agentName: string): AgentEntryConfig | undefined {
+  const config = readMasonConfig(projectDir);
+  if (!config?.agents) return undefined;
+
+  const raw = config.agents[agentName];
+  if (raw === undefined) return undefined;
+
+  const entry = parseEntryConfig(agentName, raw);
+  return entry ?? undefined;
+}
+
+/**
+ * Return all agent key names declared in .mason/config.json.
+ * Synchronous — no dynamic imports. Safe to call before program.parse().
+ *
+ * @returns Array of agent key names, or empty array if the file is absent or unparseable.
+ */
+export function readConfigAgentNames(projectDir: string): string[] {
+  const config = readMasonConfig(projectDir);
+  if (!config?.agents || typeof config.agents !== "object") return [];
+  return Object.keys(config.agents);
 }
 
 /**

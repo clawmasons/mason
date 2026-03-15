@@ -13,6 +13,7 @@ import {
   resolveAgentType,
   isKnownAgentType,
   getKnownAgentTypeNames,
+  ensureMasonConfig,
 } from "../../src/cli/commands/run-agent.js";
 import type { RoleType, ResolvedAgent } from "@clawmasons/shared";
 
@@ -56,6 +57,35 @@ describe("CLI run command", () => {
     if (cmd) {
       const bashOpt = cmd.options.find((o) => o.long === "--bash");
       expect(bashOpt).toBeDefined();
+    }
+  });
+
+  it("run command has --agent option (renamed from --agent-type)", () => {
+    const cmd = program.commands.find((c) => c.name() === "run");
+    expect(cmd).toBeDefined();
+    if (cmd) {
+      const agentOpt = cmd.options.find((o) => o.long === "--agent");
+      expect(agentOpt).toBeDefined();
+      const agentTypeOpt = cmd.options.find((o) => o.long === "--agent-type");
+      expect(agentTypeOpt).toBeUndefined();
+    }
+  });
+
+  it("run command has --home option", () => {
+    const cmd = program.commands.find((c) => c.name() === "run");
+    expect(cmd).toBeDefined();
+    if (cmd) {
+      const homeOpt = cmd.options.find((o) => o.long === "--home");
+      expect(homeOpt).toBeDefined();
+    }
+  });
+
+  it("run command has --terminal option", () => {
+    const cmd = program.commands.find((c) => c.name() === "run");
+    expect(cmd).toBeDefined();
+    if (cmd) {
+      const terminalOpt = cmd.options.find((o) => o.long === "--terminal");
+      expect(terminalOpt).toBeDefined();
     }
   });
 });
@@ -438,6 +468,85 @@ describe("generateComposeYml", () => {
     const yml = generateComposeYml(defaultOpts);
 
     expect(yml).not.toContain("AGENT_COMMAND_OVERRIDE");
+  });
+
+  it("adds homeOverride volume as first agent volume", () => {
+    const yml = generateComposeYml({
+      ...defaultOpts,
+      homeOverride: "/custom/home",
+    });
+
+    const agentSection = yml.split("agent-writer:")[1]!;
+    const volumeSection = agentSection.split("volumes:")[1]!.split("depends_on:")[0]!;
+    const mountLines = volumeSection.split("\n").filter((l) => l.includes("- \""));
+
+    // First mount should be the home override
+    expect(mountLines[0]).toContain('"/custom/home:/home/mason/"');
+    // Workspace mount comes next
+    expect(mountLines[1]).toContain("/home/mason/workspace\"");
+  });
+
+  it("does not add home mount when homeOverride is not set", () => {
+    const yml = generateComposeYml(defaultOpts);
+    const agentSection = yml.split("agent-writer:")[1]!;
+    expect(agentSection).not.toContain(":/home/mason/\"");
+  });
+});
+
+// ── ensureMasonConfig ────────────────────────────────────────────────────
+
+describe("ensureMasonConfig", () => {
+  let tmpDir: string;
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-config-test-"));
+    logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("creates .mason/config.json with default template when absent", () => {
+    ensureMasonConfig(tmpDir);
+
+    const configPath = path.join(tmpDir, ".mason", "config.json");
+    expect(fs.existsSync(configPath)).toBe(true);
+
+    const content = JSON.parse(fs.readFileSync(configPath, "utf-8")) as Record<string, unknown>;
+    const agents = content.agents as Record<string, { package: string }>;
+    expect(agents).toBeDefined();
+    expect(agents["claude"]?.package).toBe("@clawmasons/claude-code");
+    expect(agents["pi-mono-agent"]?.package).toBe("@clawmasons/pi-mono-agent");
+    expect(agents["mcp"]?.package).toBe("@clawmasons/mcp-agent");
+  });
+
+  it("creates .mason directory if it does not exist", () => {
+    expect(fs.existsSync(path.join(tmpDir, ".mason"))).toBe(false);
+    ensureMasonConfig(tmpDir);
+    expect(fs.existsSync(path.join(tmpDir, ".mason"))).toBe(true);
+  });
+
+  it("prints a notice to stderr when config is created", () => {
+    ensureMasonConfig(tmpDir);
+    const output = logSpy.mock.calls.flat().join("\n");
+    expect(output).toContain("Created .mason/config.json");
+  });
+
+  it("does not overwrite existing config.json", () => {
+    const masonDir = path.join(tmpDir, ".mason");
+    fs.mkdirSync(masonDir, { recursive: true });
+    const configPath = path.join(masonDir, "config.json");
+    const existing = JSON.stringify({ agents: { custom: { package: "@custom/agent" } } });
+    fs.writeFileSync(configPath, existing);
+
+    ensureMasonConfig(tmpDir);
+
+    const content = fs.readFileSync(configPath, "utf-8");
+    expect(content).toBe(existing);
+    expect(logSpy).not.toHaveBeenCalled();
   });
 });
 
