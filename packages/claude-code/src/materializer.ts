@@ -26,14 +26,16 @@ function generateMcpJson(
   proxyToken?: string,
 ): string {
   const pathSuffix = proxyType === "sse" ? "/sse" : "/mcp";
+  // Claude Code recognizes "sse" and "http" — not "streamable-http"
+  const claudeType = proxyType === "streamable-http" ? "http" : proxyType;
   const bearerValue = proxyToken
     ? `Bearer ${proxyToken}`
-    : "Bearer ${CHAPTER_PROXY_TOKEN}";
+    : "Bearer ${MCP_PROXY_TOKEN}";
 
   const mcpConfig = {
     mcpServers: {
       chapter: {
-        type: proxyType,
+        type: claudeType,
         url: `${proxyEndpoint}${pathSuffix}`,
         headers: {
           Authorization: bearerValue,
@@ -87,7 +89,7 @@ function generateSlashCommand(
     lines.push("## Required Skills");
     for (const skill of task.skills) {
       const skillShortName = getAppShortName(skill.name);
-      lines.push(`See skills/${skillShortName}/ for ${skill.description}.`);
+      lines.push(`See .claude/skills/${skillShortName}/ for ${skill.description}.`);
     }
     lines.push("");
   }
@@ -291,17 +293,76 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     // AGENTS.md
     result.set("AGENTS.md", generateAgentsMd(agent));
 
-    // skills/{skill-short-name}/README.md
+    // .claude/skills/{skill-short-name}/SKILL.md
     const allSkills = collectAllSkills(agent.roles);
     for (const [, skill] of allSkills) {
       const skillShortName = getAppShortName(skill.name);
       result.set(
-        `skills/${skillShortName}/README.md`,
+        `.claude/skills/${skillShortName}/SKILL.md`,
         generateSkillReadme(skill),
       );
     }
 
     // agent-launch.json — tells agent-entry how to bootstrap this agent
+    const roleInstructions = agent.roles[0]?.instructions;
+    result.set(
+      "agent-launch.json",
+      generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode, roleInstructions),
+    );
+
+    return result;
+  },
+
+  materializeSupervisor(
+    agent: ResolvedAgent,
+    proxyEndpoint: string,
+    proxyToken?: string,
+    options?: MaterializeOptions,
+    existingHomePath?: string,
+  ): MaterializationResult {
+    const result: MaterializationResult = new Map();
+    const proxyType = agent.proxy?.type ?? "sse";
+
+    // .claude.json — MCP servers merged into existing home config if present
+    const mcpRaw = generateMcpJson(proxyEndpoint, proxyType, proxyToken);
+    const mcpParsed = JSON.parse(mcpRaw) as { mcpServers: Record<string, unknown> };
+    let claudeJson: Record<string, unknown> = {};
+    if (existingHomePath) {
+      const claudeJsonPath = path.join(existingHomePath, ".claude.json");
+      if (fs.existsSync(claudeJsonPath)) {
+        claudeJson = JSON.parse(fs.readFileSync(claudeJsonPath, "utf-8")) as Record<string, unknown>;
+      }
+    }
+    claudeJson.mcpServers = { ...(claudeJson.mcpServers as Record<string, unknown> ?? {}), ...mcpParsed.mcpServers };
+    result.set(".claude.json", JSON.stringify(claudeJson, null, 2));
+
+    // .claude/settings.json — permissions
+    result.set(".claude/settings.json", generateSettingsJson());
+
+    // .claude/commands/{task-short-name}.md
+    const allTasks = collectAllTasks(agent.roles);
+    for (const [task, owningRoles] of allTasks) {
+      const taskShortName = getAppShortName(task.name);
+      result.set(
+        `.claude/commands/${taskShortName}.md`,
+        generateSlashCommand(task, owningRoles),
+      );
+    }
+
+    // AGENTS.md
+    result.set("AGENTS.md", generateAgentsMd(agent));
+
+    // .claude/skills/{skill-short-name}/SKILL.md
+    const allSkills = collectAllSkills(agent.roles);
+    for (const [, skill] of allSkills) {
+      const skillShortName = getAppShortName(skill.name);
+      result.set(
+        `.claude/skills/${skillShortName}/SKILL.md`,
+        generateSkillReadme(skill),
+      );
+    }
+
+    // agent-launch.json — caller routes this to workspace, not home
     const roleInstructions = agent.roles[0]?.instructions;
     result.set(
       "agent-launch.json",

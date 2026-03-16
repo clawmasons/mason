@@ -92,6 +92,7 @@ export const roleSourceSchema = z.object({
 export const roleSchema = z.object({
   metadata: roleMetadataSchema,
   instructions: z.string(),
+  type: z.enum(["project", "supervisor"]).optional().default("project"),
   tasks: z.array(taskRefSchema).optional().default([]),
   apps: z.array(appConfigSchema).optional().default([]),
   skills: z.array(skillRefSchema).optional().default([]),

@@ -58,6 +58,7 @@ function makeTestRole(): Role {
         requireApprovalFor: ["create_pr"],
       },
     },
+    type: "project" as const,
     sources: [],
     resources: [],
     source: {
@@ -147,11 +148,11 @@ describe("materializeForAgent", () => {
       expect(agentsMd).toContain("create-prd");
     });
 
-    it("produces skills/ directory for skills", () => {
+    it("produces .claude/skills/ directory for skills", () => {
       const role = makeTestRole();
       const result = materializeForAgent(role, "claude-code");
 
-      expect(result.has("skills/prd-writing/README.md")).toBe(true);
+      expect(result.has(".claude/skills/prd-writing/SKILL.md")).toBe(true);
     });
 
     it("uses default proxy endpoint when none provided", () => {
@@ -307,6 +308,7 @@ describe("materializeForAgent", () => {
           risk: "LOW",
           credentials: [],
         },
+        type: "project" as const,
         resources: [],
         source: {
           type: "local",
@@ -324,7 +326,7 @@ describe("materializeForAgent", () => {
       // No commands or skills
       const keys = [...result.keys()];
       expect(keys.filter((k) => k.startsWith(".claude/commands/"))).toHaveLength(0);
-      expect(keys.filter((k) => k.startsWith("skills/"))).toHaveLength(0);
+      expect(keys.filter((k) => k.startsWith(".claude/skills/"))).toHaveLength(0);
     });
   });
 });

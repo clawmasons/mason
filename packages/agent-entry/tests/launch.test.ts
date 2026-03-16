@@ -45,12 +45,12 @@ describe("launchRuntime", () => {
     delete process.env.AGENT_ENTRY_TEST_VAR;
   });
 
-  it("filters out MCP_PROXY_TOKEN from child env", async () => {
-    process.env.MCP_PROXY_TOKEN = "should-not-pass";
+  it("passes MCP_PROXY_TOKEN to child env", async () => {
+    process.env.MCP_PROXY_TOKEN = "test-proxy-token";
 
     const exitCode = await launchRuntime("node", [
       "-e",
-      "if (process.env.MCP_PROXY_TOKEN === undefined) process.exit(0); else process.exit(1);",
+      'if (process.env.MCP_PROXY_TOKEN === "test-proxy-token") process.exit(0); else process.exit(1);',
     ], {});
 
     expect(exitCode).toBe(0);

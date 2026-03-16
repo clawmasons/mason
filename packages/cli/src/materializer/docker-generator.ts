@@ -234,23 +234,39 @@ export function generateRoleDockerBuildDir(
   if (!agentRole) {
     throw new Error(`adaptRoleToResolvedAgent produced no roles for "${role.metadata.name}"`);
   }
+  const isSupervisor = role.type === "supervisor";
   const agentPkg = getAgentFromRegistry(agentType);
   const agentDockerfile = generateAgentDockerfile(resolvedAgent, agentRole, {
-    hasHome,
+    hasHome: hasHome || isSupervisor,
     dockerfileConfig: agentPkg?.dockerfile,
     devContainerCustomizations: opts.devContainerCustomizations,
+    roleType: role.type,
   });
   deps.writeFileSync(path.join(agentDir, "Dockerfile"), agentDockerfile);
 
-  // Workspace files — split into two output buckets:
-  // - agent-launch.json → {agentDir}/workspace/ (live-mounted to /home/mason/workspace/)
-  // - everything else   → {agentDir}/build/workspace/project/ (per-file overlay mounts)
+  // Workspace files — split into output buckets:
+  // File routing:
+  // - agent-launch.json          → {agentDir}/workspace/         (live-mounted to /home/mason/workspace/)
+  // - .mcp.json (supervisor)     → {agentDir}/workspace/         (Claude Code reads from WORKDIR = /home/mason/workspace)
+  // - project role: everything else → {agentDir}/build/workspace/project/  (per-file overlay mounts)
+  // - supervisor role: everything else → {agentDir}/home/         (merged into home mount at /home/mason/)
   const proxyEp = proxyEndpoint ?? `http://proxy-${roleName}:9090`;
-  const workspace = materializeForAgent(role, agentType, proxyEp);
+  const workspace = (isSupervisor && materializer?.materializeSupervisor)
+    ? materializer.materializeSupervisor(
+        resolvedAgent,
+        proxyEp,
+        undefined,
+        undefined,
+        !fsDeps ? path.join(agentDir, "home") : undefined,
+      )
+    : materializeForAgent(role, agentType, proxyEp);
   const workspaceDir = path.join(agentDir, "workspace");
   const buildWorkspaceProjectDir = path.join(agentDir, "build", "workspace", "project");
+  const homeBuildDir = path.join(agentDir, "home");
   for (const [filePath, content] of workspace) {
-    const targetDir = filePath === "agent-launch.json" ? workspaceDir : buildWorkspaceProjectDir;
+    const targetDir = filePath === "agent-launch.json"
+      ? workspaceDir
+      : isSupervisor ? homeBuildDir : buildWorkspaceProjectDir;
     const fullPath = path.join(targetDir, filePath);
     deps.mkdirSync(path.dirname(fullPath), { recursive: true });
     deps.writeFileSync(fullPath, content);
@@ -626,9 +642,10 @@ export function createSessionDirectory(
   const ignorePaths = role.container?.ignore?.paths ?? [];
   const volumeMasks = generateVolumeMasks(ignorePaths);
 
-  // Detect materialized home directory
+  // Detect materialized home directory.
+  // Supervisor roles always populate home/ (role content merged there during generateRoleDockerBuildDir).
   const homePath = path.join(opts.dockerBuildDir, opts.agentType, "home");
-  const homeExists = fsDeps ? false : fs.existsSync(homePath);
+  const homeExists = role.type === "supervisor" || (fsDeps ? false : fs.existsSync(homePath));
 
   // Compute workspace and build overlay paths
   const workspacePath = path.join(opts.dockerBuildDir, opts.agentType, "workspace");

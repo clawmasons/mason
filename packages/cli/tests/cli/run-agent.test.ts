@@ -918,6 +918,28 @@ describe("runAgent", () => {
     expect(logOutput).toContain("agent complete");
   });
 
+  it("includes role type in session summary for project role", async () => {
+    const { deps } = makeMockDeps({
+      roleType: makeRole({ type: "project" }),
+    });
+
+    await runAgent(projectDir, "claude-code", "writer", deps);
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("(project)");
+  });
+
+  it("includes role type in session summary for supervisor role", async () => {
+    const { deps } = makeMockDeps({
+      roleType: makeRole({ type: "supervisor" }),
+    });
+
+    await runAgent(projectDir, "claude-code", "writer", deps);
+
+    const logOutput = logSpy.mock.calls.flat().join("\n");
+    expect(logOutput).toContain("(supervisor)");
+  });
+
   // ── Error Cases ──────────────────────────────────────────────────────
 
   it("exits 1 when docker compose is not available", async () => {

@@ -87,7 +87,7 @@ describe("mcpAgentMaterializer", () => {
         const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000");
 
         const mcp = JSON.parse(result.get(".mcp.json")!);
-        expect(mcp.mcpServers.chapter.headers.Authorization).toBe("Bearer ${CHAPTER_PROXY_TOKEN}");
+        expect(mcp.mcpServers.chapter.headers.Authorization).toBe("Bearer ${MCP_PROXY_TOKEN}");
       });
 
       it("bakes actual token into auth header when proxyToken provided", () => {

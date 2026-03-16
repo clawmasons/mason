@@ -266,7 +266,7 @@ describe("piCodingAgentMaterializer", () => {
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const mcpJson = JSON.parse(result.get(".pi/mcp.json")!);
-        expect(mcpJson.mcpServers.chapter.headers.Authorization).toBe("Bearer ${CHAPTER_PROXY_TOKEN}");
+        expect(mcpJson.mcpServers.chapter.headers.Authorization).toBe("Bearer ${MCP_PROXY_TOKEN}");
       });
 
       it("bakes actual token into auth header when proxyToken provided", () => {
