@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi, afterEach } from "vitest";
 import http from "node:http";
-import { connectToProxy, requestCredentials } from "../src/index.js";
+import { connectToProxy, requestCredentials, credFetch } from "../src/index.js";
 
 // ── Mock Proxy Server ──────────────────────────────────────────────────
 
@@ -262,5 +262,29 @@ describe("requestCredentials", () => {
     await expect(
       requestCredentials(baseUrl, mockProxyToken, "invalid-session", ["API_KEY"]),
     ).rejects.toThrow("Credential retrieval failed");
+  });
+});
+
+// ── credFetch ──────────────────────────────────────────────────────────────
+
+describe("credFetch", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.MCP_PROXY_TOKEN;
+    delete process.env.MCP_PROXY_URL;
+    delete process.env.AGENT_CREDENTIALS;
+  });
+
+  it("exits non-zero when MCP_PROXY_TOKEN is missing", async () => {
+    delete process.env.MCP_PROXY_TOKEN;
+
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((_code?: number | string) => {
+      throw new Error(`process.exit(${_code})`);
+    }) as typeof process.exit);
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(credFetch()).rejects.toThrow("process.exit(1)");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("MCP_PROXY_TOKEN"));
   });
 });

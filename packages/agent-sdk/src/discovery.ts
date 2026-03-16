@@ -8,6 +8,43 @@ import type { AgentPackage } from "./types.js";
 export type AgentRegistry = Map<string, AgentPackage>;
 
 /**
+ * VSCode-specific dev-container customizations (extensions + settings).
+ */
+export interface DevContainerVscodeCustomizations {
+  extensions?: string[];
+  settings?: Record<string, unknown>;
+}
+
+/**
+ * Dev-container customizations to embed into the agent Dockerfile at build time.
+ * Follows the dev container spec customizations format.
+ */
+export interface DevContainerCustomizations {
+  vscode?: DevContainerVscodeCustomizations;
+}
+
+/**
+ * Default dev-container customizations applied when `dev-container-customizations`
+ * is absent from the agent config entry.
+ */
+export const DEFAULT_DEV_CONTAINER_CUSTOMIZATIONS: DevContainerCustomizations = {
+  vscode: {
+    extensions: [
+      "anthropic.claude-code",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "yoavbls.pretty-ts-errors",
+      "usernamehw.errorlens",
+      "eamodio.gitlens",
+      "editorconfig.editorconfig",
+    ],
+    settings: {
+      "terminal.integrated.defaultProfile.linux": "bash",
+    },
+  },
+};
+
+/**
  * Per-agent launch profile declared in .mason/config.json.
  */
 export interface AgentEntryConfig {
@@ -19,6 +56,8 @@ export interface AgentEntryConfig {
   mode?: "terminal" | "acp" | "bash";
   /** Default role name to use when --role is not supplied */
   role?: string;
+  /** Dev-container IDE extensions and settings to embed in the agent image at build time */
+  devContainerCustomizations?: DevContainerCustomizations;
 }
 
 /**
@@ -65,6 +104,12 @@ function parseEntryConfig(name: string, raw: unknown): AgentEntryConfig | null {
 
   if (obj.role !== undefined && typeof obj.role === "string") {
     entry.role = obj.role;
+  }
+
+  if (obj["dev-container-customizations"] !== undefined &&
+      typeof obj["dev-container-customizations"] === "object" &&
+      obj["dev-container-customizations"] !== null) {
+    entry.devContainerCustomizations = obj["dev-container-customizations"] as DevContainerCustomizations;
   }
 
   return entry;

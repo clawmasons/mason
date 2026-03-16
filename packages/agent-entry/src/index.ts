@@ -449,6 +449,54 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// ── cred-fetch subcommand ──────────────────────────────────────────────
+
+/**
+ * `agent-entry cred-fetch` — Connect to the proxy, request all declared
+ * credentials, and print them to stdout as shell export statements.
+ *
+ * Called by the static `server-env-setup` script inside the VS Code Server
+ * persistent mount on every terminal/task start.
+ */
+export async function credFetch(): Promise<never> {
+  const proxyToken = process.env.MCP_PROXY_TOKEN;
+  if (!proxyToken) {
+    console.error("[agent-entry cred-fetch] MCP_PROXY_TOKEN is not set");
+    process.exit(1);
+  }
+
+  const proxyUrl = process.env.MCP_PROXY_URL ?? "http://proxy:3000";
+
+  const credentialsJson = process.env.AGENT_CREDENTIALS ?? "[]";
+  let credentialKeys: string[];
+  try {
+    credentialKeys = JSON.parse(credentialsJson) as string[];
+    if (!Array.isArray(credentialKeys)) throw new Error("not an array");
+  } catch {
+    console.error("[agent-entry cred-fetch] AGENT_CREDENTIALS must be a JSON array of strings");
+    process.exit(1);
+  }
+
+  try {
+    const { sessionToken } = await connectToProxy(proxyUrl, proxyToken);
+
+    if (credentialKeys.length > 0) {
+      const credentialValues = await requestCredentials(proxyUrl, proxyToken, sessionToken, credentialKeys);
+      for (const [key, value] of Object.entries(credentialValues)) {
+        // Escape value for shell: replace ' with '\''
+        const escaped = value.replace(/'/g, "'\\''");
+        process.stdout.write(`export ${key}='${escaped}'\n`);
+      }
+    }
+
+    process.exit(0);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[agent-entry cred-fetch] Fatal: ${message}`);
+    process.exit(1);
+  }
+}
+
 // ── Run if executed directly ───────────────────────────────────────────
 
 // Detect if running as main module (works with esbuild bundle and npm .bin symlinks)
@@ -460,5 +508,10 @@ const isMain =
     process.argv[1].endsWith("index.js"));
 
 if (isMain) {
-  bootstrap();
+  const subcommand = process.argv[2];
+  if (subcommand === "cred-fetch") {
+    credFetch();
+  } else {
+    bootstrap();
+  }
 }

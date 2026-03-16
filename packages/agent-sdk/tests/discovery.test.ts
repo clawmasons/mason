@@ -362,4 +362,44 @@ describe("loadConfigAgentEntry", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("parses dev-container-customizations when present", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: {
+          claude: {
+            package: "@clawmasons/claude-code",
+            "dev-container-customizations": {
+              vscode: {
+                extensions: ["my.extension"],
+                settings: { "editor.fontSize": 14 },
+              },
+            },
+          },
+        },
+      });
+
+      const entry = loadConfigAgentEntry(tmpDir, "claude");
+      expect(entry?.devContainerCustomizations).toBeDefined();
+      expect(entry?.devContainerCustomizations?.vscode?.extensions).toEqual(["my.extension"]);
+      expect(entry?.devContainerCustomizations?.vscode?.settings).toEqual({ "editor.fontSize": 14 });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("leaves devContainerCustomizations undefined when field is absent", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { claude: { package: "@clawmasons/claude-code" } },
+      });
+
+      const entry = loadConfigAgentEntry(tmpDir, "claude");
+      expect(entry?.devContainerCustomizations).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });

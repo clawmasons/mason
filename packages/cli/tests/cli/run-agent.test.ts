@@ -14,6 +14,7 @@ import {
   isKnownAgentType,
   getKnownAgentTypeNames,
   ensureMasonConfig,
+  buildVscodeAttachUri,
 } from "../../src/cli/commands/run-agent.js";
 import type { RoleType, ResolvedAgent } from "@clawmasons/shared";
 
@@ -1104,5 +1105,73 @@ describe("runProxyOnly", () => {
     expect(content).toContain("proxy-writer:");
     expect(content).toContain("agent-writer:");
     expect(content).toContain(`"${projectDir}:/home/mason/workspace/project"`);
+  });
+});
+
+// ── VSCode attach URI ──────────────────────────────────────────────────────
+
+describe("buildVscodeAttachUri", () => {
+  it("produces the correct vscode-remote URI for a known container name", () => {
+    const containerName = "forge-engineer";
+    const workspace = "/workspace/project";
+    const uri = buildVscodeAttachUri(containerName, workspace);
+
+    // Manually compute expected hex: JSON.stringify({"containerName":"/forge-engineer"})
+    const expectedJson = JSON.stringify({ containerName: `/${containerName}` });
+    const expectedHex = Buffer.from(expectedJson).toString("hex");
+    expect(uri).toBe(`vscode-remote://attached-container+${expectedHex}${workspace}`);
+  });
+
+  it("hex-encodes the container name with a leading slash", () => {
+    const uri = buildVscodeAttachUri("my-agent", "/workspace");
+    const hex = uri.replace("vscode-remote://attached-container+", "").replace("/workspace", "");
+    const decoded = Buffer.from(hex, "hex").toString("utf-8");
+    expect(JSON.parse(decoded)).toEqual({ containerName: "/my-agent" });
+  });
+});
+
+// ── --dev-container flag ───────────────────────────────────────────────────
+
+describe("CLI run --dev-container flag", () => {
+  it("run command has --dev-container option", () => {
+    const cmd = program.commands.find((c) => c.name() === "run");
+    expect(cmd).toBeDefined();
+    if (cmd) {
+      const opt = cmd.options.find((o) => o.long === "--dev-container");
+      expect(opt).toBeDefined();
+    }
+  });
+});
+
+// ── generateComposeYml vscode-server mount ─────────────────────────────────
+
+describe("generateComposeYml vscode-server volume", () => {
+  it("includes vscode-server mount when vscodeSeverHostPath is provided", () => {
+    const yml = generateComposeYml({
+      dockerBuildDir: "/tmp/build",
+      dockerDir: "/tmp/docker",
+      projectDir: "/tmp/project",
+      agent: "claude-code",
+      role: "engineering",
+      logsDir: "/tmp/logs",
+      proxyToken: "tok",
+      credentialProxyToken: "ctok",
+      vscodeSeverHostPath: "/tmp/vscode-server",
+    });
+    expect(yml).toContain("/tmp/vscode-server:/home/mason/.vscode-server");
+  });
+
+  it("omits vscode-server mount when vscodeSeverHostPath is not provided", () => {
+    const yml = generateComposeYml({
+      dockerBuildDir: "/tmp/build",
+      dockerDir: "/tmp/docker",
+      projectDir: "/tmp/project",
+      agent: "claude-code",
+      role: "engineering",
+      logsDir: "/tmp/logs",
+      proxyToken: "tok",
+      credentialProxyToken: "ctok",
+    });
+    expect(yml).not.toContain(".vscode-server");
   });
 });
