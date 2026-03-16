@@ -93,7 +93,7 @@ function generatePiMcpJson(
   const pathSuffix = proxyType === "sse" ? "/sse" : "/mcp";
   const bearerValue = proxyToken
     ? `Bearer ${proxyToken}`
-    : "Bearer ${CHAPTER_PROXY_TOKEN}";
+    : "Bearer ${MCP_PROXY_TOKEN}";
 
   const mcpConfig = {
     mcpServers: {

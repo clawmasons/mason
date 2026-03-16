@@ -359,6 +359,27 @@ describe("roleSchema", () => {
     expect(result.sources).toEqual([]);
   });
 
+  it("defaults type to project when omitted", () => {
+    const result = roleSchema.parse(minimalRole);
+    expect(result.type).toBe("project");
+  });
+
+  it("accepts type supervisor", () => {
+    const result = roleSchema.parse({ ...minimalRole, type: "supervisor" });
+    expect(result.type).toBe("supervisor");
+  });
+
+  it("accepts type project explicitly", () => {
+    const result = roleSchema.parse({ ...minimalRole, type: "project" });
+    expect(result.type).toBe("project");
+  });
+
+  it("rejects unknown type value", () => {
+    expect(() =>
+      roleSchema.parse({ ...minimalRole, type: "admin" })
+    ).toThrow();
+  });
+
   it("accepts a full Role", () => {
     const fullRole = {
       metadata: {

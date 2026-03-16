@@ -49,6 +49,7 @@ function makeTestRole(overrides?: Partial<Role>): Role {
       credentials: ["GITHUB_TOKEN"],
       constraints: { maxConcurrentTasks: 3 },
     },
+    type: "project" as const,
     sources: [],
     resources: [],
     source: {
@@ -338,9 +339,96 @@ describe("generateRoleDockerBuildDir", () => {
 
     const hasMcpJson = buildWorkspaceKeys.some((k) => k.endsWith(".mcp.json"));
     const hasAgentsMd = buildWorkspaceKeys.some((k) => k.endsWith("AGENTS.md"));
+    const hasSkillMd = buildWorkspaceKeys.some((k) => k.endsWith("SKILL.md"));
 
     expect(hasMcpJson).toBe(true);
     expect(hasAgentsMd).toBe(true);
+    expect(hasSkillMd).toBe(true);
+  });
+
+  it("supervisor role routes materialized files to home/ not build/workspace/project/", () => {
+    const writtenFiles = new Map<string, string>();
+
+    generateRoleDockerBuildDir(
+      {
+        role: makeTestRole({ type: "supervisor" }),
+        agentType: "claude-code",
+        projectDir: "/project",
+        agentName: "@acme/agent",
+      },
+      {
+        mkdirSync: () => {},
+        writeFileSync: (p, data) => { writtenFiles.set(p, data); },
+      },
+    );
+
+    // No files in build/workspace/project/ for supervisor
+    const projectDirFiles = [...writtenFiles.keys()].filter((k) =>
+      k.includes(path.join("claude-code", "build", "workspace", "project")),
+    );
+    expect(projectDirFiles).toHaveLength(0);
+
+    // Materialized files go to home/
+    const homeFiles = [...writtenFiles.keys()].filter((k) =>
+      k.includes(path.join("claude-code", "home")) &&
+      !k.includes(path.join("claude-code", "workspace")),
+    );
+    expect(homeFiles.length).toBeGreaterThan(0);
+
+    // .claude.json (with mcpServers) in home/, not .mcp.json
+    expect(homeFiles.some((k) => k.endsWith(".mcp.json"))).toBe(false);
+    const claudeJsonFile = homeFiles.find((k) => k.endsWith(".claude.json"));
+    expect(claudeJsonFile).toBeDefined();
+    const claudeJsonContent = JSON.parse(writtenFiles.get(claudeJsonFile!)!);
+    expect(claudeJsonContent.mcpServers).toBeDefined();
+
+    // Skills go under home/.claude/skills/ not home/skills/
+    expect(homeFiles.some((k) => k.includes(path.join("home", "skills")))).toBe(false);
+    expect(homeFiles.some((k) => k.includes(path.join("home", ".claude", "skills")))).toBe(true);
+  });
+
+  it("supervisor role Dockerfile uses WORKDIR /home/mason/workspace (not /project)", () => {
+    const writtenFiles = new Map<string, string>();
+
+    generateRoleDockerBuildDir(
+      {
+        role: makeTestRole({ type: "supervisor" }),
+        agentType: "claude-code",
+        projectDir: "/project",
+        agentName: "@acme/agent",
+      },
+      {
+        mkdirSync: () => {},
+        writeFileSync: (p, data) => { writtenFiles.set(p, data); },
+      },
+    );
+
+    const dockerfile = [...writtenFiles.entries()].find(([k]) =>
+      k.endsWith(path.join("claude-code", "Dockerfile")),
+    );
+    expect(dockerfile).toBeDefined();
+    expect(dockerfile![1]).toContain("WORKDIR /home/mason/workspace\n");
+    expect(dockerfile![1]).not.toContain("WORKDIR /home/mason/workspace/project");
+  });
+
+  it("agent-launch.json always goes to workspace/ regardless of role type", () => {
+    const writtenFiles = new Map<string, string>();
+
+    generateRoleDockerBuildDir(
+      {
+        role: makeTestRole({ type: "supervisor" }),
+        agentType: "claude-code",
+        projectDir: "/project",
+        agentName: "@acme/agent",
+      },
+      {
+        mkdirSync: () => {},
+        writeFileSync: (p, data) => { writtenFiles.set(p, data); },
+      },
+    );
+
+    const agentLaunchFile = path.join("/project/.mason/docker", "create-prd", "claude-code", "workspace", "agent-launch.json");
+    expect(writtenFiles.has(agentLaunchFile)).toBe(true);
   });
 });
 

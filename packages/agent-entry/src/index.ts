@@ -278,7 +278,6 @@ export async function launchRuntime(
 
   // Copy parent env but filter out sensitive values
   const sensitiveKeys = new Set([
-    "MCP_PROXY_TOKEN",
     "AGENT_SESSION_TOKEN",
     "AGENT_CREDENTIALS",
     "AGENT_RUNTIME_CMD",

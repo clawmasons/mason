@@ -740,7 +740,7 @@ async function runAgentInteractiveMode(
     const agentType = agentOverride ?? inferAgentType(roleType);
 
     console.log(`\n  Agent: ${agentType}`);
-    console.log(`  Role: ${roleName}`);
+    console.log(`  Role: ${roleName} (${roleType.type})`);
 
     // 4. Ensure docker build artifacts exist (auto-build if missing)
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(

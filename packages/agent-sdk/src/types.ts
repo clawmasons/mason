@@ -47,6 +47,26 @@ export interface RuntimeMaterializer {
    * @param homePath - Absolute path to the target home directory
    */
   materializeHome?(projectDir: string, homePath: string): void;
+
+  /**
+   * Generate home-directory file content for a supervisor role.
+   *
+   * Returns a map of home-relative paths → file content (ready to write verbatim).
+   * The caller writes every entry to the home build dir, except "agent-launch.json"
+   * which is always routed to the workspace dir.
+   *
+   * @param existingHomePath - If provided, the materializer may read existing files
+   *   (e.g., host .claude.json written by materializeHome) to produce merged output.
+   *
+   * Agents that do not support supervisor roles omit this method.
+   */
+  materializeSupervisor?(
+    agent: ResolvedAgent,
+    proxyEndpoint: string,
+    proxyToken?: string,
+    options?: MaterializeOptions,
+    existingHomePath?: string,
+  ): MaterializationResult;
 }
 
 // ── Agent Package Types ──

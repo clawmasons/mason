@@ -458,6 +458,29 @@ Instructions here.`,
     expect(role.resources[0].relativePath).toBe("templates/prd.md");
     expect(role.resources[0].absolutePath).toContain("templates/prd.md");
   });
+
+  it("defaults type to project when omitted", async () => {
+    const rolePath = await createRoleFile("claude", "no-type", `---
+name: no-type
+description: Role without explicit type
+---
+
+Instructions.`);
+    const role = await readMaterializedRole(rolePath);
+    expect(role.type).toBe("project");
+  });
+
+  it("parses type: supervisor from frontmatter", async () => {
+    const rolePath = await createRoleFile("claude", "supervisor-role", `---
+name: supervisor-role
+description: A supervisor role
+type: supervisor
+---
+
+Instructions.`);
+    const role = await readMaterializedRole(rolePath);
+    expect(role.type).toBe("supervisor");
+  });
 });
 
 // ---------------------------------------------------------------------------

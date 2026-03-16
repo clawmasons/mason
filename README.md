@@ -17,6 +17,7 @@ Mason is a MIT licensed tool provided by Clawmasons, to help you run your agents
 - **Define once, run on Any Agent, Anywhere** 
   - Continue to define skills in your agent of choice, mason can run them on any supported agent in a docker container  
   - Once mason roles are setup, anyone with access to your project can securily run their agents
+  - run with a different Agent during outages
 - Seamless mcp server re-authentication [learn why this is easy for us]
 - Launch project in a dev-container with agent enabled [learn more]
 - [learn more about mason productivity improvements]

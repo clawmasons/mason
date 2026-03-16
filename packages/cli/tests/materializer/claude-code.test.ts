@@ -162,13 +162,13 @@ describe("claudeCodeMaterializer", () => {
         expect(mcp.mcpServers.chapter.url).toBe("http://mcp-proxy:8080/sse");
       });
 
-      it("generates chapter entry with streamable-http transport", () => {
+      it('generates chapter entry with http transport (streamable-http maps to "http" for Claude Code)', () => {
         const agent = makeRepoOpsAgent();
         agent.proxy = { port: 9090, type: "streamable-http" };
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const mcp = JSON.parse(result.get(".mcp.json")!);
-        expect(mcp.mcpServers.chapter.type).toBe("streamable-http");
+        expect(mcp.mcpServers.chapter.type).toBe("http");
         expect(mcp.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/mcp");
       });
 
@@ -177,7 +177,7 @@ describe("claudeCodeMaterializer", () => {
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const mcp = JSON.parse(result.get(".mcp.json")!);
-        expect(mcp.mcpServers.chapter.headers.Authorization).toBe("Bearer ${CHAPTER_PROXY_TOKEN}");
+        expect(mcp.mcpServers.chapter.headers.Authorization).toBe("Bearer ${MCP_PROXY_TOKEN}");
       });
 
       it("bakes actual token into auth header when proxyToken provided", () => {
@@ -268,7 +268,7 @@ describe("claudeCodeMaterializer", () => {
 
         const triageCmd = result.get(".claude/commands/triage-issue.md")!;
         expect(triageCmd).toContain("Required Skills");
-        expect(triageCmd).toContain("skills/labeling/");
+        expect(triageCmd).toContain(".claude/skills/labeling/");
       });
 
       it("omits skills section when task has no skills", () => {
@@ -363,29 +363,29 @@ describe("claudeCodeMaterializer", () => {
     });
 
     describe("skills directory", () => {
-      it("generates README.md for each unique skill", () => {
+      it("generates SKILL.md for each unique skill under .claude/skills/", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        expect(result.has("skills/labeling/README.md")).toBe(true);
+        expect(result.has(".claude/skills/labeling/SKILL.md")).toBe(true);
       });
 
-      it("includes skill description in README", () => {
+      it("includes skill description in SKILL.md", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const readme = result.get("skills/labeling/README.md")!;
-        expect(readme).toContain("Issue labeling taxonomy and heuristics");
+        const skillMd = result.get(".claude/skills/labeling/SKILL.md")!;
+        expect(skillMd).toContain("Issue labeling taxonomy and heuristics");
       });
 
-      it("lists skill artifacts in README", () => {
+      it("lists skill artifacts in SKILL.md", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const readme = result.get("skills/labeling/README.md")!;
-        expect(readme).toContain("./SKILL.md");
-        expect(readme).toContain("./examples/");
-        expect(readme).toContain("./schemas/");
+        const skillMd = result.get(".claude/skills/labeling/SKILL.md")!;
+        expect(skillMd).toContain("./SKILL.md");
+        expect(skillMd).toContain("./examples/");
+        expect(skillMd).toContain("./schemas/");
       });
 
       it("deduplicates skills across roles", () => {
@@ -395,9 +395,9 @@ describe("claudeCodeMaterializer", () => {
 
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        // Should only have one skills/labeling/ entry
-        const skillEntries = [...result.keys()].filter((k) => k.startsWith("skills/"));
-        expect(skillEntries).toEqual(["skills/labeling/README.md"]);
+        // Should only have one .claude/skills/labeling/ entry
+        const skillEntries = [...result.keys()].filter((k) => k.startsWith(".claude/skills/"));
+        expect(skillEntries).toEqual([".claude/skills/labeling/SKILL.md"]);
       });
     });
 
@@ -460,10 +460,10 @@ describe("claudeCodeMaterializer", () => {
           ".claude/commands/review-pr.md",
           ".claude/commands/triage-issue.md",
           ".claude/settings.json",
+          ".claude/skills/labeling/SKILL.md",
           ".mcp.json",
           "AGENTS.md",
           "agent-launch.json",
-          "skills/labeling/README.md",
         ]);
       });
 

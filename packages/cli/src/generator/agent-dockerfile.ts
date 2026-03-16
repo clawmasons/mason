@@ -10,6 +10,8 @@ export interface AgentDockerfileOptions {
   dockerfileConfig?: DockerfileConfig;
   /** Dev-container IDE customizations to embed as LABEL devcontainer.metadata. Defaults to DEFAULT_DEV_CONTAINER_CUSTOMIZATIONS. */
   devContainerCustomizations?: DevContainerCustomizations;
+  /** Role type — controls WORKDIR and devcontainer workspaceFolder. Defaults to "project". */
+  roleType?: "project" | "supervisor";
 }
 
 /**
@@ -45,12 +47,16 @@ export function generateAgentDockerfile(
   const roleShortName = getAppShortName(role.name);
   const hasHome = options?.hasHome ?? false;
   const dockerfileConfig = options?.dockerfileConfig;
+  const isSupervisor = options?.roleType === "supervisor";
 
   // Build devcontainer.metadata label
   const customizations = options?.devContainerCustomizations ?? DEFAULT_DEV_CONTAINER_CUSTOMIZATIONS;
+  const workspaceFolder = isSupervisor
+    ? "/home/mason/workspace"
+    : "/home/mason/workspace/project";
   const devcontainerMetadata = JSON.stringify([{
     remoteUser: "mason",
-    workspaceFolder: "/home/mason/workspace/project",
+    workspaceFolder,
     customizations,
   }]);
   const devcontainerLabel = `LABEL devcontainer.metadata='${devcontainerMetadata}'`;
@@ -63,8 +69,11 @@ export function generateAgentDockerfile(
 # Runtime: ${primaryRuntime} (no specific install)
 `;
 
-  // Workspace files are COPY'd from a pre-generated directory
-  const workspaceCopyLine = `COPY ${roleShortName}/${primaryRuntime}/build/workspace/ /home/mason/workspace/`;
+  // Workspace files are COPY'd from a pre-generated directory.
+  // Supervisor roles route all content to home/ instead — build/workspace/ is empty, so skip the COPY.
+  const workspaceCopyLine = isSupervisor
+    ? ""
+    : `COPY ${roleShortName}/${primaryRuntime}/build/workspace/ /home/mason/workspace/`;
 
   // Base image: role overrides agent, agent overrides default
   const baseImage = role.baseImage ?? dockerfileConfig?.baseImage ?? "node:22-slim";
@@ -125,13 +134,10 @@ RUN { \\
     echo 'if [ "$_EXIT" -eq 0 ]; then eval "$_OUT"; fi'; \\
   } > /etc/profile.d/mason-creds.sh && chmod +x /etc/profile.d/mason-creds.sh
 
-# Copy materialized workspace files
-${workspaceCopyLine}
-RUN chown -R mason:mason /home/mason/workspace
-${homeCopyLines}${homeBackupLine}
+${workspaceCopyLine ? `# Copy materialized workspace files\n${workspaceCopyLine}\nRUN chown -R mason:mason /home/mason/workspace\n` : ""}${homeCopyLines}${homeBackupLine}
 USER mason
 
-WORKDIR /home/mason/workspace/project
+WORKDIR /home/mason/workspace${isSupervisor ? "" : "/project"}
 
 # Dev-container metadata for IDE attachment (VSCode, Cursor, etc.)
 ${devcontainerLabel}

@@ -89,6 +89,7 @@ export async function readMaterializedRole(rolePath: string): Promise<Role> {
   const roleData = {
     metadata,
     instructions: body,
+    type: frontmatter.type as string | undefined,
     tasks,
     apps,
     skills,

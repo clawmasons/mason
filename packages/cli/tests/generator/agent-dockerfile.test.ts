@@ -363,6 +363,53 @@ describe("generateAgentDockerfile", () => {
 
     expect(reviewerResult).toContain("COPY reviewer/claude-code/home/ /home/mason/");
   });
+
+  // ── Role Type Tests ────────────────────────────────────────────────────
+
+  it("uses WORKDIR /home/mason/workspace/project for project role type (default)", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("WORKDIR /home/mason/workspace/project");
+    expect(result).not.toContain("WORKDIR /home/mason/workspace\n");
+  });
+
+  it("uses WORKDIR /home/mason/workspace for supervisor role type", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0], { roleType: "supervisor" });
+
+    expect(result).toContain("WORKDIR /home/mason/workspace\n");
+    expect(result).not.toContain("WORKDIR /home/mason/workspace/project");
+  });
+
+  it("omits build/workspace COPY for supervisor role (directory does not exist)", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0], { roleType: "supervisor" });
+
+    expect(result).not.toContain("build/workspace/");
+  });
+
+  it("includes build/workspace COPY for project role", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("build/workspace/");
+  });
+
+  it("sets workspaceFolder to /home/mason/workspace/project in devcontainer label for project role", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain('"workspaceFolder":"/home/mason/workspace/project"');
+  });
+
+  it("sets workspaceFolder to /home/mason/workspace in devcontainer label for supervisor role", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0], { roleType: "supervisor" });
+
+    expect(result).toContain('"workspaceFolder":"/home/mason/workspace"');
+    expect(result).not.toContain('"workspaceFolder":"/home/mason/workspace/project"');
+  });
 });
 
 // ── Proxy Dockerfile Tests ─────────────────────────────────────────────
