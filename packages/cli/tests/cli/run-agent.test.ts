@@ -16,7 +16,7 @@ import {
   ensureMasonConfig,
   buildVscodeAttachUri,
 } from "../../src/cli/commands/run-agent.js";
-import type { RoleType, ResolvedAgent } from "@clawmasons/shared";
+import type { Role, ResolvedAgent } from "@clawmasons/shared";
 
 // ── Command Registration ────────────────────────────────────────────────
 
@@ -561,9 +561,9 @@ describe("runAgent", () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
-  // Minimal RoleType fixture for testing.
+  // Minimal Role fixture for testing.
   // metadata.name uses "role-" prefix so getAppShortName strips it → "writer".
-  function makeRoleType(overrides?: Partial<RoleType>): RoleType {
+  function makeRole(overrides?: Partial<Role>): Role {
     return {
       metadata: { name: "role-writer", version: "1.0.0" },
       source: {
@@ -576,7 +576,7 @@ describe("runAgent", () => {
       tools: [],
       apps: [],
       ...overrides,
-    } as RoleType;
+    } as Role;
   }
 
   beforeEach(() => {
@@ -600,7 +600,7 @@ describe("runAgent", () => {
     agentExitCode?: number;
     downExitCode?: number;
     sessionId?: string;
-    roleType?: RoleType;
+    roleType?: Role;
     resolveRoleError?: Error;
     gitignoreCalled?: { called: boolean; dir?: string; pattern?: string };
     dockerBuildExists?: boolean;
@@ -627,7 +627,7 @@ describe("runAgent", () => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         resolveRoleFn: async (_roleName: string, _projectDir: string) => {
           if (overrides?.resolveRoleError) throw overrides.resolveRoleError;
-          return overrides?.roleType ?? makeRoleType();
+          return overrides?.roleType ?? makeRole();
         },
         adaptRoleFn: () => ({
           name: "writer",
@@ -751,7 +751,7 @@ describe("runAgent", () => {
     const baseDeps = {
       checkDockerComposeFn: () => {},
       execComposeFn: async () => 0,
-      resolveRoleFn: async () => makeRoleType(),
+      resolveRoleFn: async () => makeRole(),
       adaptRoleFn: () => ({
         name: "writer", version: "1.0.0", agentName: "writer", slug: "writer",
         runtimes: ["claude-code"], credentials: [],
@@ -972,7 +972,7 @@ describe("runProxyOnly", () => {
   let projectDir: string;
   let logSpy: ReturnType<typeof vi.spyOn>;
 
-  function makeRoleType(overrides?: Partial<RoleType>): RoleType {
+  function makeRole(overrides?: Partial<Role>): Role {
     return {
       metadata: { name: "role-writer", version: "1.0.0" },
       source: {
@@ -985,7 +985,7 @@ describe("runProxyOnly", () => {
       tools: [],
       apps: [],
       ...overrides,
-    } as RoleType;
+    } as Role;
   }
 
   beforeEach(() => {
@@ -1018,7 +1018,7 @@ describe("runProxyOnly", () => {
       deps: {
         generateSessionIdFn: () => overrides?.sessionId ?? "proxy001",
         checkDockerComposeFn: () => {},
-        resolveRoleFn: async () => makeRoleType(),
+        resolveRoleFn: async () => makeRole(),
         ensureGitignoreEntryFn: () => false,
         existsSyncFn: (p: string) => fs.existsSync(p),
         execComposeFn: async (composeFile: string, args: string[]) => {

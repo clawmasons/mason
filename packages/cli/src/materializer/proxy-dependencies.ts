@@ -15,7 +15,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { RoleType } from "@clawmasons/shared";
+import type { Role } from "@clawmasons/shared";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -445,7 +445,7 @@ function copyProxyBundle(dockerDir: string): void {
 }
 
 /**
- * Synthesize npm packages from a RoleType's inline apps and role config
+ * Synthesize npm packages from a Role's inline apps and role config
  * into the Docker build node_modules.
  *
  * When roles define `mcp_servers` inline (native .claude format) instead of
@@ -455,11 +455,11 @@ function copyProxyBundle(dockerDir: string): void {
  *
  * Idempotent — skips packages that already exist.
  *
- * @param role - The RoleType with inline app configs
+ * @param role - The Role with inline app configs
  * @param dockerDir - The Docker build root (`.mason/docker/`)
  */
 export function synthesizeRolePackages(
-  role: RoleType,
+  role: Role,
   dockerDir: string,
 ): void {
   const nodeModulesDir = path.join(dockerDir, "node_modules");

@@ -15,7 +15,7 @@ The system SHALL generate a Docker build directory at `.mason/docker/<role-name>
 - `docker-compose.yaml` — Reference compose file (informational only)
 
 #### Scenario: Build directory created for a role
-- **GIVEN** a valid `RoleType` with agent type "claude-code"
+- **GIVEN** a valid `Role` with agent type "claude-code"
 - **WHEN** `generateRoleDockerBuildDir()` is called
 - **THEN** the directory `.mason/docker/<role-name>/claude-code/Dockerfile` SHALL exist
 - **AND** the directory `.mason/docker/<role-name>/claude-code/workspace/` SHALL contain materialized files

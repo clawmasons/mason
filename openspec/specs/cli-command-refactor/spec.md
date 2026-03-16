@@ -46,7 +46,7 @@ A hidden `agent` command is registered that preserves the old `mason agent <agen
 |------|--------|
 | `packages/cli/src/cli/commands/run-agent.ts` | Added `AGENT_TYPE_ALIASES`, `resolveAgentType()`, `isKnownAgentType()`, `getKnownAgentTypeNames()`. Renamed command registration to `registerRunCommand()`. `run` command accepts `<agent-type>` positional + `--role`. Hidden `agent` alias for backward compat. Updated help epilog. |
 | `packages/cli/src/cli/commands/index.ts` | Imports `registerRunCommand` and `isKnownAgentType`. Installs shorthand detection via `installAgentTypeShorthand()` which overrides `program.parse/parseAsync` to rewrite argv. |
-| `packages/cli/src/cli/commands/list.ts` | Replaced agent-centric listing with `discoverRoles()`. Shows role metadata, source (local/package), tasks, apps, skills. JSON mode outputs `RoleType[]`. |
+| `packages/cli/src/cli/commands/list.ts` | Replaced agent-centric listing with `discoverRoles()`. Shows role metadata, source (local/package), tasks, apps, skills. JSON mode outputs `Role[]`. |
 | `packages/cli/src/cli/commands/validate.ts` | Now tries role validation first via `resolveRole()` + adapter round-trip. Falls back to agent validation. Provides npm install instructions for package-style role names not found. |
 | `packages/cli/src/cli/commands/build.ts` | Updated completion instructions from `mason agent` to `mason run`. |
 

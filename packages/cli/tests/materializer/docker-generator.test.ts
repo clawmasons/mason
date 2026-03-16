@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as path from "node:path";
-import type { RoleType } from "@clawmasons/shared";
+import type { Role } from "@clawmasons/shared";
 import {
   generateVolumeMasks,
   sanitizeVolumeName,
@@ -14,7 +14,7 @@ import {
 // Test fixture
 // ---------------------------------------------------------------------------
 
-function makeTestRole(overrides?: Partial<RoleType>): RoleType {
+function makeTestRole(overrides?: Partial<Role>): Role {
   return {
     metadata: {
       name: "create-prd",
@@ -49,6 +49,7 @@ function makeTestRole(overrides?: Partial<RoleType>): RoleType {
       credentials: ["GITHUB_TOKEN"],
       constraints: { maxConcurrentTasks: 3 },
     },
+    sources: [],
     resources: [],
     source: {
       type: "local",

@@ -1,7 +1,7 @@
 /**
- * RoleType-to-ResolvedAgent Adapter
+ * Role-to-ResolvedAgent Adapter
  *
- * Converts a RoleType (ROLE_TYPES pipeline) into the existing ResolvedAgent
+ * Converts a Role (ROLE_TYPES pipeline) into the existing ResolvedAgent
  * shape that materializers already accept. This is the key migration bridge:
  * it lets the new role-based pipeline feed into existing materializers without
  * rewriting them.
@@ -11,11 +11,11 @@
  */
 
 import type {
-  RoleType,
+  Role,
   AppConfig,
   TaskRef,
   SkillRef,
-} from "../types/role-types.js";
+} from "../types/role.js";
 import type {
   ResolvedAgent,
   ResolvedRole,
@@ -26,7 +26,7 @@ import type {
 import { getDialect } from "./dialect-registry.js";
 
 /**
- * Error thrown when the adapter cannot convert a RoleType.
+ * Error thrown when the adapter cannot convert a Role.
  */
 export class AdapterError extends Error {
   constructor(message: string) {
@@ -36,15 +36,15 @@ export class AdapterError extends Error {
 }
 
 /**
- * Convert a RoleType into a ResolvedAgent that existing materializers accept.
+ * Convert a Role into a ResolvedAgent that existing materializers accept.
  *
- * @param role - A validated RoleType from the ROLE_TYPES pipeline
+ * @param role - A validated Role from the ROLE_TYPES pipeline
  * @param agentType - The target agent dialect name (e.g., "claude-code", "codex", "aider")
  * @returns A ResolvedAgent suitable for passing to any RuntimeMaterializer
  * @throws AdapterError if agentType does not match a registered dialect
  */
 export function adaptRoleToResolvedAgent(
-  role: RoleType,
+  role: Role,
   agentType: string,
 ): ResolvedAgent {
   // Validate agent type against dialect registry
@@ -58,7 +58,7 @@ export function adaptRoleToResolvedAgent(
   const name = role.metadata.name;
   const version = role.metadata.version ?? "0.0.0";
 
-  // Build the single ResolvedRole from the RoleType
+  // Build the single ResolvedRole from the Role
   const resolvedRole = buildResolvedRole(role, version);
 
   // Build the top-level ResolvedAgent
@@ -84,7 +84,7 @@ export function adaptRoleToResolvedAgent(
 // Internal mapping functions
 // ---------------------------------------------------------------------------
 
-function buildResolvedRole(role: RoleType, version: string): ResolvedRole {
+function buildResolvedRole(role: Role, version: string): ResolvedRole {
   const permissions = aggregatePermissions(role.apps);
   const tasks = role.tasks.map((t) => adaptTask(t, role.instructions));
   const apps = role.apps.map(adaptApp);

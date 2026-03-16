@@ -118,7 +118,7 @@ import {
   computeToolFilters,
   readMaterializedRole,
   readPackagedRole,
-  type RoleType,
+  type Role,
   type ChapterField,
 } from "@clawmasons/shared";
 ```

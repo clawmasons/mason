@@ -25,7 +25,7 @@ import { join, resolve as pathResolve, basename, extname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { resolveRole, RoleDiscoveryError } from "@clawmasons/shared";
 import { getDialectByDirectory } from "@clawmasons/shared";
-import type { RoleType, TaskRef, SkillRef } from "@clawmasons/shared";
+import type { Role, TaskRef, SkillRef } from "@clawmasons/shared";
 
 // ---------------------------------------------------------------------------
 // CLI registration
@@ -52,7 +52,7 @@ export async function runPackage(
   try {
     // 1. Load role from .mason/roles/<name>/ROLE.md
     console.log(`\n  Loading role "${roleName}"...`);
-    let role: RoleType;
+    let role: Role;
     try {
       role = await resolveRole(roleName, projectDir);
     } catch (err) {
@@ -154,7 +154,7 @@ interface ResolutionResult {
 }
 
 async function resolveAllRefs(
-  role: RoleType,
+  role: Role,
   projectDir: string,
 ): Promise<ResolutionResult> {
   const resolvedTasks: ResolvedFile[] = [];
@@ -266,7 +266,7 @@ async function findFileOrDir(
 // ---------------------------------------------------------------------------
 
 async function assembleBuild(
-  role: RoleType,
+  role: Role,
   buildDir: string,
   resolvedTasks: ResolvedFile[],
   resolvedSkills: ResolvedFile[],
@@ -308,7 +308,7 @@ async function copyPath(src: string, dest: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function writePackageJson(
-  role: RoleType,
+  role: Role,
   roleName: string,
   projectDir: string,
   buildDir: string,

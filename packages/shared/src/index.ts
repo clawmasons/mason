@@ -24,12 +24,12 @@ export {
   governanceConfigSchema,
   resourceFileSchema,
   roleSourceSchema,
-  roleTypeSchema,
+  roleSchema,
 } from "./schemas/index.js";
 
 // ROLE_TYPES types
 export type {
-  RoleType,
+  Role,
   RoleMetadata,
   TaskRef,
   AppConfig,
@@ -40,7 +40,7 @@ export type {
   RoleSource,
   MountConfig,
   ToolPermissions,
-} from "./types/role-types.js";
+} from "./types/role.js";
 
 // Resolved types
 export type {

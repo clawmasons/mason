@@ -87,9 +87,9 @@ export const roleSourceSchema = z.object({
   packageName: z.string().optional(),
 });
 
-// --- Top-level RoleType schema ---
+// --- Top-level Role schema ---
 
-export const roleTypeSchema = z.object({
+export const roleSchema = z.object({
   metadata: roleMetadataSchema,
   instructions: z.string(),
   tasks: z.array(taskRefSchema).optional().default([]),

@@ -37,12 +37,12 @@ The `materializeWorkspace` method SHALL accept an optional fourth parameter `opt
 - **WHEN** `materializeWorkspace()` is called with `{ acpMode: true }`
 - **THEN** the result SHALL contain `.chapter/acp.json` with port and command fields
 
-### Requirement: materializeForAgent accepts RoleType input
+### Requirement: materializeForAgent accepts Role input
 
-The system SHALL provide a `materializeForAgent(role: RoleType, agentType: string, proxyEndpoint?: string, proxyToken?: string, options?: MaterializeOptions): MaterializationResult` function that accepts a `RoleType` from the ROLE_TYPES pipeline and produces workspace files for the specified agent runtime.
+The system SHALL provide a `materializeForAgent(role: Role, agentType: string, proxyEndpoint?: string, proxyToken?: string, options?: MaterializeOptions): MaterializationResult` function that accepts a `Role` from the ROLE_TYPES pipeline and produces workspace files for the specified agent runtime.
 
-#### Scenario: RoleType is converted to ResolvedAgent via adapter
-- **WHEN** `materializeForAgent()` is called with a valid `RoleType` and registered `agentType`
+#### Scenario: Role is converted to ResolvedAgent via adapter
+- **WHEN** `materializeForAgent()` is called with a valid `Role` and registered `agentType`
 - **THEN** it SHALL internally call `adaptRoleToResolvedAgent()` and delegate to the registered `RuntimeMaterializer`
 
 #### Scenario: Default proxy endpoint

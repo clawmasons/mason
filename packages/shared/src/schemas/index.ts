@@ -16,5 +16,5 @@ export {
   governanceConfigSchema,
   resourceFileSchema,
   roleSourceSchema,
-  roleTypeSchema,
+  roleSchema,
 } from "./role-types.js";

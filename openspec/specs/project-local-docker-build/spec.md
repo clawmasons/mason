@@ -24,9 +24,9 @@ The `docker-init` command SHALL write all docker build artifacts to `{projectDir
 - **THEN** the agent subdirectory SHALL be `agent/codex/` not `agent/claude/`
 - **AND** the workspace files SHALL still be materialized from the `.claude` role definition
 
-### Requirement: Materializer receives full RoleType with resolved dependencies
+### Requirement: Materializer receives full Role with resolved dependencies
 
-The `materializeForAgent()` caller SHALL resolve the complete role dependency graph (tools, skills, commands) and pass the full `RoleType` to the materializer. The materializer SHALL NOT perform its own role discovery.
+The `materializeForAgent()` caller SHALL resolve the complete role dependency graph (tools, skills, commands) and pass the full `Role` to the materializer. The materializer SHALL NOT perform its own role discovery.
 
 #### Scenario: Role with skill dependencies
 - **WHEN** role "writer" depends on skills "grammar-check" and "tone-adjust"

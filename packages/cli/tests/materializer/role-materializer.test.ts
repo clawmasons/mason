@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RoleType } from "@clawmasons/shared";
+import type { Role } from "@clawmasons/shared";
 import { adaptRoleToResolvedAgent } from "@clawmasons/shared";
 import {
   materializeForAgent,
@@ -12,10 +12,10 @@ import { mcpAgentMaterializer } from "@clawmasons/mcp-agent/agent-package";
 import { piCodingAgentMaterializer } from "@clawmasons/pi-coding-agent";
 
 // ---------------------------------------------------------------------------
-// Test fixture: a representative RoleType
+// Test fixture: a representative Role
 // ---------------------------------------------------------------------------
 
-function makeTestRole(): RoleType {
+function makeTestRole(): Role {
   return {
     metadata: {
       name: "create-prd",
@@ -58,6 +58,7 @@ function makeTestRole(): RoleType {
         requireApprovalFor: ["create_pr"],
       },
     },
+    sources: [],
     resources: [],
     source: {
       type: "local",
@@ -109,7 +110,7 @@ describe("materializer registry", () => {
 // ---------------------------------------------------------------------------
 
 describe("materializeForAgent", () => {
-  describe("Claude Code materialization from RoleType", () => {
+  describe("Claude Code materialization from Role", () => {
     it("produces .mcp.json", () => {
       const role = makeTestRole();
       const result = materializeForAgent(role, "claude-code");
@@ -231,7 +232,7 @@ describe("materializeForAgent", () => {
     });
   });
 
-  describe("Equivalence: RoleType pipeline vs ResolvedAgent pipeline", () => {
+  describe("Equivalence: Role pipeline vs ResolvedAgent pipeline", () => {
     it("produces same output via both paths", () => {
       const role = makeTestRole();
       const proxyEndpoint = "http://mcp-proxy:9090";
@@ -287,7 +288,7 @@ describe("materializeForAgent", () => {
 
   describe("Minimal role (no tasks, no apps, no skills)", () => {
     it("produces valid output for a minimal role", () => {
-      const minimalRole: RoleType = {
+      const minimalRole: Role = {
         metadata: {
           name: "minimal-role",
           description: "A minimal role with no dependencies",
@@ -296,6 +297,7 @@ describe("materializeForAgent", () => {
         tasks: [],
         apps: [],
         skills: [],
+        sources: [],
         container: {
           packages: { apt: [], npm: [], pip: [] },
           ignore: { paths: [] },

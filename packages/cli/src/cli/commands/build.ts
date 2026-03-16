@@ -13,7 +13,7 @@ import {
   discoverRoles,
   adaptRoleToResolvedAgent,
   getAppShortName,
-  type RoleType,
+  type Role,
 } from "@clawmasons/shared";
 import { generateRoleDockerBuildDir } from "../../materializer/docker-generator.js";
 import {
@@ -27,7 +27,7 @@ import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
  * Build Docker artifacts for a single role.
  */
 function buildRole(
-  role: RoleType,
+  role: Role,
   agentType: string,
   projectDir: string,
 ): { roleName: string; buildDir: string } {

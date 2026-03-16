@@ -1,5 +1,5 @@
 /**
- * ROLE.md Parser — reads a local ROLE.md file and produces a RoleType object.
+ * ROLE.md Parser — reads a local ROLE.md file and produces a Role object.
  *
  * Steps:
  * 1. Detect the agent dialect from the parent directory structure
@@ -7,14 +7,14 @@
  * 3. Normalize agent-specific field names to generic ROLE_TYPES names
  * 4. Resolve bundled resource paths
  * 5. Resolve dependency references
- * 6. Validate through roleTypeSchema
+ * 6. Validate through roleSchema
  */
 
 import { readFile } from "node:fs/promises";
 import { dirname, basename, resolve } from "node:path";
 import { load as yamlLoad } from "js-yaml";
-import { roleTypeSchema } from "../schemas/role-types.js";
-import type { RoleType } from "../types/role-types.js";
+import { roleSchema } from "../schemas/role-types.js";
+import type { Role } from "../types/role.js";
 import {
   getDialectByDirectory,
   getKnownDirectories,
@@ -33,13 +33,13 @@ export class RoleParseError extends Error {
 }
 
 /**
- * Read a local ROLE.md file and produce a validated RoleType object.
+ * Read a local ROLE.md file and produce a validated Role object.
  *
  * @param rolePath - Absolute path to the ROLE.md file
- * @returns Validated RoleType
+ * @returns Validated Role
  * @throws RoleParseError if the file is malformed or dialect cannot be detected
  */
-export async function readMaterializedRole(rolePath: string): Promise<RoleType> {
+export async function readMaterializedRole(rolePath: string): Promise<Role> {
   // Read the file
   const content = await readFile(rolePath, "utf-8");
 
@@ -103,7 +103,7 @@ export async function readMaterializedRole(rolePath: string): Promise<RoleType> 
     },
   };
 
-  return roleTypeSchema.parse(roleData);
+  return roleSchema.parse(roleData);
 }
 
 // ---------------------------------------------------------------------------
