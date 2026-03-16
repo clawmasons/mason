@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -7,6 +7,8 @@ import {
   getAgent,
   getRegisteredAgentNames,
   loadConfigAgents,
+  loadConfigAgentEntry,
+  readConfigAgentNames,
 } from "../src/discovery.js";
 import type { AgentPackage } from "../src/types.js";
 
@@ -199,6 +201,163 @@ describe("loadConfigAgents", () => {
 
       const result = await loadConfigAgents(tmpDir);
       expect(result).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("readConfigAgentNames", () => {
+  function makeTmpDir(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), "agent-sdk-names-test-"));
+  }
+
+  function writeMasonConfig(dir: string, content: unknown): void {
+    const masonDir = path.join(dir, ".mason");
+    fs.mkdirSync(masonDir, { recursive: true });
+    fs.writeFileSync(path.join(masonDir, "config.json"), JSON.stringify(content));
+  }
+
+  it("returns agent key names from config", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: {
+          claude: { package: "@clawmasons/claude-code" },
+          "pi-mono-agent": { package: "@clawmasons/pi-mono-agent" },
+          mcp: { package: "@clawmasons/mcp-agent" },
+        },
+      });
+
+      const names = readConfigAgentNames(tmpDir);
+      expect(names).toContain("claude");
+      expect(names).toContain("pi-mono-agent");
+      expect(names).toContain("mcp");
+      expect(names).toHaveLength(3);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns empty array when config file is absent", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      const names = readConfigAgentNames(tmpDir);
+      expect(names).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns empty array when config has malformed JSON", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".mason"), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, ".mason", "config.json"), "not-valid{{{");
+
+      const names = readConfigAgentNames(tmpDir);
+      expect(names).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns empty array when agents field is absent", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, { other: true });
+      const names = readConfigAgentNames(tmpDir);
+      expect(names).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("loadConfigAgentEntry", () => {
+  function makeTmpDir(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), "agent-sdk-entry-test-"));
+  }
+
+  function writeMasonConfig(dir: string, content: unknown): void {
+    const masonDir = path.join(dir, ".mason");
+    fs.mkdirSync(masonDir, { recursive: true });
+    fs.writeFileSync(path.join(masonDir, "config.json"), JSON.stringify(content));
+  }
+
+  it("returns the entry for a named agent", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: {
+          claude: { package: "@clawmasons/claude-code", role: "writer", mode: "terminal" },
+        },
+      });
+
+      const entry = loadConfigAgentEntry(tmpDir, "claude");
+      expect(entry).toBeDefined();
+      expect(entry?.package).toBe("@clawmasons/claude-code");
+      expect(entry?.role).toBe("writer");
+      expect(entry?.mode).toBe("terminal");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns undefined when agent is not in config", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, { agents: { claude: { package: "@clawmasons/claude-code" } } });
+
+      const entry = loadConfigAgentEntry(tmpDir, "unknown");
+      expect(entry).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns undefined when config file is absent", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      const entry = loadConfigAgentEntry(tmpDir, "claude");
+      expect(entry).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("warns and defaults mode to terminal for invalid mode value", () => {
+    const tmpDir = makeTmpDir();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { myagent: { package: "@foo/bar", mode: "interactive" } },
+      });
+
+      const entry = loadConfigAgentEntry(tmpDir, "myagent");
+      expect(entry).toBeDefined();
+      expect(entry?.mode).toBe("terminal");
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("invalid mode"),
+      );
+    } finally {
+      vi.restoreAllMocks();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("parses home and role optional fields", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: {
+          claude: { package: "@clawmasons/claude-code", home: "~/my-config", role: "coder" },
+        },
+      });
+
+      const entry = loadConfigAgentEntry(tmpDir, "claude");
+      expect(entry?.home).toBe("~/my-config");
+      expect(entry?.role).toBe("coder");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

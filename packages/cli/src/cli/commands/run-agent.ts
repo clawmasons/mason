@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { Readable, Writable } from "node:stream";
 import { spawn } from "node:child_process";
@@ -10,6 +11,7 @@ import { resolveRoleMountVolumes, type RoleMount } from "../../generator/mount-v
 import type { ResolvedAgent, RoleType } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName } from "@clawmasons/shared";
 import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../../materializer/role-materializer.js";
+import { loadConfigAgentEntry } from "@clawmasons/agent-sdk";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
 import { CredentialService, CredentialWSClient } from "@clawmasons/credential-service";
@@ -185,6 +187,7 @@ export function generateComposeYml(opts: {
   credentialKeys?: string[];
   bashMode?: boolean;
   verbose?: boolean;
+  homeOverride?: string;
 }): string {
   const { dockerBuildDir, dockerDir, projectDir, agent, role, logsDir, proxyToken, credentialProxyToken, proxyPort = 3000, roleMounts, credentialKeys } = opts;
 
@@ -204,11 +207,19 @@ export function generateComposeYml(opts: {
   const composeName = `mason-${projectHash}`;
 
   // Build agent volume lines
+  const agentVolumeLines: string[] = [];
+
+  // 0. Optional home override — bind-mounts over /home/mason/ so agent config
+  //    files (e.g. ~/.claude/) are visible inside the container.
+  if (opts.homeOverride) {
+    agentVolumeLines.push(`      - "${opts.homeOverride}:/home/mason/"`);
+  }
+
   // 1. Workspace mount — provides agent-launch.json at /home/mason/workspace/agent-launch.json
   const workspacePath = path.join(dockerBuildDir, agent, "workspace");
-  const agentVolumeLines = [`      - "${workspacePath}:/home/mason/workspace"`];
+  agentVolumeLines.push(`      - "${workspacePath}:/home/mason/workspace"`);
 
-  // 2. Project dir mount (read-only)
+  // 2. Project dir mount
   agentVolumeLines.push(`      - "${projectDir}:/home/mason/workspace/project"`);
 
   // 3. Per-file overlay mounts — inject config files into /home/mason/workspace/project/
@@ -394,12 +405,21 @@ async function ensureDockerBuild(
 
 export const RUN_ACP_AGENT_HELP_EPILOG = `
 Command Syntax:
-  mason run --role <name>                      # infers agent type from role
-  mason run --role <name> --agent-type claude   # explicit agent type
-  mason run --role <name> --acp                 # ACP mode
+  mason run --role <name>                    # infers agent from role dialect
+  mason run --role <name> --agent claude     # explicit agent (renamed from --agent-type)
+  mason run --role <name> --acp              # ACP mode
+  mason claude --role <name>                 # shorthand (config-declared or built-in agent)
 
-Agent Types:
-  claude (claude-code), codex, aider, pi (pi-coding-agent), mcp (mcp-agent)
+  --agent <name>   Agent name from .mason/config.json or built-in alias.
+                   Config entry can supply defaults for --role, --home, and mode.
+  --home <path>    Bind-mount <path> over /home/mason/ in the agent container.
+                   Overrides the "home" property in .mason/config.json.
+  --terminal       Force terminal (interactive) mode, overriding config mode.
+  --acp            Start in ACP mode (overrides config mode).
+  --bash           Launch bash shell (overrides config mode).
+
+Agent Types (built-in):
+  claude (claude-code), pi (pi-coding-agent), mcp (mcp-agent)
 
 Session Behavior:
   When an ACP client sends session/new with a "cwd" field, the agent
@@ -410,11 +430,41 @@ Session Behavior:
 Side Effects:
   - Creates .mason/ in the project for docker builds and session state
   - Appends ".mason" to the project's .gitignore if present
+  - Creates .mason/config.json from a default template if absent and
+    an agent name is provided
 
   Credential env vars (e.g. OPEN_ROUTER_KEY, ANTHROPIC_API_KEY) are
   passed through to the credential-service when set in the client's
   env block.
 `;
+
+// ── Config Auto-Init ──────────────────────────────────────────────────
+
+const DEFAULT_MASON_CONFIG = JSON.stringify(
+  {
+    agents: {
+      claude: { package: "@clawmasons/claude-code" },
+      "pi-mono-agent": { package: "@clawmasons/pi-mono-agent" },
+      mcp: { package: "@clawmasons/mcp-agent" },
+    },
+  },
+  null,
+  2,
+);
+
+/**
+ * Create .mason/config.json from the default template if it does not exist.
+ * Only called when an agent name is provided on the command line.
+ */
+export function ensureMasonConfig(projectDir: string): void {
+  const masonDir = path.join(projectDir, ".mason");
+  const configPath = path.join(masonDir, "config.json");
+  if (!fs.existsSync(configPath)) {
+    fs.mkdirSync(masonDir, { recursive: true });
+    fs.writeFileSync(configPath, DEFAULT_MASON_CONFIG + "\n");
+    console.error(`  Created .mason/config.json with default agent configuration.`);
+  }
+}
 
 // ── Deps Interface ────────────────────────────────────────────────────
 
@@ -456,6 +506,8 @@ export interface RunAgentDeps {
   waitForProxyHealthFn?: (url: string, timeoutMs: number) => Promise<void>;
   /** Override logger creation (for testing, ACP mode). */
   createLoggerFn?: (logDir: string) => AcpLogger;
+  /** Override home path (for testing). */
+  homeOverride?: string;
 }
 
 // ── Backward-compat aliases ───────────────────────────────────────────
@@ -464,27 +516,52 @@ export type RunAcpAgentDeps = RunAgentDeps;
 // ── Command Registration ──────────────────────────────────────────────
 
 /**
+ * Expand a leading ~ in a path to the user's home directory.
+ */
+function expandHome(p: string): string {
+  if (p.startsWith("~/") || p === "~") {
+    return path.join(os.homedir(), p.slice(1));
+  }
+  return p;
+}
+
+/**
  * Create the action handler for the `run` command.
  */
 function createRunAction() {
   return async (
-    positionalAgentType: string | undefined,
+    positionalAgent: string | undefined,
     options: {
       acp?: boolean;
       bash?: boolean;
+      terminal?: boolean;
       build?: boolean;
       verbose?: boolean;
       proxyOnly?: boolean;
-      agentType?: string;
+      agent?: string;
       role?: string;
+      home?: string;
       proxyPort: string;
     },
   ) => {
-    const agentTypeInput = positionalAgentType ?? options.agentType;
-    const role = options.role;
+    const agentInput = positionalAgent ?? options.agent;
+    const projectDir = process.cwd();
 
+    // Auto-init .mason/config.json when an agent name is provided
+    if (agentInput) {
+      ensureMasonConfig(projectDir);
+    }
+
+    // Load config entry for the named agent (sync, no dynamic imports)
+    const configEntry = agentInput ? loadConfigAgentEntry(projectDir, agentInput) : undefined;
+
+    // Derive effective role: --role flag > config role > error
+    const role = options.role ?? configEntry?.role;
     if (!role) {
-      console.error("\n  --role <name> is required.\n  Usage: mason run --role <name> [--agent-type <type>]\n");
+      console.error(
+        "\n  --role <name> is required (or set \"role\" in .mason/config.json for this agent).\n" +
+        "  Usage: mason run --role <name> [--agent <name>]\n",
+      );
       process.exit(1);
       return;
     }
@@ -495,31 +572,51 @@ function createRunAction() {
       return;
     }
 
-    // Resolve agent type if provided (alias or direct)
+    // Derive effective mode: explicit flags > config mode > terminal (default)
+    const effectiveAcp =
+      options.acp ||
+      (!options.bash && !options.terminal && configEntry?.mode === "acp");
+    const effectiveBash =
+      options.bash ||
+      (!options.acp && !options.terminal && configEntry?.mode === "bash");
+
+    // Resolve agent type if an agent name/type was provided
     let resolvedAgentType: string | undefined;
-    if (agentTypeInput) {
-      resolvedAgentType = resolveAgentType(agentTypeInput);
+    if (agentInput) {
+      resolvedAgentType = resolveAgentType(agentInput);
       if (!resolvedAgentType) {
         const known = getKnownAgentTypeNames().join(", ");
-        console.error(`\n  Unknown agent type "${agentTypeInput}".\n  Available agent types: ${known}\n`);
+        console.error(`\n  Unknown agent "${agentInput}".\n  Available agents: ${known}\n`);
         process.exit(1);
         return;
       }
     }
 
+    // Derive effective home: --home flag > config home > undefined
+    let homeOverride: string | undefined;
+    const rawHome = options.home ?? configEntry?.home;
+    if (rawHome) {
+      homeOverride = expandHome(rawHome);
+      if (!fs.existsSync(homeOverride)) {
+        console.warn(`  Warning: agent home path "${rawHome}" does not exist. The mount will be empty.`);
+      }
+    }
+
     if (options.proxyOnly) {
-      await runProxyOnly(process.cwd(), resolvedAgentType, role, parseInt(options.proxyPort, 10));
-    } else if (options.acp) {
-      await runAgent(process.cwd(), resolvedAgentType, role, undefined, {
+      await runProxyOnly(projectDir, resolvedAgentType, role, parseInt(options.proxyPort, 10));
+    } else if (effectiveAcp) {
+      await runAgent(projectDir, resolvedAgentType, role, undefined, {
         acp: true,
         proxyPort: parseInt(options.proxyPort, 10),
+        homeOverride,
       });
     } else {
-      await runAgent(process.cwd(), resolvedAgentType, role, undefined, {
+      await runAgent(projectDir, resolvedAgentType, role, undefined, {
         proxyPort: parseInt(options.proxyPort, 10),
-        bash: options.bash,
+        bash: effectiveBash,
         build: options.build,
         verbose: options.verbose,
+        homeOverride,
       });
     }
   };
@@ -529,12 +626,14 @@ export function registerRunCommand(program: Command): void {
   program
     .command("run")
     .description("Run a role on the specified agent runtime")
-    .argument("[agent-type]", "Agent runtime type (e.g., claude, codex, aider, pi, mcp)")
+    .argument("[agent]", "Agent name from config or built-in type (e.g., claude, pi, mcp)")
     .option("--acp", "Start in ACP mode for editor integration")
     .option("--bash", "Launch bash shell instead of the agent (for debugging)")
+    .option("--terminal", "Force terminal (interactive) mode, overriding config mode")
     .option("--build", "Force rebuild Docker images before running")
-    .option("--role <name>", "Role name to run (required)")
-    .option("--agent-type <name>", "Agent type (alternative to positional argument, overrides inference)")
+    .option("--role <name>", "Role name to run")
+    .option("--agent <name>", "Agent name from .mason/config.json or built-in alias")
+    .option("--home <path>", "Bind-mount path over /home/mason/ in the agent container")
     .option("--proxy-only", "Start proxy infrastructure only, output connection info as JSON")
     .option("--verbose", "Show Docker build and compose output")
     .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
@@ -555,6 +654,7 @@ export async function runAgent(
     bash?: boolean;
     build?: boolean;
     verbose?: boolean;
+    homeOverride?: string;
   },
 ): Promise<void> {
   // Initialize agent registry with config-declared agents from .mason/config.json
@@ -564,12 +664,13 @@ export async function runAgent(
   const proxyPort = acpOptions?.proxyPort ?? 3000;
   const bashMode = acpOptions?.bash === true;
   const buildMode = acpOptions?.build === true;
+  const homeOverride = deps?.homeOverride ?? acpOptions?.homeOverride;
 
   if (isAcpMode) {
-    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps);
+    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride);
   } else {
     const verbose = acpOptions?.verbose === true;
-    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose);
+    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride);
   }
 }
 
@@ -584,6 +685,7 @@ async function runAgentInteractiveMode(
   bashMode?: boolean,
   buildMode?: boolean,
   verbose?: boolean,
+  homeOverride?: string,
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
@@ -653,6 +755,7 @@ async function runAgentInteractiveMode(
       credentialKeys: declaredCredentialKeys,
       bashMode,
       verbose,
+      homeOverride,
     });
 
     const composeFile = path.join(dockerSessionDir, "docker-compose.yml");
@@ -861,6 +964,7 @@ async function runAgentAcpMode(
   role: string,
   proxyPort: number,
   deps?: RunAgentDeps,
+  homeOverride?: string,
 ): Promise<void> {
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
   const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;

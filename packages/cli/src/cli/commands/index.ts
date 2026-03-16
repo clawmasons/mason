@@ -6,14 +6,15 @@ import { registerPermissionsCommand } from "./permissions.js";
 import { registerProxyCommand } from "./proxy.js";
 import { registerRunCommand, isKnownAgentType } from "./run-agent.js";
 import { registerValidateCommand } from "./validate.js";
+import { readConfigAgentNames } from "@clawmasons/agent-sdk";
 
 /**
  * Register all chapter workspace subcommands under the `chapter` subcommand group,
  * and register top-level commands (`run`, `package`).
  *
  * Also installs shorthand detection: if the first positional argument is a known
- * agent type (e.g., `mason claude --role x`), it is treated as
- * `mason run claude --role x`.
+ * agent type or config-declared agent name (e.g., `mason claude --role x`), it is
+ * treated as `mason run claude --role x`.
  */
 export function registerCommands(program: Command): void {
   // Top-level commands
@@ -31,16 +32,20 @@ export function registerCommands(program: Command): void {
   registerBuildCommand(chapter);
   registerProxyCommand(chapter);
 
-  // Shorthand detection: rewrite `mason <agent-type> ...` to `mason run <agent-type> ...`
-  installAgentTypeShorthand(program);
+  // Read config-declared agent names synchronously so shorthand detection
+  // can recognise them before program.parse() fires.
+  const configAgentNames = new Set(readConfigAgentNames(process.cwd()));
+
+  // Shorthand detection: rewrite `mason <agent> ...` to `mason run <agent> ...`
+  installAgentTypeShorthand(program, configAgentNames);
 }
 
 /**
  * Install a pre-parse hook that detects when the first argument is a known
- * agent type (e.g., `mason claude --role x`) and rewrites it to
- * `mason run claude --role x`.
+ * agent type or config-declared agent name (e.g., `mason claude --role x`) and
+ * rewrites it to `mason run claude --role x`.
  */
-function installAgentTypeShorthand(program: Command): void {
+function installAgentTypeShorthand(program: Command, configAgentNames: Set<string>): void {
   // Collect the names of all registered commands (including subcommands)
   const getKnownCommandNames = (): Set<string> => {
     const names = new Set<string>();
@@ -53,6 +58,9 @@ function installAgentTypeShorthand(program: Command): void {
     return names;
   };
 
+  const isShorthandTarget = (arg: string): boolean =>
+    isKnownAgentType(arg) || configAgentNames.has(arg);
+
   // Hook into the pre-parse phase by overriding parse/parseAsync.
   const originalParseAsync = program.parseAsync.bind(program);
   program.parseAsync = async (argv?: readonly string[], parseOptions?: ParseOptions) => {
@@ -64,7 +72,7 @@ function installAgentTypeShorthand(program: Command): void {
       const firstArg = args[userArgStart];
       if (firstArg && !firstArg.startsWith("-")) {
         const knownCommands = getKnownCommandNames();
-        if (!knownCommands.has(firstArg) && isKnownAgentType(firstArg)) {
+        if (!knownCommands.has(firstArg) && isShorthandTarget(firstArg)) {
           args.splice(userArgStart, 0, "run");
         }
       }
@@ -83,7 +91,7 @@ function installAgentTypeShorthand(program: Command): void {
       const firstArg = args[userArgStart];
       if (firstArg && !firstArg.startsWith("-")) {
         const knownCommands = getKnownCommandNames();
-        if (!knownCommands.has(firstArg) && isKnownAgentType(firstArg)) {
+        if (!knownCommands.has(firstArg) && isShorthandTarget(firstArg)) {
           args.splice(userArgStart, 0, "run");
         }
       }

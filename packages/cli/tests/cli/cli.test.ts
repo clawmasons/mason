@@ -96,14 +96,50 @@ describe("CLI entry point", () => {
     }
   });
 
-  it("run command accepts agent-type positional argument", () => {
+  it("run command accepts agent positional argument", () => {
     const runCmd = program.commands.find((cmd) => cmd.name() === "run");
     expect(runCmd).toBeDefined();
     if (runCmd) {
       // Commander stores registered arguments
       const args = runCmd.registeredArguments ?? [];
       expect(args.length).toBeGreaterThanOrEqual(1);
-      expect(args[0]?.name()).toBe("agent-type");
+      expect(args[0]?.name()).toBe("agent");
+    }
+  });
+
+  it("run command has --agent option", () => {
+    const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+    expect(runCmd).toBeDefined();
+    if (runCmd) {
+      const agentOpt = runCmd.options.find((opt) => opt.long === "--agent");
+      expect(agentOpt).toBeDefined();
+    }
+  });
+
+  it("run command has --home option", () => {
+    const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+    expect(runCmd).toBeDefined();
+    if (runCmd) {
+      const homeOpt = runCmd.options.find((opt) => opt.long === "--home");
+      expect(homeOpt).toBeDefined();
+    }
+  });
+
+  it("run command has --terminal option", () => {
+    const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+    expect(runCmd).toBeDefined();
+    if (runCmd) {
+      const terminalOpt = runCmd.options.find((opt) => opt.long === "--terminal");
+      expect(terminalOpt).toBeDefined();
+    }
+  });
+
+  it("run command does not have --agent-type option (renamed to --agent)", () => {
+    const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+    expect(runCmd).toBeDefined();
+    if (runCmd) {
+      const agentTypeOpt = runCmd.options.find((opt) => opt.long === "--agent-type");
+      expect(agentTypeOpt).toBeUndefined();
     }
   });
 });

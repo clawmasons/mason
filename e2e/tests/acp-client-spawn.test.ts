@@ -1,11 +1,11 @@
 /**
- * E2E Test: ACP session lifecycle via `mason run --agent-type mcp --acp --role mcp-test`
+ * E2E Test: ACP session lifecycle via `mason run --agent mcp --acp --role mcp-test`
  *
  * Tests the full ACP flow using the SDK's ClientSideConnection over stdio
  * ndjson — the same protocol path that a real editor would use.
  *
  *   1. Copy fixture workspace with mcp-test role
- *   2. Spawn `mason run --agent-type mcp --acp --role mcp-test` (project-local)
+ *   2. Spawn `mason run --agent mcp --acp --role mcp-test` (project-local)
  *   3. Verify ACP handshake via ClientSideConnection.initialize()
  *   4. Send session/new with cwd — triggers agent container start
  *   5. Verify agent responds to prompt
@@ -124,7 +124,7 @@ describe("ACP project-local e2e", () => {
       [
         MASON_BIN,
         "run",
-        "--agent-type", "mcp",
+        "--agent", "mcp",
         "--acp",
         "--role", "mcp-test",
       ],
