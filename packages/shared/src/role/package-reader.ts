@@ -1,5 +1,5 @@
 /**
- * Package Reader — reads an NPM role package and produces a RoleType object.
+ * Package Reader — reads an NPM role package and produces a Role object.
  *
  * Steps:
  * 1. Read package.json and verify chapter.type === "role"
@@ -9,13 +9,13 @@
  *    otherwise use generic ROLE_TYPES field names directly
  * 5. Resolve all paths relative to the package directory
  * 6. Set source.type = 'package' and source.packageName
- * 7. Validate through roleTypeSchema
+ * 7. Validate through roleSchema
  */
 
 import { readFile } from "node:fs/promises";
 import { join, basename, resolve } from "node:path";
-import { roleTypeSchema } from "../schemas/role-types.js";
-import type { RoleType } from "../types/role-types.js";
+import { roleSchema } from "../schemas/role-types.js";
+import type { Role } from "../types/role.js";
 import { parseFrontmatter } from "./parser.js";
 import { scanBundledResources } from "./resource-scanner.js";
 import { getDialect, type DialectEntry } from "./dialect-registry.js";
@@ -59,13 +59,13 @@ const GENERIC_FIELD_MAPPING: DialectEntry = {
 };
 
 /**
- * Read an NPM role package and produce a validated RoleType object.
+ * Read an NPM role package and produce a validated Role object.
  *
  * @param packagePath - Absolute path to the package directory (e.g., node_modules/@acme/role-create-prd)
- * @returns Validated RoleType with source.type = 'package'
+ * @returns Validated Role with source.type = 'package'
  * @throws PackageReadError if the package is missing required files or has wrong chapter.type
  */
-export async function readPackagedRole(packagePath: string): Promise<RoleType> {
+export async function readPackagedRole(packagePath: string): Promise<Role> {
   // 1. Read and validate package.json
   const pkgJson = await readPackageJson(packagePath);
 
@@ -151,7 +151,7 @@ export async function readPackagedRole(packagePath: string): Promise<RoleType> {
     },
   };
 
-  return roleTypeSchema.parse(roleData);
+  return roleSchema.parse(roleData);
 }
 
 // ---------------------------------------------------------------------------

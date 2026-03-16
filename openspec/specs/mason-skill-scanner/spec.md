@@ -60,7 +60,7 @@ The system SHALL generate a valid ROLE.md string from scanner results.
 #### Scenario: Proposed ROLE.md parses correctly
 - **GIVEN** a generated ROLE.md from the proposer
 - **WHEN** the ROLE.md is placed at `.<agent>/roles/<name>/ROLE.md` and parsed with `readMaterializedRole()`
-- **THEN** the parse succeeds and returns a valid `RoleType`
+- **THEN** the parse succeeds and returns a valid `Role`
 
 #### Scenario: Minimal permissions (least-privilege)
 - **GIVEN** a `ScanResult` with MCP servers

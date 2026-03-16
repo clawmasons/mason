@@ -8,7 +8,7 @@
  *   4. Start proxy, connect MCP client, list governed tools
  *
  * This validates that inline mcp_servers in ROLE.md are correctly:
- *   - Parsed into RoleType apps
+ *   - Parsed into Role apps
  *   - Synthesized as proxy-discoverable packages during build
  *   - Served as governed MCP tools through the proxy
  */

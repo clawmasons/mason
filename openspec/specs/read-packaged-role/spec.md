@@ -8,7 +8,7 @@
 
 ## Overview
 
-`readPackagedRole(packagePath: string): Promise<RoleType>` reads an NPM role package directory and produces a validated `RoleType` object — the same in-memory representation used by the local ROLE.md parser. This ensures local-to-package equivalence (PRD §6.3).
+`readPackagedRole(packagePath: string): Promise<Role>` reads an NPM role package directory and produces a validated `Role` object — the same in-memory representation used by the local ROLE.md parser. This ensures local-to-package equivalence (PRD §6.3).
 
 ## Module
 
@@ -34,11 +34,11 @@ An absolute path to a package directory (e.g., `node_modules/@acme/role-create-p
 8. **Resolve skill paths** — local paths (`./`, `../`) resolve relative to package directory; package names kept as-is
 9. **Scan bundled resources** — reuse `scanBundledResources()` from `resource-scanner.ts`
 10. **Set source** — `{ type: 'package', packageName: <package.json name> }`
-11. **Validate** — pass through `roleTypeSchema.parse()`
+11. **Validate** — pass through `roleSchema.parse()`
 
 ### Output
 
-A validated `RoleType` object with `source.type = 'package'`.
+A validated `Role` object with `source.type = 'package'`.
 
 ### Error Cases
 
@@ -58,7 +58,7 @@ All `PackageReadError` messages include the package path.
 
 ## Equivalence Guarantee
 
-The output `RoleType` from `readPackagedRole` is validated through the same `roleTypeSchema` as local roles from `readMaterializedRole`. The only structural difference is the `source` field:
+The output `Role` from `readPackagedRole` is validated through the same `roleSchema` as local roles from `readMaterializedRole`. The only structural difference is the `source` field:
 - Local: `{ type: 'local', agentDialect: '...', path: '...' }`
 - Package: `{ type: 'package', packageName: '...' }`
 

@@ -45,7 +45,7 @@ Define the generic in-memory type system that all role sources normalize into. T
 
 **PRD refs:** §5 (ROLE_TYPES — In-Memory Type System), §5.1 (Design Goals), §5.2 (Core Types)
 
-**Summary:** Create new TypeScript interfaces and Zod schemas in `packages/shared/` for the ROLE_TYPES type system: `RoleType`, `RoleMetadata`, `TaskRef`, `AppConfig`, `SkillRef`, `ContainerRequirements`, `GovernanceConfig`, `ResourceFile`, `RoleSource`, `MountConfig`, `ToolPermissions`. These types are agent-agnostic — they use generic names (`tasks`, `apps`, `skills`) not tied to any runtime. `ResourceFile` tracks absolute filesystem paths but never loads file content into memory. All types must support bidirectional construction (from local ROLE.md and from NPM packages).
+**Summary:** Create new TypeScript interfaces and Zod schemas in `packages/shared/` for the ROLE_TYPES type system: `Role`, `RoleMetadata`, `TaskRef`, `AppConfig`, `SkillRef`, `ContainerRequirements`, `GovernanceConfig`, `ResourceFile`, `RoleSource`, `MountConfig`, `ToolPermissions`. These types are agent-agnostic — they use generic names (`tasks`, `apps`, `skills`) not tied to any runtime. `ResourceFile` tracks absolute filesystem paths but never loads file content into memory. All types must support bidirectional construction (from local ROLE.md and from NPM packages).
 
 **Scope:**
 - New: `packages/shared/src/schemas/role-types.ts` — Zod schemas for all ROLE_TYPES
@@ -53,7 +53,7 @@ Define the generic in-memory type system that all role sources normalize into. T
 - Export from `packages/shared/src/index.ts`
 - New tests: schema validation for all types (valid construction, required fields, defaults, rejection of invalid values)
 
-**User Story:** As a developer building the role parser or materializer, I import `RoleType` from `@clawmasons/shared` and get full type safety and runtime validation for the generic role representation.
+**User Story:** As a developer building the role parser or materializer, I import `Role` from `@clawmasons/shared` and get full type safety and runtime validation for the generic role representation.
 
 **Testable output:** Zod schemas validate well-formed ROLE_TYPES objects. Required fields are enforced. Optional fields default correctly. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
@@ -74,7 +74,7 @@ Parse ROLE.md files (YAML frontmatter + markdown body) and normalize agent-speci
 
 **PRD refs:** §4 (ROLE.md Specification), §4.1 (File Location), §4.2 (Frontmatter Schema), §4.3 (Bundled Resources), §4.5 (Dialect Mapping), §6.1 (Local Roles), Appendix B (Agent Dialect Registry)
 
-**Summary:** Implement `readMaterializedRole(rolePath: string): RoleType` — the function that reads a local ROLE.md and produces a ROLE_TYPES object. Steps: (1) Detect the agent dialect from the parent directory (`.claude/` → Claude Code, `.codex/` → Codex, `.aider/` → Aider). (2) Parse YAML frontmatter and extract the markdown body as `instructions`. (3) Map agent-specific field names to generic names using the dialect registry (`commands` → `tasks`, `mcp_servers` → `apps`, `skills` → `skills`). (4) Resolve bundled resource paths (sibling files/directories) as `ResourceFile` entries with absolute paths. (5) Resolve dependency references — local paths resolved relative to project root, package names left as references.
+**Summary:** Implement `readMaterializedRole(rolePath: string): Role` — the function that reads a local ROLE.md and produces a ROLE_TYPES object. Steps: (1) Detect the agent dialect from the parent directory (`.claude/` → Claude Code, `.codex/` → Codex, `.aider/` → Aider). (2) Parse YAML frontmatter and extract the markdown body as `instructions`. (3) Map agent-specific field names to generic names using the dialect registry (`commands` → `tasks`, `mcp_servers` → `apps`, `skills` → `skills`). (4) Resolve bundled resource paths (sibling files/directories) as `ResourceFile` entries with absolute paths. (5) Resolve dependency references — local paths resolved relative to project root, package names left as references.
 
 Also implement the dialect registry: a lookup table mapping `{ directory → dialect → field mappings }` that new runtimes can extend by adding entries.
 
@@ -84,7 +84,7 @@ Also implement the dialect registry: a lookup table mapping `{ directory → dia
 - New: `packages/shared/src/role/resource-scanner.ts` — scan role directory for bundled resources
 - New tests: parse valid ROLE.md for each dialect, verify field normalization, verify resource discovery, reject malformed frontmatter
 
-**User Story:** As a developer, I create `.claude/roles/create-prd/ROLE.md` with Claude-dialect frontmatter. The parser reads it, normalizes `commands` to `tasks` and `mcp_servers` to `apps`, discovers bundled resources, and returns a valid `RoleType`.
+**User Story:** As a developer, I create `.claude/roles/create-prd/ROLE.md` with Claude-dialect frontmatter. The parser reads it, normalizes `commands` to `tasks` and `mcp_servers` to `apps`, discovers bundled resources, and returns a valid `Role`.
 
 **Testable output:** Parser correctly handles Claude, Codex, and Aider dialects. Bundled resources are discovered with correct relative and absolute paths. Malformed YAML is rejected with clear errors. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
@@ -105,7 +105,7 @@ Load existing NPM role packages (from `node_modules/`) into the same ROLE_TYPES 
 
 **PRD refs:** §6.2 (Packaged Roles), §6.3 (Equivalence)
 
-**Summary:** Implement `readPackagedRole(packagePath: string): RoleType` — reads a role NPM package and constructs a ROLE_TYPES object. Steps: (1) Read `package.json` and verify `chapter.type === "role"`. (2) Read the bundled `ROLE.md` from the package directory. (3) Expect all dependencies (skills, apps, tasks) to already be installed in `node_modules/`. (4) Resolve all paths relative to the package's location. (5) Set `source.type = 'package'` and `source.packageName`. The output must be identical to a local role's ROLE_TYPES (except for the `source` field), ensuring local-to-package equivalence.
+**Summary:** Implement `readPackagedRole(packagePath: string): Role` — reads a role NPM package and constructs a ROLE_TYPES object. Steps: (1) Read `package.json` and verify `chapter.type === "role"`. (2) Read the bundled `ROLE.md` from the package directory. (3) Expect all dependencies (skills, apps, tasks) to already be installed in `node_modules/`. (4) Resolve all paths relative to the package's location. (5) Set `source.type = 'package'` and `source.packageName`. The output must be identical to a local role's ROLE_TYPES (except for the `source` field), ensuring local-to-package equivalence.
 
 **Scope:**
 - New: `packages/shared/src/role/package-reader.ts` — `readPackagedRole()`
@@ -127,21 +127,21 @@ Load existing NPM role packages (from `node_modules/`) into the same ROLE_TYPES 
 
 ---
 
-## CHANGE 4: RoleType-to-ResolvedAgent Adapter
+## CHANGE 4: Role-to-ResolvedAgent Adapter
 
-Create a bridge layer that converts a `RoleType` into the existing `ResolvedAgent` shape so current materializers continue to work unchanged during the migration.
+Create a bridge layer that converts a `Role` into the existing `ResolvedAgent` shape so current materializers continue to work unchanged during the migration.
 
 **PRD refs:** §5.3 (Transformation Pipeline), §7.2 (Agent Materializer)
 
-**Summary:** Implement `adaptRoleToResolvedAgent(role: RoleType, agentType: string): ResolvedAgent` — a stateless function that maps ROLE_TYPES fields to the existing `ResolvedAgent` type that materializers already accept. This is the key migration bridge: it lets us introduce the new ROLE_TYPES pipeline without rewriting materializers immediately. The adapter maps `tasks` → resolved commands/instructions, `apps` → resolved MCP server configs, `skills` → resolved skills, `container` → container requirements, and `governance` → risk/constraints. The `agentType` parameter determines which dialect to emit (reverse of the parser's normalization).
+**Summary:** Implement `adaptRoleToResolvedAgent(role: Role, agentType: string): ResolvedAgent` — a stateless function that maps ROLE_TYPES fields to the existing `ResolvedAgent` type that materializers already accept. This is the key migration bridge: it lets us introduce the new ROLE_TYPES pipeline without rewriting materializers immediately. The adapter maps `tasks` → resolved commands/instructions, `apps` → resolved MCP server configs, `skills` → resolved skills, `container` → container requirements, and `governance` → risk/constraints. The `agentType` parameter determines which dialect to emit (reverse of the parser's normalization).
 
 **Scope:**
 - New: `packages/shared/src/role/adapter.ts` — `adaptRoleToResolvedAgent()`
-- New tests: round-trip test — parse ROLE.md → RoleType → adapt to ResolvedAgent → verify fields match what the materializer expects. Test for each supported agent type.
+- New tests: round-trip test — parse ROLE.md → Role → adapt to ResolvedAgent → verify fields match what the materializer expects. Test for each supported agent type.
 
 **User Story:** As the materializer, I receive a `ResolvedAgent` from the adapter and don't need to know whether it came from the old package resolution pipeline or the new ROLE_TYPES pipeline. Everything just works.
 
-**Testable output:** Adapter produces valid `ResolvedAgent` from any `RoleType`. Round-trip from ROLE.md → ROLE_TYPES → ResolvedAgent preserves all fields. Each agent dialect produces correct agent-native field names. `npx tsc --noEmit` compiles. `npx vitest run` passes.
+**Testable output:** Adapter produces valid `ResolvedAgent` from any `Role`. Round-trip from ROLE.md → ROLE_TYPES → ResolvedAgent preserves all fields. Each agent dialect produces correct agent-native field names. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 
 **Implemented** — Branch: `role-to-resolved-agent-adapter`
 
@@ -160,7 +160,7 @@ Find roles from all sources (local ROLE.md files + installed NPM packages), merg
 
 **PRD refs:** §6 (Role Sources), §6.1 (Local Roles), §6.2 (Packaged Roles), §6.3 (Equivalence)
 
-**Summary:** Implement `discoverRoles(projectDir: string): RoleType[]` — scans the project for all available roles and returns them as a unified list. Discovery sources in precedence order: (1) Local roles from `<project>/.<agent>/roles/*/ROLE.md` for each known agent directory. (2) Packaged roles from `node_modules/` where `chapter.type === "role"`. Local roles take precedence over packaged roles with the same name (enabling "eject and customize" workflow). Also implement `resolveRole(name: string, projectDir: string): RoleType` — resolves a single role by name using the same precedence rules.
+**Summary:** Implement `discoverRoles(projectDir: string): Role[]` — scans the project for all available roles and returns them as a unified list. Discovery sources in precedence order: (1) Local roles from `<project>/.<agent>/roles/*/ROLE.md` for each known agent directory. (2) Packaged roles from `node_modules/` where `chapter.type === "role"`. Local roles take precedence over packaged roles with the same name (enabling "eject and customize" workflow). Also implement `resolveRole(name: string, projectDir: string): Role` — resolves a single role by name using the same precedence rules.
 
 **Scope:**
 - New: `packages/shared/src/role/discovery.ts` — `discoverRoles()`, `resolveRole()`
@@ -182,18 +182,18 @@ Find roles from all sources (local ROLE.md files + installed NPM packages), merg
 
 ---
 
-## CHANGE 6: Materializer Refactor — Accept RoleType Input
+## CHANGE 6: Materializer Refactor — Accept Role Input
 
-Modify existing agent materializers to accept `RoleType` input (via the adapter from Change 4) instead of requiring the old `ResolvedAgent` from the package resolver pipeline.
+Modify existing agent materializers to accept `Role` input (via the adapter from Change 4) instead of requiring the old `ResolvedAgent` from the package resolver pipeline.
 
 **PRD refs:** §7.2 (Agent Materializer), §5.3 (Transformation Pipeline)
 
-**Summary:** Update the materializer entry points to accept a `RoleType` as their primary input. Internally, the materializer calls `adaptRoleToResolvedAgent()` to convert to the shape its existing generation logic expects. This is a thin wiring change — the generation logic itself does not change yet. The materializer can now be invoked from either the old pipeline (ResolvedAgent from package resolver) or the new pipeline (RoleType from ROLE.md parser or NPM reader). Add a `materializeForAgent(role: RoleType, agentType: string)` entry point that wraps the adapter call + existing materialization.
+**Summary:** Update the materializer entry points to accept a `Role` as their primary input. Internally, the materializer calls `adaptRoleToResolvedAgent()` to convert to the shape its existing generation logic expects. This is a thin wiring change — the generation logic itself does not change yet. The materializer can now be invoked from either the old pipeline (ResolvedAgent from package resolver) or the new pipeline (Role from ROLE.md parser or NPM reader). Add a `materializeForAgent(role: Role, agentType: string)` entry point that wraps the adapter call + existing materialization.
 
 **Scope:**
-- Modify: materializer entry points in `packages/cli/src/materializer/` to accept `RoleType` as alternative input
-- New: `materializeForAgent(role: RoleType, agentType: string)` orchestration function
-- New tests: materialize a RoleType for Claude Code, verify generated workspace matches expectations. Materialize same RoleType for Codex, verify correct dialect output.
+- Modify: materializer entry points in `packages/cli/src/materializer/` to accept `Role` as alternative input
+- New: `materializeForAgent(role: Role, agentType: string)` orchestration function
+- New tests: materialize a Role for Claude Code, verify generated workspace matches expectations. Materialize same Role for Codex, verify correct dialect output.
 
 **User Story:** As the CLI, I load a ROLE.md into ROLE_TYPES and pass it directly to `materializeForAgent('claude-code')`. The materializer generates the correct workspace without me needing to construct a ResolvedAgent manually.
 
@@ -316,7 +316,7 @@ Generate a publishable npm monorepo from a local role definition, enabling distr
 
 **Scope:**
 - New: `packages/cli/src/commands/mason-init-repo.ts` — `mason init-repo` command
-- New: monorepo generator that reads a local RoleType and creates the workspace structure
+- New: monorepo generator that reads a local Role and creates the workspace structure
 - New: package.json generators for each dependency type (role, skill, app, task)
 - New tests: generate monorepo from mock role, verify directory structure matches PRD §11.3, verify all package.json files are valid, verify workspace configuration
 

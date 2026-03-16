@@ -8,7 +8,7 @@
 
 import { readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
-import type { ResourceFile } from "../types/role-types.js";
+import type { ResourceFile } from "../types/role.js";
 
 /**
  * Recursively scan a role directory for bundled resources.

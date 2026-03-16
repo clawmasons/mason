@@ -10,7 +10,7 @@ import {
   governanceConfigSchema,
   resourceFileSchema,
   roleSourceSchema,
-  roleTypeSchema,
+  roleSchema,
 } from "@clawmasons/shared";
 
 // ---------------------------------------------------------------------------
@@ -316,17 +316,17 @@ describe("roleSourceSchema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// RoleType (top-level)
+// Role (top-level)
 // ---------------------------------------------------------------------------
-describe("roleTypeSchema", () => {
+describe("roleSchema", () => {
   const minimalRole = {
     metadata: { name: "test", description: "Test role" },
     instructions: "You are a test agent.",
     source: { type: "local" as const },
   };
 
-  it("accepts a minimal RoleType", () => {
-    const result = roleTypeSchema.parse(minimalRole);
+  it("accepts a minimal Role", () => {
+    const result = roleSchema.parse(minimalRole);
     expect(result.metadata.name).toBe("test");
     expect(result.instructions).toBe("You are a test agent.");
     expect(result.tasks).toEqual([]);
@@ -342,7 +342,7 @@ describe("roleTypeSchema", () => {
   });
 
   it("accepts sources as a string array", () => {
-    const result = roleTypeSchema.parse({
+    const result = roleSchema.parse({
       ...minimalRole,
       sources: [".claude/", ".codex/"],
     });
@@ -350,16 +350,16 @@ describe("roleTypeSchema", () => {
   });
 
   it("accepts empty sources array", () => {
-    const result = roleTypeSchema.parse({ ...minimalRole, sources: [] });
+    const result = roleSchema.parse({ ...minimalRole, sources: [] });
     expect(result.sources).toEqual([]);
   });
 
   it("defaults sources to empty array when omitted", () => {
-    const result = roleTypeSchema.parse(minimalRole);
+    const result = roleSchema.parse(minimalRole);
     expect(result.sources).toEqual([]);
   });
 
-  it("accepts a full RoleType", () => {
+  it("accepts a full Role", () => {
     const fullRole = {
       metadata: {
         name: "create-prd",
@@ -407,7 +407,7 @@ describe("roleTypeSchema", () => {
       },
     };
 
-    const result = roleTypeSchema.parse(fullRole);
+    const result = roleSchema.parse(fullRole);
     expect(result.metadata.name).toBe("create-prd");
     expect(result.tasks).toHaveLength(1);
     expect(result.apps).toHaveLength(1);
@@ -419,7 +419,7 @@ describe("roleTypeSchema", () => {
 
   it("rejects missing metadata", () => {
     expect(() =>
-      roleTypeSchema.parse({
+      roleSchema.parse({
         instructions: "You are a test agent.",
         source: { type: "local" },
       })
@@ -428,7 +428,7 @@ describe("roleTypeSchema", () => {
 
   it("rejects missing instructions", () => {
     expect(() =>
-      roleTypeSchema.parse({
+      roleSchema.parse({
         metadata: { name: "test", description: "Test role" },
         source: { type: "local" },
       })
@@ -437,7 +437,7 @@ describe("roleTypeSchema", () => {
 
   it("rejects missing source", () => {
     expect(() =>
-      roleTypeSchema.parse({
+      roleSchema.parse({
         metadata: { name: "test", description: "Test role" },
         instructions: "You are a test agent.",
       })

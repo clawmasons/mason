@@ -177,12 +177,12 @@ All roles and their dependencies are represented in memory using a generic type 
 - **Agent-agnostic:** Uses generic names (tasks, apps, skills) not tied to any runtime.
 - **File-aware:** Tracks absolute filesystem paths for all bundled resources. Files are never loaded into memory — only paths are stored.
 - **Bidirectional:** Can be constructed from local ROLE.md files (read) or from NPM packages (read), and can be serialized back to either format (write).
-- **Dependency-complete:** A resolved RoleType includes all transitive dependencies (tasks, apps, skills) fully resolved.
+- **Dependency-complete:** A resolved Role includes all transitive dependencies (tasks, apps, skills) fully resolved.
 
 ### 5.2 Core Types
 
 ```
-RoleType
+Role
 ├── metadata: RoleMetadata (name, version, scope, description)
 ├── instructions: string (the markdown body)
 ├── tasks: TaskRef[] (commands/instructions provided by the role)

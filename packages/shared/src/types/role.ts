@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import type {
-  roleTypeSchema,
+  roleSchema,
   roleMetadataSchema,
   taskRefSchema,
   appConfigSchema,
@@ -13,7 +13,7 @@ import type {
   toolPermissionsSchema,
 } from "../schemas/role-types.js";
 
-export type RoleType = z.infer<typeof roleTypeSchema>;
+export type Role = z.infer<typeof roleSchema>;
 export type RoleMetadata = z.infer<typeof roleMetadataSchema>;
 export type TaskRef = z.infer<typeof taskRefSchema>;
 export type AppConfig = z.infer<typeof appConfigSchema>;

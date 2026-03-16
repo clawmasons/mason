@@ -1,6 +1,6 @@
 ## Purpose
 
-Generate a publishable npm monorepo from a local role definition, enabling distribution of roles and their dependencies through npm package registries. Implements the `mason init-repo --role <name> [--target-dir <path>]` command that reads a local RoleType and creates a complete npm workspace structure with separate packages for the role and each dependency (skills, apps, tasks).
+Generate a publishable npm monorepo from a local role definition, enabling distribution of roles and their dependencies through npm package registries. Implements the `mason init-repo --role <name> [--target-dir <path>]` command that reads a local Role and creates a complete npm workspace structure with separate packages for the role and each dependency (skills, apps, tasks).
 
 ## Requirements
 

@@ -14,7 +14,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { readMaterializedRole } from "./parser.js";
 import { readPackagedRole } from "./package-reader.js";
-import type { RoleType } from "../types/role-types.js";
+import type { Role } from "../types/role.js";
 
 /**
  * Error thrown when role discovery or resolution fails.
@@ -32,14 +32,14 @@ export class RoleDiscoveryError extends Error {
  * same name.
  *
  * @param projectDir - Absolute path to the project root
- * @returns Array of validated RoleType objects (deduplicated by name)
+ * @returns Array of validated Role objects (deduplicated by name)
  */
-export async function discoverRoles(projectDir: string): Promise<RoleType[]> {
+export async function discoverRoles(projectDir: string): Promise<Role[]> {
   const localRoles = await discoverLocalRoles(projectDir);
   const packagedRoles = await discoverPackagedRoles(projectDir);
 
   // Merge: local roles take precedence over packaged roles with the same name
-  const merged = new Map<string, RoleType>();
+  const merged = new Map<string, Role>();
 
   // Add packaged roles first (lower precedence)
   for (const role of packagedRoles) {
@@ -60,13 +60,13 @@ export async function discoverRoles(projectDir: string): Promise<RoleType[]> {
  *
  * @param name - Role name to resolve
  * @param projectDir - Absolute path to the project root
- * @returns Validated RoleType
+ * @returns Validated Role
  * @throws RoleDiscoveryError if the role is not found
  */
 export async function resolveRole(
   name: string,
   projectDir: string,
-): Promise<RoleType> {
+): Promise<Role> {
   // 1. Check local roles first (higher precedence)
   const localRole = await findLocalRole(name, projectDir);
   if (localRole) return localRole;
@@ -88,8 +88,8 @@ export async function resolveRole(
  * Scan .mason/roles/ for local ROLE.md files.
  * Silently skips the directory if it doesn't exist.
  */
-async function discoverLocalRoles(projectDir: string): Promise<RoleType[]> {
-  const roles: RoleType[] = [];
+async function discoverLocalRoles(projectDir: string): Promise<Role[]> {
+  const roles: Role[] = [];
   const rolesDir = join(projectDir, ".mason", "roles");
 
   let entries: string[];
@@ -128,7 +128,7 @@ async function discoverLocalRoles(projectDir: string): Promise<RoleType[]> {
 async function findLocalRole(
   name: string,
   projectDir: string,
-): Promise<RoleType | undefined> {
+): Promise<Role | undefined> {
   const roleMdPath = join(projectDir, ".mason", "roles", name, "ROLE.md");
   try {
     const s = await stat(roleMdPath);
@@ -152,8 +152,8 @@ async function findLocalRole(
  * Scan node_modules for packages with chapter.type === "role".
  * Checks both top-level and scoped package directories.
  */
-async function discoverPackagedRoles(projectDir: string): Promise<RoleType[]> {
-  const roles: RoleType[] = [];
+async function discoverPackagedRoles(projectDir: string): Promise<Role[]> {
+  const roles: Role[] = [];
   const nodeModulesDir = join(projectDir, "node_modules");
 
   let topLevel: string[];
@@ -210,7 +210,7 @@ async function discoverPackagedRoles(projectDir: string): Promise<RoleType[]> {
 async function findPackagedRole(
   name: string,
   projectDir: string,
-): Promise<RoleType | undefined> {
+): Promise<Role | undefined> {
   // First, try to find it among all packaged roles
   const packagedRoles = await discoverPackagedRoles(projectDir);
   return packagedRoles.find((r) => r.metadata.name === name);

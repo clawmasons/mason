@@ -14,7 +14,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 import * as os from "node:os";
-import type { RoleType } from "@clawmasons/shared";
+import type { Role } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
 import { materializeForAgent, getMaterializer, getAgentFromRegistry } from "./role-materializer.js";
 import { generateAgentDockerfile } from "../generator/agent-dockerfile.js";
@@ -156,8 +156,8 @@ export function ensureSentinelFile(
 // ---------------------------------------------------------------------------
 
 export interface GenerateBuildDirOptions {
-  /** The resolved RoleType to generate for. */
-  role: RoleType;
+  /** The resolved Role to generate for. */
+  role: Role;
   /** Target agent type (e.g., "claude-code"). */
   agentType: string;
   /** Absolute path to the project root. */
@@ -537,7 +537,7 @@ export interface CreateSessionOptions {
   /** Absolute path to the docker/ dir (for proxy build context). */
   dockerDir: string;
   /** Role definition. */
-  role: RoleType;
+  role: Role;
   /** Agent type (e.g., "claude-code"). */
   agentType: string;
   /** Agent name for proxy CMD. */

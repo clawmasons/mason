@@ -8,7 +8,7 @@ import { spawn } from "node:child_process";
 import { checkDockerCompose } from "./docker-utils.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import { resolveRoleMountVolumes, type RoleMount } from "../../generator/mount-volumes.js";
-import type { ResolvedAgent, RoleType } from "@clawmasons/shared";
+import type { ResolvedAgent, Role } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName } from "@clawmasons/shared";
 import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry } from "@clawmasons/agent-sdk";
@@ -25,30 +25,30 @@ type DevContainerCustomizations = { vscode?: { extensions?: string[]; settings?:
 // ── Role-based Agent Resolution ───────────────────────────────────────
 
 /**
- * Resolve a RoleType from a role name in the project directory.
+ * Resolve a Role from a role name in the project directory.
  */
 async function defaultResolveRole(
   roleName: string,
   projectDir: string,
-): Promise<RoleType> {
+): Promise<Role> {
   return resolveRoleByName(roleName, projectDir);
 }
 
 /**
- * Resolve a ResolvedAgent from a RoleType and agent type.
+ * Resolve a ResolvedAgent from a Role and agent type.
  */
 function defaultAdaptRole(
-  roleType: RoleType,
+  roleType: Role,
   agentType: string,
 ): ResolvedAgent {
   return adaptRoleToResolvedAgent(roleType, agentType);
 }
 
 /**
- * Infer the agent type from a RoleType's source dialect.
+ * Infer the agent type from a Role's source dialect.
  * Falls back to "claude-code" if not determinable.
  */
-export function inferAgentType(roleType: RoleType): string {
+export function inferAgentType(roleType: Role): string {
   const dialect = roleType.source.agentDialect;
   // "mason" is the agent-agnostic canonical location — default to claude-code
   if (!dialect || dialect === "mason") return "claude-code";
@@ -364,7 +364,7 @@ export function collectEnvCredentials(
  * Ensure docker build artifacts exist for a role. If not, trigger docker-init.
  */
 async function ensureDockerBuild(
-  roleType: RoleType,
+  roleType: Role,
   agentType: string,
   projectDir: string,
   deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations },
@@ -499,9 +499,9 @@ export interface RunAgentDeps {
   /** Override .gitignore entry management (for testing). */
   ensureGitignoreEntryFn?: (dir: string, pattern: string) => boolean;
   /** Override role resolution (for testing). */
-  resolveRoleFn?: (roleName: string, projectDir: string) => Promise<RoleType>;
+  resolveRoleFn?: (roleName: string, projectDir: string) => Promise<Role>;
   /** Override agent adaptation (for testing). */
-  adaptRoleFn?: (roleType: RoleType, agentType: string) => ResolvedAgent;
+  adaptRoleFn?: (roleType: Role, agentType: string) => ResolvedAgent;
   /** Override AcpSession construction (for testing, ACP mode). */
   createSessionFn?: (config: AcpSessionConfig, sessionDeps?: AcpSessionDeps) => AcpSession;
   /** Override AcpSdkBridge construction (for testing, ACP mode). */

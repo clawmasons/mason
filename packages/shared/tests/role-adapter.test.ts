@@ -2,18 +2,18 @@ import { describe, it, expect } from "vitest";
 import {
   adaptRoleToResolvedAgent,
   AdapterError,
-  roleTypeSchema,
+  roleSchema,
 } from "@clawmasons/shared";
-import type { RoleType } from "@clawmasons/shared";
+import type { Role } from "@clawmasons/shared";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Build a minimal valid RoleType for testing. Raw overrides are parsed through Zod. */
-function minimalRole(overrides: Record<string, unknown> = {}): RoleType {
+/** Build a minimal valid Role for testing. Raw overrides are parsed through Zod. */
+function minimalRole(overrides: Record<string, unknown> = {}): Role {
   const raw = overrides as Record<string, unknown>;
-  return roleTypeSchema.parse({
+  return roleSchema.parse({
     metadata: {
       name: "test-role",
       description: "A test role",
@@ -30,9 +30,9 @@ function minimalRole(overrides: Record<string, unknown> = {}): RoleType {
   });
 }
 
-/** Build a fully-populated RoleType. */
-function fullRole(): RoleType {
-  return roleTypeSchema.parse({
+/** Build a fully-populated Role. */
+function fullRole(): Role {
+  return roleSchema.parse({
     metadata: {
       name: "create-prd",
       description: "Creates PRDs",
@@ -114,7 +114,7 @@ describe("adaptRoleToResolvedAgent", () => {
   // ---- Basic adaptation ----
 
   describe("basic adaptation", () => {
-    it("produces a valid ResolvedAgent from a minimal RoleType", () => {
+    it("produces a valid ResolvedAgent from a minimal Role", () => {
       const role = minimalRole();
       const agent = adaptRoleToResolvedAgent(role, "claude-code");
 
@@ -377,7 +377,7 @@ describe("adaptRoleToResolvedAgent", () => {
   // ---- Full round-trip ----
 
   describe("full round-trip", () => {
-    it("preserves all fields from a fully-populated RoleType", () => {
+    it("preserves all fields from a fully-populated Role", () => {
       const role = fullRole();
       const agent = adaptRoleToResolvedAgent(role, "claude-code");
 

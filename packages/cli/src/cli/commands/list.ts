@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { discoverRoles } from "@clawmasons/shared";
-import type { RoleType } from "@clawmasons/shared";
+import type { Role } from "@clawmasons/shared";
 
 interface ListOptions {
   json?: boolean;
@@ -47,7 +47,7 @@ export async function runList(
   }
 }
 
-function printRole(role: RoleType): void {
+function printRole(role: Role): void {
   const source = role.source.type === "local"
     ? `local, ${role.source.path ?? "unknown"}`
     : `package, ${role.source.packageName ?? "unknown"}`;

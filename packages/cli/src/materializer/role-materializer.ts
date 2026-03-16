@@ -6,7 +6,7 @@
  * registry to look up AgentPackage instances dynamically.
  */
 
-import type { RoleType } from "@clawmasons/shared";
+import type { Role } from "@clawmasons/shared";
 import { adaptRoleToResolvedAgent } from "@clawmasons/shared";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage, AgentRegistry } from "@clawmasons/agent-sdk";
 import { createAgentRegistry, getAgent, getRegisteredAgentNames } from "@clawmasons/agent-sdk";
@@ -96,14 +96,14 @@ export function getRegisteredAgentTypes(): string[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Materialize a RoleType for a specific agent runtime.
+ * Materialize a Role for a specific agent runtime.
  *
  * This is the primary entry point for the ROLE_TYPES pipeline. It:
  * 1. Looks up the materializer for the given agent type
- * 2. Converts the RoleType to a ResolvedAgent via the adapter
+ * 2. Converts the Role to a ResolvedAgent via the adapter
  * 3. Invokes the materializer's existing workspace generation logic
  *
- * @param role - A validated RoleType from the ROLE_TYPES pipeline
+ * @param role - A validated Role from the ROLE_TYPES pipeline
  * @param agentType - The target agent type (e.g., "claude-code", "pi-coding-agent", "mcp-agent")
  * @param proxyEndpoint - The MCP proxy endpoint URL (defaults to "http://mcp-proxy:9090")
  * @param proxyToken - Optional proxy authentication token
@@ -113,7 +113,7 @@ export function getRegisteredAgentTypes(): string[] {
  * @throws AdapterError (from @clawmasons/shared) if the agent type is not a known dialect
  */
 export function materializeForAgent(
-  role: RoleType,
+  role: Role,
   agentType: string,
   proxyEndpoint?: string,
   proxyToken?: string,
@@ -128,7 +128,7 @@ export function materializeForAgent(
     );
   }
 
-  // Convert RoleType to ResolvedAgent via the adapter.
+  // Convert Role to ResolvedAgent via the adapter.
   const resolvedAgent = adaptRoleToResolvedAgent(role, agentType);
 
   const endpoint = proxyEndpoint ?? DEFAULT_PROXY_ENDPOINT;

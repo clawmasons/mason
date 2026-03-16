@@ -6,7 +6,7 @@
 #### Scenario: Discover local role from .mason/roles/
 - **WHEN** `discoverRoles("/home/user/my-project")` is called
 - **AND** `/home/user/my-project/.mason/roles/writer/ROLE.md` exists
-- **THEN** the result SHALL include a RoleType for "writer"
+- **THEN** the result SHALL include a Role for "writer"
 - **AND** no reads to `~/.clawmasons/` SHALL occur
 - **AND** no reads to `.claude/roles/` SHALL occur
 
@@ -26,7 +26,7 @@
 - **WHEN** `discoverRoles("/home/user/my-project")` is called
 - **AND** `/home/user/my-project/.claude/roles/writer/ROLE.md` exists
 - **AND** `/home/user/my-project/.mason/roles/writer/ROLE.md` does not exist
-- **THEN** the result SHALL NOT include a RoleType for "writer"
+- **THEN** the result SHALL NOT include a Role for "writer"
 
 ## REMOVED Requirements
 

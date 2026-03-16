@@ -1,6 +1,6 @@
 ## Purpose
 
-Parse ROLE.md files (YAML frontmatter + markdown body) and normalize agent-specific field names to generic ROLE_TYPES using a dialect registry. Implements `readMaterializedRole(rolePath: string): Promise<RoleType>` — the function that reads a local ROLE.md and produces a validated ROLE_TYPES object. Also provides an extensible dialect registry mapping agent directories to field name translations.
+Parse ROLE.md files (YAML frontmatter + markdown body) and normalize agent-specific field names to generic ROLE_TYPES using a dialect registry. Implements `readMaterializedRole(rolePath: string): Promise<Role>` — the function that reads a local ROLE.md and produces a validated ROLE_TYPES object. Also provides an extensible dialect registry mapping agent directories to field name translations.
 
 ## Requirements
 
@@ -107,7 +107,7 @@ The system SHALL resolve skill references — local paths relative to project ro
 - **THEN** result has `{name: 'my-skill', ref: '<absolute-path>/skills/my-skill'}`
 
 ### Requirement: Zod Validation
-The system SHALL validate the assembled role data through `roleTypeSchema.parse()` before returning.
+The system SHALL validate the assembled role data through `roleSchema.parse()` before returning.
 
 #### Scenario: Valid complete role
 - **WHEN** a well-formed Claude Code ROLE.md is parsed
