@@ -3,6 +3,8 @@ title: Chapter
 description: Workspace for packaging and managing AI agent role components
 ---
 
+// todo: remove this document any anything linking to it.  we no longer use chapters, but just rely on the project.
+
 # Chapter
 
 A **chapter** is an npm workspace containing role packages. It's the development unit where you create, compose, and build [roles](chapter-role.md), [tasks](chapter-task.md), [skills](chapter-skill.md), and [apps](chapter-app.md).

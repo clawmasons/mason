@@ -416,6 +416,47 @@ describe("generateAgentLaunchJson", () => {
     const config = JSON.parse(generateAgentLaunchJson(pkg, []));
     expect(config.command).toBe("test-runtime");
   });
+
+  it("appends instructions to args when supportsInitialPrompt is true", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--flag"], supportsInitialPrompt: true },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, "Do the thing"));
+    expect(config.args).toEqual(["--flag", "Do the thing"]);
+  });
+
+  it("does not add instructions in ACP mode", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--flag"], supportsInitialPrompt: true },
+      acp: { command: "cmd-acp" },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], true, "Do the thing"));
+    expect(config.args).toBeUndefined();
+  });
+
+  it("does not add instructions when supportsInitialPrompt is false", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--flag"], supportsInitialPrompt: false },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, "Do the thing"));
+    expect(config.args).toEqual(["--flag"]);
+  });
+
+  it("does not add instructions when supportsInitialPrompt is absent", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--flag"] },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, "Do the thing"));
+    expect(config.args).toEqual(["--flag"]);
+  });
+
+  it("does not add instructions when instructions is undefined", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--flag"], supportsInitialPrompt: true },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined));
+    expect(config.args).toEqual(["--flag"]);
+  });
 });
 
 // ── generateSkillReadme ───────────────────────────────────────────────────────

@@ -85,6 +85,8 @@ export interface RuntimeConfig {
     type: "env" | "file";
     path?: string;
   }>;
+  /** When true, the runtime accepts role instructions as a trailing positional argument. */
+  supportsInitialPrompt?: boolean;
 }
 
 /**

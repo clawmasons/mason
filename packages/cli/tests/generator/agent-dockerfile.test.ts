@@ -470,3 +470,44 @@ describe("generateProxyDockerfile", () => {
     expect(result).toContain("/app/.cache/npm");
   });
 });
+
+// ── devcontainer.metadata LABEL ────────────────────────────────────────────
+
+describe("generateAgentDockerfile devcontainer.metadata label", () => {
+  it("injects LABEL devcontainer.metadata with default customizations when none provided", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("LABEL devcontainer.metadata=");
+    expect(result).toContain("remoteUser");
+    expect(result).toContain("mason");
+    expect(result).toContain("/home/mason/workspace/project");
+    // Default extensions
+    expect(result).toContain("anthropic.claude-code");
+  });
+
+  it("uses provided devContainerCustomizations instead of default", () => {
+    const agent = makeNoteTakerAgent();
+    const custom = {
+      vscode: {
+        extensions: ["my-publisher.my-extension"],
+        settings: { "editor.tabSize": 2 },
+      },
+    };
+    const result = generateAgentDockerfile(agent, agent.roles[0], { devContainerCustomizations: custom });
+
+    expect(result).toContain("my-publisher.my-extension");
+    expect(result).not.toContain("anthropic.claude-code");
+  });
+
+  it("label value is valid compact JSON parseable as an array", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    const match = result.match(/LABEL devcontainer\.metadata='(.+)'/);
+    expect(match).not.toBeNull();
+    const parsed = JSON.parse(match![1]) as unknown[];
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed).toHaveLength(1);
+  });
+});

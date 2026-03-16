@@ -19,6 +19,9 @@ import { createFileLogger, type AcpLogger } from "../../acp/logger.js";
 import { generateRoleDockerBuildDir } from "../../materializer/docker-generator.js";
 import { ensureProxyDependencies, synthesizeRolePackages } from "../../materializer/proxy-dependencies.js";
 
+// ── Local type alias (mirrors DevContainerCustomizations from agent-sdk) ──────
+type DevContainerCustomizations = { vscode?: { extensions?: string[]; settings?: Record<string, unknown> } };
+
 // ── Role-based Agent Resolution ───────────────────────────────────────
 
 /**
@@ -188,6 +191,8 @@ export function generateComposeYml(opts: {
   bashMode?: boolean;
   verbose?: boolean;
   homeOverride?: string;
+  /** Path to the vscode-server host directory to mount into the agent container. */
+  vscodeSeverHostPath?: string;
 }): string {
   const { dockerBuildDir, dockerDir, projectDir, agent, role, logsDir, proxyToken, credentialProxyToken, proxyPort = 3000, roleMounts, credentialKeys } = opts;
 
@@ -238,7 +243,15 @@ export function generateComposeYml(opts: {
     }
   }
 
-  // 4. Role-declared extra mounts
+  // 4. VS Code Server persistent mount (dev-container mode only)
+  if (opts.vscodeSeverHostPath) {
+    agentVolumeLines.push(`      - "${opts.vscodeSeverHostPath}:/home/mason/.vscode-server"`);
+  }
+
+  // 5. Logs dir mount
+  agentVolumeLines.push(`      - "${logsDir}:/logs"`);
+
+  // 6. Role-declared extra mounts
   for (const vol of resolveRoleMountVolumes(roleMounts)) {
     agentVolumeLines.push(`      - "${vol}"`);
   }
@@ -354,7 +367,7 @@ async function ensureDockerBuild(
   roleType: RoleType,
   agentType: string,
   projectDir: string,
-  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean },
+  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations },
 ): Promise<{ dockerBuildDir: string; dockerDir: string }> {
   const existsSync = deps?.existsSyncFn ?? fs.existsSync;
   const roleName = getAppShortName(roleType.metadata.name);
@@ -384,6 +397,7 @@ async function ensureDockerBuild(
       agentType,
       projectDir,
       agentName: roleName,
+      devContainerCustomizations: deps?.devContainerCustomizations,
     });
 
     // Populate shared proxy dependencies
@@ -538,6 +552,7 @@ function createRunAction() {
       build?: boolean;
       verbose?: boolean;
       proxyOnly?: boolean;
+      devContainer?: boolean;
       agent?: string;
       role?: string;
       home?: string;
@@ -610,6 +625,15 @@ function createRunAction() {
         proxyPort: parseInt(options.proxyPort, 10),
         homeOverride,
       });
+    } else if (options.devContainer) {
+      await runAgent(projectDir, resolvedAgentType, role, undefined, {
+        devContainer: true,
+        proxyPort: parseInt(options.proxyPort, 10),
+        build: options.build,
+        verbose: options.verbose,
+        homeOverride,
+        devContainerCustomizations: (configEntry as { devContainerCustomizations?: DevContainerCustomizations } | undefined)?.devContainerCustomizations,
+      });
     } else {
       await runAgent(projectDir, resolvedAgentType, role, undefined, {
         proxyPort: parseInt(options.proxyPort, 10),
@@ -634,6 +658,7 @@ export function registerRunCommand(program: Command): void {
     .option("--role <name>", "Role name to run")
     .option("--agent <name>", "Agent name from .mason/config.json or built-in alias")
     .option("--home <path>", "Bind-mount path over /home/mason/ in the agent container")
+    .option("--dev-container", "Start in dev-container mode: print IDE attach instructions and optionally launch VSCode")
     .option("--proxy-only", "Start proxy infrastructure only, output connection info as JSON")
     .option("--verbose", "Show Docker build and compose output")
     .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
@@ -655,12 +680,15 @@ export async function runAgent(
     build?: boolean;
     verbose?: boolean;
     homeOverride?: string;
+    devContainer?: boolean;
+    devContainerCustomizations?: DevContainerCustomizations;
   },
 ): Promise<void> {
   // Initialize agent registry with config-declared agents from .mason/config.json
   await initRegistry(projectDir);
 
   const isAcpMode = acpOptions?.acp === true;
+  const isDevContainerMode = acpOptions?.devContainer === true;
   const proxyPort = acpOptions?.proxyPort ?? 3000;
   const bashMode = acpOptions?.bash === true;
   const buildMode = acpOptions?.build === true;
@@ -668,6 +696,12 @@ export async function runAgent(
 
   if (isAcpMode) {
     return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride);
+  } else if (isDevContainerMode) {
+    const verbose = acpOptions?.verbose === true;
+    return runAgentDevContainerMode(
+      projectDir, agent, role, proxyPort, deps, buildMode, verbose, homeOverride,
+      acpOptions?.devContainerCustomizations,
+    );
   } else {
     const verbose = acpOptions?.verbose === true;
     return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride);
@@ -856,6 +890,245 @@ async function runAgentInteractiveMode(
     console.error(`\n  agent failed: ${message}\n`);
     process.exit(1);
   }
+}
+
+// ── Dev-Container Mode ────────────────────────────────────────────────
+
+/**
+ * Build a VSCode attached-container URI for the given docker compose project and service.
+ * Hex-encodes JSON config using Buffer (no shell dependency).
+ */
+export function buildVscodeAttachUri(containerName: string, workspacePath: string): string {
+  const config = JSON.stringify({ containerName: `/${containerName}` });
+  const hex = Buffer.from(config).toString("hex");
+  return `vscode-remote://attached-container+${hex}${workspacePath}`;
+}
+
+/**
+ * Derive the docker container name from a compose project name and service name.
+ * Docker compose names containers as: <project>-<service>-<index>
+ */
+export function deriveContainerName(composeName: string, serviceShortName: string): string {
+  return `${composeName}-${serviceShortName}-1`;
+}
+
+async function runAgentDevContainerMode(
+  projectDir: string,
+  agentOverride: string | undefined,
+  role: string,
+  proxyPort: number,
+  deps?: RunAgentDeps,
+  buildMode?: boolean,
+  verbose?: boolean,
+  homeOverride?: string,
+  devContainerCustomizations?: DevContainerCustomizations,
+): Promise<void> {
+  const execCompose = deps?.execComposeFn ?? execComposeCommand;
+  const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
+  const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
+  const startCredService = deps?.startCredentialServiceFn ?? defaultStartCredentialService;
+  const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
+  const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
+  const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
+
+  try {
+    // 1. Pre-flight
+    checkDocker();
+
+    // 2. Resolve role
+    const roleType = await resolveRoleFn(role, projectDir);
+    const roleName = getAppShortName(roleType.metadata.name);
+    const agentType = agentOverride ?? inferAgentType(roleType);
+
+    console.log(`\n  Agent: ${agentType}`);
+    console.log(`  Role: ${roleName}`);
+    console.log(`  Mode: dev-container`);
+
+    // 3. Ensure docker build artifacts
+    const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
+      roleType, agentType, projectDir,
+      { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations },
+    );
+
+    // 4. Ensure .mason is in .gitignore
+    ensureGitignore(projectDir, ".mason");
+
+    // 5. Create vscode-server persistent directory and write static server-env-setup
+    const vscodeSeverHostPath = path.join(projectDir, ".mason", "docker", "vscode-server");
+    fs.mkdirSync(vscodeSeverHostPath, { recursive: true });
+
+    const serverEnvSetupPath = path.join(vscodeSeverHostPath, "server-env-setup");
+    const serverEnvSetupContent = [
+      "#!/bin/sh",
+      "_LOG=/logs/server-env-setup.log",
+      `echo "[$(date -u +%H:%M:%S)] server-env-setup: MCP_PROXY_TOKEN=\${MCP_PROXY_TOKEN:+set} MCP_PROXY_URL=\${MCP_PROXY_URL} AGENT_CREDENTIALS=\${AGENT_CREDENTIALS}" >> "$_LOG" 2>&1`,
+      `_OUT=$(agent-entry cred-fetch 2>>"$_LOG")`,
+      "_EXIT=$?",
+      `echo "[$(date -u +%H:%M:%S)] cred-fetch exit=$_EXIT output_len=\${#_OUT}" >> "$_LOG"`,
+      `if [ "$_EXIT" -eq 0 ]; then`,
+      `  eval "$_OUT"`,
+      `  echo "[$(date -u +%H:%M:%S)] CLAUDE_CODE_OAUTH_TOKEN=\${CLAUDE_CODE_OAUTH_TOKEN:+set}" >> "$_LOG"`,
+      "fi",
+      "",
+    ].join("\n");
+    if (!fs.existsSync(serverEnvSetupPath) ||
+        fs.readFileSync(serverEnvSetupPath, "utf-8") !== serverEnvSetupContent) {
+      fs.writeFileSync(serverEnvSetupPath, serverEnvSetupContent, { mode: 0o755 });
+    }
+
+    // 6. Generate session ID and directories
+    const sessionId = (deps?.generateSessionIdFn ?? generateSessionId)();
+    const sessionDir = path.join(projectDir, ".mason", "sessions", sessionId);
+    const dockerSessionDir = path.join(sessionDir, "docker");
+    fs.mkdirSync(dockerSessionDir, { recursive: true });
+    const logsDir = path.join(sessionDir, "logs");
+    fs.mkdirSync(logsDir, { recursive: true });
+
+    console.log(`  Session: ${sessionId}`);
+
+    // 7. Generate tokens and compose file
+    const proxyToken = crypto.randomBytes(32).toString("hex");
+    const credentialProxyToken = crypto.randomBytes(32).toString("hex");
+
+    const declaredCredentialKeys = [...(roleType.governance?.credentials ?? [])];
+    for (const app of roleType.apps ?? []) {
+      for (const key of app.credentials ?? []) {
+        if (!declaredCredentialKeys.includes(key)) declaredCredentialKeys.push(key);
+      }
+    }
+
+    // Derive compose project name to know the container name for VSCode attach
+    const projectHash = crypto.createHash("sha256").update(projectDir).digest("hex").slice(0, 8);
+    const composeName = `mason-${projectHash}`;
+    const agentServiceName = `agent-${roleName}`;
+    const containerName = deriveContainerName(composeName, agentServiceName);
+
+    const composeContent = generateComposeYml({
+      dockerBuildDir,
+      dockerDir,
+      projectDir,
+      agent: agentType,
+      role: roleName,
+      logsDir,
+      proxyToken,
+      credentialProxyToken,
+      proxyPort,
+      roleMounts: roleType.container?.mounts,
+      credentialKeys: declaredCredentialKeys,
+      verbose,
+      homeOverride,
+      vscodeSeverHostPath,
+    });
+
+    const composeFile = path.join(dockerSessionDir, "docker-compose.yml");
+    fs.writeFileSync(composeFile, composeContent);
+    console.log(`  Compose: .mason/sessions/${sessionId}/docker/docker-compose.yml`);
+
+    // 8. Build and start proxy
+    const proxyServiceName = `proxy-${roleName}`;
+    console.log(`\n  Building proxy (${proxyServiceName})...`);
+    const buildArgs = ["build"];
+    if (buildMode) buildArgs.push("--no-cache");
+    buildArgs.push(proxyServiceName);
+    const buildCode = await execCompose(composeFile, buildArgs, { verbose });
+    if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+
+    const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose });
+    if (proxyCode !== 0) throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
+    console.log(`  Proxy started.`);
+
+    await waitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
+    console.log(`  Proxy ready.`);
+
+    // 9. Start credential service
+    const resolvedAgent = adaptRoleFn(roleType, agentType);
+    const envCredentials = collectEnvCredentials(resolvedAgent);
+    const credServiceHandle = await startCredService({ proxyPort, credentialProxyToken, envCredentials });
+    console.log(`  Credential service connected.`);
+
+    // 10. Build and start agent container in background (detached)
+    console.log(`\n  Building agent (${agentServiceName})...`);
+    const agentBuildArgs = ["build"];
+    if (buildMode) agentBuildArgs.push("--no-cache");
+    agentBuildArgs.push(agentServiceName);
+    const agentBuildCode = await execCompose(composeFile, agentBuildArgs, { verbose });
+    if (agentBuildCode !== 0) throw new Error(`Failed to build agent image (exit code ${agentBuildCode}).`);
+
+    const agentUpCode = await execCompose(composeFile, ["up", "-d", agentServiceName], { verbose });
+    if (agentUpCode !== 0) throw new Error(`Failed to start agent container (exit code ${agentUpCode}).`);
+    console.log(`  Agent container started.`);
+
+    // 11. Print IDE connection instructions
+    console.log(`
+  ┌─────────────────────────────────────────────────────────────┐
+  │  Dev-Container Ready                                        │
+  ├─────────────────────────────────────────────────────────────┤
+  │  Container:  ${containerName.padEnd(47)}│
+  │  Workspace:  /home/mason/workspace/project                  │
+  │                                                             │
+  │  To attach from any dev-container-compatible IDE:           │
+  │    1. Open the Remote Explorer                              │
+  │    2. Select "Attach to Running Container"                  │
+  │    3. Choose: ${containerName.padEnd(46)}│
+  │                                                             │
+  │  Press Ctrl+C to stop the session                           │
+  └─────────────────────────────────────────────────────────────┘
+`);
+
+    // 12. Prompt to launch VSCode
+    await promptAndLaunchVscode(containerName, "/home/mason/workspace/project");
+
+    // 13. Stay alive until Ctrl+C
+    console.log(`  Session running. Press Ctrl+C to tear down.\n`);
+    await new Promise<void>((resolve) => {
+      const onSignal = () => resolve();
+      process.once("SIGINT", onSignal);
+      process.once("SIGTERM", onSignal);
+    });
+
+    // 14. Tear down
+    console.log(`\n  Tearing down services...`);
+    try { credServiceHandle.disconnect(); credServiceHandle.close(); } catch { /* best-effort */ }
+    await execCompose(composeFile, ["down"], { verbose });
+    console.log(`  Services stopped.`);
+    console.log(`  Session retained at: .mason/sessions/${sessionId}/`);
+    console.log(`\n  dev-container session complete\n`);
+
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`\n  dev-container failed: ${message}\n`);
+    process.exit(1);
+  }
+}
+
+/**
+ * Prompt the user to optionally launch VSCode and attach to the running container.
+ * Spawns `code --folder-uri` if the user confirms and `code` is on PATH.
+ */
+async function promptAndLaunchVscode(containerName: string, workspacePath: string): Promise<void> {
+  const readline = await import("node:readline");
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+  await new Promise<void>((resolve) => {
+    rl.question("  Would you like to launch VSCode and attach to the container? (y/N) ", (answer) => {
+      rl.close();
+      if (answer.toLowerCase() !== "y") {
+        resolve();
+        return;
+      }
+
+      const uri = buildVscodeAttachUri(containerName, workspacePath);
+      const child = spawn("code", ["--folder-uri", uri], {
+        detached: true,
+        stdio: "ignore",
+      });
+      child.on("error", () => {
+        console.error(`\n  VSCode (\`code\`) not found on PATH — attach manually using the instructions above.\n`);
+      });
+      child.unref();
+      resolve();
+    });
+  });
 }
 
 // ── Proxy-Only Mode ───────────────────────────────────────────────────

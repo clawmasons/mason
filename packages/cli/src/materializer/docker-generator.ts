@@ -21,6 +21,7 @@ import { generateAgentDockerfile } from "../generator/agent-dockerfile.js";
 import { generateProxyDockerfile } from "../generator/proxy-dockerfile.js";
 import { adaptRoleToResolvedAgent } from "@clawmasons/shared";
 import { resolveRoleMountVolumes, type RoleMount } from "../generator/mount-volumes.js";
+import type { DevContainerCustomizations } from "@clawmasons/agent-sdk";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -167,6 +168,8 @@ export interface GenerateBuildDirOptions {
   agentName: string;
   /** Optional: override the proxy endpoint for workspace materialization. */
   proxyEndpoint?: string;
+  /** Dev-container customizations to embed in the agent Dockerfile LABEL. */
+  devContainerCustomizations?: DevContainerCustomizations;
 }
 
 export interface BuildDirResult {
@@ -235,6 +238,7 @@ export function generateRoleDockerBuildDir(
   const agentDockerfile = generateAgentDockerfile(resolvedAgent, agentRole, {
     hasHome,
     dockerfileConfig: agentPkg?.dockerfile,
+    devContainerCustomizations: opts.devContainerCustomizations,
   });
   deps.writeFileSync(path.join(agentDir, "Dockerfile"), agentDockerfile);
 
@@ -434,6 +438,9 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
   for (const vol of resolveRoleMountVolumes(roleMounts)) {
     agentVolumeLines.push(`      - ${vol}`);
   }
+
+  // Logs dir mount
+  agentVolumeLines.push(`      - ${relLogsDir}:/logs`);
 
   // Workspace directory mount (live bind mount for agent-launch.json)
   if (workspacePath) {

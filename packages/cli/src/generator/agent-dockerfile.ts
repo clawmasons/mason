@@ -1,12 +1,15 @@
 import type { ResolvedAgent, ResolvedRole } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
-import type { DockerfileConfig } from "@clawmasons/agent-sdk";
+import type { DockerfileConfig, DevContainerCustomizations } from "@clawmasons/agent-sdk";
+import { DEFAULT_DEV_CONTAINER_CUSTOMIZATIONS } from "@clawmasons/agent-sdk";
 
 export interface AgentDockerfileOptions {
   /** Whether a materialized home directory exists for this agent. */
   hasHome?: boolean;
   /** Dockerfile config from the AgentPackage. */
   dockerfileConfig?: DockerfileConfig;
+  /** Dev-container IDE customizations to embed as LABEL devcontainer.metadata. Defaults to DEFAULT_DEV_CONTAINER_CUSTOMIZATIONS. */
+  devContainerCustomizations?: DevContainerCustomizations;
 }
 
 /**
@@ -42,6 +45,15 @@ export function generateAgentDockerfile(
   const roleShortName = getAppShortName(role.name);
   const hasHome = options?.hasHome ?? false;
   const dockerfileConfig = options?.dockerfileConfig;
+
+  // Build devcontainer.metadata label
+  const customizations = options?.devContainerCustomizations ?? DEFAULT_DEV_CONTAINER_CUSTOMIZATIONS;
+  const devcontainerMetadata = JSON.stringify([{
+    remoteUser: "mason",
+    workspaceFolder: "/home/mason/workspace/project",
+    customizations,
+  }]);
+  const devcontainerLabel = `LABEL devcontainer.metadata='${devcontainerMetadata}'`;
 
   // Determine the runtime — first runtime is the primary one
   const primaryRuntime = agent.runtimes[0] ?? "claude-code";
@@ -102,6 +114,17 @@ RUN (getent group $HOST_GID | cut -d: -f1 | xargs -r groupdel 2>/dev/null || tru
     && mkdir -p /home/mason/workspace/project /home/mason/.claude /home/mason/data /logs \\
     && chown -R mason:mason /home/mason /app /logs
 
+# Login-shell credential injector for dev-container IDE attach (userEnvProbe)
+RUN { \\
+    echo '#!/bin/sh'; \\
+    echo '_LOG=/logs/mason-creds.log'; \\
+    echo 'echo "[$(date -u +%H:%M:%S)] mason-creds.sh sourced" >> "$_LOG" 2>&1'; \\
+    echo '_OUT=$(agent-entry cred-fetch 2>>"$_LOG")'; \\
+    echo '_EXIT=$?'; \\
+    echo 'echo "[$(date -u +%H:%M:%S)] cred-fetch exit=$_EXIT" >> "$_LOG"'; \\
+    echo 'if [ "$_EXIT" -eq 0 ]; then eval "$_OUT"; fi'; \\
+  } > /etc/profile.d/mason-creds.sh && chmod +x /etc/profile.d/mason-creds.sh
+
 # Copy materialized workspace files
 ${workspaceCopyLine}
 RUN chown -R mason:mason /home/mason/workspace
@@ -109,6 +132,9 @@ ${homeCopyLines}${homeBackupLine}
 USER mason
 
 WORKDIR /home/mason/workspace/project
+
+# Dev-container metadata for IDE attachment (VSCode, Cursor, etc.)
+${devcontainerLabel}
 
 # Unified entrypoint — reads agent-launch.json for runtime config
 ENTRYPOINT ["agent-entry"]

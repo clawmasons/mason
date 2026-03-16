@@ -81,6 +81,27 @@ Starts an ACP-compliant endpoint for editor integration via stdio ndjson.
 
 In both modes, the MCP proxy runs in a Docker container and the credential service runs in-process on the host.
 
+### `mason package`
+
+Build and pack a local role from `.mason/roles/<name>/` into a distributable npm `.tgz` package.
+
+```bash
+mason package --role <name>
+```
+
+| Option | Description |
+|--------|-------------|
+| `--role <name>` | **(required)** Role name to package (must exist at `.mason/roles/<name>/ROLE.md`) |
+
+Steps performed:
+1. Loads `ROLE.md` from `.mason/roles/<name>/ROLE.md`
+2. Validates all task and skill references can be resolved from `role.sources`
+3. Assembles build directory at `.mason/roles/<name>/build/`
+4. Generates `package.json` in the build directory (merges user-supplied `package.json` if present)
+5. Runs `npm install`, then `npm run build` if a build script exists, then `npm pack`
+
+Output: `.mason/roles/<name>/build/*.tgz`
+
 ---
 
 ## Chapter Subcommands
@@ -236,3 +257,41 @@ mason chapter proxy [options]
 | `MASON_HOME` | `~/.mason` | Root directory for mason data |
 | `LODGE` | Auto-detected | Current lodge name |
 | `LODGE_HOME` | `$MASON_HOME/$LODGE` | Current lodge directory |
+
+---
+
+## Project Configuration
+
+### `.mason/config.json`
+
+Register custom or third-party agent runtimes for a project. Built-in agents (`claude`, `pi`, `mcp`) are always available; this file lets you add others or configure defaults.
+
+```json
+{
+  "agents": {
+    "claude": {
+      "package": "@clawmasons/claude-code",
+      "role": "writer",
+      "mode": "terminal",
+      "home": "~/my-claude-config"
+    },
+    "my-agent": {
+      "package": "@my-org/my-agent-package"
+    }
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `package` | string | yes | npm package name implementing the Agent Package SDK |
+| `role` | string | no | Default role name when `--role` is omitted |
+| `mode` | `"terminal"` \| `"acp"` \| `"bash"` | no | Default startup mode (overridden by CLI flags) |
+| `home` | string | no | Host path to bind-mount at `/home/mason/` in the agent container; `~` is expanded |
+| `dev-container-customizations` | object | no | VSCode extensions and settings to embed in the agent image at build time |
+
+**Notes:**
+- Config agents can override built-in agent names
+- `--role`, `--acp`, `--bash`, `--home` flags always take precedence over config defaults
+- An invalid `mode` value logs a warning and falls back to `"terminal"`
+- If `home` path does not exist, a warning is logged and the agent still starts
