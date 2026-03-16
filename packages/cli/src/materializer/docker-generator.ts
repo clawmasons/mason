@@ -439,6 +439,9 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
     agentVolumeLines.push(`      - ${vol}`);
   }
 
+  // Logs dir mount
+  agentVolumeLines.push(`      - ${relLogsDir}:/logs`);
+
   // Workspace directory mount (live bind mount for agent-launch.json)
   if (workspacePath) {
     const relWorkspacePath = path.relative(sessionDir, workspacePath);

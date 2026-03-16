@@ -50,7 +50,7 @@ export function generateAgentDockerfile(
   const customizations = options?.devContainerCustomizations ?? DEFAULT_DEV_CONTAINER_CUSTOMIZATIONS;
   const devcontainerMetadata = JSON.stringify([{
     remoteUser: "mason",
-    workspaceFolder: "/workspace/project",
+    workspaceFolder: "/home/mason/workspace/project",
     customizations,
   }]);
   const devcontainerLabel = `LABEL devcontainer.metadata='${devcontainerMetadata}'`;
@@ -113,6 +113,17 @@ RUN (getent group $HOST_GID | cut -d: -f1 | xargs -r groupdel 2>/dev/null || tru
     && groupadd -g $HOST_GID mason && useradd -m -u $HOST_UID -g $HOST_GID mason \\
     && mkdir -p /home/mason/workspace/project /home/mason/.claude /home/mason/data /logs \\
     && chown -R mason:mason /home/mason /app /logs
+
+# Login-shell credential injector for dev-container IDE attach (userEnvProbe)
+RUN { \\
+    echo '#!/bin/sh'; \\
+    echo '_LOG=/logs/mason-creds.log'; \\
+    echo 'echo "[$(date -u +%H:%M:%S)] mason-creds.sh sourced" >> "$_LOG" 2>&1'; \\
+    echo '_OUT=$(agent-entry cred-fetch 2>>"$_LOG")'; \\
+    echo '_EXIT=$?'; \\
+    echo 'echo "[$(date -u +%H:%M:%S)] cred-fetch exit=$_EXIT" >> "$_LOG"'; \\
+    echo 'if [ "$_EXIT" -eq 0 ]; then eval "$_OUT"; fi'; \\
+  } > /etc/profile.d/mason-creds.sh && chmod +x /etc/profile.d/mason-creds.sh
 
 # Copy materialized workspace files
 ${workspaceCopyLine}

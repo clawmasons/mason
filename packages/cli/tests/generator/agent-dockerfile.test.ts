@@ -481,7 +481,7 @@ describe("generateAgentDockerfile devcontainer.metadata label", () => {
     expect(result).toContain("LABEL devcontainer.metadata=");
     expect(result).toContain("remoteUser");
     expect(result).toContain("mason");
-    expect(result).toContain("/workspace/project");
+    expect(result).toContain("/home/mason/workspace/project");
     // Default extensions
     expect(result).toContain("anthropic.claude-code");
   });

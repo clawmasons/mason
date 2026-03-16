@@ -248,7 +248,10 @@ export function generateComposeYml(opts: {
     agentVolumeLines.push(`      - "${opts.vscodeSeverHostPath}:/home/mason/.vscode-server"`);
   }
 
-  // 5. Role-declared extra mounts
+  // 5. Logs dir mount
+  agentVolumeLines.push(`      - "${logsDir}:/logs"`);
+
+  // 6. Role-declared extra mounts
   for (const vol of resolveRoleMountVolumes(roleMounts)) {
     agentVolumeLines.push(`      - "${vol}"`);
   }
@@ -955,7 +958,19 @@ async function runAgentDevContainerMode(
     fs.mkdirSync(vscodeSeverHostPath, { recursive: true });
 
     const serverEnvSetupPath = path.join(vscodeSeverHostPath, "server-env-setup");
-    const serverEnvSetupContent = `eval "$(agent-entry cred-fetch)"\n`;
+    const serverEnvSetupContent = [
+      "#!/bin/sh",
+      "_LOG=/logs/server-env-setup.log",
+      `echo "[$(date -u +%H:%M:%S)] server-env-setup: MCP_PROXY_TOKEN=\${MCP_PROXY_TOKEN:+set} MCP_PROXY_URL=\${MCP_PROXY_URL} AGENT_CREDENTIALS=\${AGENT_CREDENTIALS}" >> "$_LOG" 2>&1`,
+      `_OUT=$(agent-entry cred-fetch 2>>"$_LOG")`,
+      "_EXIT=$?",
+      `echo "[$(date -u +%H:%M:%S)] cred-fetch exit=$_EXIT output_len=\${#_OUT}" >> "$_LOG"`,
+      `if [ "$_EXIT" -eq 0 ]; then`,
+      `  eval "$_OUT"`,
+      `  echo "[$(date -u +%H:%M:%S)] CLAUDE_CODE_OAUTH_TOKEN=\${CLAUDE_CODE_OAUTH_TOKEN:+set}" >> "$_LOG"`,
+      "fi",
+      "",
+    ].join("\n");
     if (!fs.existsSync(serverEnvSetupPath) ||
         fs.readFileSync(serverEnvSetupPath, "utf-8") !== serverEnvSetupContent) {
       fs.writeFileSync(serverEnvSetupPath, serverEnvSetupContent, { mode: 0o755 });
@@ -1049,7 +1064,7 @@ async function runAgentDevContainerMode(
   │  Dev-Container Ready                                        │
   ├─────────────────────────────────────────────────────────────┤
   │  Container:  ${containerName.padEnd(47)}│
-  │  Workspace:  /workspace/project                             │
+  │  Workspace:  /home/mason/workspace/project                  │
   │                                                             │
   │  To attach from any dev-container-compatible IDE:           │
   │    1. Open the Remote Explorer                              │
@@ -1061,7 +1076,7 @@ async function runAgentDevContainerMode(
 `);
 
     // 12. Prompt to launch VSCode
-    await promptAndLaunchVscode(containerName, "/workspace/project");
+    await promptAndLaunchVscode(containerName, "/home/mason/workspace/project");
 
     // 13. Stay alive until Ctrl+C
     console.log(`  Session running. Press Ctrl+C to tear down.\n`);

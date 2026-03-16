@@ -35,7 +35,6 @@ export const DEFAULT_DEV_CONTAINER_CUSTOMIZATIONS: DevContainerCustomizations = 
       "esbenp.prettier-vscode",
       "yoavbls.pretty-ts-errors",
       "usernamehw.errorlens",
-      "eamodio.gitlens",
       "editorconfig.editorconfig",
     ],
     settings: {

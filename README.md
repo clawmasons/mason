@@ -1,72 +1,68 @@
 # Mason
 
-npm-native packaging, governance, and runtime portability for AI agent roles.
+Mason is a MIT licensed tool provided by Clawmasons, to help you run your agents in containers, ASAP
 
-## Why Mason?
 
-AI agents need tools, but tool access today is ungoverned. Credentials leak via environment variables. There's no audit trail. Agent definitions are locked to a single runtime.
+# Why?  
+ 1. skills are not to be trusted (npx skill add? OMG) [learn nore]
+ 2. LLMs are not to be trusted [learn more]
+ 3. Agent frameworks are not to be trusted (see #2) [learn more]
+ 4. If less people can be hacked, we will have less hackers putting shit out there [learn more]
 
-Mason solves this:
+# How we'll get there
 
-- **Credential isolation** — Secrets resolved on-demand, never in env vars or Docker inspect
-- **Role-based tool filtering** — Agents only see tools their role permits
-- **Audit logging** — Every tool call and credential access logged
-- **Runtime portability** — Same role definition works on Claude Code, Codex, Aider, and more
-- **Local-first authoring** — Define a role as a `ROLE.md` file and run it immediately
-- **npm-native** — Package and share roles with standard npm tooling
+`mason` combines security and productivity improvements to make it a no-brainer.
+
+### How it improves your life
+- **Define once, run on Any Agent, Anywhere** 
+  - Continue to define skills in your agent of choice, mason can run them on any supported agent in a docker container  
+  - Once mason roles are setup, anyone with access to your project can securily run their agents
+- Seamless mcp server re-authentication [learn why this is easy for us]
+- Launch project in a dev-container with agent enabled [learn more]
+- [learn more about mason productivity improvements]
+
+## How it improves security
+ - **Docker Container** - First step, sandbox the agent into a container. Do this now even if you click away from this project.  
+ - **Agents access scoped by Role** — Agents only see tools and skills, credentials their role permits
+ - **MCP proxy** - MCP servers run on a different container and Agents never see the credentials.  
+ - [learn more about security]
+
 
 ## Install
 
+TODO: add prerequisits of 
+  - docker
+  - Claude Code installed, and CLAUDE_CODE_OAUTH_TOKEN exported (via claude setup-token)
+
+  COMING soon  
+  - use OPENROUTER_API_KEY  to run
+    - opencode
+    - codex
+    - pi-mono-agent
+
 ```bash
-npm install -g @clawmasons/chapter
+npm install -g @clawmasons/mason
 ```
+
+## Run your agent in a contianer
+```
+cd ~/your-project
+mason 
+mason claude
+```
+
+Congrats, you now have limited your agent to just your project instead of your whole computer
+
+Notice: agent started with a prepacked role "setup" which will help you completely setup your project.
+  - Define roles to control agent access [learn more about roles]
+  - Setup operating system tools in your container, and MCP servers [learn more]
+  - Add more agents to run your project 
+
+Once setup is complete, you can run your project on any agent as any role.
+
 
 ## Quick Start
 
-### Option 1: Local Role (recommended)
-
-Create a `ROLE.md` file in your project:
-
-```bash
-mkdir -p .claude/roles/writer
-cat > .claude/roles/writer/ROLE.md << 'EOF'
----
-name: writer
-description: A writing assistant with access to GitHub tools
-mcp_servers:
-  - name: github
-    tools:
-      allow: ['create_issue', 'list_repos']
----
-
-You are a technical writer. Help create clear documentation.
-EOF
-```
-
-Run it:
-
-```bash
-mason run claude --role writer
-```
-
-### Option 2: Chapter Workspace
-
-```bash
-# Initialize a lodge (organizational container)
-mason init
-
-# Create a chapter workspace with the note-taker template
-mason chapter init --name acme.platform --template note-taker
-cd acme.platform
-
-# Build all roles
-mason chapter build
-
-# Run a role
-mason run claude --role note-taker
-```
-
-This spins up an MCP proxy (tool filtering), credential service (secret management), and agent container — all governed by the role's permissions.
 
 ## How It Works
 
@@ -99,8 +95,6 @@ container:
 risk: LOW
 credentials: ['GITHUB_TOKEN']
 ---
-
-You are a PRD author. Create clear, well-structured requirements documents.
 ```
 
 The `ROLE.md` uses agent-native field names (e.g., `commands` for Claude Code, `instructions` for Codex). The system normalizes these to a generic representation (ROLE_TYPES) and can materialize the role for any supported runtime.
@@ -109,12 +103,10 @@ The `ROLE.md` uses agent-native field names (e.g., `commands` for Claude Code, `
 
 | Command | Description |
 |---------|-------------|
-| `mason run <agent-type> --role <name>` | Run a role on the specified agent runtime |
-| `mason <agent-type> --role <name>` | Shorthand for `run` |
-| `mason run <agent-type> --role <name> --acp` | Run as an ACP server |
-| `mason chapter build` | Build: resolve + materialize Docker dirs for all roles |
-| `mason chapter list` | List available roles (local + installed) |
-| `mason chapter validate` | Validate role definitions and dependency graphs |
+| `mason run <agent> --role <name>` | Run a role on the specified agent runtime |
+| `mason <agent> --role <name>` | Shorthand for `run` |
+| `mason run <agent> --role <name> --acp` | Run as an ACP server |
+| `mason run <agent> --role <name> --dev-container` | Run a dev container with Agent enabled within VScode |
 
 ## Documentation
 
@@ -129,7 +121,13 @@ The `ROLE.md` uses agent-native field names (e.g., `commands` for Claude Code, `
 | [MCP Proxy](docs/component-mcp-proxy.md) | Tool filtering and routing |
 | [Credential Service](docs/component-credential-service.md) | Secure credential resolution |
 
-## Editor Integration (ACP)
+## Editor Integration
+
+Use Vscode with a remote dev container
+```bash
+mason run claude --role writer --dev-container
+```
+
 
 Integrate with your editor via the Agent Communication Protocol:
 

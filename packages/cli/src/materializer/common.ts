@@ -39,10 +39,11 @@ export function generateAgentLaunchJson(
   runtime: string,
   roleCredentials: string[],
   acpMode?: boolean,
+  instructions?: string,
 ): string {
   const agentPkg = getAgentFromRegistry(runtime);
   if (agentPkg) {
-    return sdkGenerateAgentLaunchJson(agentPkg, roleCredentials, acpMode);
+    return sdkGenerateAgentLaunchJson(agentPkg, roleCredentials, acpMode, instructions);
   }
 
   // Fallback for unknown runtimes: create a minimal AgentPackage-like object
@@ -52,5 +53,5 @@ export function generateAgentLaunchJson(
     runtime: { command: runtime },
     acp: ACP_RUNTIME_COMMANDS[runtime] ? { command: ACP_RUNTIME_COMMANDS[runtime] } : undefined,
   };
-  return sdkGenerateAgentLaunchJson(fallbackPkg, roleCredentials, acpMode);
+  return sdkGenerateAgentLaunchJson(fallbackPkg, roleCredentials, acpMode, instructions);
 }

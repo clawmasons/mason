@@ -22,6 +22,7 @@ RUN npm install -g @anthropic-ai/claude-code
     credentials: [
       { key: "CLAUDE_CODE_OAUTH_TOKEN", type: "env" },
     ],
+    supportsInitialPrompt: true,
   },
 };
 

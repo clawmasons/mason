@@ -302,9 +302,10 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     }
 
     // agent-launch.json — tells agent-entry how to bootstrap this agent
+    const roleInstructions = agent.roles[0]?.instructions;
     result.set(
       "agent-launch.json",
-      generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode),
+      generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode, roleInstructions),
     );
 
     return result;

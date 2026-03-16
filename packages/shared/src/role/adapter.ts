@@ -94,6 +94,7 @@ function buildResolvedRole(role: RoleType, version: string): ResolvedRole {
     name: role.metadata.name,
     version,
     description: role.metadata.description,
+    instructions: role.instructions,
     risk: role.governance.risk ?? "LOW",
     permissions,
     tasks,

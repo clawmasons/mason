@@ -61,6 +61,7 @@ export interface ResolvedRole {
   name: string;
   version: string;
   description?: string;
+  instructions?: string;
   risk: "HIGH" | "MEDIUM" | "LOW";
   permissions: Record<string, { allow: string[]; deny: string[] }>;
   constraints?: {
