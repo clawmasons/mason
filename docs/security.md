@@ -29,7 +29,7 @@ Credentials are resolved in priority order:
 
 ## Role-Based Access Control
 
-Every agent runs under a [role](chapter-role.md) that defines explicit tool permissions:
+Every agent runs under a [role](role.md) that defines explicit tool permissions:
 
 ```json
 {
@@ -108,5 +108,5 @@ Tokens are generated per session and not reused.
 
 - [Credential Service](component-credential-service.md) — How credentials are resolved
 - [MCP Proxy](component-mcp-proxy.md) — Runtime enforcement of permissions
-- [Role](chapter-role.md) — Defining permissions and risk levels
+- [Role](role.md) — Defining permissions and risk levels
 - [Architecture](architecture.md) — Full runtime architecture

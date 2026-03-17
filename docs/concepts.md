@@ -10,14 +10,12 @@ Mason organizes AI agent roles using a hierarchy of composable npm packages. Eac
 ## Hierarchy
 
 ```
-Lodge (organizational container)
-  └── Chapter (npm workspace)
-        └── Role (deployable unit / permission boundary)
-              ├── Task (unit of work)
-              │     ├── App (MCP server / tools)
-              │     └── Skill (knowledge artifact)
-              ├── App (direct dependency)
-              └── Skill (direct dependency)
+Role (deployable unit / permission boundary)
+  ├── Task (unit of work)
+  │     ├── App (MCP server / tools)
+  │     └── Skill (knowledge artifact)
+  ├── App (direct dependency)
+  └── Skill (direct dependency)
 ```
 
 ## The Four Package Types
@@ -26,10 +24,10 @@ Every component is a standard npm package with a `chapter` field in its `package
 
 | Type | Purpose | Key Responsibility |
 |------|---------|-------------------|
-| [App](chapter-app.md) | MCP server | Provides tools to agents |
-| [Skill](chapter-skill.md) | Knowledge artifact | Provides context and conventions |
-| [Task](chapter-task.md) | Unit of work | Defines what agents do |
-| [Role](chapter-role.md) | Deployable unit | Combines tasks, tools, permissions, and system prompt |
+| [App](app.md) | MCP server | Provides tools to agents |
+| [Skill](skill.md) | Knowledge artifact | Provides context and conventions |
+| [Task](task.md) | Unit of work | Defines what agents do |
+| [Role](role.md) | Deployable unit | Combines tasks, tools, permissions, and system prompt |
 
 ## How They Compose
 
@@ -73,13 +71,6 @@ Or as a published npm package with a `chapter` field in `package.json`:
 
 The role `@acme/role-writer` might reference the task `@acme/task-take-notes`, which requires the app `@acme/app-filesystem`. The role's permissions then specify exactly which filesystem tools the agent can use.
 
-## Organizational Containers
-
-| Concept | Purpose | Details |
-|---------|---------|---------|
-| [Lodge](lodge.md) | Organizational container | Governance boundary with a charter |
-| [Chapter](chapter.md) | npm workspace | Development workspace containing packages |
-
 ## Everything Is a package.json
 
 The `chapter` field in `package.json` is the single source of truth for each component's configuration. This means:
@@ -89,10 +80,10 @@ The `chapter` field in `package.json` is the single source of truth for each com
 - **Portability** — Packages can be published to any npm registry
 - **Type safety** — All fields are validated with Zod schemas
 
-For local development, roles can also be defined as `ROLE.md` files that bypass npm packaging entirely. See [Role](chapter-role.md) for the ROLE.md format.
+For local development, roles can also be defined as `ROLE.md` files that bypass npm packaging entirely. See [Role](role.md) for the ROLE.md format.
 
 ## Next Steps
 
-- Start with [Role](chapter-role.md) to understand the primary deployable unit
+- Start with [Role](role.md) to understand the primary deployable unit
 - Read [Architecture](architecture.md) for how it all runs at runtime
 - See [Getting Started](get-started.md) to run your first role

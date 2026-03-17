@@ -13,19 +13,17 @@ npm install -g @clawmasons/mason
 
 ## Top-Level Commands
 
-### `mason init`
+### `mason configure`
 
-Initialize a new lodge.
+Configure a project for mason
 
 ```bash
-mason init [options]
+mason configure [options]
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--lodge <name>` | Lodge name (overrides `LODGE` env var) |
-| `--lodge-home <path>` | Lodge home directory (overrides `LODGE_HOME` env var) |
-| `--home <path>` | Mason home directory (overrides `MASON_HOME` env var) |
+| `--agent <name>` | What agent you want to run configure as |
 
 ### `mason run`
 
@@ -43,8 +41,7 @@ mason run <agent-type> --role <name> [options]
 |--------|-------------|
 | `--role <name>` | **(required)** Role name to run |
 | `--acp` | Start in ACP mode for editor integration (stdio ndjson) |
-| `--proxy-port <number>` | Internal proxy port (default: `3000`) |
-| `--chapter <name>` | Chapter name (use `initiate` for bootstrap flow, ACP mode) |
+| `--dev-container` | Start in dev container mode for editor integration (stdio ndjson) |
 
 **Shorthand**: You can omit `run` — `mason <agent-type> --role <name>` is equivalent.
 

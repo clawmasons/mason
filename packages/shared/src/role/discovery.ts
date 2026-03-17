@@ -113,8 +113,9 @@ async function discoverLocalRoles(projectDir: string): Promise<Role[]> {
     try {
       const role = await readMaterializedRole(roleMdPath);
       roles.push(role);
-    } catch {
-      // Malformed ROLE.md — skip during discovery (log would go here)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[mason] Skipping invalid ROLE.md at ${roleMdPath}: ${msg}`);
       continue;
     }
   }
@@ -139,7 +140,9 @@ async function findLocalRole(
 
   try {
     return await readMaterializedRole(roleMdPath);
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[mason] Invalid ROLE.md at ${roleMdPath}: ${msg}`);
     return undefined;
   }
 }

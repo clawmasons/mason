@@ -99,6 +99,6 @@ At runtime, the MCP proxy prefixes tool names with a short app identifier to avo
 
 ## Related
 
-- [Role](chapter-role.md) — Roles define which app tools are permitted
-- [Task](chapter-task.md) — Tasks declare which apps they require
+- [Role](role.md) — Roles define which app tools are permitted
+- [Task](task.md) — Tasks declare which apps they require
 - [MCP Proxy](component-mcp-proxy.md) — Manages app connections and tool routing
