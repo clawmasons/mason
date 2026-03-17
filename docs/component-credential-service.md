@@ -74,4 +74,4 @@ In **ACP mode** (`mason run <agent-type> --role <name> --acp`), credentials from
 - [MCP Proxy](component-mcp-proxy.md) — Relays credential requests from agents
 - [Security](security.md) — Full security model including credential isolation
 - [Architecture](architecture.md) — How the credential service fits in the runtime
-- [Role](chapter-role.md) — How roles declare credentials
+- [Role](role.md) — How roles declare credentials

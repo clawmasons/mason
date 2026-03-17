@@ -44,22 +44,30 @@ export const mountConfigSchema = z.object({
   readonly: z.boolean().optional().default(false),
 });
 
+const nullToUndefined = (val: unknown) => val ?? undefined;
+
 export const containerRequirementsSchema = z.object({
-  packages: z
-    .object({
-      apt: z.array(z.string()).optional().default([]),
-      npm: z.array(z.string()).optional().default([]),
-      pip: z.array(z.string()).optional().default([]),
-    })
-    .optional()
-    .default({}),
-  ignore: z
-    .object({
-      paths: z.array(z.string()).optional().default([]),
-    })
-    .optional()
-    .default({}),
-  mounts: z.array(mountConfigSchema).optional().default([]),
+  packages: z.preprocess(
+    nullToUndefined,
+    z
+      .object({
+        apt: z.array(z.string()).optional().default([]),
+        npm: z.array(z.string()).optional().default([]),
+        pip: z.array(z.string()).optional().default([]),
+      })
+      .optional()
+      .default({}),
+  ),
+  ignore: z.preprocess(
+    nullToUndefined,
+    z
+      .object({
+        paths: z.array(z.string()).optional().default([]),
+      })
+      .optional()
+      .default({}),
+  ),
+  mounts: z.preprocess(nullToUndefined, z.array(mountConfigSchema).optional().default([])),
   baseImage: z.string().optional(),
 });
 

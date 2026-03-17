@@ -174,6 +174,4 @@ CLI flags take precedence over environment variables, which take precedence over
 ## Related
 
 - [Getting Started](get-started.md) — Walk through the full setup process
-- [Chapter](chapter.md) — Workspace management details
-- [Lodge](lodge.md) — Organizational containers
 - [Architecture](architecture.md) — Runtime sequence diagrams

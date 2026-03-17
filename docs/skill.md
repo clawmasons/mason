@@ -60,11 +60,11 @@ How artifacts are delivered depends on the runtime materializer:
 
 - Keep each skill focused on one topic
 - Version skills independently — update conventions without changing tasks
-- Compose multiple skills via [roles](chapter-role.md) for different contexts
+- Compose multiple skills via [roles](role.md) for different contexts
 - Write artifacts in clear, concise markdown that an LLM can follow
 
 ## Related
 
-- [Task](chapter-task.md) — Tasks reference skills they need
-- [Role](chapter-role.md) — Roles collect skills for permission boundaries
+- [Task](task.md) — Tasks reference skills they need
+- [Role](role.md) — Roles collect skills for permission boundaries
 - [Concepts](concepts.md) — How skills fit in the package hierarchy

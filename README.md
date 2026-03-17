@@ -3,11 +3,11 @@
 Mason is a MIT licensed tool provided by Clawmasons, to help you run your agents in containers, ASAP
 
 
-# Why?  
- 1. skills are not to be trusted (npx skill add? OMG) [learn nore]
- 2. LLMs are not to be trusted [learn more]
- 3. Agent frameworks are not to be trusted (see #2) [learn more]
- 4. If less people can be hacked, we will have less hackers putting shit out there [learn more]
+# Why?
+ 1. Skills are not to be trusted (running arbitrary code from npm is a real risk) — [learn more]
+ 2. LLMs are not to be trusted — [learn more]
+ 3. Agent frameworks are not to be trusted (see #2) — [learn more]
+ 4. Fewer compromised machines means fewer incentives for attackers — [learn more]
 
 # How we'll get there
 
@@ -16,47 +16,45 @@ Mason is a MIT licensed tool provided by Clawmasons, to help you run your agents
 ### How it improves your life
 - **Define once, run on Any Agent, Anywhere** 
   - Continue to define skills in your agent of choice, mason can run them on any supported agent in a docker container  
-  - Once mason roles are setup, anyone with access to your project can securily run their agents
+  - Once mason roles are set up, anyone with access to your project can securely run their agents
   - run with a different Agent during outages
-- Seamless mcp server re-authentication [learn why this is easy for us]
-- Launch project in a dev-container with agent enabled [learn more]
+- Seamless MCP server re-authentication [learn why this is easy for us]
+- Launch a project in a dev-container with agent enabled [learn more]
 - [learn more about mason productivity improvements]
 
 ## How it improves security
- - **Docker Container** - First step, sandbox the agent into a container. Do this now even if you click away from this project.  
- - **Agents access scoped by Role** — Agents only see tools and skills, credentials their role permits
- - **MCP proxy** - MCP servers run on a different container and Agents never see the credentials.  
- - [learn more about security]
+ - **Docker Container** — First step: sandbox the agent into a container. Start here, even if you explore other features later.
+ - **Securely share credentials with agents** — 
+   - Know what tools the agent is going to use credentials for
+   - Agents use a separate MCP proxy to run the tools, which enforces the role permissions
+   - Agents never have direct access to your mcp tool credentials
+   - [learn more about security]
 
+
+## Prerequisites
+
+- **Docker** — Required for running agents in containers
+- **Claude Code** — Installed and authenticated (`claude setup-token` exports `CLAUDE_CODE_OAUTH_TOKEN`)
 
 ## Install
-
-TODO: add prerequisits of 
-  - docker
-  - Claude Code installed, and CLAUDE_CODE_OAUTH_TOKEN exported (via claude setup-token)
-
-  COMING soon  
-  - use OPENROUTER_API_KEY  to run
-    - opencode
-    - codex
-    - pi-mono-agent
 
 ```bash
 npm install -g @clawmasons/mason
 ```
 
-## Run your agent in a contianer
-```
+## Run your agent in a container
+
+```bash
 cd ~/your-project
-mason 
+mason
 mason claude
 ```
 
-Congrats, you now have limited your agent to just your project instead of your whole computer
+Your agent is now sandboxed to your project directory instead of your entire computer.
 
-Notice: agent started with a prepacked role "setup" which will help you completely setup your project.
+The agent starts with a pre-packaged "setup" role that walks you through configuring your project:
   - Define roles to control agent access [learn more about roles]
-  - Setup operating system tools in your container, and MCP servers [learn more]
+  - Set up operating system tools in your container, and MCP servers [learn more]
   - Add more agents to run your project 
 
 Once setup is complete, you can run your project on any agent as any role.
@@ -115,7 +113,7 @@ The `ROLE.md` uses agent-native field names (e.g., `commands` for Claude Code, `
 |-----|-------------|
 | [Overview](docs/overview.md) | What Mason is and why it matters |
 | [Getting Started](docs/get-started.md) | Install and run your first role |
-| [Core Concepts](docs/concepts.md) | Lodges, chapters, roles, tasks, skills, apps |
+| [Core Concepts](docs/concepts.md) | Roles, tasks, skills, apps, and how they compose |
 | [Architecture](docs/architecture.md) | Runtime architecture with sequence diagrams |
 | [CLI Reference](docs/cli.md) | Complete command reference |
 | [Security Model](docs/security.md) | Credentials, permissions, audit logging |
@@ -124,7 +122,7 @@ The `ROLE.md` uses agent-native field names (e.g., `commands` for Claude Code, `
 
 ## Editor Integration
 
-Use Vscode with a remote dev container
+Use VSCode with a remote dev container
 ```bash
 mason run claude --role writer --dev-container
 ```

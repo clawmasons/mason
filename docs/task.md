@@ -5,7 +5,7 @@ description: Unit of work that agents execute
 
 # Task
 
-A **task** is a unit of work that defines what an agent does. Tasks declare what [apps](chapter-app.md) and [skills](chapter-skill.md) they need, and can be composed into workflows.
+A **task** is a unit of work that defines what an agent does. Tasks declare what [apps](app.md) and [skills](skill.md) they need, and can be composed into workflows.
 
 ## Package Definition
 
@@ -100,6 +100,6 @@ Composite tasks orchestrate sub-tasks:
 
 ## Related
 
-- [Role](chapter-role.md) — Roles reference tasks to make them available
-- [App](chapter-app.md) — Tools that tasks require
-- [Skill](chapter-skill.md) — Knowledge that tasks use
+- [Role](role.md) — Roles reference tasks to make them available
+- [App](app.md) — Tools that tasks require
+- [Skill](skill.md) — Knowledge that tasks use
