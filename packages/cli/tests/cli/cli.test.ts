@@ -142,4 +142,18 @@ describe("CLI entry point", () => {
       expect(agentTypeOpt).toBeUndefined();
     }
   });
+
+  it("has top-level configure command registered", () => {
+    const configureCmd = program.commands.find((cmd) => cmd.name() === "configure");
+    expect(configureCmd).toBeDefined();
+  });
+
+  it("configure command does not have --role option", () => {
+    const configureCmd = program.commands.find((cmd) => cmd.name() === "configure");
+    expect(configureCmd).toBeDefined();
+    if (configureCmd) {
+      const roleOption = configureCmd.options.find((opt) => opt.long === "--role");
+      expect(roleOption).toBeUndefined();
+    }
+  });
 });

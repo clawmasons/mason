@@ -4,7 +4,7 @@ import { registerListCommand } from "./list.js";
 import { registerPackageCommand } from "./package.js";
 import { registerPermissionsCommand } from "./permissions.js";
 import { registerProxyCommand } from "./proxy.js";
-import { registerRunCommand, isKnownAgentType } from "./run-agent.js";
+import { registerRunCommand, registerConfigureCommand, isKnownAgentType } from "./run-agent.js";
 import { registerValidateCommand } from "./validate.js";
 import { readConfigAgentNames } from "@clawmasons/agent-sdk";
 
@@ -19,6 +19,7 @@ import { readConfigAgentNames } from "@clawmasons/agent-sdk";
 export function registerCommands(program: Command): void {
   // Top-level commands
   registerRunCommand(program);
+  registerConfigureCommand(program);
   registerPackageCommand(program);
 
   // `chapter` subcommand group
