@@ -1,7 +1,8 @@
 {
   "name": "@clawmasons/mcp-proxy",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Placeholder package for namespace protection. See https://github.com/clawmasons/chapter",
+  "files": [],
   "license": "MIT",
   "repository": {
     "type": "git",

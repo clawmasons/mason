@@ -15,8 +15,11 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
+  "files": [
+    "dist"
+  ],
   "license": "MIT",
   "dependencies": {
-    "@clawmasons/shared": "*"
+    "@clawmasons/shared": "0.1.0"
   }
 }

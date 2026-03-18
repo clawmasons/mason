@@ -1,7 +1,7 @@
 {
   "name": "@clawmasons/shared",
   "version": "0.1.0",
-  "description": "Shared types, schemas, and utilities for Mason Chapter",
+  "description": "Shared types, schemas, and utilities for mason command line",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,6 +15,9 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
+  "files": [
+    "dist"
+  ],
   "license": "MIT",
   "dependencies": {
     "js-yaml": "^4.1.1",

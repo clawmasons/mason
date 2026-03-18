@@ -15,9 +15,12 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
+  "files": [
+    "dist"
+  ],
   "license": "MIT",
   "dependencies": {
-    "@clawmasons/agent-sdk": "*",
-    "@clawmasons/shared": "*"
+    "@clawmasons/agent-sdk": "0.1.0",
+    "@clawmasons/shared": "0.1.0"
   }
 }

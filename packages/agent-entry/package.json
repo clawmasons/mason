@@ -19,6 +19,9 @@
     "build:types": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
+  "files": [
+    "dist"
+  ],
   "license": "MIT",
   "dependencies": {},
   "devDependencies": {

@@ -15,9 +15,12 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
+  "files": [
+    "dist"
+  ],
   "license": "MIT",
   "dependencies": {
-    "@clawmasons/shared": "*",
+    "@clawmasons/shared": "0.1.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "better-sqlite3": "^12.6.2",
     "ws": "^8.19.0"

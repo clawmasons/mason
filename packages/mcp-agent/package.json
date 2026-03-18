@@ -23,11 +23,14 @@
     "build:types": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
+  "files": [
+    "dist"
+  ],
   "license": "MIT",
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.16.0",
-    "@clawmasons/agent-sdk": "*",
-    "@clawmasons/shared": "*"
+    "@clawmasons/agent-sdk": "0.1.0",
+    "@clawmasons/shared": "0.1.0"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
