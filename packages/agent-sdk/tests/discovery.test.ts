@@ -402,4 +402,68 @@ describe("loadConfigAgentEntry", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("parses credentials array correctly", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: {
+          claude: { package: "@clawmasons/claude-code", credentials: ["MY_KEY", "OTHER_KEY"] },
+        },
+      });
+
+      const entry = loadConfigAgentEntry(tmpDir, "claude");
+      expect(entry?.credentials).toEqual(["MY_KEY", "OTHER_KEY"]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("leaves credentials undefined when field is absent", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { claude: { package: "@clawmasons/claude-code" } },
+      });
+
+      const entry = loadConfigAgentEntry(tmpDir, "claude");
+      expect(entry?.credentials).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("warns and ignores credentials when value is not an array", () => {
+    const tmpDir = makeTmpDir();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { myagent: { package: "@foo/bar", credentials: "MY_KEY" } },
+      });
+
+      const entry = loadConfigAgentEntry(tmpDir, "myagent");
+      expect(entry?.credentials).toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("invalid credentials"));
+    } finally {
+      vi.restoreAllMocks();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("warns and skips non-string entries in credentials array", () => {
+    const tmpDir = makeTmpDir();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { myagent: { package: "@foo/bar", credentials: ["VALID_KEY", 123, null] } },
+      });
+
+      const entry = loadConfigAgentEntry(tmpDir, "myagent");
+      expect(entry?.credentials).toEqual(["VALID_KEY"]);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("non-string entry"));
+    } finally {
+      vi.restoreAllMocks();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });

@@ -188,6 +188,41 @@ describe("materializeForAgent", () => {
       const launchConfig = JSON.parse(result.get("agent-launch.json")!);
       expect(launchConfig.command).toBe("claude-agent-acp");
     });
+
+    it("includes agent-config credentials in agent-launch.json", () => {
+      const role = makeTestRole();
+      const result = materializeForAgent(role, "claude-code", undefined, undefined, {
+        agentConfigCredentials: ["MY_PROJECT_KEY"],
+      });
+
+      const launchConfig = JSON.parse(result.get("agent-launch.json")!);
+      const cred = launchConfig.credentials.find((c: { key: string }) => c.key === "MY_PROJECT_KEY");
+      expect(cred).toBeDefined();
+      expect(cred.type).toBe("env");
+    });
+
+    it("deduplicates agent-config credentials already declared in role governance", () => {
+      const role = makeTestRole();
+      role.governance.credentials = ["SHARED_KEY"];
+      const result = materializeForAgent(role, "claude-code", undefined, undefined, {
+        agentConfigCredentials: ["SHARED_KEY"],
+      });
+
+      const launchConfig = JSON.parse(result.get("agent-launch.json")!);
+      const matches = launchConfig.credentials.filter((c: { key: string }) => c.key === "SHARED_KEY");
+      expect(matches).toHaveLength(1);
+    });
+
+    it("deduplicates agent-config credentials already declared in SDK runtime.credentials", () => {
+      const role = makeTestRole();
+      const result = materializeForAgent(role, "claude-code", undefined, undefined, {
+        agentConfigCredentials: ["CLAUDE_CODE_OAUTH_TOKEN"],
+      });
+
+      const launchConfig = JSON.parse(result.get("agent-launch.json")!);
+      const matches = launchConfig.credentials.filter((c: { key: string }) => c.key === "CLAUDE_CODE_OAUTH_TOKEN");
+      expect(matches).toHaveLength(1);
+    });
   });
 
   describe("Cross-agent materialization (Claude role -> Codex output)", () => {

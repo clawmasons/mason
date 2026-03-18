@@ -57,6 +57,8 @@ export interface AgentEntryConfig {
   role?: string;
   /** Dev-container IDE extensions and settings to embed in the agent image at build time */
   devContainerCustomizations?: DevContainerCustomizations;
+  /** Additional credential env var keys required by this agent in the current project */
+  credentials?: string[];
 }
 
 /**
@@ -109,6 +111,22 @@ function parseEntryConfig(name: string, raw: unknown): AgentEntryConfig | null {
       typeof obj["dev-container-customizations"] === "object" &&
       obj["dev-container-customizations"] !== null) {
     entry.devContainerCustomizations = obj["dev-container-customizations"] as DevContainerCustomizations;
+  }
+
+  if (obj.credentials !== undefined) {
+    if (!Array.isArray(obj.credentials)) {
+      console.warn(`[agent-sdk] Agent "${name}" has invalid credentials value (expected array). Ignoring.`);
+    } else {
+      const validKeys: string[] = [];
+      for (const item of obj.credentials) {
+        if (typeof item === "string") {
+          validKeys.push(item);
+        } else {
+          console.warn(`[agent-sdk] Agent "${name}" credentials contains non-string entry "${String(item)}". Skipping.`);
+        }
+      }
+      entry.credentials = validKeys;
+    }
   }
 
   return entry;

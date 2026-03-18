@@ -170,6 +170,8 @@ export interface GenerateBuildDirOptions {
   proxyEndpoint?: string;
   /** Dev-container customizations to embed in the agent Dockerfile LABEL. */
   devContainerCustomizations?: DevContainerCustomizations;
+  /** Additional credential env var keys from agent config (.mason/config.json) to include in agent-launch.json. */
+  agentConfigCredentials?: string[];
 }
 
 export interface BuildDirResult {
@@ -256,10 +258,12 @@ export function generateRoleDockerBuildDir(
         resolvedAgent,
         proxyEp,
         undefined,
-        undefined,
+        opts.agentConfigCredentials?.length ? { agentConfigCredentials: opts.agentConfigCredentials } : undefined,
         !fsDeps ? path.join(agentDir, "home") : undefined,
       )
-    : materializeForAgent(role, agentType, proxyEp);
+    : materializeForAgent(role, agentType, proxyEp, undefined,
+        opts.agentConfigCredentials?.length ? { agentConfigCredentials: opts.agentConfigCredentials } : undefined,
+      );
   const workspaceDir = path.join(agentDir, "workspace");
   const buildWorkspaceProjectDir = path.join(agentDir, "build", "workspace", "project");
   const homeBuildDir = path.join(agentDir, "home");

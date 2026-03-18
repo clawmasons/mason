@@ -367,7 +367,7 @@ async function ensureDockerBuild(
   roleType: Role,
   agentType: string,
   projectDir: string,
-  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations },
+  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations; agentConfigCredentials?: string[] },
 ): Promise<{ dockerBuildDir: string; dockerDir: string }> {
   const existsSync = deps?.existsSyncFn ?? fs.existsSync;
   const roleName = getAppShortName(roleType.metadata.name);
@@ -398,6 +398,7 @@ async function ensureDockerBuild(
       projectDir,
       agentName: roleName,
       devContainerCustomizations: deps?.devContainerCustomizations,
+      agentConfigCredentials: deps?.agentConfigCredentials,
     });
 
     // Populate shared proxy dependencies
@@ -624,6 +625,7 @@ function createRunAction(overrideRole?: string) {
         acp: true,
         proxyPort: parseInt(options.proxyPort, 10),
         homeOverride,
+        agentConfigCredentials: configEntry?.credentials,
       });
     } else if (options.devContainer) {
       await runAgent(projectDir, resolvedAgentType, role, undefined, {
@@ -633,6 +635,7 @@ function createRunAction(overrideRole?: string) {
         verbose: options.verbose,
         homeOverride,
         devContainerCustomizations: (configEntry as { devContainerCustomizations?: DevContainerCustomizations } | undefined)?.devContainerCustomizations,
+        agentConfigCredentials: configEntry?.credentials,
       });
     } else {
       await runAgent(projectDir, resolvedAgentType, role, undefined, {
@@ -641,6 +644,7 @@ function createRunAction(overrideRole?: string) {
         build: options.build,
         verbose: options.verbose,
         homeOverride,
+        agentConfigCredentials: configEntry?.credentials,
       });
     }
   };
@@ -702,6 +706,7 @@ export async function runAgent(
     homeOverride?: string;
     devContainer?: boolean;
     devContainerCustomizations?: DevContainerCustomizations;
+    agentConfigCredentials?: string[];
   },
 ): Promise<void> {
   // Initialize agent registry with config-declared agents from .mason/config.json
@@ -713,18 +718,20 @@ export async function runAgent(
   const bashMode = acpOptions?.bash === true;
   const buildMode = acpOptions?.build === true;
   const homeOverride = deps?.homeOverride ?? acpOptions?.homeOverride;
+  const agentConfigCredentials = acpOptions?.agentConfigCredentials;
 
   if (isAcpMode) {
-    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride);
+    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials);
   } else if (isDevContainerMode) {
     const verbose = acpOptions?.verbose === true;
     return runAgentDevContainerMode(
       projectDir, agent, role, proxyPort, deps, buildMode, verbose, homeOverride,
       acpOptions?.devContainerCustomizations,
+      agentConfigCredentials,
     );
   } else {
     const verbose = acpOptions?.verbose === true;
-    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride);
+    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials);
   }
 }
 
@@ -740,6 +747,7 @@ async function runAgentInteractiveMode(
   buildMode?: boolean,
   verbose?: boolean,
   homeOverride?: string,
+  agentConfigCredentials?: string[],
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
@@ -764,7 +772,7 @@ async function runAgentInteractiveMode(
 
     // 4. Ensure docker build artifacts exist (auto-build if missing)
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
-      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode },
+      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials },
     );
 
     // 5. Ensure .mason is in project's .gitignore
@@ -785,8 +793,10 @@ async function runAgentInteractiveMode(
     const proxyToken = crypto.randomBytes(32).toString("hex");
     const credentialProxyToken = crypto.randomBytes(32).toString("hex");
 
-    // Collect declared credential keys from the role
-    const declaredCredentialKeys = [...(roleType.governance?.credentials ?? [])];
+    // Collect declared credential keys: SDK defaults, agent config, role governance, app-level
+    const agentPkgForCreds = getAgentFromRegistry(agentType);
+    const sdkCredKeys = agentPkgForCreds?.runtime?.credentials?.map((c) => c.key) ?? [];
+    const declaredCredentialKeys = [...sdkCredKeys, ...(agentConfigCredentials ?? []), ...(roleType.governance?.credentials ?? [])];
     for (const app of roleType.apps ?? []) {
       for (const key of app.credentials ?? []) {
         if (!declaredCredentialKeys.includes(key)) {
@@ -942,6 +952,7 @@ async function runAgentDevContainerMode(
   verbose?: boolean,
   homeOverride?: string,
   devContainerCustomizations?: DevContainerCustomizations,
+  agentConfigCredentials?: string[],
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
@@ -967,7 +978,7 @@ async function runAgentDevContainerMode(
     // 3. Ensure docker build artifacts
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
       roleType, agentType, projectDir,
-      { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations },
+      { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations, agentConfigCredentials },
     );
 
     // 4. Ensure .mason is in .gitignore
@@ -1010,7 +1021,9 @@ async function runAgentDevContainerMode(
     const proxyToken = crypto.randomBytes(32).toString("hex");
     const credentialProxyToken = crypto.randomBytes(32).toString("hex");
 
-    const declaredCredentialKeys = [...(roleType.governance?.credentials ?? [])];
+    const agentPkgForCreds = getAgentFromRegistry(agentType);
+    const sdkCredKeys = agentPkgForCreds?.runtime?.credentials?.map((c) => c.key) ?? [];
+    const declaredCredentialKeys = [...sdkCredKeys, ...(agentConfigCredentials ?? []), ...(roleType.governance?.credentials ?? [])];
     for (const app of roleType.apps ?? []) {
       for (const key of app.credentials ?? []) {
         if (!declaredCredentialKeys.includes(key)) declaredCredentialKeys.push(key);
@@ -1258,6 +1271,7 @@ async function runAgentAcpMode(
   proxyPort: number,
   deps?: RunAgentDeps,
   homeOverride?: string,
+  agentConfigCredentials?: string[],
 ): Promise<void> {
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
   const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
@@ -1322,7 +1336,7 @@ async function runAgentAcpMode(
 
     // ── Step 3: Ensure docker build artifacts ────────────────────────
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
-      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn },
+      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, agentConfigCredentials },
     );
 
     // ── Create file logger in session-local logs ─────────────────────
@@ -1371,7 +1385,8 @@ async function runAgentAcpMode(
       ? [...acpRuntimeCmd.split(" ").slice(1)]
       : undefined;
 
-    const declaredCredentialKeys = new Set<string>(resolvedAgent.credentials);
+    const sdkCredKeys = agentPkg?.runtime?.credentials?.map((c) => c.key) ?? [];
+    const declaredCredentialKeys = new Set<string>([...sdkCredKeys, ...(agentConfigCredentials ?? []), ...resolvedAgent.credentials]);
     for (const agentRole of resolvedAgent.roles) {
       for (const app of agentRole.apps) {
         for (const key of app.credentials) {

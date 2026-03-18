@@ -131,6 +131,15 @@ export function materializeForAgent(
   // Convert Role to ResolvedAgent via the adapter.
   const resolvedAgent = adaptRoleToResolvedAgent(role, agentType);
 
+  // Merge agent-config credentials (from .mason/config.json) into the resolved agent.
+  if (options?.agentConfigCredentials?.length) {
+    for (const key of options.agentConfigCredentials) {
+      if (!resolvedAgent.credentials.includes(key)) {
+        resolvedAgent.credentials.push(key);
+      }
+    }
+  }
+
   const endpoint = proxyEndpoint ?? DEFAULT_PROXY_ENDPOINT;
 
   return materializer.materializeWorkspace(
