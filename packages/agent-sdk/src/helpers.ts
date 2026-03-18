@@ -166,6 +166,7 @@ export function generateAgentLaunchJson(
   roleCredentials: string[],
   acpMode?: boolean,
   instructions?: string,
+  agentArgs?: string[],
 ): string {
   // Start with runtime-specific credentials from the agent package
   const credentials: LaunchCredentialConfig[] = [
@@ -195,6 +196,11 @@ export function generateAgentLaunchJson(
 
   if (instructions && !acpMode && agentPkg.runtime?.supportsInitialPrompt) {
     args = [...(args ?? []), instructions];
+  }
+
+  // Append alias-level agent-args after all other resolved args
+  if (agentArgs && agentArgs.length > 0) {
+    args = [...(args ?? []), ...agentArgs];
   }
 
   const config: Record<string, unknown> = { credentials, command };

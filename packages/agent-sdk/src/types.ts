@@ -16,6 +16,8 @@ export interface MaterializeOptions {
   acpMode?: boolean;
   /** Additional credential env var keys from agent config (.mason/config.json). Merged into agent-launch.json credentials. */
   agentConfigCredentials?: string[];
+  /** Extra args from alias config appended to the agent invocation after all mason-resolved args. */
+  agentArgs?: string[];
 }
 
 /**

@@ -28,10 +28,12 @@ export {
   loadConfigAgents,
   loadConfigAgentEntry,
   readConfigAgentNames,
+  loadConfigAliasEntry,
+  readConfigAliasNames,
   getAgent,
   getRegisteredAgentNames,
 } from "./discovery.js";
-export type { AgentRegistry, AgentEntryConfig, DevContainerCustomizations, DevContainerVscodeCustomizations } from "./discovery.js";
+export type { AgentRegistry, AgentEntryConfig, AliasEntryConfig, DevContainerCustomizations, DevContainerVscodeCustomizations } from "./discovery.js";
 export { DEFAULT_DEV_CONTAINER_CUSTOMIZATIONS } from "./discovery.js";
 
 // Re-exports from @clawmasons/shared for convenience

@@ -1,172 +1,133 @@
 ---
 title: Initialization
-description: How mason sets up lodges, chapters, and runtime directories
+description: How mason sets up the .mason directory and prepares your project for agent execution
 ---
 
 # Initialization
 
-Mason uses a layered initialization process: **lodge** (organizational container), **chapter** (workspace), **build** (Docker artifacts), and **role** (runtime directory). Each step is idempotent — running it again safely skips what already exists.
+When you first run `mason run` or `mason configure` in a project, Mason creates a `.mason` directory that holds all the configuration, build artifacts, and session data needed to run agents securely. Each step is idempotent — running it again safely skips what already exists.
 
-## Lodge Initialization
-
-```bash
-mason init
-```
-
-Creates the top-level organizational container at `~/.mason/`:
+## The `.mason` Directory
 
 ```
-~/.mason/
-├── config.json              # Registry of initialized lodges
-├── .gitignore
-└── <lodge>/
-    ├── chapters/            # Chapter workspaces live here
-    └── CHARTER.md           # Governance charter
+your-project/
+└── .mason/
+    ├── config.json          # Agent registry and alias configuration
+    ├── .gitignore           # Ignores docker/ and sessions/
+    ├── roles/               # Local role definitions
+    │   └── <role-name>/
+    │       └── ROLE.md
+    ├── docker/              # Docker build artifacts (generated)
+    │   └── <role-name>/
+    │       ├── mcp-proxy/
+    │       ├── <agent-type>/
+    │       ├── node_modules/
+    │       └── package.json
+    └── sessions/            # Session state (generated per run)
+        └── <session-id>/
+            ├── docker/
+            │   ├── docker-compose.yml
+            │   └── .env
+            └── logs/
 ```
 
-The lodge name defaults to your system username. Override it with `--lodge <name>` or the `LODGE` environment variable.
+### `config.json`
 
-`config.json` maps lodge names to their home directories:
+The agent registry that maps agent names to their npm packages, along with any aliases you've configured:
 
 ```json
 {
-  "acme": { "home": "/Users/you/.mason/acme" }
+  "agents": {
+    "claude": { "package": "@clawmasons/claude-code" },
+    "pi": { "package": "@clawmasons/pi-coding-agent" },
+    "mcp": { "package": "@clawmasons/mcp-agent" }
+  },
+  "aliases": {}
 }
 ```
 
-## Chapter Initialization
+Mason creates this file automatically on first run with the default built-in agents. You can add custom agents or configure aliases here. See [CLI Reference](cli.md#project-configuration) for the full schema.
 
-```bash
-mason chapter init --name acme.platform --template note-taker
-```
+### `roles/`
 
-Creates an npm workspace with the standard package directory layout:
+Local role definitions live here. Each role is a subdirectory containing a `ROLE.md` file:
 
 ```
-acme.platform/
-├── package.json               # Workspace root with npm workspaces
-├── .mason/
-│   └── chapter.json           # Workspace metadata
-├── roles/                     # Role packages
-├── tasks/                     # Task packages
-├── skills/                    # Skill packages
-└── apps/                      # App packages (MCP servers)
+.mason/roles/
+├── developer/
+│   └── ROLE.md
+├── lead/
+│   └── ROLE.md
+└── devops/
+    └── ROLE.md
 ```
 
-The root `package.json` declares npm workspaces so all packages are linked:
+These roles are created by `mason configure` or by hand. See [Role](role.md) for the ROLE.md format.
 
-```json
-{
-  "name": "@acme.platform/chapter",
-  "private": true,
-  "workspaces": ["apps/*", "tasks/*", "skills/*", "roles/*"]
-}
-```
+## Role Discovery
 
-`.mason/chapter.json` stores workspace metadata:
+When you run `mason run <agent> --role <name>`, Mason searches for the role in two places:
 
-```json
-{
-  "chapter": "acme.platform",
-  "version": "0.1.0"
-}
-```
+1. **Local roles** (highest priority) — `.mason/roles/<name>/ROLE.md`
+2. **Installed npm packages** — Any package in `node_modules/` with `chapter.type: "role"` in its `package.json`
 
-When you use a `--template`, the CLI copies template files into the workspace directories and runs `npm install` to link everything.
+Local roles take precedence over packaged roles with the same name. This lets you override a published role with a local customization.
 
-## Package Discovery
+## Docker Build Artifacts
 
-Before a role can be built or run, the CLI discovers all chapter packages in the workspace:
-
-1. Scans `apps/`, `tasks/`, `skills/`, and `roles/` directories
-2. Scans `node_modules/` for published chapter packages
-3. Reads each `package.json` and validates the `chapter` field
-4. Workspace packages take precedence over `node_modules` versions
-
-The result is a map of every available package and its configuration.
-
-## Role Resolution
-
-With all packages discovered, the CLI resolves the full dependency graph for a role:
-
-1. Looks up the role package and extracts its tasks, skills, and app references
-2. For each task, resolves its required apps and skills (with circular dependency detection)
-3. Validates that all permission references point to real tools on real apps
-
-The resolved graph contains everything needed to generate runtime artifacts.
-
-## Build
-
-```bash
-mason chapter build
-```
-
-The build step takes the resolved role graph and produces deployable artifacts:
-
-1. **Pack** — Builds all workspace packages into `dist/*.tgz`
-2. **Docker init** — Generates Dockerfiles and a `docker/` directory with all dependencies
-3. **Lock file** — Writes `chapter.lock.json` with the resolved dependency snapshot
-
-After build, `chapter.json` is updated with the Docker build path:
-
-```json
-{
-  "chapter": "acme.platform",
-  "version": "0.1.0",
-  "docker-build": "/path/to/docker/",
-  "docker-registries": ["local"]
-}
-```
-
-The generated `docker/` directory contains:
+The `.mason/docker/` directory contains generated Dockerfiles and dependencies for each role. Mason creates these automatically the first time you run a role.
 
 ```
-docker/
+.mason/docker/<role-name>/
+├── mcp-proxy/          # MCP proxy Dockerfile and workspace
+│   ├── Dockerfile
+│   └── workspace/
+├── <agent-type>/       # Agent Dockerfile (e.g., claude-code)
+│   ├── Dockerfile
+│   ├── workspace/
+│   └── home/
+├── node_modules/       # Shared framework packages
 ├── package.json
-├── node_modules/              # Framework packages + packed chapters
-├── proxy/<role>/Dockerfile
-├── agent/<role>/Dockerfile
-└── credential-service/Dockerfile
+└── .bin/
 ```
 
-## Role Initialization
+If a role's Docker artifacts are missing or outdated, Mason regenerates them before starting the containers. You generally don't need to manage this directory by hand.
 
-```bash
-mason chapter init-role --role writer
-```
+## Sessions
 
-Registers a role for host-wide use. This creates a runtime directory under the lodge and records the role in `~/.mason/chapters.json`:
+Each `mason run` invocation creates a session in `.mason/sessions/`. A session captures the Docker Compose configuration and logs for that specific run.
 
 ```
-~/.mason/<lodge>/
-└── roles/<role>/
-    ├── .mason/role.json   # Role metadata
-    ├── docker/
-    │   └── docker-compose.yml  # Reusable compose template
-    └── logs/                   # Session logs
+.mason/sessions/<session-id>/
+├── docker/
+│   ├── docker-compose.yml    # Compose config for this run
+│   └── .env                  # Environment variables (tokens, etc.)
+└── logs/                     # Captured output
 ```
 
-The `chapters.json` registry tracks which chapter each role belongs to, enabling the CLI to locate the correct Docker artifacts at runtime.
+Session IDs are short random hex strings. Sessions persist after the run completes so you can inspect logs and debug issues.
 
-## Role Startup
+## Startup Sequence
 
-When you run `mason run <agent-type> --role <name>`, the CLI ties all of this together:
+When you run `mason run <agent-type> --role <name>`, the following happens:
 
-1. **Discovers** packages in the chapter workspace
-2. **Resolves** the role's full dependency graph
-3. **Generates** a session-specific `docker-compose.yml`
-4. **Starts** the MCP proxy container (detached)
-5. **Starts** the credential service in-process
-6. **Starts** the agent container (interactive or piped for ACP)
+1. **Pre-flight checks** — Verify Docker Compose is available
+2. **Ensure `.mason/config.json`** — Create the agent registry if it doesn't exist
+3. **Discover the role** — Search local roles, then installed packages
+4. **Generate Docker artifacts** — Build Dockerfiles and install dependencies if needed
+5. **Create a session** — Set up `.mason/sessions/<id>/` with compose config
+6. **Start the MCP proxy** — Build and launch the proxy container (detached)
+7. **Start the credential service** — Run in-process on the host
+8. **Start the agent container** — Launch interactively or in ACP mode
 
-See [Architecture](architecture.md) for the full startup sequence diagram.
+See [Architecture](architecture.md) for the full sequence diagram.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MASON_HOME` | `~/.mason` | Root directory for all mason data |
-| `LODGE` | System username | Current lodge name |
+| `MASON_HOME` | `~/.mason` | Root directory for mason data |
+| `LODGE` | Auto-detected | Current lodge name |
 | `LODGE_HOME` | `$MASON_HOME/$LODGE` | Current lodge directory |
 
 CLI flags take precedence over environment variables, which take precedence over defaults.
@@ -175,3 +136,5 @@ CLI flags take precedence over environment variables, which take precedence over
 
 - [Getting Started](get-started.md) — Walk through the full setup process
 - [Architecture](architecture.md) — Runtime sequence diagrams
+- [Role](role.md) — How roles are defined
+- [CLI Reference](cli.md) — Full command reference

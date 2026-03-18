@@ -8,7 +8,9 @@ import {
   getRegisteredAgentNames,
   loadConfigAgents,
   loadConfigAgentEntry,
+  loadConfigAliasEntry,
   readConfigAgentNames,
+  readConfigAliasNames,
 } from "../src/discovery.js";
 import type { AgentPackage } from "../src/types.js";
 
@@ -287,6 +289,7 @@ describe("loadConfigAgentEntry", () => {
 
   it("returns the entry for a named agent", () => {
     const tmpDir = makeTmpDir();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: {
@@ -299,7 +302,10 @@ describe("loadConfigAgentEntry", () => {
       expect(entry?.package).toBe("@clawmasons/claude-code");
       expect(entry?.role).toBe("writer");
       expect(entry?.mode).toBe("terminal");
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("runtime fields"));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("aliases"));
     } finally {
+      vi.restoreAllMocks();
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
@@ -346,8 +352,9 @@ describe("loadConfigAgentEntry", () => {
     }
   });
 
-  it("parses home and role optional fields", () => {
+  it("parses home and role optional fields (with deprecation warning)", () => {
     const tmpDir = makeTmpDir();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: {
@@ -358,13 +365,16 @@ describe("loadConfigAgentEntry", () => {
       const entry = loadConfigAgentEntry(tmpDir, "claude");
       expect(entry?.home).toBe("~/my-config");
       expect(entry?.role).toBe("coder");
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("runtime fields"));
     } finally {
+      vi.restoreAllMocks();
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 
-  it("parses dev-container-customizations when present", () => {
+  it("parses dev-container-customizations when present (with deprecation warning)", () => {
     const tmpDir = makeTmpDir();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: {
@@ -384,7 +394,9 @@ describe("loadConfigAgentEntry", () => {
       expect(entry?.devContainerCustomizations).toBeDefined();
       expect(entry?.devContainerCustomizations?.vscode?.extensions).toEqual(["my.extension"]);
       expect(entry?.devContainerCustomizations?.vscode?.settings).toEqual({ "editor.fontSize": 14 });
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("runtime fields"));
     } finally {
+      vi.restoreAllMocks();
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
@@ -403,8 +415,9 @@ describe("loadConfigAgentEntry", () => {
     }
   });
 
-  it("parses credentials array correctly", () => {
+  it("parses credentials array correctly (with deprecation warning)", () => {
     const tmpDir = makeTmpDir();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: {
@@ -414,7 +427,9 @@ describe("loadConfigAgentEntry", () => {
 
       const entry = loadConfigAgentEntry(tmpDir, "claude");
       expect(entry?.credentials).toEqual(["MY_KEY", "OTHER_KEY"]);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("runtime fields"));
     } finally {
+      vi.restoreAllMocks();
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
@@ -463,6 +478,204 @@ describe("loadConfigAgentEntry", () => {
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("non-string entry"));
     } finally {
       vi.restoreAllMocks();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ── Alias Tests ───────────────────────────────────────────────────────
+
+describe("loadConfigAliasEntry", () => {
+  function makeTmpDir(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), "agent-sdk-alias-test-"));
+  }
+
+  function writeMasonConfig(dir: string, content: unknown): void {
+    const masonDir = path.join(dir, ".mason");
+    fs.mkdirSync(masonDir, { recursive: true });
+    fs.writeFileSync(path.join(masonDir, "config.json"), JSON.stringify(content));
+  }
+
+  it("returns a valid alias entry with all fields", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { claude: { package: "@clawmasons/claude-code" } },
+        aliases: {
+          frontend: {
+            agent: "claude",
+            mode: "terminal",
+            role: "frontend-dev",
+            home: "~/projects/fe",
+            credentials: ["MY_KEY"],
+            "agent-args": ["--max-turns", "10"],
+          },
+        },
+      });
+
+      const entry = loadConfigAliasEntry(tmpDir, "frontend");
+      expect(entry).toBeDefined();
+      expect(entry?.agent).toBe("claude");
+      expect(entry?.mode).toBe("terminal");
+      expect(entry?.role).toBe("frontend-dev");
+      expect(entry?.home).toBe("~/projects/fe");
+      expect(entry?.credentials).toEqual(["MY_KEY"]);
+      expect(entry?.agentArgs).toEqual(["--max-turns", "10"]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns alias with only agent field (all optional fields undefined)", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { claude: { package: "@clawmasons/claude-code" } },
+        aliases: { quick: { agent: "claude" } },
+      });
+
+      const entry = loadConfigAliasEntry(tmpDir, "quick");
+      expect(entry).toBeDefined();
+      expect(entry?.agent).toBe("claude");
+      expect(entry?.mode).toBeUndefined();
+      expect(entry?.role).toBeUndefined();
+      expect(entry?.home).toBeUndefined();
+      expect(entry?.credentials).toBeUndefined();
+      expect(entry?.agentArgs).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns undefined when alias name is not in config", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { claude: { package: "@clawmasons/claude-code" } },
+        aliases: { other: { agent: "claude" } },
+      });
+
+      const entry = loadConfigAliasEntry(tmpDir, "nonexistent");
+      expect(entry).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns undefined when aliases section is absent", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { claude: { package: "@clawmasons/claude-code" } },
+      });
+
+      const entry = loadConfigAliasEntry(tmpDir, "frontend");
+      expect(entry).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("warns and defaults to terminal for invalid mode in alias", () => {
+    const tmpDir = makeTmpDir();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { claude: { package: "@clawmasons/claude-code" } },
+        aliases: { bad: { agent: "claude", mode: "interactive" } },
+      });
+
+      const entry = loadConfigAliasEntry(tmpDir, "bad");
+      expect(entry?.mode).toBe("terminal");
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("invalid mode"));
+    } finally {
+      vi.restoreAllMocks();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns null for alias missing agent field", () => {
+    const tmpDir = makeTmpDir();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { claude: { package: "@clawmasons/claude-code" } },
+        aliases: { bad: { mode: "terminal" } },
+      });
+
+      const entry = loadConfigAliasEntry(tmpDir, "bad");
+      expect(entry).toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('missing "agent" field'));
+    } finally {
+      vi.restoreAllMocks();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("parses agent-args array correctly", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { claude: { package: "@clawmasons/claude-code" } },
+        aliases: { api: { agent: "claude", "agent-args": ["--verbose", "--max-turns", "5"] } },
+      });
+
+      const entry = loadConfigAliasEntry(tmpDir, "api");
+      expect(entry?.agentArgs).toEqual(["--verbose", "--max-turns", "5"]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("readConfigAliasNames", () => {
+  function makeTmpDir(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), "agent-sdk-alias-names-test-"));
+  }
+
+  function writeMasonConfig(dir: string, content: unknown): void {
+    const masonDir = path.join(dir, ".mason");
+    fs.mkdirSync(masonDir, { recursive: true });
+    fs.writeFileSync(path.join(masonDir, "config.json"), JSON.stringify(content));
+  }
+
+  it("returns alias key names from config", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, {
+        agents: { claude: { package: "@clawmasons/claude-code" } },
+        aliases: {
+          frontend: { agent: "claude" },
+          "api-review": { agent: "claude" },
+        },
+      });
+
+      const names = readConfigAliasNames(tmpDir);
+      expect(names).toContain("frontend");
+      expect(names).toContain("api-review");
+      expect(names).toHaveLength(2);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns empty array when aliases section is absent", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      writeMasonConfig(tmpDir, { agents: { claude: { package: "@clawmasons/claude-code" } } });
+      const names = readConfigAliasNames(tmpDir);
+      expect(names).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns empty array when config file is absent", () => {
+    const tmpDir = makeTmpDir();
+    try {
+      const names = readConfigAliasNames(tmpDir);
+      expect(names).toEqual([]);
+    } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });

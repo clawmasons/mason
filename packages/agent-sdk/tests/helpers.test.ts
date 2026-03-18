@@ -457,6 +457,34 @@ describe("generateAgentLaunchJson", () => {
     const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined));
     expect(config.args).toEqual(["--flag"]);
   });
+
+  it("appends agentArgs after resolved args", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--effort", "max"] },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, ["--max-turns", "10"]));
+    expect(config.args).toEqual(["--effort", "max", "--max-turns", "10"]);
+  });
+
+  it("appends agentArgs when no base args exist", () => {
+    const pkg = makeAgentPackage({ runtime: { command: "cmd" } });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, ["--verbose"]));
+    expect(config.args).toEqual(["--verbose"]);
+  });
+
+  it("does not set args when agentArgs is empty and no base args", () => {
+    const pkg = makeAgentPackage({ runtime: { command: "cmd" } });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, []));
+    expect(config.args).toBeUndefined();
+  });
+
+  it("appends agentArgs after instructions", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", supportsInitialPrompt: true },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, "Do the thing", ["--max-turns", "5"]));
+    expect(config.args).toEqual(["Do the thing", "--max-turns", "5"]);
+  });
 });
 
 // ── generateSkillReadme ───────────────────────────────────────────────────────
