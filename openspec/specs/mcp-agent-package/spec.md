@@ -82,7 +82,7 @@ With the `--acp` flag, the agent SHALL start an HTTP server on a configurable po
 
 ### Requirement: mcp-test fixture delegates to mcp-agent
 
-The `e2e/fixtures/test-chapter/agents/mcp-test/` fixture SHALL depend on `@clawmasons/mcp-agent` and its `src/index.ts` SHALL import and run the mcp-agent's main function.
+The `packages/tests/fixtures/test-chapter/agents/mcp-test/` fixture SHALL depend on `@clawmasons/mcp-agent` and its `src/index.ts` SHALL import and run the mcp-agent's main function.
 
 #### Scenario: fixture uses package
 - **GIVEN** the mcp-test fixture package.json

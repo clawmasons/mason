@@ -20,7 +20,7 @@
 
 ### 4. Verification Before Done
 - **Every code change must**: compile (`npx tsc --noEmit`), pass the linter (`npx eslint src/ tests/`), and pass tests (`npx vitest run`)
-- All branches targeted to merge to main must past the e2e tests `cd /Users/greff/Projects/clawmasons/chapter/e2e && npx vitest run --config vitest.config.ts 2>&1`. 
+- All branches targeted to merge to main must past the e2e tests `cd /Users/greff/Projects/clawmasons/chapter/packages/tests && npx vitest run --config vitest.config.ts 2>&1`.
 - Never mark a task complete without proving it works
 - Diff behavior between main and your changes when relevant
 - Ask yourself: "Would a staff engineer approve this?"

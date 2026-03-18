@@ -31,7 +31,7 @@ The system SHALL update the generated proxy Dockerfile entrypoint to reference `
 - **AND** the CMD line still passes `proxy --agent <agentName>`
 
 ### Requirement: E2E test helpers updated
-The system SHALL update `e2e/tests/helpers.ts` to reference `bin/mason.js` instead of `bin/clawmasons.js` for the `CLAWMASONS_BIN` constant (renamed to `MASON_BIN`).
+The system SHALL update `packages/tests/tests/helpers.ts` to reference `bin/mason.js` instead of `bin/clawmasons.js` for the `CLAWMASONS_BIN` constant (renamed to `MASON_BIN`).
 
 #### Scenario: E2E tests use new binary path
 - **WHEN** E2E tests execute CLI commands
@@ -85,9 +85,9 @@ The system SHALL update all unit test assertions that check for the `clawmasons`
 | `packages/cli/src/cli/commands/proxy.ts` | Shutdown/ready messages |
 | `packages/cli/src/cli/commands/run-init.ts` | Error messages |
 | `packages/cli/src/acp/warnings.ts` | Warning log prefix |
-| `e2e/tests/helpers.ts` | `MASON_BIN` export + `CLAWMASONS_BIN` deprecated alias |
-| `e2e/tests/build-pi-runtime.test.ts` | Assertion update |
-| `e2e/tests/build-pipeline.test.ts` | Assertion update |
+| `packages/tests/tests/helpers.ts` | `MASON_BIN` export + `CLAWMASONS_BIN` deprecated alias |
+| `packages/tests/tests/build-pi-runtime.test.ts` | Assertion update |
+| `packages/tests/tests/build-pipeline.test.ts` | Assertion update |
 | `packages/cli/tests/cli/cli.test.ts` | Program name assertion |
 | `packages/cli/tests/cli/build.test.ts` | Log output assertion |
 | `packages/cli/tests/cli/init.test.ts` | Log output assertions |

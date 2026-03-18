@@ -13,10 +13,10 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const E2E_ROOT = path.resolve(__dirname, "..");
-export const PROJECT_ROOT = path.resolve(E2E_ROOT, "..");
+export const PROJECT_ROOT = path.resolve(E2E_ROOT, "../..");
 export const FIXTURES_BASE = path.join(E2E_ROOT, "fixtures");
 export const FIXTURES_DIR = path.join(FIXTURES_BASE, "test-chapter");
-export const MASON_BIN = path.join(PROJECT_ROOT, "bin", "mason.js");
+export const MASON_BIN = path.join(PROJECT_ROOT, "scripts", "mason.js");
 /** @deprecated Use MASON_BIN instead */
 export const CHAPTER_BIN = MASON_BIN;
 

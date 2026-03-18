@@ -9,12 +9,12 @@ E2E tests SHALL invoke the `mason` CLI binary exclusively. Tests MUST NOT import
 **Rationale:** E2E tests verify the CLI's public contract — exit codes, stdout, generated files, and running containers. Internal function behavior is covered by unit tests in `packages/*/tests/`.
 
 #### Scenario: No internal imports
-- **GIVEN** any file in `e2e/tests/`
+- **GIVEN** any file in `packages/tests/tests/`
 - **WHEN** scanned for import paths matching `../../packages/`
 - **THEN** zero matches are found
 
 #### Scenario: No resolve aliases needed
-- **GIVEN** `e2e/vitest.config.ts`
+- **GIVEN** `packages/tests/vitest.config.ts`
 - **THEN** it contains no `resolve.alias` entries for `@clawmasons/*` packages
 
 ### REQ-02: CLI as the setup mechanism
@@ -34,7 +34,7 @@ The only pre-CLI setup allowed is copying fixture files to a temp workspace (tes
 
 ### REQ-03: Shared test helpers
 
-Common test operations SHALL be extracted to `e2e/tests/helpers.ts` to eliminate duplication across test files. Required helpers:
+Common test operations SHALL be extracted to `packages/tests/tests/helpers.ts` to eliminate duplication across test files. Required helpers:
 
 | Helper | Purpose |
 |--------|---------|
@@ -44,6 +44,8 @@ Common test operations SHALL be extracted to `e2e/tests/helpers.ts` to eliminate
 | `waitForHealth(url, timeout, diagnostics?)` | Poll health endpoint with Docker log diagnostics on failure |
 | `isDockerAvailable()` | Check Docker daemon availability |
 
+`MASON_BIN` SHALL resolve to `scripts/mason.js` at the monorepo root.
+
 #### Scenario: Helper functions available
 - **GIVEN** any E2E test file
 - **WHEN** it imports from `./helpers`
@@ -51,7 +53,7 @@ Common test operations SHALL be extracted to `e2e/tests/helpers.ts` to eliminate
 
 ### REQ-04: Unit tests belong in packages
 
-Tests for internal module functions SHALL live in `packages/*/tests/`, not in `e2e/tests/`. Specifically:
+Tests for internal module functions SHALL live in `packages/*/tests/`, not in `packages/tests/tests/`. Specifically:
 
 | Module | Unit test location |
 |--------|--------------------|
@@ -69,7 +71,7 @@ E2E tests MAY verify the observable effects of these modules (e.g., checking tha
 
 ### REQ-05: build-pi-runtime
 
-`e2e/tests/build-pi-runtime.test.ts` validates the pi-coding-agent runtime build for the note-taker agent.
+`packages/tests/tests/build-pi-runtime.test.ts` validates the pi-coding-agent runtime build for the note-taker agent.
 
 **Setup:** `copyFixtureWorkspace()` + `mason build @test/agent-test-note-taker`
 
@@ -87,7 +89,7 @@ E2E tests MAY verify the observable effects of these modules (e.g., checking tha
 
 ### REQ-06: build-pipeline
 
-`e2e/tests/build-pipeline.test.ts` validates the full `mason build` pipeline and Docker proxy connectivity.
+`packages/tests/tests/build-pipeline.test.ts` validates the full `mason build` pipeline and Docker proxy connectivity.
 
 **Setup:** `copyFixtureWorkspace()` + `mason build`
 
@@ -106,7 +108,7 @@ E2E tests MAY verify the observable effects of these modules (e.g., checking tha
 
 ### REQ-07: docker-proxy
 
-`e2e/tests/docker-proxy.test.ts` validates Docker proxy behavior with ACP session metadata.
+`packages/tests/tests/docker-proxy.test.ts` validates Docker proxy behavior with ACP session metadata.
 
 **Setup:** `copyFixtureWorkspace(excludePaths: ["agents/mcp-test", "roles/mcp-test"])` + `mason build`
 
@@ -128,13 +130,13 @@ To verify all requirements:
 
 ```bash
 # No internal imports
-grep -r "../../packages/" e2e/tests/ && echo "FAIL: internal imports found" || echo "PASS"
+grep -r "../../packages/" packages/tests/tests/ && echo "FAIL: internal imports found" || echo "PASS"
 
 # Unit tests pass
 npx vitest run  # 1034+ tests
 
 # E2E tests pass
-cd e2e && npx vitest run  # 44+ tests (2 skipped)
+cd packages/tests && npx vitest run  # 44+ tests (2 skipped)
 
 # Type check
 npx tsc --noEmit

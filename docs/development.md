@@ -14,8 +14,8 @@ chapter/
     agent-entry/          # @clawmasons/agent-entry — agent bootstrap binary
     mcp-agent/            # MCP agent runtime (REPL + ACP modes)
     placeholders/         # Stub packages for testing
-  e2e/                    # End-to-end test suite
-  bin/                    # CLI entry point
+    tests/                # End-to-end test suite
+  scripts/                # CLI entry point and dev scripts
   dist/                   # Packed .tgz files (generated)
   docker/                 # Docker artifacts (generated)
   skills/                 # Built-in skills (e.g., mason)
@@ -78,16 +78,16 @@ cd /path/to/project && npm link @clawmasons/chapter
 
 ## E2E Tests
 
-End-to-end tests are in the `e2e/` directory and require Docker:
+End-to-end tests are in the `packages/tests/` directory and require Docker:
 
 ```bash
-cd e2e
+cd packages/tests
 npm run setup        # initialize test fixtures
 npx vitest run --config vitest.config.ts
 npm run teardown     # clean up
 ```
 
-Some tests require API keys and will skip gracefully if unavailable. See [e2e/README.md](e2e/README.md) for details on individual test suites.
+Some tests require API keys and will skip gracefully if unavailable. See [packages/tests/README.md](packages/tests/README.md) for details on individual test suites.
 
 ## Verification Checklist
 
@@ -97,7 +97,7 @@ Before submitting changes:
 npx tsc --noEmit                    # type-check
 npx eslint src/ tests/              # lint
 npx vitest run                      # unit tests
-cd e2e && npx vitest run --config vitest.config.ts  # e2e tests
+cd packages/tests && npx vitest run --config vitest.config.ts  # e2e tests
 ```
 
 ## Programmatic API
