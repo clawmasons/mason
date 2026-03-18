@@ -1,102 +1,76 @@
 # Mason
 
-Mason is a MIT licensed tool provided by Clawmasons, to help you run your agents in containers, ASAP
-
-
-# Why?
- 1. Skills are not to be trusted (running arbitrary code from npm is a real risk) — [learn more]
- 2. LLMs are not to be trusted — [learn more]
- 3. Agent frameworks are not to be trusted (see #2) — [learn more]
- 4. Fewer compromised machines means fewer incentives for attackers — [learn more]
-
-# How we'll get there
-
-`mason` combines security and productivity improvements to make it a no-brainer.
-
-### How it improves your life
-- **Define once, run on Any Agent, Anywhere** 
-  - Continue to define skills in your agent of choice, mason can run them on any supported agent in a docker container  
-  - Once mason roles are set up, anyone with access to your project can securely run their agents
-  - run with a different Agent during outages
-- Seamless MCP server re-authentication [learn why this is easy for us]
-- Launch a project in a dev-container with agent enabled [learn more]
-- [learn more about mason productivity improvements]
-
-## How it improves security
- - **Docker Container** — First step: sandbox the agent into a container. Start here, even if you explore other features later.
- - **Securely share credentials with agents** — 
-   - Know what tools the agent is going to use credentials for
-   - Agents use a separate MCP proxy to run the tools, which enforces the role permissions
-   - Agents never have direct access to your mcp tool credentials
-   - [learn more about security]
-
+Mason runs your agents in secure docker contianers scoped to what they need with [**Roles**](/docs/roles.md)
 
 ## Prerequisites
 
-- **Docker** — Required for running agents in containers
-- **Claude Code** — Installed and authenticated (`claude setup-token` exports `CLAUDE_CODE_OAUTH_TOKEN`)
+```mason``` is a typescript command line that runs your agent in containers.  Hence the three prerequisites
 
-## Install
+- [**Docker**](docker.md)
+- [**Node Environment**](node.md) 
+- [**Supported Agent**](docs/agents.md)
 
+
+## Quick start
+
+### 1. Install mason globally
 ```bash
 npm install -g @clawmasons/mason
 ```
 
-## Run your agent in a container
+### 2. Define your roles
+
+Have your agent [**configure**](docs/mason-configure.md) your project's roles with mason. 
 
 ```bash
 cd ~/your-project
-mason
-mason claude
+mason configure --agent claude
 ```
 
-Your agent is now sandboxed to your project directory instead of your entire computer.
+###.3. Run your agents with a role
 
-The agent starts with a pre-packaged "setup" role that walks you through configuring your project:
-  - Define roles to control agent access [learn more about roles]
-  - Set up operating system tools in your container, and MCP servers [learn more]
-  - Add more agents to run your project 
-
-Once setup is complete, you can run your project on any agent as any role.
+```basH
+mason claude --role {project-role}
+```
+Follow thes instructions generated in ```.mason/inital-role.plan.md``` to test your roles
 
 
-## Quick Start
+## Our dream, in a simplified example
+
+Let's say Joe Devops is running a project and has admin level AWS, github and jira credentials
+on your laptop today.  furthermore, joe has skills loaded up in .claude ready to use all those 
+credentials as needed for your workflow.
+
+This is a powder keg waiting for either a prompt injection attack, or an agent to accidetally 
+run the worng skill at the wrong time.
 
 
-## How It Works
+After ```mason configure`` Joe's project's roles might look like this
+```
+** Devops **
+ -skills: terraform, ship-it
+ -tools: aws
 
-**Roles are the primary deployable unit.** A role is defined by a `ROLE.md` file — a markdown document with YAML frontmatter that declares the role's tasks, tools, permissions, container requirements, and system prompt.
-
-Roles are composed from four npm package types:
-
-| Type | Purpose |
-|------|---------|
-| **Role** | Deployable unit — tasks, tools, permissions, and system prompt |
-| **App** | MCP server providing tools |
-| **Skill** | Knowledge artifacts (prompts, conventions) |
-| **Task** | Unit of work for the agent |
-
-### ROLE.md Format
-
-```yaml
----
-name: create-prd
-description: Creates product requirements documents
-commands: ['define-change']
-skills: ['@acme/skill-prd-writing']
-mcp_servers:
-  - name: github
-    tools:
-      allow: ['create_issue', 'create_pr']
-container:
-  packages:
-    apt: ['jq']
-risk: LOW
-credentials: ['GITHUB_TOKEN']
----
+** Lead **
+ - skills: review-pr, merge-pr, create-story, create-bug
+ - tools: github-pr-merge
+  
+** Developer **
+ - skills: openspec, implement-story, fix-bug,
+ - tools: github-pr-create
 ```
 
-The `ROLE.md` uses agent-native field names (e.g., `commands` for Claude Code, `instructions` for Codex). The system normalizes these to a generic representation (ROLE_TYPES) and can materialize the role for any supported runtime.
+Joe runs claude and interacts with it like it was running on his host computer.
+```
+ mason claude --role developer
+```
+
+Which locks the agent into a [**secure docker container**](docs/docker.md), with only access to that role's skills, tools and the project directory.  Futhermore, mcp-server's for the tools (and the credentials ncessary to run them) are executed in a [**mcp proxy**](docs/component-mcp-proxy.md) sidecar container.   
+
+The container environment provides both [**security**](docs/security.md) and allows the agent to [**focus**](docs/benefits.md#focus) on their current role.
+
+That's the dream, and the goal for our developer experience
+
 
 ### Command Reference
 
@@ -104,8 +78,8 @@ The `ROLE.md` uses agent-native field names (e.g., `commands` for Claude Code, `
 |---------|-------------|
 | `mason run <agent> --role <name>` | Run a role on the specified agent runtime |
 | `mason <agent> --role <name>` | Shorthand for `run` |
-| `mason run <agent> --role <name> --acp` | Run as an ACP server |
-| `mason run <agent> --role <name> --dev-container` | Run a dev container with Agent enabled within VScode |
+| `mason run <agent> --role <name> --acp` | Run as an ACP agent which proxies to the agent in the container |
+| `mason run <agent> --role <name> --dev-container` | Run project in a dev container with Agent enabled within VScode |
 
 ## Documentation
 
@@ -120,21 +94,7 @@ The `ROLE.md` uses agent-native field names (e.g., `commands` for Claude Code, `
 | [MCP Proxy](docs/component-mcp-proxy.md) | Tool filtering and routing |
 | [Credential Service](docs/component-credential-service.md) | Secure credential resolution |
 
-## Editor Integration
 
-Use VSCode with a remote dev container
-```bash
-mason run claude --role writer --dev-container
-```
-
-
-Integrate with your editor via the Agent Communication Protocol:
-
-```bash
-mason run claude --role writer --acp
-```
-
-Works with Zed, JetBrains, Neovim, and any ACP-compatible client. See the [CLI reference](docs/cli.md#mason-run) for configuration details.
 
 ## Contributing
 
