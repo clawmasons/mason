@@ -1,10 +1,10 @@
 # Mason
 
-Mason runs your agents in secure docker contianers scoped to what they need with [**Roles**](/docs/roles.md)
+Mason runs your agents in secure docker contianers scoped to what they need with [**Roles**](/docs/role.md)
 
 ## Prerequisites
 
-```mason``` is a typescript command line that runs your agent in containers.  Hence the three prerequisites
+```mason``` is a typescript command line that runs your agent in containers.  Hence three prerequisites:
 
 - [**Docker**](docker.md)
 - [**Node Environment**](node.md) 
@@ -32,20 +32,21 @@ mason configure --agent claude
 ```basH
 mason claude --role {project-role}
 ```
-Follow thes instructions generated in ```.mason/inital-role.plan.md``` to test your roles
+
+*Follow instructions generated in ```.mason/inital-role.plan.md``` to test the roles*
 
 
 ## Our dream, in a simplified example
 
-Let's say Joe Devops is running a project and has admin level AWS, github and jira credentials
-on your laptop today.  furthermore, joe has skills loaded up in .claude ready to use all those 
-credentials as needed for your workflow.
+Joe Devops is running a project and has admin level AWS, github and jira credentials
+on your laptop today.  Furthermore, joey has skills loaded up in .claude ready to use all those 
+credentials as needed for his workflow.
 
-This is a powder keg waiting for either a prompt injection attack, or an agent to accidetally 
+This is a powder keg waiting for either a prompt injection attack or an agent to accidetally 
 run the worng skill at the wrong time.
 
 
-After ```mason configure`` Joe's project's roles might look like this
+Joe installs and run's ```mason configure```, to get roles that look like:
 ```
 ** Devops **
  -skills: terraform, ship-it
@@ -60,12 +61,12 @@ After ```mason configure`` Joe's project's roles might look like this
  - tools: github-pr-create
 ```
 
-Joe runs claude and interacts with it like it was running on his host computer.
+Joe runs claude and interacts with it like it was running on his host computer.  If he needs to write code:
 ```
  mason claude --role developer
 ```
 
-Which locks the agent into a [**secure docker container**](docs/docker.md), with only access to that role's skills, tools and the project directory.  Futhermore, mcp-server's for the tools (and the credentials ncessary to run them) are executed in a [**mcp proxy**](docs/component-mcp-proxy.md) sidecar container.   
+Which locks the agent into a [**secure docker container**](docs/docker.md), with only access to that role's skills, tools and the project directory.  Futhermore, mcp-server's for the tools (and the credentials ncessary to run them) are executed in a [**mcp proxy**](docs/component-mcp-proxy.md) sidecar container.  No risk of an overly helpful agent or prompt-injection attack deleting AWS.
 
 The container environment provides both [**security**](docs/security.md) and allows the agent to [**focus**](docs/benefits.md#focus) on their current role.
 
