@@ -9,7 +9,7 @@ The `mcp-test` agent and role packages provide an interactive CLI for integratio
 The agent package SHALL declare `credentials: ["TEST_TOKEN"]` in its chapter field, with runtime `node` and role `@test/role-mcp-test`.
 
 #### Scenario: Agent package validates correctly
-- **GIVEN** the mcp-test agent package.json at `e2e/fixtures/test-chapter/agents/mcp-test/package.json`
+- **GIVEN** the mcp-test agent package.json at `packages/tests/fixtures/test-chapter/agents/mcp-test/package.json`
 - **WHEN** the chapter field is validated against the agent schema
 - **THEN** it passes validation with `type: "agent"`, `credentials: ["TEST_TOKEN"]`, `runtimes: ["node"]`
 
@@ -18,7 +18,7 @@ The agent package SHALL declare `credentials: ["TEST_TOKEN"]` in its chapter fie
 The role package SHALL have `risk: "LOW"` and permissions that allow all tools from all apps (`"*": { "allow": ["*"] }`).
 
 #### Scenario: Role package validates correctly
-- **GIVEN** the mcp-test role package.json at `e2e/fixtures/test-chapter/roles/mcp-test/package.json`
+- **GIVEN** the mcp-test role package.json at `packages/tests/fixtures/test-chapter/roles/mcp-test/package.json`
 - **WHEN** the chapter field is validated against the role schema
 - **THEN** it passes validation with `type: "role"`, `risk: "LOW"`, wildcard permissions
 

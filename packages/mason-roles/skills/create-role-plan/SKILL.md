@@ -5,7 +5,8 @@ description: Generates a detailed plan to implement and use mason roles in this 
 
 # create-role-plan — Project Scanner and Role Plan Generator
 
-Scans your project and generates a `{project-dir}.mason/{project-name}-role-plan.md` — a planning document that captures proposed roles, implementation steps, and how to test them with mason.
+
+Scans your project and generates a `{project-dir}.mason/plans/initial-role-plan.md` — a planning document that captures proposed roles, implementation steps, and how to test them with mason.
 
 ## When to use
 
@@ -20,7 +21,7 @@ Use this skill when you want to:
 
 2. **Determine the project name** — Use the root directory name or the `name` field from `package.json` / `pyproject.toml` if present.
 
-3. **Generate `.mason/{project-name}-role-plan.md`** — Write the plan document with the structure below.
+3. **Generate `.mason/plans/initial-role-plan.md`** — Write the plan document with the structure below.
   - Summarize the roles that will created
   - document the exact ROLE.md that will be created in .mason/roles/{role-name}/ROLE.md
   - follow ## Document Output Structure
@@ -51,14 +52,14 @@ and a one-paragraph summary of the proposed role structure.
 
 Repeat for each proposed role.
 
-## Implementation Steps
+## {role-name} Implementation Steps
 
 - [ ] Create `{project-dir}.mason/roles/{role-name}/ROLE.md` for each proposed role
 - [ ] Populate frontmatter (name, description, version, type, risk, credentials, container)
 - [ ] Write system prompt body in each ROLE.md
 - [ ] Configure MCP server tool allow/deny lists
 - [ ] Add container ignore paths (`.mason/`, `.claude/`, `.env` at minimum)
-
+- [ ] Add a an "alias" to .mason/config.json to run this role with the current agent
 ## Testing
 
 How to launch and verify each role with mason:

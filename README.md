@@ -99,7 +99,7 @@ That's the dream, and the goal for our developer experience
 
 ## Contributing
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions, project structure, and the programmatic API.
+See [DEVELOPMENT.md](docs/development.md) for build instructions, project structure, and the programmatic API.
 
 ## License
 

@@ -14,8 +14,7 @@
   "license": "MIT",
   "workspaces": [
     "packages/*",
-    "!packages/placeholders",
-    "e2e"
+    "!packages/placeholders"
   ],
   "devDependencies": {
     "@eslint/js": "^9.0.0",

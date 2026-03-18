@@ -1,5 +1,5 @@
 # .claude/rules/e2e-tests.md
 ---
-paths: e2e/**/*
+paths: packages/tests/**/*
 ---
 @pe2e/AGENTS.md
