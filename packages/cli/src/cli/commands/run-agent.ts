@@ -542,7 +542,7 @@ function expandHome(p: string): string {
 /**
  * Create the action handler for the `run` command.
  */
-function createRunAction() {
+function createRunAction(overrideRole?: string) {
   return async (
     positionalAgent: string | undefined,
     options: {
@@ -570,8 +570,8 @@ function createRunAction() {
     // Load config entry for the named agent (sync, no dynamic imports)
     const configEntry = agentInput ? loadConfigAgentEntry(projectDir, agentInput) : undefined;
 
-    // Derive effective role: --role flag > config role > error
-    const role = options.role ?? configEntry?.role;
+    // Derive effective role: override (for configure) > --role flag > config role > error
+    const role = overrideRole ?? options.role ?? configEntry?.role;
     if (!role) {
       console.error(
         "\n  --role <name> is required (or set \"role\" in .mason/config.json for this agent).\n" +
@@ -664,6 +664,26 @@ export function registerRunCommand(program: Command): void {
     .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
     .addHelpText("after", RUN_ACP_AGENT_HELP_EPILOG)
     .action(createRunAction());
+}
+
+const CONFIGURE_ROLE = "@clawmasons/role-configure-project";
+
+export function registerConfigureCommand(program: Command): void {
+  program
+    .command("configure")
+    .description("Configure a project for mason (alias for run with the configure-project role)")
+    .argument("[agent]", "Agent name from config or built-in type (e.g., claude, pi, mcp)")
+    .option("--acp", "Start in ACP mode for editor integration")
+    .option("--bash", "Launch bash shell instead of the agent (for debugging)")
+    .option("--terminal", "Force terminal (interactive) mode, overriding config mode")
+    .option("--build", "Force rebuild Docker images before running")
+    .option("--agent <name>", "Agent name from .mason/config.json or built-in alias")
+    .option("--home <path>", "Bind-mount path over /home/mason/ in the agent container")
+    .option("--dev-container", "Start in dev-container mode: print IDE attach instructions and optionally launch VSCode")
+    .option("--proxy-only", "Start proxy infrastructure only, output connection info as JSON")
+    .option("--verbose", "Show Docker build and compose output")
+    .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
+    .action(createRunAction(CONFIGURE_ROLE));
 }
 
 // ── Main Orchestrator ─────────────────────────────────────────────────
