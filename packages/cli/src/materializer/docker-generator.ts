@@ -172,6 +172,8 @@ export interface GenerateBuildDirOptions {
   devContainerCustomizations?: DevContainerCustomizations;
   /** Additional credential env var keys from agent config (.mason/config.json) to include in agent-launch.json. */
   agentConfigCredentials?: string[];
+  /** Extra args from alias config to append to the agent invocation. */
+  agentArgs?: string[];
 }
 
 export interface BuildDirResult {
@@ -253,17 +255,21 @@ export function generateRoleDockerBuildDir(
   // - project role: everything else → {agentDir}/build/workspace/project/  (per-file overlay mounts)
   // - supervisor role: everything else → {agentDir}/home/         (merged into home mount at /home/mason/)
   const proxyEp = proxyEndpoint ?? `http://proxy-${roleName}:9090`;
+  const materializeOpts = (opts.agentConfigCredentials?.length || opts.agentArgs?.length)
+    ? {
+        ...(opts.agentConfigCredentials?.length ? { agentConfigCredentials: opts.agentConfigCredentials } : {}),
+        ...(opts.agentArgs?.length ? { agentArgs: opts.agentArgs } : {}),
+      }
+    : undefined;
   const workspace = (isSupervisor && materializer?.materializeSupervisor)
     ? materializer.materializeSupervisor(
         resolvedAgent,
         proxyEp,
         undefined,
-        opts.agentConfigCredentials?.length ? { agentConfigCredentials: opts.agentConfigCredentials } : undefined,
+        materializeOpts,
         !fsDeps ? path.join(agentDir, "home") : undefined,
       )
-    : materializeForAgent(role, agentType, proxyEp, undefined,
-        opts.agentConfigCredentials?.length ? { agentConfigCredentials: opts.agentConfigCredentials } : undefined,
-      );
+    : materializeForAgent(role, agentType, proxyEp, undefined, materializeOpts);
   const workspaceDir = path.join(agentDir, "workspace");
   const buildWorkspaceProjectDir = path.join(agentDir, "build", "workspace", "project");
   const homeBuildDir = path.join(agentDir, "home");

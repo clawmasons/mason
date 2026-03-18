@@ -11,7 +11,7 @@ import { resolveRoleMountVolumes, type RoleMount } from "../../generator/mount-v
 import type { ResolvedAgent, Role } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName } from "@clawmasons/shared";
 import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../../materializer/role-materializer.js";
-import { loadConfigAgentEntry } from "@clawmasons/agent-sdk";
+import { loadConfigAgentEntry, loadConfigAliasEntry } from "@clawmasons/agent-sdk";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
 import { CredentialService, CredentialWSClient } from "@clawmasons/credential-service";
@@ -367,7 +367,7 @@ async function ensureDockerBuild(
   roleType: Role,
   agentType: string,
   projectDir: string,
-  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations; agentConfigCredentials?: string[] },
+  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations; agentConfigCredentials?: string[]; agentArgs?: string[] },
 ): Promise<{ dockerBuildDir: string; dockerDir: string }> {
   const existsSync = deps?.existsSyncFn ?? fs.existsSync;
   const roleName = getAppShortName(roleType.metadata.name);
@@ -399,6 +399,7 @@ async function ensureDockerBuild(
       agentName: roleName,
       devContainerCustomizations: deps?.devContainerCustomizations,
       agentConfigCredentials: deps?.agentConfigCredentials,
+      agentArgs: deps?.agentArgs,
     });
 
     // Populate shared proxy dependencies
@@ -568,14 +569,27 @@ function createRunAction(overrideRole?: string) {
       ensureMasonConfig(projectDir);
     }
 
-    // Load config entry for the named agent (sync, no dynamic imports)
-    const configEntry = agentInput ? loadConfigAgentEntry(projectDir, agentInput) : undefined;
+    // Alias resolution: check aliases first (alias takes precedence over agent name)
+    const aliasEntry = agentInput ? loadConfigAliasEntry(projectDir, agentInput) : undefined;
+    if (aliasEntry) {
+      // Warn if the alias name collides with an agent key
+      const directAgentEntry = agentInput ? loadConfigAgentEntry(projectDir, agentInput) : undefined;
+      if (directAgentEntry) {
+        console.warn(`[config] Alias "${agentInput}" shadows agent name "${agentInput}". The alias will be used.`);
+      }
+    }
+
+    // Effective agent name: from alias reference, or the direct input
+    const effectiveAgentInput = aliasEntry ? aliasEntry.agent : agentInput;
+
+    // Runtime config: alias fields take precedence, fall back to agent config entry (deprecated)
+    const configEntry = aliasEntry ?? (agentInput ? loadConfigAgentEntry(projectDir, agentInput) : undefined);
 
     // Derive effective role: override (for configure) > --role flag > config role > error
     const role = overrideRole ?? options.role ?? configEntry?.role;
     if (!role) {
       console.error(
-        "\n  --role <name> is required (or set \"role\" in .mason/config.json for this agent).\n" +
+        "\n  --role <name> is required (or set \"role\" in .mason/config.json for this agent or alias).\n" +
         "  Usage: mason run --role <name> [--agent <name>]\n",
       );
       process.exit(1);
@@ -596,13 +610,13 @@ function createRunAction(overrideRole?: string) {
       options.bash ||
       (!options.acp && !options.terminal && configEntry?.mode === "bash");
 
-    // Resolve agent type if an agent name/type was provided
+    // Resolve agent type from effective agent name (after alias resolution)
     let resolvedAgentType: string | undefined;
-    if (agentInput) {
-      resolvedAgentType = resolveAgentType(agentInput);
+    if (effectiveAgentInput) {
+      resolvedAgentType = resolveAgentType(effectiveAgentInput);
       if (!resolvedAgentType) {
         const known = getKnownAgentTypeNames().join(", ");
-        console.error(`\n  Unknown agent "${agentInput}".\n  Available agents: ${known}\n`);
+        console.error(`\n  Unknown agent "${effectiveAgentInput}".\n  Available agents: ${known}\n`);
         process.exit(1);
         return;
       }
@@ -618,6 +632,9 @@ function createRunAction(overrideRole?: string) {
       }
     }
 
+    // agent-args from alias config (undefined if not an alias or no agent-args set)
+    const agentArgs = aliasEntry?.agentArgs;
+
     if (options.proxyOnly) {
       await runProxyOnly(projectDir, resolvedAgentType, role, parseInt(options.proxyPort, 10));
     } else if (effectiveAcp) {
@@ -626,6 +643,7 @@ function createRunAction(overrideRole?: string) {
         proxyPort: parseInt(options.proxyPort, 10),
         homeOverride,
         agentConfigCredentials: configEntry?.credentials,
+        agentArgs,
       });
     } else if (options.devContainer) {
       await runAgent(projectDir, resolvedAgentType, role, undefined, {
@@ -636,6 +654,7 @@ function createRunAction(overrideRole?: string) {
         homeOverride,
         devContainerCustomizations: (configEntry as { devContainerCustomizations?: DevContainerCustomizations } | undefined)?.devContainerCustomizations,
         agentConfigCredentials: configEntry?.credentials,
+        agentArgs,
       });
     } else {
       await runAgent(projectDir, resolvedAgentType, role, undefined, {
@@ -645,6 +664,7 @@ function createRunAction(overrideRole?: string) {
         verbose: options.verbose,
         homeOverride,
         agentConfigCredentials: configEntry?.credentials,
+        agentArgs,
       });
     }
   };
@@ -707,6 +727,7 @@ export async function runAgent(
     devContainer?: boolean;
     devContainerCustomizations?: DevContainerCustomizations;
     agentConfigCredentials?: string[];
+    agentArgs?: string[];
   },
 ): Promise<void> {
   // Initialize agent registry with config-declared agents from .mason/config.json
@@ -719,19 +740,21 @@ export async function runAgent(
   const buildMode = acpOptions?.build === true;
   const homeOverride = deps?.homeOverride ?? acpOptions?.homeOverride;
   const agentConfigCredentials = acpOptions?.agentConfigCredentials;
+  const agentArgs = acpOptions?.agentArgs;
 
   if (isAcpMode) {
-    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials);
+    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials, agentArgs);
   } else if (isDevContainerMode) {
     const verbose = acpOptions?.verbose === true;
     return runAgentDevContainerMode(
       projectDir, agent, role, proxyPort, deps, buildMode, verbose, homeOverride,
       acpOptions?.devContainerCustomizations,
       agentConfigCredentials,
+      agentArgs,
     );
   } else {
     const verbose = acpOptions?.verbose === true;
-    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials);
+    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs);
   }
 }
 
@@ -748,6 +771,7 @@ async function runAgentInteractiveMode(
   verbose?: boolean,
   homeOverride?: string,
   agentConfigCredentials?: string[],
+  agentArgs?: string[],
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
@@ -772,7 +796,7 @@ async function runAgentInteractiveMode(
 
     // 4. Ensure docker build artifacts exist (auto-build if missing)
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
-      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials },
+      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs },
     );
 
     // 5. Ensure .mason is in project's .gitignore
@@ -953,6 +977,7 @@ async function runAgentDevContainerMode(
   homeOverride?: string,
   devContainerCustomizations?: DevContainerCustomizations,
   agentConfigCredentials?: string[],
+  agentArgs?: string[],
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
@@ -978,7 +1003,7 @@ async function runAgentDevContainerMode(
     // 3. Ensure docker build artifacts
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
       roleType, agentType, projectDir,
-      { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations, agentConfigCredentials },
+      { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations, agentConfigCredentials, agentArgs },
     );
 
     // 4. Ensure .mason is in .gitignore
@@ -1272,6 +1297,7 @@ async function runAgentAcpMode(
   deps?: RunAgentDeps,
   homeOverride?: string,
   agentConfigCredentials?: string[],
+  agentArgs?: string[],
 ): Promise<void> {
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
   const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
@@ -1336,7 +1362,7 @@ async function runAgentAcpMode(
 
     // ── Step 3: Ensure docker build artifacts ────────────────────────
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
-      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, agentConfigCredentials },
+      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, agentConfigCredentials, agentArgs },
     );
 
     // ── Create file logger in session-local logs ─────────────────────

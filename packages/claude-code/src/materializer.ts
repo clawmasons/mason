@@ -307,7 +307,7 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     const roleInstructions = agent.roles[0]?.instructions;
     result.set(
       "agent-launch.json",
-      generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode, roleInstructions),
+      generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode, roleInstructions, options?.agentArgs),
     );
 
     return result;
@@ -366,7 +366,7 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     const roleInstructions = agent.roles[0]?.instructions;
     result.set(
       "agent-launch.json",
-      generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode, roleInstructions),
+      generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode, roleInstructions, options?.agentArgs),
     );
 
     return result;

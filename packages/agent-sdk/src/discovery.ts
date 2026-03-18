@@ -44,21 +44,60 @@ export const DEFAULT_DEV_CONTAINER_CUSTOMIZATIONS: DevContainerCustomizations = 
 };
 
 /**
- * Per-agent launch profile declared in .mason/config.json.
+ * Per-agent registry entry declared in .mason/config.json agents section.
+ * Only `package` is the canonical field. Runtime fields are deprecated —
+ * move them to an `aliases` entry instead.
  */
 export interface AgentEntryConfig {
   /** npm package name implementing the agent SDK */
   package: string;
-  /** Host path to bind-mount over /home/mason/ in the agent container */
+  /**
+   * @deprecated Move to an `aliases` entry. Will be removed in a future version.
+   * Host path to bind-mount over /home/mason/ in the agent container.
+   */
   home?: string;
+  /**
+   * @deprecated Move to an `aliases` entry. Will be removed in a future version.
+   * Default startup mode (overridable by CLI flags).
+   */
+  mode?: "terminal" | "acp" | "bash";
+  /**
+   * @deprecated Move to an `aliases` entry. Will be removed in a future version.
+   * Default role name to use when --role is not supplied.
+   */
+  role?: string;
+  /**
+   * @deprecated Move to an `aliases` entry. Will be removed in a future version.
+   * Dev-container IDE extensions and settings to embed in the agent image at build time.
+   */
+  devContainerCustomizations?: DevContainerCustomizations;
+  /**
+   * @deprecated Move to an `aliases` entry. Will be removed in a future version.
+   * Additional credential env var keys required by this agent in the current project.
+   */
+  credentials?: string[];
+}
+
+/**
+ * Named runnable preset declared in .mason/config.json aliases section.
+ * An alias references an agent from the agents registry and carries all
+ * runtime configuration. Run with: mason {aliasName}
+ */
+export interface AliasEntryConfig {
+  /** Key in the agents registry */
+  agent: string;
   /** Default startup mode (overridable by CLI flags) */
   mode?: "terminal" | "acp" | "bash";
   /** Default role name to use when --role is not supplied */
   role?: string;
+  /** Host path to bind-mount over /home/mason/ in the agent container */
+  home?: string;
   /** Dev-container IDE extensions and settings to embed in the agent image at build time */
   devContainerCustomizations?: DevContainerCustomizations;
-  /** Additional credential env var keys required by this agent in the current project */
+  /** Additional credential env var keys required by this alias */
   credentials?: string[];
+  /** Extra args appended to the agent invocation after all mason-resolved args */
+  agentArgs?: string[];
 }
 
 /**
@@ -66,6 +105,7 @@ export interface AgentEntryConfig {
  */
 interface MasonConfig {
   agents?: Record<string, unknown>;
+  aliases?: Record<string, unknown>;
 }
 
 const VALID_MODES = new Set<string>(["terminal", "acp", "bash"]);
@@ -88,29 +128,39 @@ function parseEntryConfig(name: string, raw: unknown): AgentEntryConfig | null {
 
   const entry: AgentEntryConfig = { package: obj.package };
 
+  // Detect deprecated runtime fields and warn once with all offending keys
+  const runtimeFields = ["home", "mode", "role", "credentials", "dev-container-customizations"] as const;
+  const foundDeprecated = runtimeFields.filter((f) => obj[f] !== undefined);
+  if (foundDeprecated.length > 0) {
+    console.warn(
+      `[agent-sdk] Agent "${name}" has runtime fields (${foundDeprecated.join(", ")}) in the "agents" config. ` +
+      `Move these to an "aliases" entry. Runtime fields in "agents" will be removed in a future version.`,
+    );
+  }
+
   if (obj.home !== undefined && typeof obj.home === "string") {
-    entry.home = obj.home;
+    entry.home = obj.home; // deprecated field — still parsed during deprecation period
   }
 
   if (obj.mode !== undefined) {
     if (typeof obj.mode === "string" && VALID_MODES.has(obj.mode)) {
-      entry.mode = obj.mode as "terminal" | "acp" | "bash";
+      entry.mode = obj.mode as "terminal" | "acp" | "bash"; // deprecated
     } else {
       console.warn(
         `[agent-sdk] Agent "${name}" has invalid mode "${String(obj.mode)}" (expected terminal, acp, or bash). Defaulting to terminal.`,
       );
-      entry.mode = "terminal";
+      entry.mode = "terminal"; // deprecated
     }
   }
 
   if (obj.role !== undefined && typeof obj.role === "string") {
-    entry.role = obj.role;
+    entry.role = obj.role; // deprecated
   }
 
   if (obj["dev-container-customizations"] !== undefined &&
       typeof obj["dev-container-customizations"] === "object" &&
       obj["dev-container-customizations"] !== null) {
-    entry.devContainerCustomizations = obj["dev-container-customizations"] as DevContainerCustomizations;
+    entry.devContainerCustomizations = obj["dev-container-customizations"] as DevContainerCustomizations; // deprecated
   }
 
   if (obj.credentials !== undefined) {
@@ -125,7 +175,7 @@ function parseEntryConfig(name: string, raw: unknown): AgentEntryConfig | null {
           console.warn(`[agent-sdk] Agent "${name}" credentials contains non-string entry "${String(item)}". Skipping.`);
         }
       }
-      entry.credentials = validKeys;
+      entry.credentials = validKeys; // deprecated
     }
   }
 
@@ -293,4 +343,126 @@ export function getRegisteredAgentNames(registry: AgentRegistry): string[] {
     names.add(agent.name);
   }
   return [...names];
+}
+
+// ── Alias Config Loading ──────────────────────────────────────────────
+
+/**
+ * Parse and validate a raw alias config entry.
+ * Returns null if the entry is invalid (missing or invalid agent field).
+ * @param name - The alias key name
+ * @param raw - The raw value from config.json
+ * @param knownAgentNames - Set of valid agent keys for validation
+ */
+function parseAliasEntryConfig(
+  name: string,
+  raw: unknown,
+  knownAgentNames: Set<string>,
+): AliasEntryConfig | null {
+  if (!raw || typeof raw !== "object") {
+    console.warn(`[agent-sdk] Invalid alias config for "${name}": must be an object`);
+    return null;
+  }
+  const obj = raw as Record<string, unknown>;
+
+  if (typeof obj.agent !== "string") {
+    console.warn(`[agent-sdk] Invalid alias config for "${name}": missing "agent" field`);
+    return null;
+  }
+
+  if (!knownAgentNames.has(obj.agent)) {
+    console.error(`[agent-sdk] Alias "${name}" references unknown agent "${obj.agent}"`);
+    process.exit(1);
+  }
+
+  const entry: AliasEntryConfig = { agent: obj.agent };
+
+  if (obj.mode !== undefined) {
+    if (typeof obj.mode === "string" && VALID_MODES.has(obj.mode)) {
+      entry.mode = obj.mode as "terminal" | "acp" | "bash";
+    } else {
+      console.warn(
+        `[agent-sdk] Alias "${name}" has invalid mode "${String(obj.mode)}" (expected terminal, acp, or bash). Defaulting to terminal.`,
+      );
+      entry.mode = "terminal";
+    }
+  }
+
+  if (obj.role !== undefined && typeof obj.role === "string") {
+    entry.role = obj.role;
+  }
+
+  if (obj.home !== undefined && typeof obj.home === "string") {
+    entry.home = obj.home;
+  }
+
+  if (obj["dev-container-customizations"] !== undefined &&
+      typeof obj["dev-container-customizations"] === "object" &&
+      obj["dev-container-customizations"] !== null) {
+    entry.devContainerCustomizations = obj["dev-container-customizations"] as DevContainerCustomizations;
+  }
+
+  if (obj.credentials !== undefined) {
+    if (!Array.isArray(obj.credentials)) {
+      console.warn(`[agent-sdk] Alias "${name}" has invalid credentials value (expected array). Ignoring.`);
+    } else {
+      const validKeys: string[] = [];
+      for (const item of obj.credentials) {
+        if (typeof item === "string") {
+          validKeys.push(item);
+        } else {
+          console.warn(`[agent-sdk] Alias "${name}" credentials contains non-string entry "${String(item)}". Skipping.`);
+        }
+      }
+      entry.credentials = validKeys;
+    }
+  }
+
+  if (obj["agent-args"] !== undefined) {
+    if (!Array.isArray(obj["agent-args"])) {
+      console.warn(`[agent-sdk] Alias "${name}" has invalid agent-args value (expected array). Ignoring.`);
+    } else {
+      const validArgs: string[] = [];
+      for (const item of obj["agent-args"]) {
+        if (typeof item === "string") {
+          validArgs.push(item);
+        } else {
+          console.warn(`[agent-sdk] Alias "${name}" agent-args contains non-string entry "${String(item)}". Skipping.`);
+        }
+      }
+      entry.agentArgs = validArgs;
+    }
+  }
+
+  return entry;
+}
+
+/**
+ * Return the validated alias config entry for a named alias from .mason/config.json.
+ * Synchronous — no dynamic imports.
+ *
+ * @returns The AliasEntryConfig, or undefined if absent or invalid.
+ */
+export function loadConfigAliasEntry(projectDir: string, aliasName: string): AliasEntryConfig | undefined {
+  const config = readMasonConfig(projectDir);
+  if (!config?.aliases) return undefined;
+
+  const raw = config.aliases[aliasName];
+  if (raw === undefined) return undefined;
+
+  const knownAgentNames = new Set(Object.keys(config.agents ?? {}));
+  const entry = parseAliasEntryConfig(aliasName, raw, knownAgentNames);
+  return entry ?? undefined;
+}
+
+/**
+ * Return all alias key names declared in .mason/config.json.
+ * Synchronous — no dynamic imports.
+ *
+ * @returns Array of alias key names, or empty array if the file is absent or unparseable.
+ */
+export function readConfigAliasNames(projectDir: string): string[] {
+  const config = readMasonConfig(projectDir);
+  if (!config?.aliases || typeof config.aliases !== "object") return [];
+  return Object.keys(config.aliases);
 }
