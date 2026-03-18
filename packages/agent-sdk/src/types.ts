@@ -14,6 +14,8 @@ export type MaterializationResult = Map<string, string>;
 export interface MaterializeOptions {
   /** When true, generate ACP agent configuration alongside standard workspace files. */
   acpMode?: boolean;
+  /** Additional credential env var keys from agent config (.mason/config.json). Merged into agent-launch.json credentials. */
+  agentConfigCredentials?: string[];
 }
 
 /**
