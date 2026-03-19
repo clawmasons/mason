@@ -627,7 +627,7 @@ services:
       context: ${relDockerDir}
       dockerfile: ${path.relative(dockerDir, path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"))}
     volumes:
-      - ${relProjectDir}:${PROJECT_MOUNT_PATH}:ro
+      - ${relProjectDir}:${PROJECT_MOUNT_PATH}
       - ${relLogsDir}:/logs
       - ${rel(path.join(dockerBuildDir, "mcp-proxy", ".cache"))}:/app/.cache
     environment:

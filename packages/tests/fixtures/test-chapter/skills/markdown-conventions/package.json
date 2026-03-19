@@ -1,9 +1,0 @@
-{
-  "name": "@test/skill-markdown-conventions",
-  "version": "1.0.0",
-  "chapter": {
-    "type": "skill",
-    "artifacts": ["./SKILL.md"],
-    "description": "Markdown formatting conventions for consistent note structure"
-  }
-}
