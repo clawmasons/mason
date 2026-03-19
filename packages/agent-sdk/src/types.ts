@@ -86,6 +86,8 @@ export interface DockerfileConfig {
   installSteps?: string;
   /** Additional apt packages required by the agent runtime. */
   aptPackages?: string[];
+  /** Additional npm packages to install globally in the agent container. */
+  npmPackages?: string[];
 }
 
 /**

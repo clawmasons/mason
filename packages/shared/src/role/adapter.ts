@@ -109,6 +109,11 @@ function buildResolvedRole(role: Role, version: string): ResolvedRole {
       resolvedRole.aptPackages = aptPackages;
     }
 
+    const npmPackages = role.container.packages?.npm;
+    if (npmPackages && npmPackages.length > 0) {
+      resolvedRole.npmPackages = npmPackages;
+    }
+
     if (role.container.baseImage) {
       resolvedRole.baseImage = role.container.baseImage;
     }

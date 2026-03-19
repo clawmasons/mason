@@ -331,6 +331,67 @@ describe("generateAgentDockerfile", () => {
     expect(result).toContain("apt-get install -y --no-install-recommends python3 make");
   });
 
+  // ── Npm Packages Tests ───────────────────────────────────────────────
+
+  it("includes npm install -g step when role npmPackages specified", () => {
+    const agent = makeNoteTakerAgent();
+    const role = { ...agent.roles[0], npmPackages: ["typescript", "@fission-ai/openspec@latest"] };
+    const result = generateAgentDockerfile(agent, role);
+
+    expect(result).toContain("npm install -g typescript @fission-ai/openspec@latest");
+  });
+
+  it("does not include npm install step when npmPackages is undefined", () => {
+    const agent = makeNoteTakerAgent();
+    const role = { ...agent.roles[0] };
+    delete role.npmPackages;
+    const result = generateAgentDockerfile(agent, role);
+
+    expect(result).not.toContain("npm install -g");
+  });
+
+  it("does not include npm install step when npmPackages is empty", () => {
+    const agent = makeNoteTakerAgent();
+    const role = { ...agent.roles[0], npmPackages: [] };
+    const result = generateAgentDockerfile(agent, role);
+
+    expect(result).not.toContain("npm install -g");
+  });
+
+  it("merges and deduplicates npm packages from agent dockerfileConfig and role", () => {
+    const agent = makeNoteTakerAgent();
+    const role = { ...agent.roles[0], npmPackages: ["typescript"] };
+    const result = generateAgentDockerfile(agent, role, {
+      dockerfileConfig: { npmPackages: ["typescript", "@fission-ai/openspec@latest"] },
+    });
+
+    const matches = result.match(/npm install -g (.+)/);
+    expect(matches).not.toBeNull();
+    const packages = matches![1].split(" ");
+    expect(packages).toContain("typescript");
+    expect(packages).toContain("@fission-ai/openspec@latest");
+    // deduplicated — typescript appears only once
+    expect(packages.filter((p) => p === "typescript")).toHaveLength(1);
+  });
+
+  it("npm install step appears after apt-get and before groupadd", () => {
+    const agent = makeNoteTakerAgent();
+    const role = {
+      ...agent.roles[0],
+      aptPackages: ["git"],
+      npmPackages: ["typescript"],
+    };
+    const result = generateAgentDockerfile(agent, role);
+
+    const aptPos = result.indexOf("apt-get update");
+    const npmPos = result.indexOf("npm install -g");
+    const groupaddPos = result.indexOf("groupadd");
+
+    expect(aptPos).toBeGreaterThan(-1);
+    expect(npmPos).toBeGreaterThan(aptPos);
+    expect(groupaddPos).toBeGreaterThan(npmPos);
+  });
+
   // ── Home Directory Tests ────────────────────────────────────────────
 
   it("does not include home COPY when hasHome is false", () => {

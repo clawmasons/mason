@@ -90,6 +90,18 @@ export function generateAgentDockerfile(
       ? `\n# Install apt packages\nRUN apt-get update && apt-get install -y --no-install-recommends ${uniqueAptPackages.join(" ")} && rm -rf /var/lib/apt/lists/*\n`
       : "";
 
+  // Merge npm packages from agent and role, deduplicate
+  const allNpmPackages = [
+    ...(dockerfileConfig?.npmPackages ?? []),
+    ...(role.npmPackages ?? []),
+  ];
+  const uniqueNpmPackages = [...new Set(allNpmPackages)];
+
+  const npmInstallStep =
+    uniqueNpmPackages.length > 0
+      ? `\n# Install global npm packages\nRUN npm install -g ${uniqueNpmPackages.join(" ")}\n`
+      : "";
+
   // Home directory COPY and backup (when materialized home exists)
   const homeCopyLines = hasHome
     ? `
@@ -113,7 +125,7 @@ ${runtimeInstall}
 # Copy pre-populated node_modules (all deps resolved by docker-init)
 COPY node_modules/ /app/node_modules/
 ENV PATH="/app/node_modules/.bin:$PATH"
-${aptInstallStep}
+${aptInstallStep}${npmInstallStep}
 # Create mason user with host-matching UID/GID
 ARG HOST_UID=1000
 ARG HOST_GID=1000

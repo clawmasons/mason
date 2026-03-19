@@ -71,6 +71,7 @@ export interface ResolvedRole {
   mounts?: Array<{ source: string; target: string; readonly: boolean }>;
   baseImage?: string;
   aptPackages?: string[];
+  npmPackages?: string[];
   tasks: ResolvedTask[];
   apps: ResolvedApp[];
   skills: ResolvedSkill[];

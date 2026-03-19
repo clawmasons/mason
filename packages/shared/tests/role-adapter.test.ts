@@ -306,6 +306,30 @@ describe("adaptRoleToResolvedAgent", () => {
       const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.roles[0].aptPackages).toBeUndefined();
     });
+
+    it("maps npm packages", () => {
+      const role = minimalRole({
+        container: {
+          packages: { npm: ["typescript", "@fission-ai/openspec@latest"] },
+        },
+      });
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      expect(agent.roles[0].npmPackages).toEqual(["typescript", "@fission-ai/openspec@latest"]);
+    });
+
+    it("omits npmPackages when empty", () => {
+      const role = minimalRole({
+        container: { packages: { npm: [] } },
+      });
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      expect(agent.roles[0].npmPackages).toBeUndefined();
+    });
+
+    it("omits npmPackages when absent", () => {
+      const role = minimalRole();
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      expect(agent.roles[0].npmPackages).toBeUndefined();
+    });
   });
 
   // ---- Governance ----
