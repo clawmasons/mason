@@ -193,13 +193,13 @@ describe("readPackagedRole — valid packages", () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-claude-prd",
       chapterType: "role",
-      chapterDialect: "claude-code",
+      chapterDialect: "claude-code-agent",
       roleMd: CLAUDE_DIALECT_ROLE_MD,
     });
 
     const role = await readPackagedRole(pkgDir);
 
-    // "commands" normalized to tasks via claude-code dialect
+    // "commands" normalized to tasks via claude-code-agent dialect
     expect(role.tasks).toHaveLength(2);
     expect(role.tasks[0].name).toBe("define-change");
 

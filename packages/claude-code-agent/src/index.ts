@@ -4,12 +4,12 @@ import { claudeCodeMaterializer, _setAgentPackage } from "./materializer.js";
 export { claudeCodeMaterializer } from "./materializer.js";
 
 const claudeCodeAgent: AgentPackage = {
-  name: "claude-code",
+  name: "claude-code-agent",
   aliases: ["claude"],
   materializer: claudeCodeMaterializer,
   dockerfile: {
     installSteps: `
-# Install claude-code runtime
+# Install claude-code-agent runtime
 RUN npm install -g @anthropic-ai/claude-code
 `,
   },

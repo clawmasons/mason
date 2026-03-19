@@ -111,7 +111,7 @@ describe("agent type rejection", () => {
       type: "agent",
       name: "Test Agent",
       slug: "test-agent",
-      runtimes: ["claude-code"],
+      runtimes: ["claude-code-agent"],
       roles: ["@test/role"],
     });
     expect(result.success).toBe(false);

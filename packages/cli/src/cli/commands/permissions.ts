@@ -29,7 +29,7 @@ export async function runPermissions(
   try {
     // 1. Resolve role and adapt to ResolvedAgent for compatibility
     const roleType = await resolveRole(roleName, rootDir);
-    const agentType = roleType.source.agentDialect ?? "claude-code";
+    const agentType = roleType.source.agentDialect ?? "claude-code-agent";
     const agent = adaptRoleToResolvedAgent(roleType, agentType);
 
     // 2. Compute toolFilters

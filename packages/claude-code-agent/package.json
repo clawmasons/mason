@@ -1,5 +1,5 @@
 {
-  "name": "@clawmasons/claude-code",
+  "name": "@clawmasons/claude-code-agent",
   "version": "0.1.0",
   "description": "Claude Code agent package for Mason Chapter",
   "type": "module",

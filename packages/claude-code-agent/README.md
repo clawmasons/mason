@@ -1,4 +1,4 @@
-# @clawmasons/claude-code
+# @clawmasons/claude-code-agent
 
 Claude Code agent package for Mason
 

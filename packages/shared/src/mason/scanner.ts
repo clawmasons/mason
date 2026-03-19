@@ -23,7 +23,7 @@ export interface DiscoveredSkill {
   name: string;
   /** Absolute path to the skill directory */
   path: string;
-  /** Dialect that owns this skill (e.g., "claude-code") */
+  /** Dialect that owns this skill (e.g., "claude-code-agent") */
   dialect: string;
 }
 

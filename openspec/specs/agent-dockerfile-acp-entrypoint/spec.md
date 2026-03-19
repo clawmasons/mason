@@ -29,7 +29,7 @@ export function generateAgentDockerfile(
 
 | Runtime | Default Entrypoint | ACP Entrypoint |
 |---------|-------------------|----------------|
-| `claude-code` | `ENTRYPOINT ["claude"]` | `ENTRYPOINT ["claude-agent-acp"]` |
+| `claude-code-agent` | `ENTRYPOINT ["claude"]` | `ENTRYPOINT ["claude-agent-acp"]` |
 | `pi-coding-agent` | `ENTRYPOINT ["pi"]` | `ENTRYPOINT ["pi-agent-acp"]` |
 | `node` | `ENTRYPOINT ["npx", "node"]` | `ENTRYPOINT ["node", "src/index.js", "--acp"]` |
 | unknown runtime | `ENTRYPOINT ["npx", "<runtime>"]` | `ENTRYPOINT ["npx", "<runtime>"]` (unchanged, with warning comment) |
@@ -51,7 +51,7 @@ export function generateAgentDockerfile(
 ## Test Plan
 
 1. Non-ACP mode generates identical Dockerfile (regression guard)
-2. ACP mode with `claude-code` runtime uses `ENTRYPOINT ["claude-agent-acp"]`
+2. ACP mode with `claude-code-agent` runtime uses `ENTRYPOINT ["claude-agent-acp"]`
 3. ACP mode with `pi-coding-agent` runtime uses `ENTRYPOINT ["pi-agent-acp"]`
 4. ACP mode with `node` runtime uses `ENTRYPOINT ["node", "src/index.js", "--acp"]`
 5. ACP mode with unknown runtime falls back to default entrypoint

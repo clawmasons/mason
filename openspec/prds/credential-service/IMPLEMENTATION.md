@@ -153,7 +153,7 @@ Create `packages/agent-entry` — a standalone esbuild-bundled binary that boots
 
 **Summary:** Create a new package `packages/agent-entry` that bundles into a single JavaScript file via esbuild. The bootstrap flow: (1) read `MCP_PROXY_TOKEN` from environment, (2) POST to proxy `/connect-agent` → receive `AGENT_SESSION_TOKEN` + `session_id`, (3) for each credential in the agent's `credentials` list, call the proxy's `credential_request` MCP tool, (4) spawn the agent runtime child process with credentials set as env vars on the child only (using `child_process.spawn` with `env` option), (5) pipe container stdin/stdout/stderr to child process, (6) wait for child exit and propagate exit code. The agent's credential list and runtime command are passed via environment variables (`AGENT_CREDENTIALS` as JSON array, `AGENT_RUNTIME_CMD` as the command to run).
 
-**User Story:** As a Docker container entrypoint, agent-entry boots, authenticates with the proxy, retrieves all credentials securely, and launches the actual agent runtime (e.g., claude-code). The runtime has credentials in its env, but the container itself doesn't — so `docker inspect` shows nothing sensitive.
+**User Story:** As a Docker container entrypoint, agent-entry boots, authenticates with the proxy, retrieves all credentials securely, and launches the actual agent runtime (e.g., claude-code-agent). The runtime has credentials in its env, but the container itself doesn't — so `docker inspect` shows nothing sensitive.
 
 **Scope:**
 - New: `packages/agent-entry/package.json` — `@clawmasons/agent-entry`, esbuild build script

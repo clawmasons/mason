@@ -77,11 +77,11 @@ The `AgentPackage.runtime` field SHALL be a `RuntimeConfig` object with:
 Each agent package SHALL export its `AgentPackage` object as the default export of the package's main entry point. Named exports for individual components (e.g., the materializer) SHALL also be available.
 
 #### Scenario: Default import resolves AgentPackage
-- **WHEN** the CLI runs `import agent from "@clawmasons/claude-code"`
+- **WHEN** the CLI runs `import agent from "@clawmasons/claude-code-agent"`
 - **THEN** the `agent` variable SHALL be an `AgentPackage` object with `name`, `materializer`, and other fields
 
 #### Scenario: Named import for materializer
-- **WHEN** the CLI runs `import { claudeCodeMaterializer } from "@clawmasons/claude-code"`
+- **WHEN** the CLI runs `import { claudeCodeMaterializer } from "@clawmasons/claude-code-agent"`
 - **THEN** the import SHALL resolve to the `RuntimeMaterializer` implementation
 
 ### Requirement: SDK exports common helper functions

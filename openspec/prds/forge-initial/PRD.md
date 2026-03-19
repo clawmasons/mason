@@ -216,7 +216,7 @@ An agent is the top-level deployable unit. It declares the roles the agent opera
   "forge": {
     "type": "agent",
     "description": "Repository operations agent for GitHub.",
-    "runtimes": ["claude-code", "codex"],
+    "runtimes": ["claude-code-agent", "codex"],
     "roles": [
       "@clawmasons/role-issue-manager",
       "@clawmasons/role-pr-reviewer"
@@ -354,7 +354,7 @@ repo-ops/
 ├── mcp-proxy/
 │   └── config.json               # tbxark/mcp-proxy config with all apps
 │
-├── claude-code/
+├── claude-code-agent/
 │   ├── Dockerfile
 │   └── workspace/
 │       ├── .claude/
@@ -383,7 +383,7 @@ The generated `docker-compose.yml` is streamlined to just two service categories
 #### 6.2.1 Service Categories
 
 - **mcp-proxy:** Single `ghcr.io/tbxark/mcp-proxy` container. Runs all stdio-based app servers internally. Connects to remote app servers over the network. Exposes a single SSE or streamable-http endpoint to runtime containers. The `toolFilter` on each `mcpServer` entry enforces tool-level access control.
-- **Runtime containers:** One container per declared runtime. Dockerfile installs the CLI tool (claude-code, codex, etc.). The `workspace/` directory is bind-mounted from the host. All runtimes point to the same proxy endpoint.
+- **Runtime containers:** One container per declared runtime. Dockerfile installs the CLI tool (claude-code-agent, codex, etc.). The `workspace/` directory is bind-mounted from the host. All runtimes point to the same proxy endpoint.
 - **agent-net:** Isolated Docker bridge network connecting the proxy to runtime containers.
 
 #### 6.2.2 Role Switching (Option A)
@@ -426,11 +426,11 @@ services:
     networks:
       - agent-net
 
-  claude-code:
-    build: ./claude-code
+  claude-code-agent:
+    build: ./claude-code-agent
     restart: unless-stopped
     volumes:
-      - ./claude-code/workspace:/workspace
+      - ./claude-code-agent/workspace:/workspace
     working_dir: /workspace
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -566,7 +566,7 @@ repo-ops/
 │   └── config.json     # toolFilter = issue-manager allow-list only
 ├── mcp-proxy-pr-reviewer/
 │   └── config.json     # toolFilter = pr-reviewer allow-list only
-├── claude-code/
+├── claude-code-agent/
 │   └── workspace/      # settings.json references both proxy endpoints
 └── ...
 ```

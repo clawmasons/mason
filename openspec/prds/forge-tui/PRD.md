@@ -83,7 +83,7 @@ Acceptance criteria:
 The TUI uses `docker ps` (via Docker API or CLI) to detect running agents and proxies. It identifies forge containers by their naming convention (e.g., `forge-proxy-<agent-name>`, `forge-<agent-name>-<runtime>`).
 
 Acceptance criteria:
-- Given Docker containers `forge-proxy-repo-ops` and `forge-repo-ops-claude-code` are running, when the TUI queries Docker, then it shows agent `repo-ops` as online with runtime `claude-code`.
+- Given Docker containers `forge-proxy-repo-ops` and `forge-repo-ops-claude-code-agent` are running, when the TUI queries Docker, then it shows agent `repo-ops` as online with runtime `claude-code-agent`.
 - Given Docker is not running, when the TUI queries Docker, then it shows a warning "Docker not available" and the agent panel shows no agents.
 
 **REQ-004: Pending Approvals Panel**

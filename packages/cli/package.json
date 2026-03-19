@@ -36,7 +36,7 @@
     "@agentclientprotocol/sdk": "^0.16.0",
     "@clawmasons/shared": "0.1.0",
     "@clawmasons/agent-sdk": "0.1.0",
-    "@clawmasons/claude-code": "0.1.0",
+    "@clawmasons/claude-code-agent": "0.1.0",
     "@clawmasons/pi-coding-agent": "0.1.0",
     "@clawmasons/proxy": "0.1.0",
     "@clawmasons/credential-service": "0.1.0",

@@ -94,8 +94,8 @@ describe("CLI run command", () => {
 // ── Agent Type Resolution ────────────────────────────────────────────────
 
 describe("resolveAgentType", () => {
-  it("resolves alias 'claude' to 'claude-code'", () => {
-    expect(resolveAgentType("claude")).toBe("claude-code");
+  it("resolves alias 'claude' to 'claude-code-agent'", () => {
+    expect(resolveAgentType("claude")).toBe("claude-code-agent");
   });
 
   it("resolves alias 'pi' to 'pi-coding-agent'", () => {
@@ -106,8 +106,8 @@ describe("resolveAgentType", () => {
     expect(resolveAgentType("mcp")).toBe("mcp-agent");
   });
 
-  it("resolves direct agent type 'claude-code'", () => {
-    expect(resolveAgentType("claude-code")).toBe("claude-code");
+  it("resolves direct agent type 'claude-code-agent'", () => {
+    expect(resolveAgentType("claude-code-agent")).toBe("claude-code-agent");
   });
 
   it("returns undefined for unknown agent type", () => {
@@ -123,7 +123,7 @@ describe("isKnownAgentType", () => {
   });
 
   it("returns true for registered types", () => {
-    expect(isKnownAgentType("claude-code")).toBe(true);
+    expect(isKnownAgentType("claude-code-agent")).toBe(true);
     expect(isKnownAgentType("pi-coding-agent")).toBe(true);
   });
 
@@ -137,7 +137,7 @@ describe("getKnownAgentTypeNames", () => {
   it("includes all aliases and registered types", () => {
     const names = getKnownAgentTypeNames();
     expect(names).toContain("claude");
-    expect(names).toContain("claude-code");
+    expect(names).toContain("claude-code-agent");
     expect(names).toContain("pi");
     expect(names).toContain("mcp");
     expect(names.length).toBeGreaterThan(3);
@@ -281,7 +281,7 @@ describe("generateComposeYml", () => {
     dockerBuildDir: "/projects/my-project/.mason/docker/writer",
     dockerDir: "/projects/my-project/.mason/docker",
     projectDir: "/projects/my-project",
-    agent: "claude-code",
+    agent: "claude-code-agent",
     role: "writer",
     logsDir: "/projects/my-project/.mason/sessions/abc123/logs",
     proxyToken: "test-token-abc",
@@ -303,7 +303,7 @@ describe("generateComposeYml", () => {
 
     // Agent: context is dockerDir, dockerfile is relative path
     expect(yml).toContain(`context: "${defaultOpts.dockerDir}"`);
-    expect(yml).toContain('dockerfile: "writer/claude-code/Dockerfile"');
+    expect(yml).toContain('dockerfile: "writer/claude-code-agent/Dockerfile"');
 
     // Volumes: project mount uses /home/mason/workspace/project
     expect(yml).toContain(`"${defaultOpts.projectDir}:/home/mason/workspace/project"`);
@@ -520,7 +520,7 @@ describe("ensureMasonConfig", () => {
     const content = JSON.parse(fs.readFileSync(configPath, "utf-8")) as Record<string, unknown>;
     const agents = content.agents as Record<string, { package: string }>;
     expect(agents).toBeDefined();
-    expect(agents["claude"]?.package).toBe("@clawmasons/claude-code");
+    expect(agents["claude"]?.package).toBe("@clawmasons/claude-code-agent");
     expect(agents["pi-mono-agent"]?.package).toBe("@clawmasons/pi-mono-agent");
     expect(agents["mcp"]?.package).toBe("@clawmasons/mcp-agent");
   });
@@ -567,7 +567,7 @@ describe("runAgent", () => {
     return {
       metadata: { name: "role-writer", version: "1.0.0" },
       source: {
-        agentDialect: "claude-code",
+        agentDialect: "claude-code-agent",
         agentDir: ".claude",
         roleDir: path.join(projectDir, ".claude", "roles", "writer"),
       },
@@ -612,8 +612,8 @@ describe("runAgent", () => {
     const dockerDir = path.join(projectDir, ".mason", "docker");
     const dockerBuildDir = path.join(dockerDir, "writer");
     if (shouldExist) {
-      fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
-      fs.writeFileSync(path.join(dockerBuildDir, "claude-code", "Dockerfile"), "FROM node:20\n");
+      fs.mkdirSync(path.join(dockerBuildDir, "claude-code-agent"), { recursive: true });
+      fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", "Dockerfile"), "FROM node:20\n");
       fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
       fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
     }
@@ -634,7 +634,7 @@ describe("runAgent", () => {
           version: "1.0.0",
           agentName: "writer",
           slug: "writer",
-          runtimes: ["claude-code"],
+          runtimes: ["claude-code-agent"],
           credentials: [],
           roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
         } as ResolvedAgent),
@@ -683,10 +683,10 @@ describe("runAgent", () => {
   it("resolves role and displays agent info", async () => {
     const { deps } = makeMockDeps({ sessionId: "sess0001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("claude-code");
+    expect(logOutput).toContain("claude-code-agent");
     expect(logOutput).toContain("writer");
   });
 
@@ -695,7 +695,7 @@ describe("runAgent", () => {
       resolveRoleError: new Error("Role 'nonexistent' not found"),
     });
 
-    await runAgent(projectDir, "claude-code", "nonexistent", deps);
+    await runAgent(projectDir, "claude-code-agent", "nonexistent", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -706,7 +706,7 @@ describe("runAgent", () => {
   it("creates per-project .mason/sessions/<id>/ for session state", async () => {
     const { deps } = makeMockDeps({ sessionId: "sess0001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const sessionDir = path.join(projectDir, ".mason", "sessions", "sess0001", "docker");
     expect(fs.existsSync(sessionDir)).toBe(true);
@@ -725,7 +725,7 @@ describe("runAgent", () => {
     const gitignoreCalled = { called: false, dir: "", pattern: "" };
     const { deps } = makeMockDeps({ gitignoreCalled });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     expect(gitignoreCalled.called).toBe(true);
     expect(gitignoreCalled.dir).toBe(projectDir);
@@ -735,7 +735,7 @@ describe("runAgent", () => {
   it("mounts project dir as /home/mason/workspace/project", async () => {
     const { deps } = makeMockDeps({ sessionId: "mount001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const composeFile = path.join(
       projectDir, ".mason", "sessions", "mount001", "docker", "docker-compose.yml",
@@ -754,7 +754,7 @@ describe("runAgent", () => {
       resolveRoleFn: async () => makeRole(),
       adaptRoleFn: () => ({
         name: "writer", version: "1.0.0", agentName: "writer", slug: "writer",
-        runtimes: ["claude-code"], credentials: [],
+        runtimes: ["claude-code-agent"], credentials: [],
         roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
       } as ResolvedAgent),
       ensureGitignoreEntryFn: () => false,
@@ -766,17 +766,17 @@ describe("runAgent", () => {
     // Pre-create docker build dirs for both runs
     const dockerDir = path.join(projectDir, ".mason", "docker");
     const dockerBuildDir = path.join(dockerDir, "writer");
-    fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
-    fs.writeFileSync(path.join(dockerBuildDir, "claude-code", "Dockerfile"), "FROM node:20\n");
+    fs.mkdirSync(path.join(dockerBuildDir, "claude-code-agent"), { recursive: true });
+    fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", "Dockerfile"), "FROM node:20\n");
     fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
 
-    await runAgent(projectDir, "claude-code", "writer", {
+    await runAgent(projectDir, "claude-code-agent", "writer", {
       ...baseDeps,
       generateSessionIdFn: () => ids[callCount++]!,
     });
 
-    await runAgent(projectDir, "claude-code", "writer", {
+    await runAgent(projectDir, "claude-code-agent", "writer", {
       ...baseDeps,
       generateSessionIdFn: () => ids[callCount++]!,
     });
@@ -790,7 +790,7 @@ describe("runAgent", () => {
   it("starts proxy detached, then credential service in-process, then agent interactively", async () => {
     const { calls, deps } = makeMockDeps();
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     // First call: proxy build
     expect(calls[0]!.args).toContain("build");
@@ -812,7 +812,7 @@ describe("runAgent", () => {
   it("tears down all services after agent exits", async () => {
     const { calls, deps } = makeMockDeps();
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     // Fourth call should be docker compose down (build, up, agent run, down)
     expect(calls[3]!.args).toContain("down");
@@ -821,7 +821,7 @@ describe("runAgent", () => {
   it("retains session directory after exit", async () => {
     const { deps } = makeMockDeps({ sessionId: "keep0001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const sessionDir = path.join(projectDir, ".mason", "sessions", "keep0001");
     expect(fs.existsSync(sessionDir)).toBe(true);
@@ -830,7 +830,7 @@ describe("runAgent", () => {
   it("compose file references correct docker build paths", async () => {
     const { deps } = makeMockDeps({ sessionId: "ref00001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const composeFile = path.join(
       projectDir, ".mason", "sessions", "ref00001", "docker", "docker-compose.yml",
@@ -839,13 +839,13 @@ describe("runAgent", () => {
 
     const dockerDir = path.join(projectDir, ".mason", "docker");
     expect(content).toContain(`context: "${dockerDir}"`);
-    expect(content).toContain('dockerfile: "writer/claude-code/Dockerfile"');
+    expect(content).toContain('dockerfile: "writer/claude-code-agent/Dockerfile"');
   });
 
   it("compose file has CREDENTIAL_PROXY_TOKEN in proxy", async () => {
     const { deps } = makeMockDeps({ sessionId: "tok00001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const composeFile = path.join(
       projectDir, ".mason", "sessions", "tok00001", "docker", "docker-compose.yml",
@@ -864,7 +864,7 @@ describe("runAgent", () => {
   it("compose file has no API keys in agent environment", async () => {
     const { deps } = makeMockDeps({ sessionId: "nokeys01" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const composeFile = path.join(
       projectDir, ".mason", "sessions", "nokeys01", "docker", "docker-compose.yml",
@@ -882,8 +882,8 @@ describe("runAgent", () => {
     const { deps: deps1 } = makeMockDeps({ sessionId: "uniq0001" });
     const { deps: deps2 } = makeMockDeps({ sessionId: "uniq0002" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps1);
-    await runAgent(projectDir, "claude-code", "writer", deps2);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps1);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps2);
 
     const file1 = path.join(
       projectDir, ".mason", "sessions", "uniq0001", "docker", "docker-compose.yml",
@@ -909,10 +909,10 @@ describe("runAgent", () => {
   it("logs session info and completion message", async () => {
     const { deps } = makeMockDeps({ sessionId: "log00001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("claude-code");
+    expect(logOutput).toContain("claude-code-agent");
     expect(logOutput).toContain("writer");
     expect(logOutput).toContain("log00001");
     expect(logOutput).toContain("agent complete");
@@ -923,7 +923,7 @@ describe("runAgent", () => {
       roleType: makeRole({ type: "project" }),
     });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("(project)");
@@ -934,7 +934,7 @@ describe("runAgent", () => {
       roleType: makeRole({ type: "supervisor" }),
     });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("(supervisor)");
@@ -948,7 +948,7 @@ describe("runAgent", () => {
       throw new Error("Docker Compose v2 is required");
     };
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -959,7 +959,7 @@ describe("runAgent", () => {
   it("exits 1 when proxy fails to start", async () => {
     const { deps } = makeMockDeps({ proxyExitCode: 1 });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -969,7 +969,7 @@ describe("runAgent", () => {
   it("exits 1 when credential service fails to start", async () => {
     const { deps } = makeMockDeps({ credServiceExitCode: 1 });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -979,7 +979,7 @@ describe("runAgent", () => {
   it("creates logs directory in session directory", async () => {
     const { deps } = makeMockDeps({ sessionId: "logs0001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const logsDir = path.join(projectDir, ".mason", "sessions", "logs0001", "logs");
     expect(fs.existsSync(logsDir)).toBe(true);
@@ -998,7 +998,7 @@ describe("runProxyOnly", () => {
     return {
       metadata: { name: "role-writer", version: "1.0.0" },
       source: {
-        agentDialect: "claude-code",
+        agentDialect: "claude-code-agent",
         agentDir: ".claude",
         roleDir: path.join(projectDir, ".claude", "roles", "writer"),
       },
@@ -1021,8 +1021,8 @@ describe("runProxyOnly", () => {
     // Pre-create docker build dirs
     const dockerDir = path.join(projectDir, ".mason", "docker");
     const dockerBuildDir = path.join(dockerDir, "writer");
-    fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
-    fs.writeFileSync(path.join(dockerBuildDir, "claude-code", "Dockerfile"), "FROM node:20\n");
+    fs.mkdirSync(path.join(dockerBuildDir, "claude-code-agent"), { recursive: true });
+    fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", "Dockerfile"), "FROM node:20\n");
     fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
   });
@@ -1057,7 +1057,7 @@ describe("runProxyOnly", () => {
   it("builds proxy then starts it detached", async () => {
     const { calls, deps } = makeDeps();
 
-    await runProxyOnly(projectDir, "claude-code", "writer", 19700, deps);
+    await runProxyOnly(projectDir, "claude-code-agent", "writer", 19700, deps);
 
     expect(calls).toHaveLength(2);
     expect(calls[0]!.args).toContain("build");
@@ -1070,7 +1070,7 @@ describe("runProxyOnly", () => {
   it("does NOT start agent or credential service", async () => {
     const { calls, deps } = makeDeps();
 
-    await runProxyOnly(projectDir, "claude-code", "writer", 3000, deps);
+    await runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps);
 
     // Only 2 compose calls: build + up (no agent run, no down)
     expect(calls).toHaveLength(2);
@@ -1082,7 +1082,7 @@ describe("runProxyOnly", () => {
   it("outputs JSON with connection info to stdout", async () => {
     const { deps } = makeDeps({ sessionId: "json0001" });
 
-    await runProxyOnly(projectDir, "claude-code", "writer", 19700, deps);
+    await runProxyOnly(projectDir, "claude-code-agent", "writer", 19700, deps);
 
     // logSpy captures the JSON output (origLog is called once with JSON)
     const jsonCall = logSpy.mock.calls.find((call) => {
@@ -1102,7 +1102,7 @@ describe("runProxyOnly", () => {
     const { deps } = makeDeps({ buildExitCode: 1 });
 
     await expect(
-      runProxyOnly(projectDir, "claude-code", "writer", 3000, deps),
+      runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps),
     ).rejects.toThrow("Failed to build proxy image");
   });
 
@@ -1110,14 +1110,14 @@ describe("runProxyOnly", () => {
     const { deps } = makeDeps({ upExitCode: 1 });
 
     await expect(
-      runProxyOnly(projectDir, "claude-code", "writer", 3000, deps),
+      runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps),
     ).rejects.toThrow("Failed to start proxy");
   });
 
   it("creates compose file with correct paths", async () => {
     const { deps } = makeDeps({ sessionId: "path0001" });
 
-    await runProxyOnly(projectDir, "claude-code", "writer", 3000, deps);
+    await runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps);
 
     const composeFile = path.join(
       projectDir, ".mason", "sessions", "path0001", "docker", "docker-compose.yml",
@@ -1174,7 +1174,7 @@ describe("generateComposeYml vscode-server volume", () => {
       dockerBuildDir: "/tmp/build",
       dockerDir: "/tmp/docker",
       projectDir: "/tmp/project",
-      agent: "claude-code",
+      agent: "claude-code-agent",
       role: "engineering",
       logsDir: "/tmp/logs",
       proxyToken: "tok",
@@ -1189,7 +1189,7 @@ describe("generateComposeYml vscode-server volume", () => {
       dockerBuildDir: "/tmp/build",
       dockerDir: "/tmp/docker",
       projectDir: "/tmp/project",
-      agent: "claude-code",
+      agent: "claude-code-agent",
       role: "engineering",
       logsDir: "/tmp/logs",
       proxyToken: "tok",

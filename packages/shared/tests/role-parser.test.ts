@@ -128,13 +128,13 @@ describe("dialectRegistry", () => {
   it("has three built-in dialects", () => {
     const all = getAllDialects();
     expect(all.length).toBeGreaterThanOrEqual(3);
-    expect(all.map((d) => d.name)).toContain("claude-code");
+    expect(all.map((d) => d.name)).toContain("claude-code-agent");
     expect(all.map((d) => d.name)).toContain("codex");
     expect(all.map((d) => d.name)).toContain("aider");
   });
 
   it("looks up dialect by name", () => {
-    const claude = getDialect("claude-code");
+    const claude = getDialect("claude-code-agent");
     expect(claude).toBeDefined();
     expect(claude!.directory).toBe("claude");
     expect(claude!.fieldMapping.tasks).toBe("commands");
@@ -286,7 +286,7 @@ describe("detectDialect", () => {
     const roleDir = join(testDir, ".claude", "roles", "my-role");
     await mkdir(roleDir, { recursive: true });
     const dialect = detectDialect(roleDir, join(roleDir, "ROLE.md"));
-    expect(dialect.name).toBe("claude-code");
+    expect(dialect.name).toBe("claude-code-agent");
   });
 
   it("detects Codex dialect", async () => {
@@ -436,7 +436,7 @@ describe("readMaterializedRole — Claude Code", () => {
 
     // Source
     expect(role.source.type).toBe("local");
-    expect(role.source.agentDialect).toBe("claude-code");
+    expect(role.source.agentDialect).toBe("claude-code-agent");
   });
 
   it("discovers bundled resources", async () => {

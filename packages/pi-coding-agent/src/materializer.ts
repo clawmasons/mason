@@ -13,7 +13,7 @@ import {
 /**
  * Generate the command prompt for a pi `registerCommand()` call.
  *
- * Same structure as claude-code's slash commands:
+ * Same structure as claude-code-agent's slash commands:
  * - Role context with permitted tools
  * - Skill references
  * - Task prompt
@@ -173,7 +173,7 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
   ): MaterializationResult {
     const result: MaterializationResult = new Map();
 
-    // AGENTS.md — agent identity and role docs (shared with claude-code)
+    // AGENTS.md — agent identity and role docs (shared with claude-code-agent)
     result.set("AGENTS.md", generateAgentsMd(agent));
 
     // .pi/settings.json — model configuration

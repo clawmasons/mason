@@ -35,7 +35,7 @@ describe("createAgentRegistry", () => {
   });
 
   it("registers built-in agents by each alias", async () => {
-    const agent = makeMockAgent("claude-code", ["claude", "cc"]);
+    const agent = makeMockAgent("claude-code-agent", ["claude", "cc"]);
     const registry = await createAgentRegistry([agent]);
 
     expect(registry.get("claude")).toBe(agent);
@@ -74,7 +74,7 @@ describe("getAgent", () => {
   });
 
   it("retrieves agent by alias", async () => {
-    const agent = makeMockAgent("claude-code", ["claude"]);
+    const agent = makeMockAgent("claude-code-agent", ["claude"]);
     const registry = await createAgentRegistry([agent]);
 
     expect(getAgent(registry, "claude")).toBe(agent);
@@ -94,11 +94,11 @@ describe("getAgent", () => {
 
 describe("getRegisteredAgentNames", () => {
   it("returns canonical names only (no aliases)", async () => {
-    const agent = makeMockAgent("claude-code", ["claude", "cc"]);
+    const agent = makeMockAgent("claude-code-agent", ["claude", "cc"]);
     const registry = await createAgentRegistry([agent]);
 
     const names = getRegisteredAgentNames(registry);
-    expect(names).toEqual(["claude-code"]);
+    expect(names).toEqual(["claude-code-agent"]);
   });
 
   it("deduplicates when multiple aliases point to same agent", async () => {
@@ -225,7 +225,7 @@ describe("readConfigAgentNames", () => {
     try {
       writeMasonConfig(tmpDir, {
         agents: {
-          claude: { package: "@clawmasons/claude-code" },
+          claude: { package: "@clawmasons/claude-code-agent" },
           "pi-mono-agent": { package: "@clawmasons/pi-mono-agent" },
           mcp: { package: "@clawmasons/mcp-agent" },
         },
@@ -293,13 +293,13 @@ describe("loadConfigAgentEntry", () => {
     try {
       writeMasonConfig(tmpDir, {
         agents: {
-          claude: { package: "@clawmasons/claude-code", role: "writer", mode: "terminal" },
+          claude: { package: "@clawmasons/claude-code-agent", role: "writer", mode: "terminal" },
         },
       });
 
       const entry = loadConfigAgentEntry(tmpDir, "claude");
       expect(entry).toBeDefined();
-      expect(entry?.package).toBe("@clawmasons/claude-code");
+      expect(entry?.package).toBe("@clawmasons/claude-code-agent");
       expect(entry?.role).toBe("writer");
       expect(entry?.mode).toBe("terminal");
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("runtime fields"));
@@ -313,7 +313,7 @@ describe("loadConfigAgentEntry", () => {
   it("returns undefined when agent is not in config", () => {
     const tmpDir = makeTmpDir();
     try {
-      writeMasonConfig(tmpDir, { agents: { claude: { package: "@clawmasons/claude-code" } } });
+      writeMasonConfig(tmpDir, { agents: { claude: { package: "@clawmasons/claude-code-agent" } } });
 
       const entry = loadConfigAgentEntry(tmpDir, "unknown");
       expect(entry).toBeUndefined();
@@ -358,7 +358,7 @@ describe("loadConfigAgentEntry", () => {
     try {
       writeMasonConfig(tmpDir, {
         agents: {
-          claude: { package: "@clawmasons/claude-code", home: "~/my-config", role: "coder" },
+          claude: { package: "@clawmasons/claude-code-agent", home: "~/my-config", role: "coder" },
         },
       });
 
@@ -379,7 +379,7 @@ describe("loadConfigAgentEntry", () => {
       writeMasonConfig(tmpDir, {
         agents: {
           claude: {
-            package: "@clawmasons/claude-code",
+            package: "@clawmasons/claude-code-agent",
             "dev-container-customizations": {
               vscode: {
                 extensions: ["my.extension"],
@@ -405,7 +405,7 @@ describe("loadConfigAgentEntry", () => {
     const tmpDir = makeTmpDir();
     try {
       writeMasonConfig(tmpDir, {
-        agents: { claude: { package: "@clawmasons/claude-code" } },
+        agents: { claude: { package: "@clawmasons/claude-code-agent" } },
       });
 
       const entry = loadConfigAgentEntry(tmpDir, "claude");
@@ -421,7 +421,7 @@ describe("loadConfigAgentEntry", () => {
     try {
       writeMasonConfig(tmpDir, {
         agents: {
-          claude: { package: "@clawmasons/claude-code", credentials: ["MY_KEY", "OTHER_KEY"] },
+          claude: { package: "@clawmasons/claude-code-agent", credentials: ["MY_KEY", "OTHER_KEY"] },
         },
       });
 
@@ -438,7 +438,7 @@ describe("loadConfigAgentEntry", () => {
     const tmpDir = makeTmpDir();
     try {
       writeMasonConfig(tmpDir, {
-        agents: { claude: { package: "@clawmasons/claude-code" } },
+        agents: { claude: { package: "@clawmasons/claude-code-agent" } },
       });
 
       const entry = loadConfigAgentEntry(tmpDir, "claude");
@@ -500,7 +500,7 @@ describe("loadConfigAliasEntry", () => {
     const tmpDir = makeTmpDir();
     try {
       writeMasonConfig(tmpDir, {
-        agents: { claude: { package: "@clawmasons/claude-code" } },
+        agents: { claude: { package: "@clawmasons/claude-code-agent" } },
         aliases: {
           frontend: {
             agent: "claude",
@@ -530,7 +530,7 @@ describe("loadConfigAliasEntry", () => {
     const tmpDir = makeTmpDir();
     try {
       writeMasonConfig(tmpDir, {
-        agents: { claude: { package: "@clawmasons/claude-code" } },
+        agents: { claude: { package: "@clawmasons/claude-code-agent" } },
         aliases: { quick: { agent: "claude" } },
       });
 
@@ -551,7 +551,7 @@ describe("loadConfigAliasEntry", () => {
     const tmpDir = makeTmpDir();
     try {
       writeMasonConfig(tmpDir, {
-        agents: { claude: { package: "@clawmasons/claude-code" } },
+        agents: { claude: { package: "@clawmasons/claude-code-agent" } },
         aliases: { other: { agent: "claude" } },
       });
 
@@ -566,7 +566,7 @@ describe("loadConfigAliasEntry", () => {
     const tmpDir = makeTmpDir();
     try {
       writeMasonConfig(tmpDir, {
-        agents: { claude: { package: "@clawmasons/claude-code" } },
+        agents: { claude: { package: "@clawmasons/claude-code-agent" } },
       });
 
       const entry = loadConfigAliasEntry(tmpDir, "frontend");
@@ -581,7 +581,7 @@ describe("loadConfigAliasEntry", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
-        agents: { claude: { package: "@clawmasons/claude-code" } },
+        agents: { claude: { package: "@clawmasons/claude-code-agent" } },
         aliases: { bad: { agent: "claude", mode: "interactive" } },
       });
 
@@ -599,7 +599,7 @@ describe("loadConfigAliasEntry", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
-        agents: { claude: { package: "@clawmasons/claude-code" } },
+        agents: { claude: { package: "@clawmasons/claude-code-agent" } },
         aliases: { bad: { mode: "terminal" } },
       });
 
@@ -616,7 +616,7 @@ describe("loadConfigAliasEntry", () => {
     const tmpDir = makeTmpDir();
     try {
       writeMasonConfig(tmpDir, {
-        agents: { claude: { package: "@clawmasons/claude-code" } },
+        agents: { claude: { package: "@clawmasons/claude-code-agent" } },
         aliases: { api: { agent: "claude", "agent-args": ["--verbose", "--max-turns", "5"] } },
       });
 
@@ -643,7 +643,7 @@ describe("readConfigAliasNames", () => {
     const tmpDir = makeTmpDir();
     try {
       writeMasonConfig(tmpDir, {
-        agents: { claude: { package: "@clawmasons/claude-code" } },
+        agents: { claude: { package: "@clawmasons/claude-code-agent" } },
         aliases: {
           frontend: { agent: "claude" },
           "api-review": { agent: "claude" },
@@ -662,7 +662,7 @@ describe("readConfigAliasNames", () => {
   it("returns empty array when aliases section is absent", () => {
     const tmpDir = makeTmpDir();
     try {
-      writeMasonConfig(tmpDir, { agents: { claude: { package: "@clawmasons/claude-code" } } });
+      writeMasonConfig(tmpDir, { agents: { claude: { package: "@clawmasons/claude-code-agent" } } });
       const names = readConfigAliasNames(tmpDir);
       expect(names).toEqual([]);
     } finally {

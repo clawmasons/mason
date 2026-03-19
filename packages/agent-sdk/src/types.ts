@@ -27,7 +27,7 @@ export interface MaterializeOptions {
  * a specific runtime's native configuration format.
  */
 export interface RuntimeMaterializer {
-  /** Runtime identifier (e.g., "claude-code", "mcp-agent"). */
+  /** Runtime identifier (e.g., "claude-code-agent", "mcp-agent"). */
   name: string;
 
   /**
@@ -124,7 +124,7 @@ export interface AgentPackage {
   /** Primary agent type identifier used in `mason run --agent <name>`. */
   name: string;
 
-  /** Alternative names for this agent (e.g., "claude" for "claude-code"). */
+  /** Alternative names for this agent (e.g., "claude" for "claude-code-agent"). */
   aliases?: string[];
 
   /** The workspace materialization implementation. */

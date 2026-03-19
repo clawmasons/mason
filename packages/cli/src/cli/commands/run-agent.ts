@@ -46,12 +46,12 @@ function defaultAdaptRole(
 
 /**
  * Infer the agent type from a Role's source dialect.
- * Falls back to "claude-code" if not determinable.
+ * Falls back to "claude-code-agent" if not determinable.
  */
 export function inferAgentType(roleType: Role): string {
   const dialect = roleType.source.agentDialect;
-  // "mason" is the agent-agnostic canonical location — default to claude-code
-  if (!dialect || dialect === "mason") return "claude-code";
+  // "mason" is the agent-agnostic canonical location — default to claude-code-agent
+  if (!dialect || dialect === "mason") return "claude-code-agent";
   return dialect;
 }
 
@@ -71,7 +71,7 @@ export function generateSessionId(): string {
  * @deprecated Aliases are now declared by AgentPackage.aliases in agent packages.
  */
 export const AGENT_TYPE_ALIASES: Record<string, string> = {
-  claude: "claude-code",
+  claude: "claude-code-agent",
   codex: "codex",
   aider: "aider",
   pi: "pi-coding-agent",
@@ -435,7 +435,7 @@ Command Syntax:
   --bash           Launch bash shell (overrides config mode).
 
 Agent Types (built-in):
-  claude (claude-code), pi (pi-coding-agent), mcp (mcp-agent)
+  claude (claude-code-agent), pi (pi-coding-agent), mcp (mcp-agent)
 
 Session Behavior:
   When an ACP client sends session/new with a "cwd" field, the agent
@@ -459,7 +459,7 @@ Side Effects:
 const DEFAULT_MASON_CONFIG = JSON.stringify(
   {
     agents: {
-      claude: { package: "@clawmasons/claude-code" },
+      claude: { package: "@clawmasons/claude-code-agent" },
       "pi-mono-agent": { package: "@clawmasons/pi-mono-agent" },
       mcp: { package: "@clawmasons/mcp-agent" },
     },

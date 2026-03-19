@@ -35,7 +35,7 @@ mason run <agent-type> --role <name> [options]
 
 | Argument | Description |
 |----------|-------------|
-| `<agent-type>` | Agent runtime to use (e.g., `claude` → `claude-code`, `pi` → `pi-coding-agent`, `mcp-agent`) |
+| `<agent-type>` | Agent runtime to use (e.g., `claude` → `claude-code-agent`, `pi` → `pi-coding-agent`, `mcp-agent`) |
 
 | Option | Description |
 |--------|-------------|
@@ -267,7 +267,7 @@ Register custom or third-party agent runtimes for a project. Built-in agents (`c
 {
   "agents": {
     "claude": {
-      "package": "@clawmasons/claude-code",
+      "package": "@clawmasons/claude-code-agent",
       "role": "writer",
       "mode": "terminal",
       "home": "~/my-claude-config"

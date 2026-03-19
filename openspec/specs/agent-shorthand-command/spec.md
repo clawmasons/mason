@@ -23,9 +23,9 @@ When `--agent <name>` (or the positional `[agent]`) is provided, the CLI SHALL f
 - **AND** SHALL use `"coder"` as the default role (unless `--role` overrides it)
 
 #### Scenario: --agent falls back to built-in registry
-- **WHEN** `.mason/config.json` does not declare an entry named `"claude-code"`
-- **AND** the user runs `mason run --agent claude-code --role writer`
-- **THEN** the CLI SHALL resolve `"claude-code"` via the built-in agent registry
+- **WHEN** `.mason/config.json` does not declare an entry named `"claude-code-agent"`
+- **AND** the user runs `mason run --agent claude-code-agent --role writer`
+- **THEN** the CLI SHALL resolve `"claude-code-agent"` via the built-in agent registry
 
 #### Scenario: --agent unknown in both config and registry
 - **WHEN** `.mason/config.json` does not declare `"unknown"`

@@ -164,7 +164,7 @@ Agents declare the credentials they require. This is a top-level list — the un
     "type": "agent",
     "name": "Researcher",
     "slug": "researcher",
-    "runtimes": ["claude-code"],
+    "runtimes": ["claude-code-agent"],
     "roles": ["@lodge.chapter/role-web-research"],
     "credentials": ["SERP_API_KEY", "OPENAI_API_KEY"],
     "llm": {

@@ -36,6 +36,6 @@ When generating the Dockerfile:
 - **AND** duplicates SHALL be deduplicated
 
 #### Scenario: Workspace COPY uses build/ path
-- **WHEN** `generateAgentDockerfile()` is called for a claude-code agent in role "writer"
-- **THEN** the output Dockerfile SHALL contain `COPY writer/claude-code/build/workspace/ /home/mason/workspace/`
-- **AND** SHALL NOT contain `COPY writer/claude-code/workspace/ /home/mason/workspace/`
+- **WHEN** `generateAgentDockerfile()` is called for a claude-code-agent agent in role "writer"
+- **THEN** the output Dockerfile SHALL contain `COPY writer/claude-code-agent/build/workspace/ /home/mason/workspace/`
+- **AND** SHALL NOT contain `COPY writer/claude-code-agent/workspace/ /home/mason/workspace/`

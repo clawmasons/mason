@@ -212,7 +212,7 @@ function checkCredentialCoverage(
 
 /**
  * Check LLM configuration: pi-coding-agent requires an `llm` field,
- * claude-code warns when `llm` is present (it only supports Anthropic).
+ * claude-code-agent warns when `llm` is present (it only supports Anthropic).
  */
 function checkLlmConfig(
   agent: ResolvedAgent,
@@ -220,7 +220,7 @@ function checkLlmConfig(
   warnings: ValidationWarning[],
 ): void {
   const hasPi = agent.runtimes.includes("pi-coding-agent");
-  const hasClaude = agent.runtimes.includes("claude-code");
+  const hasClaude = agent.runtimes.includes("claude-code-agent");
   const hasLlm = agent.llm !== undefined;
 
   // Pi requires LLM config — it has no default provider
@@ -236,8 +236,8 @@ function checkLlmConfig(
   if (hasClaude && hasLlm) {
     warnings.push({
       category: "llm-config",
-      message: `Agent "${agent.agentName}" uses runtime "claude-code" with an "llm" configuration. Claude Code only supports Anthropic — the "llm" field will be ignored.`,
-      context: { agent: agent.name, runtime: "claude-code" },
+      message: `Agent "${agent.agentName}" uses runtime "claude-code-agent" with an "llm" configuration. Claude Code only supports Anthropic — the "llm" field will be ignored.`,
+      context: { agent: agent.name, runtime: "claude-code-agent" },
     });
   }
 }

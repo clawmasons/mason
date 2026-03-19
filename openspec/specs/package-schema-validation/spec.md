@@ -68,7 +68,7 @@ The system SHALL validate `chapter` fields of type `"role"` against a Zod schema
 The system SHALL validate `chapter` fields of type `"member"` against a Zod discriminated union schema on `memberType`. Agent members (`memberType: "agent"`) require `name`, `slug`, `email`, `runtimes` (string array min 1), and `roles` (string array min 1), with optional fields: `description`, `authProviders` (string array, defaults to []), `resources` (array of objects with `type`, `ref`, `access`, defaults to []), `proxy` (object with `port`, `type`). Human members (`memberType: "human"`) require `name`, `slug`, `email`, and `roles`, with optional `description` and `authProviders`.
 
 #### Scenario: Valid agent member
-- **WHEN** a chapter field with `type: "member"`, `memberType: "agent"`, `name: "Ops"`, `slug: "ops"`, `email: "ops@chapter.local"`, `runtimes: ["claude-code", "codex"]`, `roles: ["@clawmasons/role-issue-manager"]`, `proxy: { port: 9090, type: "sse" }` is validated
+- **WHEN** a chapter field with `type: "member"`, `memberType: "agent"`, `name: "Ops"`, `slug: "ops"`, `email: "ops@chapter.local"`, `runtimes: ["claude-code-agent", "codex"]`, `roles: ["@clawmasons/role-issue-manager"]`, `proxy: { port: 9090, type: "sse" }` is validated
 - **THEN** validation succeeds and returns a typed `MemberChapterField` object
 
 #### Scenario: Valid human member

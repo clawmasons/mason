@@ -104,9 +104,9 @@ OPENROUTER_API_KEY=sk-or-v1-...
 
 ### 3.5 Default Behavior
 
-- If `llm` is omitted and the runtime is `claude-code`, the member uses Anthropic Claude (existing behavior, no change).
+- If `llm` is omitted and the runtime is `claude-code-agent`, the member uses Anthropic Claude (existing behavior, no change).
 - If `llm` is omitted and the runtime is `pi-coding-agent`, the materializer raises a validation error — pi requires explicit provider configuration because it has no default.
-- If `llm` is present and the runtime is `claude-code`, the `llm` field is ignored with a warning — Claude Code only supports Anthropic.
+- If `llm` is present and the runtime is `claude-code-agent`, the `llm` field is ignored with a warning — Claude Code only supports Anthropic.
 
 ---
 
@@ -114,7 +114,7 @@ OPENROUTER_API_KEY=sk-or-v1-...
 
 ### 4.1 Overview
 
-The pi-coding-agent materializer implements the `RuntimeMaterializer` interface (same as claude-code). It translates the resolved member dependency graph into pi's native configuration format.
+The pi-coding-agent materializer implements the `RuntimeMaterializer` interface (same as claude-code-agent). It translates the resolved member dependency graph into pi's native configuration format.
 
 ### 4.2 Generated Workspace Structure
 
@@ -138,7 +138,7 @@ The pi-coding-agent materializer implements the `RuntimeMaterializer` interface 
 
 #### 4.3.1 `AGENTS.md`
 
-Same structure as claude-code's `AGENTS.md` — agent identity, roles, permitted tools, and constraints. Pi reads `AGENTS.md` from the working directory automatically.
+Same structure as claude-code-agent's `AGENTS.md` — agent identity, roles, permitted tools, and constraints. Pi reads `AGENTS.md` from the working directory automatically.
 
 #### 4.3.2 `.pi/settings.json`
 
@@ -225,11 +225,11 @@ The materializer generates the extension code with all tasks pre-registered, inc
 - Skill references
 - Task prompt content
 
-This is equivalent to claude-code's `.claude/commands/*.md` but uses pi's native command registration API.
+This is equivalent to claude-code-agent's `.claude/commands/*.md` but uses pi's native command registration API.
 
 #### 4.3.5 `skills/{skill-short-name}/README.md`
 
-Identical to claude-code's skill READMEs. Pi also reads skill documentation from a skills directory.
+Identical to claude-code-agent's skill READMEs. Pi also reads skill documentation from a skills directory.
 
 ### 4.4 Dockerfile
 
@@ -245,7 +245,7 @@ COPY --chown=node:node workspace/ /home/node/workspace/
 CMD ["pi", "--no-session", "--mode", "print"]
 ```
 
-Key differences from claude-code:
+Key differences from claude-code-agent:
 - Installs `@mariozechner/pi-coding-agent` instead of `@anthropic-ai/claude-code`.
 - Uses `pi --no-session --mode print` for non-interactive execution.
 - No `DISABLE_AUTOUPDATER` needed (pi doesn't auto-update).
@@ -277,15 +277,15 @@ The LLM provider's API key env var is dynamically selected based on `llm.provide
 
 ### 4.6 Materializer Registration
 
-The new materializer is registered alongside claude-code in the materializer registry:
+The new materializer is registered alongside claude-code-agent in the materializer registry:
 
 ```typescript
 // src/materializer/index.ts
-import { claudeCodeMaterializer } from "./claude-code.js";
+import { claudeCodeMaterializer } from "./claude-code-agent.js";
 import { piCodingAgentMaterializer } from "./pi-coding-agent.js";
 
 export const materializers: Record<string, RuntimeMaterializer> = {
-  "claude-code": claudeCodeMaterializer,
+  "claude-code-agent": claudeCodeMaterializer,
   "pi-coding-agent": piCodingAgentMaterializer,
 };
 ```
@@ -481,11 +481,11 @@ Acceptance criteria:
 - Given a member with `llm: { provider: "openrouter" }` (missing model), when validated, then it fails.
 - Given a member with `llm: { model: "..." }` (missing provider), when validated, then it fails.
 - Given a member with `runtimes: ["pi-coding-agent"]` and no `llm`, when validated during install, then a validation error is raised.
-- Given a member with `runtimes: ["claude-code"]` and `llm` present, when validated during install, then a warning is emitted but install proceeds.
+- Given a member with `runtimes: ["claude-code-agent"]` and `llm` present, when validated during install, then a warning is emitted but install proceeds.
 
 **REQ-003: Materializer Registry**
 
-Register pi-coding-agent alongside claude-code in the materializer registry so the install pipeline can look up materializers by runtime name.
+Register pi-coding-agent alongside claude-code-agent in the materializer registry so the install pipeline can look up materializers by runtime name.
 
 Acceptance criteria:
 - Given the materializer registry, when looked up by `"pi-coding-agent"`, then the pi materializer is returned.
@@ -616,7 +616,7 @@ chapter install @<member>
   ├─4─ Compute toolFilters
   ├─5─ Scaffold per-member directory
   ├─6─ Materialize runtimes
-  │      ├── claude-code materializer (existing)
+  │      ├── claude-code-agent materializer (existing)
   │      └── pi-coding-agent materializer (NEW)
   ├─7─ Generate docker-compose.yml (NEW: pi service + provider env vars)
   ├─8─ Write chapter.lock.json

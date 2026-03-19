@@ -69,7 +69,7 @@ function makeMember(overrides: Partial<ResolvedAgent> = {}): ResolvedAgent {
     agentName: "Repo Ops",
     slug: "repo-ops",
     description: "Repository operations member",
-    runtimes: ["claude-code"],
+    runtimes: ["claude-code-agent"],
     credentials: [],
     roles: [makeRole()],
     ...overrides,
@@ -144,7 +144,7 @@ describe("validateAgent", () => {
 
       const agent = makeMember({
         roles: [issueManagerRole, prReviewerRole],
-        runtimes: ["claude-code", "codex"],
+        runtimes: ["claude-code-agent", "codex"],
       });
 
       const result = validateAgent(agent);
@@ -455,52 +455,52 @@ describe("validateAgent", () => {
       expect(result.warnings).toHaveLength(0);
     });
 
-    it("warns when claude-code runtime has llm config", () => {
+    it("warns when claude-code-agent runtime has llm config", () => {
       const result = validateAgent(makeMember({
-        runtimes: ["claude-code"],
+        runtimes: ["claude-code-agent"],
         llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" },
       }));
       expect(result.valid).toBe(true); // warnings don't affect validity
       expect(result.errors.filter((e) => e.category === "llm-config")).toHaveLength(0);
       expect(result.warnings).toHaveLength(1);
       expect(result.warnings[0].category).toBe("llm-config");
-      expect(result.warnings[0].message).toContain("claude-code");
+      expect(result.warnings[0].message).toContain("claude-code-agent");
       expect(result.warnings[0].message).toContain("will be ignored");
       expect(result.warnings[0].context.agent).toBe("@clawmasons/agent-repo-ops");
-      expect(result.warnings[0].context.runtime).toBe("claude-code");
+      expect(result.warnings[0].context.runtime).toBe("claude-code-agent");
     });
 
-    it("no warning when claude-code runtime has no llm config", () => {
+    it("no warning when claude-code-agent runtime has no llm config", () => {
       const result = validateAgent(makeMember({
-        runtimes: ["claude-code"],
+        runtimes: ["claude-code-agent"],
         // no llm field — default behavior
       }));
       expect(result.valid).toBe(true);
       expect(result.warnings).toHaveLength(0);
     });
 
-    it("errors for pi and warns for claude-code when both runtimes present without llm", () => {
+    it("errors for pi and warns for claude-code-agent when both runtimes present without llm", () => {
       const result = validateAgent(makeMember({
-        runtimes: ["pi-coding-agent", "claude-code"],
-        // no llm — pi needs it, claude-code is fine
+        runtimes: ["pi-coding-agent", "claude-code-agent"],
+        // no llm — pi needs it, claude-code-agent is fine
       }));
       expect(result.valid).toBe(false);
       const llmErrors = result.errors.filter((e) => e.category === "llm-config");
       expect(llmErrors).toHaveLength(1);
       expect(llmErrors[0].context.runtime).toBe("pi-coding-agent");
-      expect(result.warnings).toHaveLength(0); // no llm → no claude-code warning
+      expect(result.warnings).toHaveLength(0); // no llm → no claude-code-agent warning
     });
 
-    it("warns for claude-code when both runtimes present with llm", () => {
+    it("warns for claude-code-agent when both runtimes present with llm", () => {
       const result = validateAgent(makeMember({
-        runtimes: ["pi-coding-agent", "claude-code"],
+        runtimes: ["pi-coding-agent", "claude-code-agent"],
         llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" },
       }));
-      expect(result.valid).toBe(true); // pi is satisfied, claude-code just warns
+      expect(result.valid).toBe(true); // pi is satisfied, claude-code-agent just warns
       const llmErrors = result.errors.filter((e) => e.category === "llm-config");
       expect(llmErrors).toHaveLength(0);
       expect(result.warnings).toHaveLength(1);
-      expect(result.warnings[0].context.runtime).toBe("claude-code");
+      expect(result.warnings[0].context.runtime).toBe("claude-code-agent");
     });
 
     it("skips llm check for human members", () => {

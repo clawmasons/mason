@@ -11,11 +11,11 @@ Mason supports multiple agent runtimes out of the box. The same [role](role.md) 
 
 ### Claude Code
 
-[Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) is Anthropic's coding agent with full IDE capabilities.
+[Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code-agent/overview) is Anthropic's coding agent with full IDE capabilities.
 
 | | |
 |---|---|
-| **Package** | `@clawmasons/claude-code` |
+| **Package** | `@clawmasons/claude-code-agent` |
 | **Alias** | `claude` |
 | **Install** | `npm install -g @anthropic-ai/claude-code` |
 | **Credentials** | `CLAUDE_CODE_OAUTH_TOKEN` |

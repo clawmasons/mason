@@ -37,7 +37,7 @@ The `ResolvedAgent` type SHALL include an optional `acp?: { port: number }` fiel
 ### Requirement: ACP_RUNTIME_COMMANDS maps runtimes to ACP commands
 
 The `ACP_RUNTIME_COMMANDS` constant SHALL map runtime identifiers to their ACP agent commands:
-- `"claude-code"` -> `"claude-agent-acp"`
+- `"claude-code-agent"` -> `"claude-agent-acp"`
 - `"pi-coding-agent"` -> `"pi-agent-acp"`
 - `"node"` -> `"node src/index.js --acp"`
 

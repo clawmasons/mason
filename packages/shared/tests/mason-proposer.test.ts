@@ -64,8 +64,8 @@ describe("proposeRoleMd", () => {
     const result = proposeRoleMd(
       makeScanResult({
         commands: [
-          { name: "deploy", path: "/tmp/deploy.md", dialect: "claude-code" },
-          { name: "test", path: "/tmp/test.md", dialect: "claude-code" },
+          { name: "deploy", path: "/tmp/deploy.md", dialect: "claude-code-agent" },
+          { name: "test", path: "/tmp/test.md", dialect: "claude-code-agent" },
         ],
       }),
     );
@@ -82,7 +82,7 @@ describe("proposeRoleMd", () => {
           {
             name: "my-skill",
             path: "/tmp/skills/my-skill",
-            dialect: "claude-code",
+            dialect: "claude-code-agent",
           },
         ],
       }),
@@ -100,7 +100,7 @@ describe("proposeRoleMd", () => {
             name: "github",
             command: "npx",
             args: ["-y", "@mcp/github"],
-            dialect: "claude-code",
+            dialect: "claude-code-agent",
           },
         ],
       }),
@@ -119,7 +119,7 @@ describe("proposeRoleMd", () => {
             name: "github",
             command: "npx",
             env: { GITHUB_TOKEN: "", OTHER_VAR: "has-value" },
-            dialect: "claude-code",
+            dialect: "claude-code-agent",
           },
         ],
       }),
@@ -160,10 +160,10 @@ describe("proposeRoleMd", () => {
   it("proposed ROLE.md parses correctly with readMaterializedRole", async () => {
     const scanResult = makeScanResult({
       commands: [
-        { name: "deploy", path: "/tmp/deploy.md", dialect: "claude-code" },
+        { name: "deploy", path: "/tmp/deploy.md", dialect: "claude-code-agent" },
       ],
       skills: [
-        { name: "my-skill", path: "/tmp/skills/my-skill", dialect: "claude-code" },
+        { name: "my-skill", path: "/tmp/skills/my-skill", dialect: "claude-code-agent" },
       ],
       mcpServers: [
         {
@@ -171,7 +171,7 @@ describe("proposeRoleMd", () => {
           command: "npx",
           args: ["-y", "@mcp/github"],
           env: { GITHUB_TOKEN: "" },
-          dialect: "claude-code",
+          dialect: "claude-code-agent",
         },
       ],
       systemPrompt: "You are a code reviewer.",
@@ -210,7 +210,7 @@ describe("proposeRoleMd", () => {
           {
             name: "remote-server",
             url: "https://example.com/mcp",
-            dialect: "claude-code",
+            dialect: "claude-code-agent",
           },
         ],
       }),
@@ -229,13 +229,13 @@ describe("proposeRoleMd", () => {
             name: "server-a",
             command: "cmd-a",
             env: { SHARED_TOKEN: "" },
-            dialect: "claude-code",
+            dialect: "claude-code-agent",
           },
           {
             name: "server-b",
             command: "cmd-b",
             env: { SHARED_TOKEN: "" },
-            dialect: "claude-code",
+            dialect: "claude-code-agent",
           },
         ],
       }),

@@ -1,4 +1,4 @@
-# claude-code-materializer Specification
+# claude-code-agent-materializer Specification
 
 ## Purpose
 Translates a resolved chapter agent graph into Claude Code-specific runtime artifacts: workspace files, Dockerfile, and docker-compose service definition.
@@ -120,7 +120,7 @@ The Dockerfile SHALL NOT:
 ### Requirement: Claude Code materializer generates a docker-compose service definition
 
 The `generateComposeService()` method SHALL return a `ComposeServiceDef` with:
-- `build` pointing to `./claude-code`
+- `build` pointing to `./claude-code-agent`
 - `restart` set to `"no"` (interactive containers should not auto-restart)
 - `volumes` bind-mounting workspace to `/home/node/workspace`, `.claude` directory to `/home/node/.claude`, and `.claude.json` to `/home/node/.claude.json`
 - `depends_on` including `mcp-proxy`
@@ -131,7 +131,7 @@ The `generateComposeService()` method SHALL return a `ComposeServiceDef` with:
 
 #### Scenario: Compose service mounts .claude directory and .claude.json
 - **WHEN** `generateComposeService()` is called
-- **THEN** volumes SHALL contain `./claude-code/.claude:/home/node/.claude`, `./claude-code/.claude.json:/home/node/.claude.json`, and `./claude-code/workspace:/home/node/workspace`
+- **THEN** volumes SHALL contain `./claude-code-agent/.claude:/home/node/.claude`, `./claude-code-agent/.claude.json:/home/node/.claude.json`, and `./claude-code-agent/workspace:/home/node/workspace`
 
 #### Scenario: Compose service does not include CLAUDE_AUTH_TOKEN
 - **WHEN** `generateComposeService()` is called

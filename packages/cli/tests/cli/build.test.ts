@@ -30,7 +30,7 @@ vi.mock("../../src/cli/commands/run-agent.js", async () => {
   const actual = await vi.importActual<typeof import("../../src/cli/commands/run-agent.js")>("../../src/cli/commands/run-agent.js");
   return {
     ...actual,
-    inferAgentType: vi.fn(() => "claude-code"),
+    inferAgentType: vi.fn(() => "claude-code-agent"),
     resolveAgentType: vi.fn((t: string) => t),
   };
 });
@@ -44,7 +44,7 @@ vi.mock("../../src/runtime/gitignore.js", () => ({
 function makeRole(name: string) {
   return {
     metadata: { name },
-    source: { agentDialect: "claude-code" },
+    source: { agentDialect: "claude-code-agent" },
   };
 }
 
@@ -122,7 +122,7 @@ describe("runBuild", () => {
     discoverRoles.mockResolvedValue([]);
     adaptRoleToResolvedAgent.mockReturnValue({});
     generateRoleDockerBuildDir.mockReturnValue({ buildDir: path.join(tmpDir, ".mason/docker/my-role") });
-    inferAgentType.mockReturnValue("claude-code");
+    inferAgentType.mockReturnValue("claude-code-agent");
 
     const buildMod = await import("../../src/cli/commands/build.js");
     runBuild = buildMod.runBuild;

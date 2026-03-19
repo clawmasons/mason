@@ -14,7 +14,7 @@ The `RuntimeMaterializer` interface SHALL include an optional method `materializ
 
 ### Requirement: Claude Code materializer copies host claude config to agent home
 
-The claude-code materializer SHALL implement `materializeHome(projectDir, homePath)` that copies the following from the host user's home directory into `homePath/.claude/`:
+The claude-code-agent materializer SHALL implement `materializeHome(projectDir, homePath)` that copies the following from the host user's home directory into `homePath/.claude/`:
 - `~/.claude/statsig/` (recursive)
 - `~/.claude/projects/` (recursive, with path transformation)
 - `~/.claude/settings.json`
@@ -78,7 +78,7 @@ When `generateRoleDockerBuildDir` processes a Role with `type === "supervisor"`,
 - **THEN** materialized files SHALL continue to be placed under `{agentDir}/build/workspace/project/` as before
 
 ### Requirement: Claude Code materializer switches file prefix for supervisor roles
-The `claude-code` materializer's `materializeWorkspace` method SHALL check `role.type` when generating the `MaterializationResult` map keys. For supervisor roles, the path prefix SHALL be home-relative (e.g. `.claude/commands/`). For project roles, the prefix SHALL remain workspace-project-relative (e.g. `.claude/commands/` under the project root, ultimately mounted at `workspace/project/.claude/commands/`).
+The `claude-code-agent` materializer's `materializeWorkspace` method SHALL check `role.type` when generating the `MaterializationResult` map keys. For supervisor roles, the path prefix SHALL be home-relative (e.g. `.claude/commands/`). For project roles, the prefix SHALL remain workspace-project-relative (e.g. `.claude/commands/` under the project root, ultimately mounted at `workspace/project/.claude/commands/`).
 
 #### Scenario: Supervisor keys use home prefix
 - **WHEN** `materializeWorkspace` is called with a supervisor Role containing tasks and skills
@@ -93,7 +93,7 @@ The `claude-code` materializer's `materializeWorkspace` method SHALL check `role
 The `generateRoleDockerBuildDir` function SHALL call the materializer's `materializeHome(projectDir, homePath)` method (if implemented) during build directory generation. The `homePath` SHALL be `{buildDir}/{agentType}/home/`.
 
 #### Scenario: Build generates home directory
-- **WHEN** `generateRoleDockerBuildDir` is called for a claude-code agent
+- **WHEN** `generateRoleDockerBuildDir` is called for a claude-code-agent agent
 - **THEN** it SHALL call `materializeHome` and produce a `home/` directory alongside `workspace/` under the agent type directory
 
 #### Scenario: Build skips home for materializers without materializeHome

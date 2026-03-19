@@ -39,7 +39,7 @@ export class AdapterError extends Error {
  * Convert a Role into a ResolvedAgent that existing materializers accept.
  *
  * @param role - A validated Role from the ROLE_TYPES pipeline
- * @param agentType - The target agent dialect name (e.g., "claude-code", "codex", "aider")
+ * @param agentType - The target agent dialect name (e.g., "claude-code-agent", "codex", "aider")
  * @returns A ResolvedAgent suitable for passing to any RuntimeMaterializer
  * @throws AdapterError if agentType does not match a registered dialect
  */
@@ -51,7 +51,7 @@ export function adaptRoleToResolvedAgent(
   const dialect = getDialect(agentType);
   if (!dialect) {
     throw new AdapterError(
-      `Unknown agent type "${agentType}". Must be a registered dialect (e.g., "claude-code", "codex", "aider", "mcp-agent").`,
+      `Unknown agent type "${agentType}". Must be a registered dialect (e.g., "claude-code-agent", "codex", "aider", "mcp-agent").`,
     );
   }
 

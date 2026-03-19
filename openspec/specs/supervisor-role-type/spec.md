@@ -16,7 +16,7 @@ The `Role` schema SHALL include a top-level `type` field with valid values `"pro
 - **THEN** validation SHALL fail with a schema error
 
 ### Requirement: Supervisor roles materialize content to the agent home directory
-When `role.type === "supervisor"`, the `claude-code` materializer SHALL route materialized files (tasks, skills, commands, and apps) to the agent home directory path prefix (`~/.claude/`) rather than the project workspace prefix (`workspace/project/.claude/`). MCP server configuration SHALL be written to `~/.claude.json` instead of the project-local settings file.
+When `role.type === "supervisor"`, the `claude-code-agent` materializer SHALL route materialized files (tasks, skills, commands, and apps) to the agent home directory path prefix (`~/.claude/`) rather than the project workspace prefix (`workspace/project/.claude/`). MCP server configuration SHALL be written to `~/.claude.json` instead of the project-local settings file.
 
 #### Scenario: Supervisor materialization writes to home
 - **WHEN** `materializeForAgent` is called with a Role where `type === "supervisor"`

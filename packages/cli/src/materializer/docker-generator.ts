@@ -158,7 +158,7 @@ export function ensureSentinelFile(
 export interface GenerateBuildDirOptions {
   /** The resolved Role to generate for. */
   role: Role;
-  /** Target agent type (e.g., "claude-code"). */
+  /** Target agent type (e.g., "claude-code-agent"). */
   agentType: string;
   /** Absolute path to the project root. */
   projectDir: string;
@@ -346,7 +346,7 @@ export interface SessionComposeOptions {
   dockerDir: string;
   /** Role short name. */
   roleName: string;
-  /** Agent type (e.g., "claude-code"). */
+  /** Agent type (e.g., "claude-code-agent"). */
   agentType: string;
   /** Agent name for service naming. */
   agentName: string;
@@ -564,7 +564,7 @@ export interface CreateSessionOptions {
   dockerDir: string;
   /** Role definition. */
   role: Role;
-  /** Agent type (e.g., "claude-code"). */
+  /** Agent type (e.g., "claude-code-agent"). */
   agentType: string;
   /** Agent name for proxy CMD. */
   agentName: string;

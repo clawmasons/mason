@@ -31,12 +31,12 @@ When the user provides an agent type (via `--agent-type` or positional arg), the
 
 #### Scenario: Agent type inferred from role directory
 - **WHEN** `chapter run --role writer` is executed
-- **AND** the role "writer" has `source.agentDialect` of `"claude-code"`
-- **THEN** the agent type SHALL be resolved to `"claude-code"` via the agent registry
+- **AND** the role "writer" has `source.agentDialect` of `"claude-code-agent"`
+- **THEN** the agent type SHALL be resolved to `"claude-code-agent"` via the agent registry
 
 #### Scenario: Agent type override with alias
 - **WHEN** `chapter run --role writer --agent-type claude` is executed
-- **THEN** the agent type SHALL resolve to `"claude-code"` via the alias in the agent registry
+- **THEN** the agent type SHALL resolve to `"claude-code-agent"` via the alias in the agent registry
 
 #### Scenario: Unknown agent type error includes registry agents
 - **WHEN** `chapter run --role writer --agent-type unknown` is executed
@@ -102,7 +102,7 @@ The run command SHALL use a two-phase approach to support interactive runtimes:
 - **Phase 1:** `docker compose -f <compose-path> up -d mcp-proxy` (start proxy detached)
 - **Phase 2:** `docker compose -f <compose-path> run --rm <runtime>` (run runtime interactively)
 
-This allows interactive runtimes (like claude-code) to attach to stdin/stdout.
+This allows interactive runtimes (like claude-code-agent) to attach to stdin/stdout.
 
 #### Scenario: Successful two-phase startup
 - **WHEN** `chapter run @acme/member-ops` is executed with valid configuration and a single runtime
@@ -123,11 +123,11 @@ This allows interactive runtimes (like claude-code) to attach to stdin/stdout.
 When `--runtime` is not specified, the run command SHALL parse the compose file to detect runtime services (all services except `mcp-proxy`). If exactly one runtime exists, it SHALL be used automatically.
 
 #### Scenario: Single runtime auto-detected
-- **WHEN** `chapter run @acme/member-ops` is executed and the compose file has only `mcp-proxy` and `claude-code` services
-- **THEN** the command SHALL auto-detect `claude-code` as the runtime and proceed with two-phase startup
+- **WHEN** `chapter run @acme/member-ops` is executed and the compose file has only `mcp-proxy` and `claude-code-agent` services
+- **THEN** the command SHALL auto-detect `claude-code-agent` as the runtime and proceed with two-phase startup
 
 #### Scenario: Multiple runtimes require --runtime flag
-- **WHEN** `chapter run @acme/member-ops` is executed and the compose file has `mcp-proxy`, `claude-code`, and `codex` services
+- **WHEN** `chapter run @acme/member-ops` is executed and the compose file has `mcp-proxy`, `claude-code-agent`, and `codex` services
 - **THEN** the command SHALL print an error listing the available runtimes and suggesting `--runtime` and exit with code 1
 
 #### Scenario: No runtime services found
@@ -139,8 +139,8 @@ When `--runtime` is not specified, the run command SHALL parse the compose file 
 When `--runtime` is specified, the run command SHALL use the specified runtime in the two-phase startup.
 
 #### Scenario: Starting a specific runtime
-- **WHEN** `chapter run @acme/member-ops --runtime claude-code` is executed
-- **THEN** the command SHALL execute phase 1 (`up -d mcp-proxy`) and phase 2 (`run --rm claude-code`)
+- **WHEN** `chapter run @acme/member-ops --runtime claude-code-agent` is executed
+- **THEN** the command SHALL execute phase 1 (`up -d mcp-proxy`) and phase 2 (`run --rm claude-code-agent`)
 
 #### Scenario: Unknown runtime specified
 - **WHEN** `chapter run @acme/member-ops --runtime unknown-runtime` is executed

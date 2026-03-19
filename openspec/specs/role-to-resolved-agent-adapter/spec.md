@@ -9,12 +9,12 @@ The system SHALL provide `adaptRoleToResolvedAgent(role: Role, agentType: string
 
 #### Scenario: Minimal Role produces valid ResolvedAgent
 - **GIVEN** a Role with only required fields (metadata.name, metadata.description, instructions, source)
-- **WHEN** `adaptRoleToResolvedAgent(role, "claude-code")` is called
+- **WHEN** `adaptRoleToResolvedAgent(role, "claude-code-agent")` is called
 - **THEN** a valid ResolvedAgent is returned with name, version, agentName, slug, runtimes, credentials, and a single ResolvedRole
 
 #### Scenario: Full Role preserves all fields
 - **GIVEN** a Role with tasks, apps, skills, container, governance, and resources
-- **WHEN** `adaptRoleToResolvedAgent(role, "claude-code")` is called
+- **WHEN** `adaptRoleToResolvedAgent(role, "claude-code-agent")` is called
 - **THEN** all fields are mapped to the corresponding ResolvedAgent/ResolvedRole fields
 
 ### Requirement: Task mapping

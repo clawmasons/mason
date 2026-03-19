@@ -172,18 +172,18 @@ Add the `acp` field to the agent schema and extend Claude Code + pi-coding-agent
 
 **Summary:** (1) Add optional `acp` field to `agentChapterFieldSchema` with `port` config. (2) Add an `ACP_RUNTIME_COMMANDS` mapping from runtime name to ACP agent command. (3) Extend the Claude Code materializer to additionally generate ACP agent config when running in ACP mode. (4) Extend the pi-coding-agent materializer similarly. (5) Create an mcp-agent materializer for the new package from CHANGE 3.
 
-**User Story:** As the `chapter acp-proxy` command, when I resolve an agent with `runtimes: ["claude-code"]` and start it in ACP mode, the materializer generates the standard workspace files PLUS the ACP agent config so `claude-agent-acp` knows to listen for incoming ACP connections on the configured port.
+**User Story:** As the `chapter acp-proxy` command, when I resolve an agent with `runtimes: ["claude-code-agent"]` and start it in ACP mode, the materializer generates the standard workspace files PLUS the ACP agent config so `claude-agent-acp` knows to listen for incoming ACP connections on the configured port.
 
 **Scope:**
 - Modify: `packages/shared/src/schemas/agent.ts` — add `acp: z.object({ port: z.number().default(3002) }).optional()`
 - Modify: `packages/shared/src/types.ts` — add `acp` to `ResolvedAgent` type
-- Modify: `packages/cli/src/materializer/claude-code.ts` — accept `acpMode?: boolean` option; when true, add ACP agent config to materialized workspace
+- Modify: `packages/cli/src/materializer/claude-code-agent.ts` — accept `acpMode?: boolean` option; when true, add ACP agent config to materialized workspace
 - Modify: `packages/cli/src/materializer/pi-coding-agent.ts` — same ACP mode extension
 - New file: `packages/cli/src/materializer/mcp-agent.ts` — materializer for the mcp-agent package
 - Add: `ACP_RUNTIME_COMMANDS` constant mapping runtime names to ACP commands
 - Update tests: materializer tests verify ACP mode generates additional config
 
-**Testable output:** (a) Agent schema accepts `acp: { port: 3002 }` field, (b) Claude Code materializer in ACP mode produces ACP-specific config file, (c) pi-coding-agent materializer same, (d) mcp-agent materializer produces correct workspace, (e) `ACP_RUNTIME_COMMANDS` correctly maps `"claude-code"` → `"claude-agent-acp"`, `"pi-coding-agent"` → `"pi-agent-acp"`, `"node"` → `"node src/index.js --acp"`.
+**Testable output:** (a) Agent schema accepts `acp: { port: 3002 }` field, (b) Claude Code materializer in ACP mode produces ACP-specific config file, (c) pi-coding-agent materializer same, (d) mcp-agent materializer produces correct workspace, (e) `ACP_RUNTIME_COMMANDS` correctly maps `"claude-code-agent"` → `"claude-agent-acp"`, `"pi-coding-agent"` → `"pi-agent-acp"`, `"node"` → `"node src/index.js --acp"`.
 
 **Implemented**
 
@@ -192,8 +192,8 @@ Add the `acp` field to the agent schema and extend Claude Code + pi-coding-agent
   - [Design](../../changes/archive/2026-03-10-agent-schema-acp-extension/design.md)
   - [Tasks](../../changes/archive/2026-03-10-agent-schema-acp-extension/tasks.md)
 - Spec: [agent-schema-acp-extension](../../specs/agent-schema-acp-extension/spec.md)
-- Source: `packages/shared/src/schemas/agent.ts`, `packages/shared/src/types.ts`, `packages/cli/src/materializer/common.ts`, `packages/cli/src/materializer/claude-code.ts`, `packages/cli/src/materializer/pi-coding-agent.ts`, `packages/cli/src/materializer/mcp-agent.ts`
-- Tests: `packages/cli/tests/materializer/claude-code.test.ts`, `packages/cli/tests/materializer/pi-coding-agent.test.ts`, `packages/cli/tests/materializer/mcp-agent.test.ts`
+- Source: `packages/shared/src/schemas/agent.ts`, `packages/shared/src/types.ts`, `packages/cli/src/materializer/common.ts`, `packages/cli/src/materializer/claude-code-agent.ts`, `packages/cli/src/materializer/pi-coding-agent.ts`, `packages/cli/src/materializer/mcp-agent.ts`
+- Tests: `packages/cli/tests/materializer/claude-code-agent.test.ts`, `packages/cli/tests/materializer/pi-coding-agent.test.ts`, `packages/cli/tests/materializer/mcp-agent.test.ts`
 
 ---
 

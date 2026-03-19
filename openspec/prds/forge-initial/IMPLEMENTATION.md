@@ -158,13 +158,13 @@ Implement the `RuntimeMaterializer` interface and the Claude Code materializer. 
 - Generates a Dockerfile for the Claude Code runtime container
 
 **Implemented:** 2026-03-03
-- [Proposal](../../changes/archive/2026-03-03-claude-code-materializer/proposal.md)
-- [Design](../../changes/archive/2026-03-03-claude-code-materializer/design.md)
-- [Tasks](../../changes/archive/2026-03-03-claude-code-materializer/tasks.md)
-- [Specs: materializer-interface](../../changes/archive/2026-03-03-claude-code-materializer/specs/materializer-interface/spec.md)
-- [Specs: claude-code-materializer](../../changes/archive/2026-03-03-claude-code-materializer/specs/claude-code-materializer/spec.md)
+- [Proposal](../../changes/archive/2026-03-03-claude-code-agent-materializer/proposal.md)
+- [Design](../../changes/archive/2026-03-03-claude-code-agent-materializer/design.md)
+- [Tasks](../../changes/archive/2026-03-03-claude-code-agent-materializer/tasks.md)
+- [Specs: materializer-interface](../../changes/archive/2026-03-03-claude-code-agent-materializer/specs/materializer-interface/spec.md)
+- [Specs: claude-code-agent-materializer](../../changes/archive/2026-03-03-claude-code-agent-materializer/specs/claude-code-agent-materializer/spec.md)
 - [Main Spec: materializer-interface](../../specs/materializer-interface/spec.md)
-- [Main Spec: claude-code-materializer](../../specs/claude-code-materializer/spec.md)
+- [Main Spec: claude-code-agent-materializer](../../specs/claude-code-agent-materializer/spec.md)
 
 ---
 
@@ -207,7 +207,7 @@ Wire together all preceding components into the `forge install <agent-pkg>` comm
 
 **Testable output:**
 - Integration test: `forge install` on a fixture agent package produces the full directory layout from PRD §6.1
-- All generated files are present: docker-compose.yml, mcp-proxy/config.json, claude-code/workspace/*, .env, forge.lock.json
+- All generated files are present: docker-compose.yml, mcp-proxy/config.json, claude-code-agent/workspace/*, .env, forge.lock.json
 - Validation errors abort install with clear messages
 - Re-running install updates existing scaffold (idempotent)
 - Credential prompting interactively asks for missing env vars (or reads from FORGE_ENV_FILE)
@@ -260,7 +260,7 @@ Implement `forge run <agent> [--runtime=X]` and `forge stop <agent>`. Run starts
 
 **Testable output:**
 - `forge run` executes `docker compose up -d` in the agent's scaffolded directory
-- `forge run --runtime=claude-code` starts only the proxy and claude-code services
+- `forge run --runtime=claude-code-agent` starts only the proxy and claude-code-agent services
 - `forge stop` executes `docker compose down` cleanly
 - Missing `.env` values produce a clear error before starting Docker
 - Exit codes propagate from Docker Compose
@@ -329,7 +329,7 @@ Implement the Codex materializer following the same `RuntimeMaterializer` interf
 - Generates `instructions.md` with role descriptions and tool constraints
 - Copies skill artifacts into `skills/` directory
 - Generates Dockerfile for Codex runtime container
-- Agent with `runtimes: ["claude-code", "codex"]` produces both workspace directories
+- Agent with `runtimes: ["claude-code-agent", "codex"]` produces both workspace directories
 
 ---
 

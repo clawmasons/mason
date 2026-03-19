@@ -294,11 +294,11 @@ describe("roleSourceSchema", () => {
   it("accepts local source", () => {
     const result = roleSourceSchema.parse({
       type: "local",
-      agentDialect: "claude-code",
+      agentDialect: "claude-code-agent",
       path: "/home/user/project/.claude/roles/create-prd",
     });
     expect(result.type).toBe("local");
-    expect(result.agentDialect).toBe("claude-code");
+    expect(result.agentDialect).toBe("claude-code-agent");
   });
 
   it("accepts package source", () => {
@@ -423,7 +423,7 @@ describe("roleSchema", () => {
       ],
       source: {
         type: "local" as const,
-        agentDialect: "claude-code",
+        agentDialect: "claude-code-agent",
         path: "/home/user/.claude/roles/create-prd",
       },
     };

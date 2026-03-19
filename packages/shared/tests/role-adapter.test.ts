@@ -26,7 +26,7 @@ function minimalRole(overrides: Record<string, unknown> = {}): Role {
     container: raw.container ?? {},
     governance: raw.governance ?? {},
     resources: raw.resources ?? [],
-    source: raw.source ?? { type: "local", agentDialect: "claude-code", path: "/tmp/test" },
+    source: raw.source ?? { type: "local", agentDialect: "claude-code-agent", path: "/tmp/test" },
   });
 }
 
@@ -100,7 +100,7 @@ function fullRole(): Role {
     ],
     source: {
       type: "local",
-      agentDialect: "claude-code",
+      agentDialect: "claude-code-agent",
       path: "/home/user/project/.claude/roles/create-prd",
     },
   });
@@ -116,14 +116,14 @@ describe("adaptRoleToResolvedAgent", () => {
   describe("basic adaptation", () => {
     it("produces a valid ResolvedAgent from a minimal Role", () => {
       const role = minimalRole();
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
 
       expect(agent.name).toBe("test-role");
       expect(agent.version).toBe("0.0.0");
       expect(agent.agentName).toBe("test-role");
       expect(agent.slug).toBe("test-role");
       expect(agent.description).toBe("A test role");
-      expect(agent.runtimes).toEqual(["claude-code"]);
+      expect(agent.runtimes).toEqual(["claude-code-agent"]);
       expect(agent.credentials).toEqual([]);
       expect(agent.roles).toHaveLength(1);
       expect(agent.proxy).toEqual({ port: 9090, type: "streamable-http" });
@@ -137,7 +137,7 @@ describe("adaptRoleToResolvedAgent", () => {
           version: "2.0.0",
         },
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.version).toBe("2.0.0");
       expect(agent.roles[0].version).toBe("2.0.0");
     });
@@ -150,7 +150,7 @@ describe("adaptRoleToResolvedAgent", () => {
       const role = minimalRole({
         tasks: [{ name: "define-change" }, { name: "review-change" }],
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       const tasks = agent.roles[0].tasks;
 
       expect(tasks).toHaveLength(2);
@@ -181,7 +181,7 @@ describe("adaptRoleToResolvedAgent", () => {
           },
         ],
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       const app = agent.roles[0].apps[0];
 
       expect(app.name).toBe("github");
@@ -198,7 +198,7 @@ describe("adaptRoleToResolvedAgent", () => {
       const role = minimalRole({
         apps: [{ name: "local-server" }],
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.roles[0].apps[0].transport).toBe("stdio");
     });
   });
@@ -219,7 +219,7 @@ describe("adaptRoleToResolvedAgent", () => {
           },
         ],
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       const perms = agent.roles[0].permissions;
 
       expect(perms["github"]).toEqual({
@@ -236,7 +236,7 @@ describe("adaptRoleToResolvedAgent", () => {
       const role = minimalRole({
         apps: [{ name: "bare-server" }],
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.roles[0].permissions["bare-server"]).toEqual({
         allow: [],
         deny: [],
@@ -254,7 +254,7 @@ describe("adaptRoleToResolvedAgent", () => {
           { name: "markdown" },
         ],
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       const skills = agent.roles[0].skills;
 
       expect(skills).toHaveLength(2);
@@ -275,7 +275,7 @@ describe("adaptRoleToResolvedAgent", () => {
           packages: { apt: ["jq", "curl"] },
         },
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.roles[0].aptPackages).toEqual(["jq", "curl"]);
     });
 
@@ -285,7 +285,7 @@ describe("adaptRoleToResolvedAgent", () => {
           mounts: [{ source: "./data", target: "/workspace/data", readonly: true }],
         },
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.roles[0].mounts).toEqual([
         { source: "./data", target: "/workspace/data", readonly: true },
       ]);
@@ -295,7 +295,7 @@ describe("adaptRoleToResolvedAgent", () => {
       const role = minimalRole({
         container: { baseImage: "node:22-slim" },
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.roles[0].baseImage).toBe("node:22-slim");
     });
 
@@ -303,7 +303,7 @@ describe("adaptRoleToResolvedAgent", () => {
       const role = minimalRole({
         container: { packages: { apt: [] } },
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.roles[0].aptPackages).toBeUndefined();
     });
   });
@@ -315,13 +315,13 @@ describe("adaptRoleToResolvedAgent", () => {
       const role = minimalRole({
         governance: { risk: "HIGH" },
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.roles[0].risk).toBe("HIGH");
     });
 
     it("defaults risk to LOW", () => {
       const role = minimalRole();
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.roles[0].risk).toBe("LOW");
     });
 
@@ -334,7 +334,7 @@ describe("adaptRoleToResolvedAgent", () => {
           },
         },
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.roles[0].constraints).toEqual({
         maxConcurrentTasks: 3,
         requireApprovalFor: ["create_pr"],
@@ -347,7 +347,7 @@ describe("adaptRoleToResolvedAgent", () => {
           credentials: ["GITHUB_TOKEN", "ANTHROPIC_API_KEY"],
         },
       });
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.credentials).toEqual(["GITHUB_TOKEN", "ANTHROPIC_API_KEY"]);
     });
   });
@@ -367,7 +367,7 @@ describe("adaptRoleToResolvedAgent", () => {
 
     it("accepts all registered dialects", () => {
       const role = minimalRole();
-      for (const agentType of ["claude-code", "codex", "aider", "mcp-agent"]) {
+      for (const agentType of ["claude-code-agent", "codex", "aider", "mcp-agent"]) {
         const agent = adaptRoleToResolvedAgent(role, agentType);
         expect(agent.runtimes).toEqual([agentType]);
       }
@@ -379,13 +379,13 @@ describe("adaptRoleToResolvedAgent", () => {
   describe("full round-trip", () => {
     it("preserves all fields from a fully-populated Role", () => {
       const role = fullRole();
-      const agent = adaptRoleToResolvedAgent(role, "claude-code");
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
 
       // Top-level
       expect(agent.name).toBe("create-prd");
       expect(agent.version).toBe("1.2.3");
       expect(agent.description).toBe("Creates PRDs");
-      expect(agent.runtimes).toEqual(["claude-code"]);
+      expect(agent.runtimes).toEqual(["claude-code-agent"]);
       expect(agent.credentials).toEqual(["GITHUB_TOKEN", "ANTHROPIC_API_KEY"]);
 
       // Single role

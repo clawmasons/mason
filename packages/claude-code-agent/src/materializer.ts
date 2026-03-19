@@ -217,7 +217,7 @@ data.effortCalloutDismissed = true;
 let _agentPkg: AgentPackage;
 
 export const claudeCodeMaterializer: RuntimeMaterializer = {
-  name: "claude-code",
+  name: "claude-code-agent",
 
   materializeHome(projectDir: string, homePath: string): void {
     const hostHome = os.homedir();
