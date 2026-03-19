@@ -636,6 +636,10 @@ describe("runAgent", () => {
           // Agent up call
           return overrides?.agentExitCode ?? 0;
         },
+        runAgentFn: async (composeFile: string, args: string[]) => {
+          calls.push({ composeFile, args, opts: { interactive: true } });
+          return overrides?.agentExitCode ?? 0;
+        },
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         startCredentialServiceFn: async (_opts: {
           proxyPort: number;
@@ -722,6 +726,7 @@ describe("runAgent", () => {
     const baseDeps = {
       checkDockerComposeFn: () => {},
       execComposeFn: async () => 0,
+      runAgentFn: async () => 0,
       resolveRoleFn: async () => makeRole(),
       adaptRoleFn: () => ({
         name: "writer", version: "1.0.0", agentName: "writer", slug: "writer",

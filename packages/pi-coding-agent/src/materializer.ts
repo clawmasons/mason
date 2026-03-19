@@ -5,7 +5,6 @@ import {
   formatPermittedTools,
   collectAllSkills,
   collectAllTasks,
-  generateAgentsMd,
   generateSkillReadme,
   generateAgentLaunchJson,
 } from "@clawmasons/agent-sdk";
@@ -172,9 +171,6 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
     options?: MaterializeOptions,
   ): MaterializationResult {
     const result: MaterializationResult = new Map();
-
-    // AGENTS.md — agent identity and role docs (shared with claude-code-agent)
-    result.set("AGENTS.md", generateAgentsMd(agent));
 
     // .pi/settings.json — model configuration
     result.set(".pi/settings.json", generatePiSettingsJson(agent));

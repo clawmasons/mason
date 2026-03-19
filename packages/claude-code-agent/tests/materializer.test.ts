@@ -138,19 +138,19 @@ describe("claudeCodeMaterializer", () => {
   });
 
   describe("materializeWorkspace", () => {
-    describe(".mcp.json", () => {
+    describe(".claude.json (MCP config)", () => {
       it("generates single chapter entry with default SSE proxy", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const mcpJson = result.get(".mcp.json");
-        expect(mcpJson).toBeDefined();
+        const claudeJson = result.get(".claude.json");
+        expect(claudeJson).toBeDefined();
 
-        const mcp = JSON.parse(mcpJson!);
-        expect(mcp.mcpServers.chapter).toBeDefined();
-        expect(mcp.mcpServers.chapter.type).toBe("sse");
-        expect(mcp.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/sse");
-        expect(Object.keys(mcp.mcpServers)).toEqual(["chapter"]);
+        const parsed = JSON.parse(claudeJson!);
+        expect(parsed.mcpServers.chapter).toBeDefined();
+        expect(parsed.mcpServers.chapter.type).toBe("sse");
+        expect(parsed.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/sse");
+        expect(Object.keys(parsed.mcpServers)).toEqual(["chapter"]);
       });
 
       it("generates single chapter entry with custom port", () => {
@@ -158,8 +158,8 @@ describe("claudeCodeMaterializer", () => {
         agent.proxy = { port: 8080, type: "sse" };
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:8080");
 
-        const mcp = JSON.parse(result.get(".mcp.json")!);
-        expect(mcp.mcpServers.chapter.url).toBe("http://mcp-proxy:8080/sse");
+        const parsed = JSON.parse(result.get(".claude.json")!);
+        expect(parsed.mcpServers.chapter.url).toBe("http://mcp-proxy:8080/sse");
       });
 
       it('generates chapter entry with http transport (streamable-http maps to "http" for Claude Code)', () => {
@@ -167,17 +167,17 @@ describe("claudeCodeMaterializer", () => {
         agent.proxy = { port: 9090, type: "streamable-http" };
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const mcp = JSON.parse(result.get(".mcp.json")!);
-        expect(mcp.mcpServers.chapter.type).toBe("http");
-        expect(mcp.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/mcp");
+        const parsed = JSON.parse(result.get(".claude.json")!);
+        expect(parsed.mcpServers.chapter.type).toBe("http");
+        expect(parsed.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/mcp");
       });
 
       it("includes placeholder auth header when no token provided", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const mcp = JSON.parse(result.get(".mcp.json")!);
-        expect(mcp.mcpServers.chapter.headers.Authorization).toBe("Bearer ${MCP_PROXY_TOKEN}");
+        const parsed = JSON.parse(result.get(".claude.json")!);
+        expect(parsed.mcpServers.chapter.headers.Authorization).toBe("Bearer ${MCP_PROXY_TOKEN}");
       });
 
       it("bakes actual token into auth header when proxyToken provided", () => {
@@ -185,16 +185,8 @@ describe("claudeCodeMaterializer", () => {
         const token = "abc123def456";
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", token);
 
-        const mcp = JSON.parse(result.get(".mcp.json")!);
-        expect(mcp.mcpServers.chapter.headers.Authorization).toBe("Bearer abc123def456");
-      });
-
-      it("does not contain permissions", () => {
-        const agent = makeRepoOpsAgent();
-        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const mcp = JSON.parse(result.get(".mcp.json")!);
-        expect(mcp.permissions).toBeUndefined();
+        const parsed = JSON.parse(result.get(".claude.json")!);
+        expect(parsed.mcpServers.chapter.headers.Authorization).toBe("Bearer abc123def456");
       });
 
       it("defaults to SSE when agent has no proxy field", () => {
@@ -202,9 +194,15 @@ describe("claudeCodeMaterializer", () => {
         delete agent.proxy;
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const mcp = JSON.parse(result.get(".mcp.json")!);
-        expect(mcp.mcpServers.chapter.type).toBe("sse");
-        expect(mcp.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/sse");
+        const parsed = JSON.parse(result.get(".claude.json")!);
+        expect(parsed.mcpServers.chapter.type).toBe("sse");
+        expect(parsed.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/sse");
+      });
+
+      it("does not emit .mcp.json", () => {
+        const agent = makeRepoOpsAgent();
+        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+        expect(result.has(".mcp.json")).toBe(false);
       });
     });
 
@@ -299,68 +297,6 @@ describe("claudeCodeMaterializer", () => {
       });
     });
 
-    describe("AGENTS.md", () => {
-      it("generates AGENTS.md with agent short name", () => {
-        const agent = makeRepoOpsAgent();
-        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        expect(agentsMd).toContain("# Agent: repo-ops");
-      });
-
-      it("includes chapter-managed preamble", () => {
-        const agent = makeRepoOpsAgent();
-        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        expect(agentsMd).toContain("managed by chapter");
-        expect(agentsMd).toContain("Only use tools permitted by the active role");
-      });
-
-      it("includes sections for all roles with descriptions", () => {
-        const agent = makeRepoOpsAgent();
-        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        expect(agentsMd).toContain("### issue-manager");
-        expect(agentsMd).toContain("Manages GitHub issues: triage, label, assign.");
-        expect(agentsMd).toContain("### pr-reviewer");
-        expect(agentsMd).toContain("Reviews pull requests and provides feedback.");
-      });
-
-      it("lists permitted tools per role per app", () => {
-        const agent = makeRepoOpsAgent();
-        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        // issue-manager tools
-        expect(agentsMd).toContain("github: create_issue, list_repos, add_label");
-        expect(agentsMd).toContain("slack: send_message");
-        // pr-reviewer tools
-        expect(agentsMd).toContain("github: list_repos, get_pr, create_review");
-      });
-
-      it("includes constraints when present", () => {
-        const agent = makeRepoOpsAgent();
-        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        expect(agentsMd).toContain("**Constraints:**");
-        expect(agentsMd).toContain("Max concurrent tasks: 3");
-        expect(agentsMd).toContain("Requires approval for: assign_issue");
-      });
-
-      it("omits constraints section when role has no constraints", () => {
-        const agent = makeRepoOpsAgent();
-        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        // pr-reviewer has no constraints -- find the section after pr-reviewer
-        const prReviewerIndex = agentsMd.indexOf("### pr-reviewer");
-        const afterPrReviewer = agentsMd.slice(prReviewerIndex);
-        expect(afterPrReviewer).not.toContain("**Constraints:**");
-      });
-    });
 
     describe("skills directory", () => {
       it("generates SKILL.md for each unique skill under .claude/skills/", () => {
@@ -457,12 +393,11 @@ describe("claudeCodeMaterializer", () => {
 
         const keys = [...result.keys()].sort();
         expect(keys).toEqual([
+          ".claude.json",
           ".claude/commands/review-pr.md",
           ".claude/commands/triage-issue.md",
           ".claude/settings.json",
           ".claude/skills/labeling/SKILL.md",
-          ".mcp.json",
-          "AGENTS.md",
           "agent-launch.json",
         ]);
       });
@@ -480,9 +415,8 @@ describe("claudeCodeMaterializer", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
 
-        expect(result.has(".mcp.json")).toBe(true);
+        expect(result.has(".claude.json")).toBe(true);
         expect(result.has(".claude/settings.json")).toBe(true);
-        expect(result.has("AGENTS.md")).toBe(true);
         expect(result.has(".claude/commands/triage-issue.md")).toBe(true);
       });
     });
@@ -524,12 +458,12 @@ describe("claudeCodeMaterializer", () => {
       expect(result.has(".claude/commands/review-pr.md")).toBe(true);
     });
 
-    it("emits AGENTS.md and agent-launch.json", () => {
+    it("emits agent-launch.json", () => {
       const agent = makeRepoOpsAgent();
       const result = claudeCodeMaterializer.materializeSupervisor!(agent, "http://mcp-proxy:9090");
 
-      expect(result.has("AGENTS.md")).toBe(true);
       expect(result.has("agent-launch.json")).toBe(true);
+      expect(result.has("AGENTS.md")).toBe(false);
     });
 
     it("merges mcpServers into existing .claude.json when existingHomePath provided", () => {
@@ -568,7 +502,6 @@ describe("claudeCodeMaterializer", () => {
         ".claude/commands/triage-issue.md",
         ".claude/settings.json",
         ".claude/skills/labeling/SKILL.md",
-        "AGENTS.md",
         "agent-launch.json",
       ]);
     });

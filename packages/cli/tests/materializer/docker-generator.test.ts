@@ -317,7 +317,7 @@ describe("generateRoleDockerBuildDir", () => {
     expect(proxyDockerfile![1]).toContain("proxy");
   });
 
-  it("generates workspace files including .mcp.json and AGENTS.md in build/workspace/project/", () => {
+  it("generates .claude.json in home/ (not build/workspace/project/) and SKILL.md in build/workspace/project/", () => {
     const writtenFiles = new Map<string, string>();
 
     generateRoleDockerBuildDir(
@@ -336,14 +336,18 @@ describe("generateRoleDockerBuildDir", () => {
     const buildWorkspaceKeys = [...writtenFiles.keys()].filter((k) =>
       k.includes(path.join("claude-code-agent", "build", "workspace", "project")),
     );
+    const homeKeys = [...writtenFiles.keys()].filter((k) =>
+      k.includes(path.join("claude-code-agent", "home")) &&
+      !k.includes(path.join("claude-code-agent", "workspace")),
+    );
 
-    const hasMcpJson = buildWorkspaceKeys.some((k) => k.endsWith(".mcp.json"));
-    const hasAgentsMd = buildWorkspaceKeys.some((k) => k.endsWith("AGENTS.md"));
-    const hasSkillMd = buildWorkspaceKeys.some((k) => k.endsWith("SKILL.md"));
+    // .claude.json goes to home/, not build/workspace/project/
+    expect(buildWorkspaceKeys.some((k) => k.endsWith(".claude.json"))).toBe(false);
+    expect(homeKeys.some((k) => k.endsWith(".claude.json"))).toBe(true);
 
-    expect(hasMcpJson).toBe(true);
-    expect(hasAgentsMd).toBe(true);
-    expect(hasSkillMd).toBe(true);
+    expect(buildWorkspaceKeys.some((k) => k.endsWith(".mcp.json"))).toBe(false);
+    expect(buildWorkspaceKeys.some((k) => k.endsWith("AGENTS.md"))).toBe(false);
+    expect(buildWorkspaceKeys.some((k) => k.endsWith("SKILL.md"))).toBe(true);
   });
 
   it("supervisor role routes materialized files to home/ not build/workspace/project/", () => {
@@ -452,7 +456,7 @@ describe("generateSessionComposeYml", () => {
     logsDir: "/project/.mason/sessions/abc12345/logs",
     workspacePath: "/project/.mason/docker/create-prd/claude-code-agent/workspace",
     buildWorkspaceProjectPath: "/project/.mason/docker/create-prd/claude-code-agent/build/workspace/project",
-    buildWorkspaceProjectFileEntries: [".mcp.json", "AGENTS.md"],
+    buildWorkspaceProjectFileEntries: ["agent-launch.json"],
     buildWorkspaceProjectDirEntries: [".claude"],
   };
 
@@ -508,12 +512,12 @@ describe("generateSessionComposeYml", () => {
 
     // Top-level configs section
     expect(yml).toContain("configs:");
-    expect(yml).toContain("overlay-mcp-json:");
-    expect(yml).toContain("overlay-agents-md:");
+    expect(yml).toContain("overlay-agent-launch-json:");
+    expect(yml).not.toContain("overlay-claude-json:");
 
     // Service-level configs in agent service
-    expect(yml).toContain("target: /home/mason/workspace/project/.mcp.json");
-    expect(yml).toContain("target: /home/mason/workspace/project/AGENTS.md");
+    expect(yml).toContain("target: /home/mason/workspace/project/agent-launch.json");
+    expect(yml).not.toContain("target: /home/mason/workspace/project/.claude.json");
   });
 
   it("emits directory overlays as bind mounts", () => {
@@ -533,7 +537,7 @@ describe("generateSessionComposeYml", () => {
       buildWorkspaceProjectDirEntries: [],
     });
 
-    expect(yml).not.toContain(":/home/mason/workspace/project/.mcp.json");
+    expect(yml).not.toContain(":/home/mason/workspace/project/.claude.json");
     expect(yml).not.toContain("overlay-");
   });
 

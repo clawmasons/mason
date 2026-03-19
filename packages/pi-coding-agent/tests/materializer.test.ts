@@ -140,54 +140,6 @@ describe("piCodingAgentMaterializer", () => {
   });
 
   describe("materializeWorkspace", () => {
-    describe("AGENTS.md", () => {
-      it("generates AGENTS.md with agent short name", () => {
-        const agent = makePiAgent();
-        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        expect(agentsMd).toContain("# Agent: repo-ops");
-      });
-
-      it("includes chapter-managed preamble", () => {
-        const agent = makePiAgent();
-        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        expect(agentsMd).toContain("managed by chapter");
-        expect(agentsMd).toContain("Only use tools permitted by the active role");
-      });
-
-      it("includes sections for all roles with descriptions", () => {
-        const agent = makePiAgent();
-        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        expect(agentsMd).toContain("### issue-manager");
-        expect(agentsMd).toContain("Manages GitHub issues: triage, label, assign.");
-        expect(agentsMd).toContain("### pr-reviewer");
-      });
-
-      it("lists permitted tools per role per app", () => {
-        const agent = makePiAgent();
-        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        expect(agentsMd).toContain("github: create_issue, list_repos, add_label");
-        expect(agentsMd).toContain("slack: send_message");
-        expect(agentsMd).toContain("github: list_repos, get_pr, create_review");
-      });
-
-      it("includes constraints when present", () => {
-        const agent = makePiAgent();
-        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        expect(agentsMd).toContain("**Constraints:**");
-        expect(agentsMd).toContain("Max concurrent tasks: 3");
-        expect(agentsMd).toContain("Requires approval for: assign_issue");
-      });
-    });
 
     describe(".pi/settings.json", () => {
       it("contains correct model ID from llm config", () => {
@@ -442,7 +394,6 @@ describe("piCodingAgentMaterializer", () => {
           ".pi/extensions/chapter-mcp/package.json",
           ".pi/mcp.json",
           ".pi/settings.json",
-          "AGENTS.md",
           "agent-launch.json",
           "skills/labeling/README.md",
         ]);
@@ -461,7 +412,6 @@ describe("piCodingAgentMaterializer", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
 
-        expect(result.has("AGENTS.md")).toBe(true);
         expect(result.has(".pi/settings.json")).toBe(true);
         expect(result.has(".pi/mcp.json")).toBe(true);
         expect(result.has(".pi/extensions/chapter-mcp/index.ts")).toBe(true);

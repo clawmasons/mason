@@ -99,24 +99,6 @@ describe("mcpAgentMaterializer", () => {
       });
     });
 
-    describe("AGENTS.md", () => {
-      it("generates AGENTS.md with agent short name", () => {
-        const agent = makeMcpTestAgent();
-        const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        expect(agentsMd).toContain("# Agent: mcp-test");
-      });
-
-      it("includes role with permitted tools", () => {
-        const agent = makeMcpTestAgent();
-        const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000");
-
-        const agentsMd = result.get("AGENTS.md")!;
-        expect(agentsMd).toContain("### mcp-test");
-        expect(agentsMd).toContain("filesystem: read_file, write_file, list_directory");
-      });
-    });
 
     describe("agent-launch.json", () => {
       it("generates agent-launch.json with mcp-agent command", () => {
@@ -154,12 +136,12 @@ describe("mcpAgentMaterializer", () => {
     });
 
     describe("result completeness", () => {
-      it("contains .mcp.json, AGENTS.md, and agent-launch.json", () => {
+      it("contains .mcp.json and agent-launch.json", () => {
         const agent = makeMcpTestAgent();
         const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000");
 
         const keys = [...result.keys()].sort();
-        expect(keys).toEqual([".mcp.json", "AGENTS.md", "agent-launch.json"]);
+        expect(keys).toEqual([".mcp.json", "agent-launch.json"]);
       });
 
       it("does not generate slash commands or IDE settings", () => {
@@ -186,7 +168,7 @@ describe("mcpAgentMaterializer", () => {
         const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000", undefined, { acpMode: true });
 
         const keys = [...result.keys()].sort();
-        expect(keys).toEqual([".mcp.json", "AGENTS.md", "agent-launch.json"]);
+        expect(keys).toEqual([".mcp.json", "agent-launch.json"]);
       });
     });
   });

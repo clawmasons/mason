@@ -1,7 +1,6 @@
 import type { ResolvedAgent } from "@clawmasons/shared";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage } from "@clawmasons/agent-sdk";
 import {
-  generateAgentsMd,
   generateAgentLaunchJson,
 } from "@clawmasons/agent-sdk";
 
@@ -66,9 +65,6 @@ export const mcpAgentMaterializer: RuntimeMaterializer = {
       ".mcp.json",
       generateMcpJson(proxyEndpoint, proxyType, proxyToken),
     );
-
-    // AGENTS.md — agent identity and role documentation
-    result.set("AGENTS.md", generateAgentsMd(agent));
 
     // agent-launch.json — tells agent-entry how to bootstrap this agent
     result.set(

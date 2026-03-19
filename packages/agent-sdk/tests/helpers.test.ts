@@ -7,7 +7,6 @@ import {
   findRolesForTask,
   formatPermittedTools,
   generateAgentLaunchJson,
-  generateAgentsMd,
   generateSkillReadme,
 } from "../src/helpers.js";
 import type { AgentPackage } from "../src/types.js";
@@ -275,73 +274,6 @@ describe("collectAllTasks", () => {
   it("returns empty array for roles with no tasks", () => {
     const role = makeRole("@clawmasons/role-a");
     expect(collectAllTasks([role])).toEqual([]);
-  });
-});
-
-// ── generateAgentsMd ─────────────────────────────────────────────────────────
-
-describe("generateAgentsMd", () => {
-  it("includes agent short name in header", () => {
-    const agent = makeAgent([makeRole("@clawmasons/role-a")]);
-    const result = generateAgentsMd(agent);
-    // @clawmasons/agent-test -> short name "test" (getAppShortName strips scope + "agent-" prefix)
-    expect(result).toContain("# Agent: test");
-  });
-
-  it("includes chapter-managed preamble", () => {
-    const agent = makeAgent([makeRole("@clawmasons/role-a")]);
-    const result = generateAgentsMd(agent);
-    expect(result).toContain("managed by chapter");
-    expect(result).toContain("Only use tools permitted by the active role");
-  });
-
-  it("includes each role as a section with short name", () => {
-    const roles = [
-      makeRole("@clawmasons/role-issue-manager"),
-      makeRole("@clawmasons/role-pr-reviewer"),
-    ];
-    const result = generateAgentsMd(makeAgent(roles));
-    expect(result).toContain("### issue-manager");
-    expect(result).toContain("### pr-reviewer");
-  });
-
-  it("includes role description when present", () => {
-    const role = makeRole("@clawmasons/role-a");
-    role.description = "Does important work.";
-    const result = generateAgentsMd(makeAgent([role]));
-    expect(result).toContain("Does important work.");
-  });
-
-  it("includes permitted tools for each role", () => {
-    const role = makeRole("@clawmasons/role-a");
-    role.permissions = {
-      "@clawmasons/app-github": { allow: ["create_issue", "list_repos"], deny: [] },
-    };
-    const result = generateAgentsMd(makeAgent([role]));
-    expect(result).toContain("github: create_issue, list_repos");
-  });
-
-  it("includes constraints when present", () => {
-    const role = makeRole("@clawmasons/role-a");
-    role.constraints = { maxConcurrentTasks: 3, requireApprovalFor: ["delete"] };
-    const result = generateAgentsMd(makeAgent([role]));
-    expect(result).toContain("**Constraints:**");
-    expect(result).toContain("Max concurrent tasks: 3");
-    expect(result).toContain("Requires approval for: delete");
-  });
-
-  it("omits constraints section when role has no constraints", () => {
-    const role = makeRole("@clawmasons/role-a");
-    role.constraints = undefined;
-    const result = generateAgentsMd(makeAgent([role]));
-    expect(result).not.toContain("**Constraints:**");
-  });
-
-  it("omits constraints section when constraints are empty", () => {
-    const role = makeRole("@clawmasons/role-a");
-    role.constraints = { requireApprovalFor: [] };
-    const result = generateAgentsMd(makeAgent([role]));
-    expect(result).not.toContain("**Constraints:**");
   });
 });
 

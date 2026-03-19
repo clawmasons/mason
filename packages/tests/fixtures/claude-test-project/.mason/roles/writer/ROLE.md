@@ -28,11 +28,13 @@ container:
   packages:
     apt:
       - curl
+      - git
+    npm:
+      - "@fission-ai/openspec@latest"
   ignore:
     paths:
       - '.mason/'
       - '.claude/'
-      - '.env'
 
 risk: LOW
     
