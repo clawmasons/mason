@@ -95,7 +95,7 @@ fi
 npx changeset publish
 echo "==> Published to npm"
 
-git push --follow-tags
+git push origin HEAD --follow-tags
 echo "==> Pushed to remote with tags"
 
 echo "==> Done! All packages published at v${NEW_VERSION}"
