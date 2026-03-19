@@ -135,7 +135,7 @@ describe("mcp-proxy-agent: agent↔proxy via CLI", () => {
     // auto-build, proxy startup, credential service, agent container
     cliProcess = spawn(
       "node",
-      [MASON_BIN, "run", "--role", "writer", "--agent", "mcp", "--proxy-port", "19702"],
+      [MASON_BIN, "run", "--role", "writer", "--agent", "mcp"],
       {
         cwd: workspaceDir,
         stdio: ["pipe", "pipe", "pipe"],

@@ -3,29 +3,38 @@
 ## Purpose
 Translates a resolved chapter agent graph into Claude Code-specific runtime artifacts: workspace files, Dockerfile, and docker-compose service definition.
 ## Requirements
-### Requirement: Claude Code materializer generates settings.json with single chapter MCP entry
+### Requirement: Claude Code materializer writes MCP config into .claude.json
 
-The Claude Code materializer SHALL generate a `.claude/settings.json` file containing a single `mcpServers` entry keyed as `"chapter"`, pointing at the proxy's unified endpoint. The proxy handles tool prefixing internally (e.g. `github_create_pr`), so per-app routing is unnecessary. The entry SHALL have:
-- `type` set to the agent's proxy type (default `"sse"`)
+The Claude Code materializer SHALL write MCP server configuration into `.claude.json` at the home directory level, merging with any existing content. The `mcpServers.chapter` entry SHALL have:
+- `type` set to the agent's proxy type (`"sse"` or `"http"`)
 - `url` set to `{proxyEndpoint}/sse` (for SSE) or `{proxyEndpoint}/mcp` (for streamable-http)
-- `headers.Authorization` set to `"Bearer <actual-token>"` when a `proxyToken` is provided, or `"Bearer ${CHAPTER_PROXY_TOKEN}"` as a fallback placeholder
-- A `permissions` block with `allow: ["mcp__chapter__*"]` and `deny: []`
+- `headers.Authorization` set to `"Bearer <actual-token>"` when a `proxyToken` is provided, or `"Bearer ${MCP_PROXY_TOKEN}"` as a fallback placeholder
 
-#### Scenario: Default SSE proxy settings
-- **WHEN** materializeWorkspace is called with a resolved agent using default SSE proxy on port 9090
-- **THEN** the result SHALL contain key `.claude/settings.json` with a JSON object having a single `mcpServers.chapter` entry with `url` equal to `"http://mcp-proxy:9090/sse"` and `type` equal to `"sse"`
+This applies to both `materializeWorkspace` and `materializeSupervisor`. Neither method SHALL emit `.mcp.json`.
 
-#### Scenario: Custom proxy port and streamable-http
-- **WHEN** the agent has `proxy.port` of 8080 and `proxy.type` of `"streamable-http"`
-- **THEN** the settings SHALL have `mcpServers.chapter.url` equal to `"http://mcp-proxy:8080/mcp"` and `mcpServers.chapter.type` equal to `"streamable-http"`
+#### Scenario: materializeWorkspace emits .claude.json with MCP config
+- **WHEN** `materializeWorkspace` is called with a resolved agent using default SSE proxy on port 9090
+- **THEN** the result SHALL contain key `.claude.json` with a JSON object having `mcpServers.chapter.url` equal to `"http://mcp-proxy:9090/sse"` and `mcpServers.chapter.type` equal to `"sse"`
 
-#### Scenario: Auth header with baked token
-- **WHEN** settings.json is generated with a `proxyToken` of `"abc123"`
-- **THEN** `mcpServers.chapter.headers.Authorization` SHALL equal `"Bearer abc123"`
+#### Scenario: materializeWorkspace does NOT emit .mcp.json
+- **WHEN** `materializeWorkspace` is called
+- **THEN** the result SHALL NOT contain a key `.mcp.json`
 
-#### Scenario: Auth header placeholder fallback
-- **WHEN** settings.json is generated without a `proxyToken`
-- **THEN** `mcpServers.chapter.headers.Authorization` SHALL equal `"Bearer ${CHAPTER_PROXY_TOKEN}"`
+#### Scenario: Auth header with baked token in .claude.json
+- **WHEN** `materializeWorkspace` is called with a `proxyToken` of `"abc123"`
+- **THEN** `.claude.json` SHALL have `mcpServers.chapter.headers.Authorization` equal to `"Bearer abc123"`
+
+#### Scenario: Auth header placeholder fallback in .claude.json
+- **WHEN** `materializeWorkspace` is called without a `proxyToken`
+- **THEN** `.claude.json` SHALL have `mcpServers.chapter.headers.Authorization` equal to `"Bearer ${MCP_PROXY_TOKEN}"`
+
+### Requirement: Claude Code materializer generates settings.json with permissions only
+
+The Claude Code materializer SHALL generate a `.claude/settings.json` file containing only a `permissions` block with `allow: ["mcp__chapter__*"]` and `deny: []`. The file SHALL NOT contain a `mcpServers` key.
+
+#### Scenario: settings.json contains only permissions
+- **WHEN** `materializeWorkspace` is called for any agent
+- **THEN** the result SHALL contain key `.claude/settings.json` with a JSON object having only a `permissions` key
 
 #### Scenario: Single chapter permission
 - **WHEN** settings.json is generated for any agent
@@ -50,21 +59,6 @@ For each task in each role, the materializer SHALL generate a file at `.claude/c
 #### Scenario: Task short name derived from package name
 - **WHEN** a task is named `@clawmasons/task-triage-issue`
 - **THEN** the command file SHALL be named `triage-issue.md` (scope and `task-` prefix stripped)
-
-### Requirement: Claude Code materializer generates AGENTS.md with role documentation
-
-The materializer SHALL generate an `AGENTS.md` file containing:
-- Agent identity header with the agent's short name
-- A chapter-managed agent preamble explaining multi-role operation
-- One section per role with: role short name, description, permitted tools per app, and constraints (if any)
-
-#### Scenario: Multi-role agent generates complete AGENTS.md
-- **WHEN** an agent has roles `issue-manager` (tools: github create_issue/list_repos/add_label, slack send_message; maxConcurrentTasks: 3) and `pr-reviewer` (tools: github list_repos/get_pr/create_review)
-- **THEN** `AGENTS.md` SHALL contain sections for both roles with their respective tool lists and the issue-manager's constraint about max concurrent tasks
-
-#### Scenario: Role constraints included when present
-- **WHEN** a role has `constraints.maxConcurrentTasks` of 3 and `constraints.requireApprovalFor` of `["assign_issue"]`
-- **THEN** the AGENTS.md role section SHALL include a Constraints subsection listing both constraints
 
 ### Requirement: Claude Code materializer generates skills directory manifest
 
@@ -150,6 +144,10 @@ The materializer SHALL provide a `generateConfigJson()` method that returns the 
 - **THEN** the result SHALL be valid JSON containing `hasCompletedOnboarding: true` and `hasTrustDialogAccepted: true` for `/home/node/workspace`
 
 ## REMOVED Requirements
+
+### Requirement: Claude Code materializer generates AGENTS.md with role documentation
+**Reason**: `AGENTS.md` is a single-file workspace mount that contributes to Docker mount ordering race conditions. The file is documentation only and is not read by any runtime path; agent behaviour is fully controlled by `agent-launch.json` and role configurations.
+**Migration**: Remove `result.set("AGENTS.md", ...)` from `materializeWorkspace` and `materializeSupervisor`. Remove test assertions that expect `AGENTS.md` in the materialization result.
 
 ### Requirement: Claude Code materializer supports ACP mode
 **Reason**: `.chapter/acp.json` has no consumer in the codebase. The file was generated but never read at runtime by any agent, bootstrap, or CLI code.

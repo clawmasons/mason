@@ -40,6 +40,7 @@ export interface RuntimeMaterializer {
     proxyEndpoint: string,
     proxyToken?: string,
     options?: MaterializeOptions,
+    existingHomePath?: string,
   ): MaterializationResult;
 
   /**

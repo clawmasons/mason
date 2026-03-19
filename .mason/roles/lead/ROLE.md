@@ -15,7 +15,7 @@ skills:
   - openspec-sync-specs
   - openspec-onboard
 
-commands:
+tasks:
   - opsx/apply
   - opsx/verify
   - opsx/new
@@ -38,6 +38,12 @@ commands:
   - prd-todos
 
 container:
+  packages:
+    apt:
+      - curl
+      - git
+    npm:
+      - "@fission-ai/openspec@latest"
   ignore:
     paths:
       - '.mason/'

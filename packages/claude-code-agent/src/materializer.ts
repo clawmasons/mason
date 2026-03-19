@@ -8,13 +8,12 @@ import {
   formatPermittedTools,
   collectAllSkills,
   collectAllTasks,
-  generateAgentsMd,
   generateSkillReadme,
   generateAgentLaunchJson,
 } from "@clawmasons/agent-sdk";
 
 /**
- * Generate .mcp.json content.
+ * Generate MCP server config object for merging into .claude.json.
  *
  * Creates a single "chapter" MCP server entry pointing at the proxy's
  * unified endpoint:  /sse  (SSE)  or  /mcp  (streamable-http).
@@ -50,7 +49,7 @@ function generateMcpJson(
 /**
  * Generate .claude/settings.json content.
  *
- * Contains only permissions — MCP server config lives in .mcp.json.
+ * Contains only permissions — MCP server config lives in .claude.json.
  */
 function generateSettingsJson(): string {
   const settings = {
@@ -264,15 +263,23 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     proxyEndpoint: string,
     proxyToken?: string,
     options?: MaterializeOptions,
+    existingHomePath?: string,
   ): MaterializationResult {
     const result: MaterializationResult = new Map();
     const proxyType = agent.proxy?.type ?? "sse";
 
-    // .mcp.json — MCP server config at workspace root
-    result.set(
-      ".mcp.json",
-      generateMcpJson(proxyEndpoint, proxyType, proxyToken),
-    );
+    // .claude.json — MCP servers merged into existing home config if present
+    const mcpRaw = generateMcpJson(proxyEndpoint, proxyType, proxyToken);
+    const mcpParsed = JSON.parse(mcpRaw) as { mcpServers: Record<string, unknown> };
+    let claudeJson: Record<string, unknown> = {};
+    if (existingHomePath) {
+      const claudeJsonPath = path.join(existingHomePath, ".claude.json");
+      if (fs.existsSync(claudeJsonPath)) {
+        claudeJson = JSON.parse(fs.readFileSync(claudeJsonPath, "utf-8")) as Record<string, unknown>;
+      }
+    }
+    claudeJson.mcpServers = { ...(claudeJson.mcpServers as Record<string, unknown> ?? {}), ...mcpParsed.mcpServers };
+    result.set(".claude.json", JSON.stringify(claudeJson, null, 2));
 
     // .claude/settings.json — permissions only
     result.set(
@@ -289,9 +296,6 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
         generateSlashCommand(task, owningRoles),
       );
     }
-
-    // AGENTS.md
-    result.set("AGENTS.md", generateAgentsMd(agent));
 
     // .claude/skills/{skill-short-name}/SKILL.md
     const allSkills = collectAllSkills(agent.roles);
@@ -348,9 +352,6 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
         generateSlashCommand(task, owningRoles),
       );
     }
-
-    // AGENTS.md
-    result.set("AGENTS.md", generateAgentsMd(agent));
 
     // .claude/skills/{skill-short-name}/SKILL.md
     const allSkills = collectAllSkills(agent.roles);

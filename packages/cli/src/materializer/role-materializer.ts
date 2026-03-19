@@ -118,6 +118,7 @@ export function materializeForAgent(
   proxyEndpoint?: string,
   proxyToken?: string,
   options?: MaterializeOptions,
+  existingHomePath?: string,
 ): MaterializationResult {
   const materializer = getMaterializer(agentType);
   if (!materializer) {
@@ -147,5 +148,6 @@ export function materializeForAgent(
     endpoint,
     proxyToken,
     options,
+    existingHomePath,
   );
 }

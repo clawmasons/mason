@@ -293,22 +293,22 @@ export function generateRoleDockerBuildDir(
         ...(opts.agentArgs?.length ? { agentArgs: opts.agentArgs } : {}),
       }
     : undefined;
+  const workspaceDir = path.join(agentDir, "workspace");
+  const buildWorkspaceProjectDir = path.join(agentDir, "build", "workspace", "project");
+  const homeBuildDir = path.join(agentDir, "home");
   const workspace = (isSupervisor && materializer?.materializeSupervisor)
     ? materializer.materializeSupervisor(
         resolvedAgent,
         proxyEp,
         undefined,
         materializeOpts,
-        !fsDeps ? path.join(agentDir, "home") : undefined,
+        !fsDeps ? homeBuildDir : undefined,
       )
-    : materializeForAgent(role, agentType, proxyEp, undefined, materializeOpts);
-  const workspaceDir = path.join(agentDir, "workspace");
-  const buildWorkspaceProjectDir = path.join(agentDir, "build", "workspace", "project");
-  const homeBuildDir = path.join(agentDir, "home");
+    : materializeForAgent(role, agentType, proxyEp, undefined, materializeOpts, !fsDeps ? homeBuildDir : undefined);
   for (const [filePath, content] of workspace) {
     const targetDir = filePath === "agent-launch.json"
       ? workspaceDir
-      : isSupervisor ? homeBuildDir : buildWorkspaceProjectDir;
+      : (isSupervisor || filePath === ".claude.json") ? homeBuildDir : buildWorkspaceProjectDir;
     const fullPath = path.join(targetDir, filePath);
     deps.mkdirSync(path.dirname(fullPath), { recursive: true });
     deps.writeFileSync(fullPath, content);
@@ -652,7 +652,7 @@ ${agentEnvLines.join("\n")}${commandLine}
     stdin_open: true
     tty: true
     init: true
-    restart: "on-failure:3"
+    restart: "no"
 ${topLevelConfigsSection}${volumesSection}`;
 }
 

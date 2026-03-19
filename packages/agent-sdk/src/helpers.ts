@@ -1,4 +1,4 @@
-import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from "@clawmasons/shared";
+import type { ResolvedRole, ResolvedTask, ResolvedSkill } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
 import type { AgentPackage } from "./types.js";
 
@@ -92,53 +92,6 @@ export function collectAllTasks(
   }
 
   return result;
-}
-
-/**
- * Generate AGENTS.md content.
- */
-export function generateAgentsMd(agent: ResolvedAgent): string {
-  const agentShortName = getAppShortName(agent.name);
-  const lines: string[] = [];
-
-  lines.push(`# Agent: ${agentShortName}`);
-  lines.push("");
-  lines.push("You are an agent managed by chapter (Clawmasons Chapter).");
-  lines.push("You have multiple roles. Each task you execute specifies which");
-  lines.push("role is active. Only use tools permitted by the active role.");
-  lines.push("");
-  lines.push("## Roles");
-
-  for (const role of agent.roles) {
-    const roleShortName = getAppShortName(role.name);
-    lines.push("");
-    lines.push(`### ${roleShortName}`);
-    if (role.description) {
-      lines.push(role.description);
-    }
-    lines.push("");
-    lines.push("**Permitted tools:**");
-    lines.push(formatPermittedTools(role.permissions));
-
-    if (role.constraints) {
-      const hasConstraints =
-        role.constraints.maxConcurrentTasks !== undefined ||
-        (role.constraints.requireApprovalFor && role.constraints.requireApprovalFor.length > 0);
-
-      if (hasConstraints) {
-        lines.push("");
-        lines.push("**Constraints:**");
-        if (role.constraints.maxConcurrentTasks !== undefined) {
-          lines.push(`- Max concurrent tasks: ${role.constraints.maxConcurrentTasks}`);
-        }
-        if (role.constraints.requireApprovalFor && role.constraints.requireApprovalFor.length > 0) {
-          lines.push(`- Requires approval for: ${role.constraints.requireApprovalFor.join(", ")}`);
-        }
-      }
-    }
-  }
-
-  return lines.join("\n");
 }
 
 // ── agent-launch.json Generation ──────────────────────────────────────

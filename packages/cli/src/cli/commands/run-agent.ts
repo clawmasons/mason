@@ -202,6 +202,105 @@ export function execComposeCommand(
   });
 }
 
+// ── OCI Restart Policy ───────────────────────────────────────────────
+
+const OCI_RESTART_MAX = 3;
+const OCI_RESTART_DELAY_MS = 2000;
+
+/**
+ * Run `docker compose run` interactively while capturing stderr for OCI detection.
+ * stdin and stdout are inherited (interactive); stderr is piped and tee'd to process.stderr.
+ * Returns { code, stderr }.
+ */
+export function execComposeRunWithStderr(
+  composeFile: string,
+  args: string[],
+): Promise<{ code: number; stderr: string }> {
+  const baseArgs = ["compose", "-f", composeFile, ...args];
+  return new Promise((resolve) => {
+    const child = spawn("docker", baseArgs, {
+      stdio: ["inherit", "inherit", "pipe"],
+    });
+    let stderr = "";
+    child.stderr?.on("data", (chunk: Buffer) => {
+      const text = chunk.toString();
+      stderr += text;
+      process.stderr.write(text);
+    });
+    child.on("close", (code) => resolve({ code: code ?? 0, stderr }));
+    child.on("error", () => resolve({ code: 1, stderr }));
+  });
+}
+
+/**
+ * Collect single-file volume bind-mount host paths from a compose YAML string.
+ * Returns paths where the host side resolves to a regular file (not a directory).
+ */
+export function collectSingleFileMounts(composeYaml: string, baseDir: string): string[] {
+  const singleFiles: string[] = [];
+  // Match volume lines of the form: - <hostPath>:<containerPath>[:<options>]
+  const volumeLineRe = /^\s*-\s+([^:]+):[^:]/gm;
+  let match: RegExpExecArray | null;
+  while ((match = volumeLineRe.exec(composeYaml)) !== null) {
+    const hostPart = match[1].trim();
+    // Skip named volumes (no path separator)
+    if (!hostPart.includes("/") && !hostPart.startsWith(".")) continue;
+    const resolved = path.resolve(baseDir, hostPart);
+    try {
+      const stat = fs.statSync(resolved);
+      if (stat.isFile()) {
+        singleFiles.push(hostPart);
+      }
+    } catch { /* path doesn't exist — skip */ }
+  }
+  return singleFiles;
+}
+
+/**
+ * Run the agent container with OCI-gated restart policy.
+ * Restarts only when output contains "OCI runtime", with a 2s pause and max 3 attempts.
+ * Prints single-file mount paths on restart with a recommendation.
+ */
+export async function runAgentWithOciRestart(
+  composeFile: string,
+  runArgs: string[],
+): Promise<number> {
+  let attempts = 0;
+  while (true) {
+    const { code, stderr } = await execComposeRunWithStderr(composeFile, runArgs);
+    if (code === 0) return 0;
+
+    const isOciError = stderr.includes("OCI runtime");
+    if (!isOciError || attempts >= OCI_RESTART_MAX) {
+      if (attempts >= OCI_RESTART_MAX) {
+        console.error(`\n  Max OCI restart attempts (${OCI_RESTART_MAX}) reached. Giving up.`);
+      }
+      return code;
+    }
+
+    attempts++;
+
+    // Show single-file mount warning
+    try {
+      const composeYaml = fs.readFileSync(composeFile, "utf-8");
+      const composeDir = path.dirname(composeFile);
+      const singleFiles = collectSingleFileMounts(composeYaml, composeDir);
+      if (singleFiles.length > 0) {
+        console.error(`\n  OCI runtime error detected (attempt ${attempts}/${OCI_RESTART_MAX}). Retrying in ${OCI_RESTART_DELAY_MS / 1000}s...`);
+        console.error(`\n  Single-file mounts detected (these can cause mount ordering races):`);
+        for (const f of singleFiles) {
+          console.error(`    - ${f}`);
+        }
+        console.error(`  Recommendation: move these files into a directory and mount the directory instead.`);
+      } else {
+        console.error(`\n  OCI runtime error detected (attempt ${attempts}/${OCI_RESTART_MAX}). Retrying in ${OCI_RESTART_DELAY_MS / 1000}s...`);
+      }
+    } catch { /* best-effort */ }
+
+    await new Promise((r) => setTimeout(r, OCI_RESTART_DELAY_MS));
+  }
+}
+
 // ── Environment Variable Credential Collection ───────────────────────
 
 /**
@@ -386,6 +485,8 @@ export interface RunAgentDeps {
   mkdirSyncFn?: (dirPath: string, options?: { recursive?: boolean }) => void;
   /** Override fs.existsSync (for testing). */
   existsSyncFn?: (filePath: string) => boolean;
+  /** Override the agent run function (for testing). When set, bypasses OCI restart logic. */
+  runAgentFn?: (composeFile: string, args: string[]) => Promise<number>;
   /** Override credential service startup (for testing). */
   startCredentialServiceFn?: (opts: {
     proxyPort: number;
@@ -671,6 +772,7 @@ async function runAgentInteractiveMode(
   agentArgs?: string[],
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
+  const runAgent = deps?.runAgentFn ?? runAgentWithOciRestart;
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
   const startCredService = deps?.startCredentialServiceFn ?? defaultStartCredentialService;
@@ -791,11 +893,7 @@ async function runAgentInteractiveMode(
     }
     runArgs.push(agentServiceName);
 
-    const agentCode = await execCompose(
-      composeFile,
-      runArgs,
-      { interactive: true },
-    );
+    const agentCode = await runAgent(composeFile, runArgs);
 
     // 11. Tear down all containers on agent exit
     console.log(`\n  Agent exited (code ${agentCode}). Tearing down services...`);

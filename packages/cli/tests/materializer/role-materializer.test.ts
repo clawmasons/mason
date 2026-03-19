@@ -112,12 +112,12 @@ describe("materializer registry", () => {
 
 describe("materializeForAgent", () => {
   describe("Claude Code materialization from Role", () => {
-    it("produces .mcp.json", () => {
+    it("produces .claude.json with mcpServers", () => {
       const role = makeTestRole();
       const result = materializeForAgent(role, "claude-code-agent");
 
-      expect(result.has(".mcp.json")).toBe(true);
-      const mcp = JSON.parse(result.get(".mcp.json")!);
+      expect(result.has(".claude.json")).toBe(true);
+      const mcp = JSON.parse(result.get(".claude.json")!);
       expect(mcp.mcpServers.chapter).toBeDefined();
       expect(mcp.mcpServers.chapter.url).toContain("mcp-proxy:9090");
     });
@@ -139,15 +139,6 @@ describe("materializeForAgent", () => {
       expect(result.has(".claude/commands/review-change.md")).toBe(true);
     });
 
-    it("produces AGENTS.md", () => {
-      const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code-agent");
-
-      expect(result.has("AGENTS.md")).toBe(true);
-      const agentsMd = result.get("AGENTS.md")!;
-      expect(agentsMd).toContain("create-prd");
-    });
-
     it("produces .claude/skills/ directory for skills", () => {
       const role = makeTestRole();
       const result = materializeForAgent(role, "claude-code-agent");
@@ -159,7 +150,7 @@ describe("materializeForAgent", () => {
       const role = makeTestRole();
       const result = materializeForAgent(role, "claude-code-agent");
 
-      const mcp = JSON.parse(result.get(".mcp.json")!);
+      const mcp = JSON.parse(result.get(".claude.json")!);
       expect(mcp.mcpServers.chapter.url).toContain("http://mcp-proxy:9090");
     });
 
@@ -167,7 +158,7 @@ describe("materializeForAgent", () => {
       const role = makeTestRole();
       const result = materializeForAgent(role, "claude-code-agent", "http://custom-proxy:8080");
 
-      const mcp = JSON.parse(result.get(".mcp.json")!);
+      const mcp = JSON.parse(result.get(".claude.json")!);
       expect(mcp.mcpServers.chapter.url).toContain("http://custom-proxy:8080");
     });
 
@@ -176,7 +167,7 @@ describe("materializeForAgent", () => {
       const token = "test-token-123";
       const result = materializeForAgent(role, "claude-code-agent", undefined, token);
 
-      const mcp = JSON.parse(result.get(".mcp.json")!);
+      const mcp = JSON.parse(result.get(".claude.json")!);
       expect(mcp.mcpServers.chapter.headers.Authorization).toBe("Bearer test-token-123");
     });
 
@@ -239,21 +230,8 @@ describe("materializeForAgent", () => {
       const result = materializeForAgent(role, "claude-code-agent");
 
       // Claude Code materializer output
-      expect(result.has(".mcp.json")).toBe(true);
+      expect(result.has(".claude.json")).toBe(true);
       expect(result.has(".claude/settings.json")).toBe(true);
-      expect(result.has("AGENTS.md")).toBe(true);
-    });
-
-    it("AGENTS.md reflects the role data regardless of source dialect", () => {
-      const role = makeTestRole();
-      // Source dialect is codex, but we materialize for claude-code-agent
-      role.source.agentDialect = "codex";
-
-      const result = materializeForAgent(role, "claude-code-agent");
-
-      const agentsMd = result.get("AGENTS.md")!;
-      expect(agentsMd).toContain("create-prd");
-      expect(agentsMd).toContain("Creates product requirements documents");
     });
 
     it("same role produces different output for different agent types", () => {
@@ -354,9 +332,8 @@ describe("materializeForAgent", () => {
 
       const result = materializeForAgent(minimalRole, "claude-code-agent");
 
-      expect(result.has(".mcp.json")).toBe(true);
+      expect(result.has(".claude.json")).toBe(true);
       expect(result.has(".claude/settings.json")).toBe(true);
-      expect(result.has("AGENTS.md")).toBe(true);
 
       // No commands or skills
       const keys = [...result.keys()];
