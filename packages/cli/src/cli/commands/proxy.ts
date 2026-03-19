@@ -94,7 +94,7 @@ export async function startProxy(
       version: resolvedRole.version,
       agentName: roleName,
       slug: roleName.replace(/^@[^/]+\//, "").replace(/[^a-z0-9-]/g, "-"),
-      runtimes: ["claude-code"],
+      runtimes: ["claude-code-agent"],
       credentials: [],
       roles: [resolvedRole],
     };

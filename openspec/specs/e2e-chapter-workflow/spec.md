@@ -25,7 +25,7 @@ The integration test (`tests/integration/install-flow.test.ts`) SHALL exercise t
 
 #### Scenario: Install generates deployment artifacts
 - **WHEN** `chapter install @<scope>/member-note-taker` is run
-- **THEN** `.chapter/members/note-taker/` SHALL contain proxy/Dockerfile, docker-compose.yml, log/ directory, and claude-code workspace
+- **THEN** `.chapter/members/note-taker/` SHALL contain proxy/Dockerfile, docker-compose.yml, log/ directory, and claude-code-agent workspace
 
 ### Requirement: E2E test verifies the members registry after install
 
@@ -45,16 +45,16 @@ After a successful `chapter install`, the `.chapter/members.json` file SHALL be 
 After install, the integration test SHALL verify the complete per-member directory layout for agent members.
 
 #### Scenario: All required directories and files exist
-- **WHEN** `chapter install` has completed for an agent member with slug `note-taker` and runtime `claude-code`
+- **WHEN** `chapter install` has completed for an agent member with slug `note-taker` and runtime `claude-code-agent`
 - **THEN** the following SHALL exist:
   - `.chapter/members/note-taker/log/` (activity log directory)
   - `.chapter/members/note-taker/proxy/Dockerfile` (proxy build context)
   - `.chapter/members/note-taker/proxy/chapter/dist/` (pre-built chapter artifacts)
   - `.chapter/members/note-taker/proxy/chapter/package.json` (for Docker build)
-  - `.chapter/members/note-taker/claude-code/Dockerfile` (runtime Dockerfile)
-  - `.chapter/members/note-taker/claude-code/workspace/` (runtime workspace)
-  - `.chapter/members/note-taker/claude-code/workspace/.claude/settings.json`
-  - `.chapter/members/note-taker/claude-code/workspace/AGENTS.md`
+  - `.chapter/members/note-taker/claude-code-agent/Dockerfile` (runtime Dockerfile)
+  - `.chapter/members/note-taker/claude-code-agent/workspace/` (runtime workspace)
+  - `.chapter/members/note-taker/claude-code-agent/workspace/.claude/settings.json`
+  - `.chapter/members/note-taker/claude-code-agent/workspace/AGENTS.md`
   - `.chapter/members/note-taker/docker-compose.yml`
   - `.chapter/members/note-taker/.env`
   - `.chapter/members/note-taker/chapter.lock.json`

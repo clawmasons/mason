@@ -20,7 +20,7 @@ export interface DialectFieldMapping {
 }
 
 export interface DialectEntry {
-  /** Dialect identifier (e.g., "claude-code") */
+  /** Dialect identifier (e.g., "claude-code-agent") */
   name: string;
   /** Agent directory name without dot (e.g., "claude") */
   directory: string;
@@ -42,7 +42,7 @@ export function registerDialect(entry: DialectEntry): void {
 }
 
 /**
- * Look up a dialect by its name (e.g., "claude-code").
+ * Look up a dialect by its name (e.g., "claude-code-agent").
  */
 export function getDialect(name: string): DialectEntry | undefined {
   return dialects.get(name);
@@ -77,7 +77,7 @@ export function getKnownDirectories(): string[] {
 // ---------------------------------------------------------------------------
 
 registerDialect({
-  name: "claude-code",
+  name: "claude-code-agent",
   directory: "claude",
   fieldMapping: {
     tasks: "commands",

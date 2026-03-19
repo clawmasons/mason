@@ -1,12 +1,12 @@
 # materializer-interface Specification
 
 ## Purpose
-TBD - created by archiving change claude-code-materializer. Update Purpose after archive.
+TBD - created by archiving change claude-code-agent-materializer. Update Purpose after archive.
 ## Requirements
 ### Requirement: RuntimeMaterializer interface defines the contract for all materializers
 
 The `RuntimeMaterializer` interface SHALL be defined in the `@clawmasons/agent-sdk` package (moved from `packages/cli/src/materializer/types.ts`). The interface SHALL include:
-- `name: string` — the runtime identifier (e.g., `"claude-code"`, `"mcp-agent"`)
+- `name: string` — the runtime identifier (e.g., `"claude-code-agent"`, `"mcp-agent"`)
 - `materializeWorkspace(agent: ResolvedAgent, proxyEndpoint: string, proxyToken?: string, options?: MaterializeOptions): MaterializationResult` — generates workspace file content
 - `materializeHome?(projectDir: string, homePath: string): void` — optional home directory materialization
 
@@ -61,10 +61,10 @@ The registry SHALL no longer be a hardcoded `Map` with static imports. It SHALL 
 
 #### Scenario: Registry contains built-in materializers
 - **WHEN** `getRegisteredAgentTypes()` is called
-- **THEN** it SHALL return at minimum `["claude-code", "pi-coding-agent", "mcp-agent"]`
+- **THEN** it SHALL return at minimum `["claude-code-agent", "pi-coding-agent", "mcp-agent"]`
 - **AND** it SHALL also include any agents loaded from `.mason/config.json`
 
 #### Scenario: getMaterializer returns materializer from AgentPackage
-- **WHEN** `getMaterializer("claude-code")` is called
-- **THEN** it SHALL return the `RuntimeMaterializer` from the `@clawmasons/claude-code` package's `AgentPackage.materializer` field
+- **WHEN** `getMaterializer("claude-code-agent")` is called
+- **THEN** it SHALL return the `RuntimeMaterializer` from the `@clawmasons/claude-code-agent` package's `AgentPackage.materializer` field
 

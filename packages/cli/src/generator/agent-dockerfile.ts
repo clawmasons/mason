@@ -62,7 +62,7 @@ export function generateAgentDockerfile(
   const devcontainerLabel = `LABEL devcontainer.metadata='${devcontainerMetadata}'`;
 
   // Determine the runtime — first runtime is the primary one
-  const primaryRuntime = agent.runtimes[0] ?? "claude-code";
+  const primaryRuntime = agent.runtimes[0] ?? "claude-code-agent";
 
   // Build runtime-specific install step from AgentPackage config
   const runtimeInstall = dockerfileConfig?.installSteps ?? `

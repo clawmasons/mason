@@ -54,7 +54,7 @@ function makeTestRole(overrides?: Partial<Role>): Role {
     resources: [],
     source: {
       type: "local",
-      agentDialect: "claude-code",
+      agentDialect: "claude-code-agent",
       path: "/projects/cool-app/.claude/roles/create-prd",
     },
     ...overrides,
@@ -228,7 +228,7 @@ describe("generateRoleDockerBuildDir", () => {
     const result = generateRoleDockerBuildDir(
       {
         role: makeTestRole(),
-        agentType: "claude-code",
+        agentType: "claude-code-agent",
         projectDir: "/project",
         agentName: "@acme/agent-note-taker",
         dockerBuildRoot: "/project/.mason/docker",
@@ -243,7 +243,7 @@ describe("generateRoleDockerBuildDir", () => {
     expect(result.buildDir).toBe(path.join("/project/.mason/docker", "create-prd"));
 
     // Agent Dockerfile exists
-    const agentDockerfile = path.join(result.buildDir, "claude-code", "Dockerfile");
+    const agentDockerfile = path.join(result.buildDir, "claude-code-agent", "Dockerfile");
     expect(writtenFiles.has(agentDockerfile)).toBe(true);
     expect(writtenFiles.get(agentDockerfile)).toContain("FROM");
 
@@ -257,19 +257,19 @@ describe("generateRoleDockerBuildDir", () => {
     expect(writtenFiles.has(composeFile)).toBe(true);
 
     // agent-launch.json lands in workspace/
-    const agentLaunchFile = path.join(result.buildDir, "claude-code", "workspace", "agent-launch.json");
+    const agentLaunchFile = path.join(result.buildDir, "claude-code-agent", "workspace", "agent-launch.json");
     expect(writtenFiles.has(agentLaunchFile)).toBe(true);
 
     // Other workspace files land in build/workspace/project/
     const buildWorkspaceFiles = [...writtenFiles.keys()].filter((k) =>
-      k.includes(path.join("claude-code", "build", "workspace", "project")),
+      k.includes(path.join("claude-code-agent", "build", "workspace", "project")),
     );
     expect(buildWorkspaceFiles.length).toBeGreaterThan(0);
 
     // No other files should land directly in workspace/ (only agent-launch.json)
     const workspaceFiles = [...writtenFiles.keys()].filter((k) =>
-      k.includes(path.join("claude-code", "workspace")) &&
-      !k.includes(path.join("claude-code", "build", "workspace")),
+      k.includes(path.join("claude-code-agent", "workspace")) &&
+      !k.includes(path.join("claude-code-agent", "build", "workspace")),
     );
     expect(workspaceFiles).toEqual([agentLaunchFile]);
   });
@@ -278,7 +278,7 @@ describe("generateRoleDockerBuildDir", () => {
     const result = generateRoleDockerBuildDir(
       {
         role: makeTestRole(),
-        agentType: "claude-code",
+        agentType: "claude-code-agent",
         projectDir: "/project",
         agentName: "@acme/agent",
       },
@@ -288,7 +288,7 @@ describe("generateRoleDockerBuildDir", () => {
       },
     );
 
-    expect(result.agentDockerfilePath).toBe("claude-code/Dockerfile");
+    expect(result.agentDockerfilePath).toBe("claude-code-agent/Dockerfile");
     expect(result.proxyDockerfilePath).toBe("mcp-proxy/Dockerfile");
   });
 
@@ -298,7 +298,7 @@ describe("generateRoleDockerBuildDir", () => {
     generateRoleDockerBuildDir(
       {
         role: makeTestRole(),
-        agentType: "claude-code",
+        agentType: "claude-code-agent",
         projectDir: "/project",
         agentName: "@acme/agent",
       },
@@ -323,7 +323,7 @@ describe("generateRoleDockerBuildDir", () => {
     generateRoleDockerBuildDir(
       {
         role: makeTestRole(),
-        agentType: "claude-code",
+        agentType: "claude-code-agent",
         projectDir: "/project",
         agentName: "@acme/agent",
       },
@@ -334,7 +334,7 @@ describe("generateRoleDockerBuildDir", () => {
     );
 
     const buildWorkspaceKeys = [...writtenFiles.keys()].filter((k) =>
-      k.includes(path.join("claude-code", "build", "workspace", "project")),
+      k.includes(path.join("claude-code-agent", "build", "workspace", "project")),
     );
 
     const hasMcpJson = buildWorkspaceKeys.some((k) => k.endsWith(".mcp.json"));
@@ -352,7 +352,7 @@ describe("generateRoleDockerBuildDir", () => {
     generateRoleDockerBuildDir(
       {
         role: makeTestRole({ type: "supervisor" }),
-        agentType: "claude-code",
+        agentType: "claude-code-agent",
         projectDir: "/project",
         agentName: "@acme/agent",
       },
@@ -364,14 +364,14 @@ describe("generateRoleDockerBuildDir", () => {
 
     // No files in build/workspace/project/ for supervisor
     const projectDirFiles = [...writtenFiles.keys()].filter((k) =>
-      k.includes(path.join("claude-code", "build", "workspace", "project")),
+      k.includes(path.join("claude-code-agent", "build", "workspace", "project")),
     );
     expect(projectDirFiles).toHaveLength(0);
 
     // Materialized files go to home/
     const homeFiles = [...writtenFiles.keys()].filter((k) =>
-      k.includes(path.join("claude-code", "home")) &&
-      !k.includes(path.join("claude-code", "workspace")),
+      k.includes(path.join("claude-code-agent", "home")) &&
+      !k.includes(path.join("claude-code-agent", "workspace")),
     );
     expect(homeFiles.length).toBeGreaterThan(0);
 
@@ -393,7 +393,7 @@ describe("generateRoleDockerBuildDir", () => {
     generateRoleDockerBuildDir(
       {
         role: makeTestRole({ type: "supervisor" }),
-        agentType: "claude-code",
+        agentType: "claude-code-agent",
         projectDir: "/project",
         agentName: "@acme/agent",
       },
@@ -404,7 +404,7 @@ describe("generateRoleDockerBuildDir", () => {
     );
 
     const dockerfile = [...writtenFiles.entries()].find(([k]) =>
-      k.endsWith(path.join("claude-code", "Dockerfile")),
+      k.endsWith(path.join("claude-code-agent", "Dockerfile")),
     );
     expect(dockerfile).toBeDefined();
     expect(dockerfile![1]).toContain("WORKDIR /home/mason/workspace\n");
@@ -417,7 +417,7 @@ describe("generateRoleDockerBuildDir", () => {
     generateRoleDockerBuildDir(
       {
         role: makeTestRole({ type: "supervisor" }),
-        agentType: "claude-code",
+        agentType: "claude-code-agent",
         projectDir: "/project",
         agentName: "@acme/agent",
       },
@@ -427,7 +427,7 @@ describe("generateRoleDockerBuildDir", () => {
       },
     );
 
-    const agentLaunchFile = path.join("/project/.mason/docker", "create-prd", "claude-code", "workspace", "agent-launch.json");
+    const agentLaunchFile = path.join("/project/.mason/docker", "create-prd", "claude-code-agent", "workspace", "agent-launch.json");
     expect(writtenFiles.has(agentLaunchFile)).toBe(true);
   });
 });
@@ -442,7 +442,7 @@ describe("generateSessionComposeYml", () => {
     dockerBuildDir: "/project/.mason/docker/create-prd",
     dockerDir: "/project/docker",
     roleName: "create-prd",
-    agentType: "claude-code",
+    agentType: "claude-code-agent",
     agentName: "@acme/agent",
     proxyToken: "test-proxy-token",
     credentialProxyToken: "test-cred-token",
@@ -450,9 +450,10 @@ describe("generateSessionComposeYml", () => {
     volumeMasks: generateVolumeMasks([".mason/", ".claude/", ".env"]),
     sessionDir: "/project/.mason/sessions/abc12345",
     logsDir: "/project/.mason/sessions/abc12345/logs",
-    workspacePath: "/project/.mason/docker/create-prd/claude-code/workspace",
-    buildWorkspaceProjectPath: "/project/.mason/docker/create-prd/claude-code/build/workspace/project",
-    buildWorkspaceProjectEntries: [".mcp.json", ".claude", "AGENTS.md"],
+    workspacePath: "/project/.mason/docker/create-prd/claude-code-agent/workspace",
+    buildWorkspaceProjectPath: "/project/.mason/docker/create-prd/claude-code-agent/build/workspace/project",
+    buildWorkspaceProjectFileEntries: [".mcp.json", "AGENTS.md"],
+    buildWorkspaceProjectDirEntries: [".claude"],
   };
 
   it("generates valid YAML with proxy and agent services", () => {
@@ -470,10 +471,12 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain("ignore-claude:/home/mason/workspace/project/.claude");
   });
 
-  it("includes volume masking for files as sentinel bind mounts", () => {
+  it("includes volume masking for files as Docker Compose configs (VirtioFS-safe)", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
-    expect(yml).toContain("/home/mason/workspace/project/.env:ro");
+    // File masks should appear as configs, not bind mounts
+    expect(yml).toContain("mask-env:");
+    expect(yml).toContain("target: /home/mason/workspace/project/.env");
     expect(yml).toContain("empty-file");
   });
 
@@ -485,10 +488,13 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain("  ignore-claude:");
   });
 
-  it("mounts project read-only at /home/mason/workspace/project", () => {
+  it("mounts project at /home/mason/workspace/project without :ro (agents need write access)", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
-    expect(yml).toContain("/home/mason/workspace/project:ro");
+    // Agent project mount should NOT have :ro
+    const agentSection = yml.split("agent-create-prd:")[1]!;
+    expect(agentSection).toContain(":/home/mason/workspace/project\n");
+    expect(agentSection).not.toContain("/home/mason/workspace/project:ro");
   });
 
   it("mounts workspace path to /home/mason/workspace when workspacePath provided", () => {
@@ -497,22 +503,38 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain(":/home/mason/workspace\n");
   });
 
-  it("emits per-entry overlay mounts for build workspace project entries", () => {
+  it("emits file overlays as Docker Compose configs (VirtioFS-safe)", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
-    expect(yml).toContain(":/home/mason/workspace/project/.mcp.json");
-    expect(yml).toContain(":/home/mason/workspace/project/.claude");
-    expect(yml).toContain(":/home/mason/workspace/project/AGENTS.md");
+    // Top-level configs section
+    expect(yml).toContain("configs:");
+    expect(yml).toContain("overlay-mcp-json:");
+    expect(yml).toContain("overlay-agents-md:");
+
+    // Service-level configs in agent service
+    expect(yml).toContain("target: /home/mason/workspace/project/.mcp.json");
+    expect(yml).toContain("target: /home/mason/workspace/project/AGENTS.md");
   });
 
-  it("does not emit overlay mounts when buildWorkspaceProjectEntries is empty", () => {
+  it("emits directory overlays as bind mounts", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+
+    // .claude is a directory entry — should appear as bind mount volume
+    expect(yml).toContain(":/home/mason/workspace/project/.claude");
+
+    // Should NOT appear as a config
+    expect(yml).not.toContain("overlay-claude:");
+  });
+
+  it("does not emit overlay mounts when entries are empty", () => {
     const yml = generateSessionComposeYml({
       ...baseOpts,
-      buildWorkspaceProjectEntries: [],
+      buildWorkspaceProjectFileEntries: [],
+      buildWorkspaceProjectDirEntries: [],
     });
 
-    // Should have workspace mount but no overlay mounts for specific files
     expect(yml).not.toContain(":/home/mason/workspace/project/.mcp.json");
+    expect(yml).not.toContain("overlay-");
   });
 
   it("uses relative paths from session directory", () => {
@@ -537,6 +559,12 @@ describe("generateSessionComposeYml", () => {
         }
       }
     }
+  });
+
+  it("includes PROJECT_DIR in proxy environment", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+    const proxySection = yml.split("agent-create-prd:")[0]!;
+    expect(proxySection).toContain("PROJECT_DIR=/home/mason/workspace/project");
   });
 
   it("includes tokens in environment", () => {
@@ -582,12 +610,12 @@ describe("generateSessionComposeYml", () => {
   it("includes home directory mount when homePath is provided", () => {
     const yml = generateSessionComposeYml({
       ...baseOpts,
-      homePath: "/project/.mason/docker/create-prd/claude-code/home",
+      homePath: "/project/.mason/docker/create-prd/claude-code-agent/home",
     });
 
     expect(yml).toContain(":/home/mason");
     // Should use relative path from session dir
-    expect(yml).not.toContain("/project/.mason/docker/create-prd/claude-code/home");
+    expect(yml).not.toContain("/project/.mason/docker/create-prd/claude-code-agent/home");
   });
 
   it("does not include home mount when homePath is omitted", () => {
@@ -628,6 +656,41 @@ describe("generateSessionComposeYml", () => {
       }
     }
   });
+
+  it("adds homeOverride volume before project mount", () => {
+    const yml = generateSessionComposeYml({
+      ...baseOpts,
+      homeOverride: "/custom/home",
+    });
+    const agentSection = yml.split("agent-create-prd:")[1]!;
+    const volumeSection = agentSection.split("volumes:")[1]!.split(/configs:|depends_on:/)[0]!;
+    const mountLines = volumeSection.split("\n").filter((l) => l.trim().startsWith("- "));
+
+    // First mount should be the home override
+    expect(mountLines[0]).toContain(":/home/mason/");
+    // Project mount comes next
+    expect(mountLines[1]).toContain(":/home/mason/workspace/project");
+  });
+
+  it("adds bashMode AGENT_COMMAND_OVERRIDE env var", () => {
+    const yml = generateSessionComposeYml({ ...baseOpts, bashMode: true });
+    const agentSection = yml.split("agent-create-prd:")[1]!;
+    expect(agentSection).toContain("AGENT_COMMAND_OVERRIDE=bash");
+  });
+
+  it("adds verbose AGENT_ENTRY_VERBOSE env var", () => {
+    const yml = generateSessionComposeYml({ ...baseOpts, verbose: true });
+    const agentSection = yml.split("agent-create-prd:")[1]!;
+    expect(agentSection).toContain("AGENT_ENTRY_VERBOSE=1");
+  });
+
+  it("adds vscodeServerHostPath volume mount", () => {
+    const yml = generateSessionComposeYml({
+      ...baseOpts,
+      vscodeServerHostPath: "/project/.mason/docker/vscode-server",
+    });
+    expect(yml).toContain(":/home/mason/.vscode-server");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -645,7 +708,7 @@ describe("createSessionDirectory", () => {
         dockerBuildDir: "/project/.mason/docker/create-prd",
         dockerDir: "/project/docker",
         role: makeTestRole(),
-        agentType: "claude-code",
+        agentType: "claude-code-agent",
         agentName: "@acme/agent",
       },
       {
@@ -681,7 +744,7 @@ describe("createSessionDirectory", () => {
         dockerBuildDir: "/project/.mason/docker/create-prd",
         dockerDir: "/project/docker",
         role: makeTestRole(),
-        agentType: "claude-code",
+        agentType: "claude-code-agent",
         agentName: "@acme/agent",
       },
       {
@@ -708,7 +771,7 @@ describe("createSessionDirectory", () => {
         dockerBuildDir: "/project/.mason/docker/create-prd",
         dockerDir: "/project/docker",
         role: makeTestRole(),
-        agentType: "claude-code",
+        agentType: "claude-code-agent",
         agentName: "@acme/agent",
       },
       {
@@ -727,8 +790,9 @@ describe("createSessionDirectory", () => {
     // Directory masks
     expect(content).toContain("ignore-mason:/home/mason/workspace/project/.mason");
     expect(content).toContain("ignore-claude:/home/mason/workspace/project/.claude");
-    // File mask
-    expect(content).toContain("/home/mason/workspace/project/.env:ro");
+    // File mask (now via configs)
+    expect(content).toContain("mask-env:");
+    expect(content).toContain("target: /home/mason/workspace/project/.env");
   });
 
   it("works with role that has no ignore paths", () => {
@@ -747,7 +811,7 @@ describe("createSessionDirectory", () => {
         dockerBuildDir: "/project/.mason/docker/minimal",
         dockerDir: "/project/docker",
         role: roleNoIgnore,
-        agentType: "claude-code",
+        agentType: "claude-code-agent",
         agentName: "@acme/agent",
       },
       {

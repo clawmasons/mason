@@ -88,7 +88,7 @@ An agent is the top-level deployable unit. It replaces the "member" type from th
     "name": "Note Taker",
     "slug": "note-taker",
     "description": "Note-taking agent that manages markdown files.",
-    "runtimes": ["claude-code"],
+    "runtimes": ["claude-code-agent"],
     "roles": [
       "@lodge.chapter/role-writer"
     ],
@@ -117,7 +117,7 @@ An agent is the top-level deployable unit. It replaces the "member" type from th
 | `name` | string | Yes | Display name of the agent. |
 | `slug` | string | Yes | URL-safe identifier, used for directory names and references. |
 | `description` | string | No | Human-readable summary. |
-| `runtimes` | string[] | Yes | Runtime environments (e.g., `"claude-code"`, `"codex"`). |
+| `runtimes` | string[] | Yes | Runtime environments (e.g., `"claude-code-agent"`, `"codex"`). |
 | `roles` | string[] | Yes | Role packages this agent operates with. Defines the permission envelope. |
 | `resources` | object[] | No | External resource declarations. |
 | `proxy` | object | No | Proxy configuration. |
@@ -176,7 +176,7 @@ The following commands from the previous CLI are removed:
 
 ### 5.4 Retained and Refactored Infrastructure
 
-- **Materializer** (`src/materializer/`): The `RuntimeMaterializer` interface and per-runtime implementations (claude-code, pi-coding-agent) are retained as the core mechanism for materializing agent workspaces. Docker-specific methods (`generateDockerfile`, `generateComposeService`, `generateConfigJson`) are removed from the interface, leaving only `materializeWorkspace()`. Docker generation is re-introduced in `docker-init` (Section 6) as a separate concern.
+- **Materializer** (`src/materializer/`): The `RuntimeMaterializer` interface and per-runtime implementations (claude-code-agent, pi-coding-agent) are retained as the core mechanism for materializing agent workspaces. Docker-specific methods (`generateDockerfile`, `generateComposeService`, `generateConfigJson`) are removed from the interface, leaving only `materializeWorkspace()`. Docker generation is re-introduced in `docker-init` (Section 6) as a separate concern.
 - **Docker utilities**: General-purpose docker utilities (`checkDockerCompose`, `validateEnvFile`, `execDockerCompose`) are retained for reuse by `docker-init` and `run-agent`. The install-specific `resolveMemberDir` is removed.
 - **`PROVIDER_ENV_VARS`**: Provider-to-environment-variable mapping is relocated to `materializer/common.ts` for reuse by materializers and future docker environment generation.
 
@@ -345,7 +345,7 @@ chapter run-agent <agent> <role> [<task>]
 | Image Type | Scope | User | Purpose |
 |------------|-------|------|---------|
 | Proxy | Per role | `mason` | Runs `@clawmasons/proxy` configured for the role's apps |
-| Agent | Per agent × role | `mason` | Runs the agent runtime (e.g., claude-code) with role access |
+| Agent | Per agent × role | `mason` | Runs the agent runtime (e.g., claude-code-agent) with role access |
 
 ### 9.2 Mount Structure
 
@@ -730,7 +730,7 @@ chapter run-agent <agent> <role> [<task>]
 |------|--------|
 | `src/materializer/types.ts` | Remove docker methods from `RuntimeMaterializer`; remove `ComposeServiceDef` |
 | `src/materializer/common.ts` | Add `PROVIDER_ENV_VARS` (moved from pi-coding-agent.ts); rename member→agent |
-| `src/materializer/claude-code.ts` | Remove `generateDockerfile`, `generateComposeService`, `generateConfigJson`; rename member→agent |
+| `src/materializer/claude-code-agent.ts` | Remove `generateDockerfile`, `generateComposeService`, `generateConfigJson`; rename member→agent |
 | `src/materializer/pi-coding-agent.ts` | Remove `generateDockerfile`, `generateComposeService`; move `PROVIDER_ENV_VARS` out; rename member→agent |
 | `src/materializer/index.ts` | Update exports |
 | `src/cli/commands/docker-utils.ts` | Remove `resolveMemberDir`; keep general docker utilities |

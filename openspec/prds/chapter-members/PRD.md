@@ -13,7 +13,7 @@ Clawmasons Chapter (formerly Agent Forge / forge) is a framework for creating an
 This PRD covers two interrelated changes:
 
 - **Rebrand:** Rename forge → chapter across all CLI commands, package names, directory structures, and documentation. The `forge` CLI becomes `chapter`, `.forge/` becomes `.chapter/`, and the `@clawmasons/forge` package becomes `@clawmasons/mason`.
-- **Members model:** Replace the agent-centric model with a member-centric model. Members are either `human` or `agent` type. Both have roles, identities, and activity logs. Agent members retain runtimes (claude-code, codex). The CLI gains `chapter enable/disable @member` commands for managing member status.
+- **Members model:** Replace the agent-centric model with a member-centric model. Members are either `human` or `agent` type. Both have roles, identities, and activity logs. Agent members retain runtimes (claude-code-agent, codex). The CLI gains `chapter enable/disable @member` commands for managing member status.
 
 ---
 
@@ -77,7 +77,7 @@ A member is the top-level deployable unit. It replaces the former "agent" type. 
     "email": "note-taker@chapter.local",
     "authProviders": [],
     "description": "Note-taking agent that manages markdown files.",
-    "runtimes": ["claude-code"],
+    "runtimes": ["claude-code-agent"],
     "roles": [
       "@clawmasons/role-writer"
     ],
@@ -211,7 +211,7 @@ After `chapter install @<member>`, each member gets a directory under `.chapter/
     ├── note-taker/                    # agent member
     │   ├── log/                       # activity log
     │   ├── proxy/                     # member's proxy config (replaces forge-proxy/)
-    │   ├── claude-code/               # runtime workspace (agent members only)
+    │   ├── claude-code-agent/               # runtime workspace (agent members only)
     │   │   ├── Dockerfile
     │   │   └── workspace/
     │   │       ├── .claude/
@@ -234,7 +234,7 @@ Key changes from the old layout:
 - **Per-member isolation:** Each member has its own directory instead of a shared agent workspace.
 - **`proxy/`** replaces the old `forge-proxy/` or `mcp-proxy/` directory, scoped per member.
 - **`log/`** directory for activity tracking. Agent members will have richer logs to support running across runtimes with a proxy.
-- **Runtime directories** (claude-code/, codex/) are nested under the member, not at the top level.
+- **Runtime directories** (claude-code-agent/, codex/) are nested under the member, not at the top level.
 
 ---
 
@@ -337,9 +337,9 @@ The `agent` package type is replaced by `member`. The member schema extends the 
 For `memberType: "agent"`, the `runtimes` and `proxy` fields are required (as they were for agents). For `memberType: "human"`, `runtimes` and `proxy` are not applicable and should not be present.
 
 Acceptance criteria:
-- Given a member package with `memberType: "agent"` and `runtimes: ["claude-code"]`, when validated, then it passes.
+- Given a member package with `memberType: "agent"` and `runtimes: ["claude-code-agent"]`, when validated, then it passes.
 - Given a member package with `memberType: "human"` and no `runtimes`, when validated, then it passes.
-- Given a member package with `memberType: "human"` and `runtimes: ["claude-code"]`, when validated, then it fails.
+- Given a member package with `memberType: "human"` and `runtimes: ["claude-code-agent"]`, when validated, then it fails.
 - Given a member package without `memberType`, when validated, then it fails.
 - Given a member package without `name`, `slug`, or `email`, when validated, then it fails.
 
@@ -363,11 +363,11 @@ Acceptance criteria:
 
 **REQ-008: Per-Member Directory Structure**
 
-`chapter install` scaffolds a per-member directory under `.chapter/members/<slug>/` instead of the previous flat layout. Each member gets: `log/` directory, and for agent members: `proxy/`, and runtime directories (e.g., `claude-code/`, `codex/`).
+`chapter install` scaffolds a per-member directory under `.chapter/members/<slug>/` instead of the previous flat layout. Each member gets: `log/` directory, and for agent members: `proxy/`, and runtime directories (e.g., `claude-code-agent/`, `codex/`).
 
 Acceptance criteria:
 - Given `chapter install @member-note-taker` where slug is `note-taker`, then `.chapter/members/note-taker/log/` exists.
-- Given an agent member with `runtimes: ["claude-code"]`, then `.chapter/members/note-taker/claude-code/workspace/` exists.
+- Given an agent member with `runtimes: ["claude-code-agent"]`, then `.chapter/members/note-taker/claude-code-agent/workspace/` exists.
 - Given an agent member, then `.chapter/members/note-taker/proxy/` exists.
 - Given a human member, then `.chapter/members/alice/log/` exists but no `proxy/` or runtime directories.
 
@@ -434,7 +434,7 @@ Members can communicate with each other through a chapter-internal messaging sys
   "name": "@clawmasons/agent-note-taker",
   "forge": {
     "type": "agent",
-    "runtimes": ["claude-code"],
+    "runtimes": ["claude-code-agent"],
     "roles": ["@clawmasons/role-writer"]
   }
 }
@@ -451,7 +451,7 @@ Members can communicate with each other through a chapter-internal messaging sys
     "slug": "note-taker",
     "email": "note-taker@chapter.local",
     "authProviders": [],
-    "runtimes": ["claude-code"],
+    "runtimes": ["claude-code-agent"],
     "roles": ["@clawmasons/role-writer"]
   }
 }
@@ -490,7 +490,7 @@ chapter install @<member>
 │
 ├── log/                             # activity logs
 │
-├── claude-code/
+├── claude-code-agent/
 │   ├── Dockerfile
 │   └── workspace/
 │       ├── .claude/

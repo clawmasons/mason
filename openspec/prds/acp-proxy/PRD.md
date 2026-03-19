@@ -443,7 +443,7 @@ The ACP proxy reuses chapter's existing infrastructure and adds a thin ACP bridg
 | `proxy/hooks/approval.ts` | Approval workflow for constrained tools |
 | `proxy/handlers/credential-relay.ts` | Credential request relay to credential-service |
 | `proxy/handlers/connect-agent.ts` | Session management with risk-based locking |
-| `materializer/claude-code.ts` | Workspace materialization (`.mcp.json`, `AGENTS.md`, etc.) |
+| `materializer/claude-code-agent.ts` | Workspace materialization (`.mcp.json`, `AGENTS.md`, etc.) |
 | `materializer/pi-coding-agent.ts` | PI workspace materialization |
 | `generator/proxy-dockerfile.ts` | Proxy container Dockerfile |
 | `generator/agent-dockerfile.ts` | Agent container Dockerfile (extended for ACP mode) |
@@ -465,7 +465,7 @@ New modules to create:
 | `acp/rewriter.ts` | MCP server config rewriting (replace matched entries with proxy) |
 | `acp/warnings.ts` | Unmatched server warning generation and logging |
 | `generator/agent-dockerfile.ts` | Extended to support ACP agent mode entrypoints |
-| `materializer/claude-code.ts` | Extended to produce ACP agent config |
+| `materializer/claude-code-agent.ts` | Extended to produce ACP agent config |
 | `materializer/pi-coding-agent.ts` | Extended to produce ACP agent config |
 
 ### 7.6 Agent Schema Extension
@@ -483,7 +483,7 @@ The `runtimes` array continues to declare which runtimes the agent supports. The
 
 ```typescript
 const ACP_RUNTIME_COMMANDS: Record<string, string> = {
-  "claude-code": "claude-agent-acp",
+  "claude-code-agent": "claude-agent-acp",
   "pi-coding-agent": "pi-agent-acp",
   "node": "node src/index.js --acp",
 };
@@ -493,7 +493,7 @@ const ACP_RUNTIME_COMMANDS: Record<string, string> = {
 
 Both the Claude Code and pi-coding-agent materializers are extended to support ACP agent mode:
 
-**Claude Code materializer** (`materializer/claude-code.ts`):
+**Claude Code materializer** (`materializer/claude-code-agent.ts`):
 - Existing: generates `.mcp.json` pointing to `{proxyEndpoint}/mcp`
 - ACP mode: additionally generates ACP agent config so `claude-agent-acp` knows to listen for incoming ACP connections
 

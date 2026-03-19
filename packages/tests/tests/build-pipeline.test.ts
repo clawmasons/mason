@@ -31,7 +31,7 @@ describe("full chapter build → run validation flow", () => {
 
   // The local role "test-writer" is in .mason/roles/test-writer/ROLE.md
   const ROLE_NAME = "test-writer";
-  const AGENT_TYPE = "claude-code";
+  const AGENT_TYPE = "claude-code-agent";
 
   beforeAll(async () => {
     // 1. Create temp workspace from fixtures

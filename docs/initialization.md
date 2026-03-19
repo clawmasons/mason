@@ -38,7 +38,7 @@ The agent registry that maps agent names to their npm packages, along with any a
 ```json
 {
   "agents": {
-    "claude": { "package": "@clawmasons/claude-code" },
+    "claude": { "package": "@clawmasons/claude-code-agent" },
     "pi": { "package": "@clawmasons/pi-coding-agent" },
     "mcp": { "package": "@clawmasons/mcp-agent" }
   },
@@ -82,7 +82,7 @@ The `.mason/docker/` directory contains generated Dockerfiles and dependencies f
 ├── mcp-proxy/          # MCP proxy Dockerfile and workspace
 │   ├── Dockerfile
 │   └── workspace/
-├── <agent-type>/       # Agent Dockerfile (e.g., claude-code)
+├── <agent-type>/       # Agent Dockerfile (e.g., claude-code-agent)
 │   ├── Dockerfile
 │   ├── workspace/
 │   └── home/

@@ -110,7 +110,7 @@ function makeNoteTakerAgent(): ResolvedAgent {
     agentName: "Note Taker",
     slug: "note-taker",
     description: "Note-taking agent",
-    runtimes: ["claude-code"],
+    runtimes: ["claude-code-agent"],
     credentials: [],
     roles: [makeWriterRole(), makeReviewerRole()],
     proxy: { port: 9090, type: "sse" },
@@ -178,16 +178,16 @@ describe("generateAgentDockerfile", () => {
     const writerRole = agent.roles[0];
     const result = generateAgentDockerfile(agent, writerRole);
 
-    expect(result).toContain("COPY writer/claude-code/build/workspace/");
+    expect(result).toContain("COPY writer/claude-code-agent/build/workspace/");
     expect(result).toContain("/home/mason/workspace/");
-    expect(result).not.toContain("COPY writer/claude-code/workspace/");
+    expect(result).not.toContain("COPY writer/claude-code-agent/workspace/");
   });
 
-  it("installs claude-code runtime and uses agent-entry entrypoint", () => {
+  it("installs claude-code-agent runtime and uses agent-entry entrypoint", () => {
     const agent = makeNoteTakerAgent();
     const result = generateAgentDockerfile(agent, agent.roles[0]);
 
-    expect(result).toContain("claude-code");
+    expect(result).toContain("claude-code-agent");
     expect(result).toContain('ENTRYPOINT ["agent-entry"]');
   });
 
@@ -254,8 +254,8 @@ describe("generateAgentDockerfile", () => {
     const reviewerResult = generateAgentDockerfile(agent, agent.roles[1]);
 
     // They should differ in workspace COPY paths
-    expect(writerResult).toContain("writer/claude-code/build/workspace/");
-    expect(reviewerResult).toContain("reviewer/claude-code/build/workspace/");
+    expect(writerResult).toContain("writer/claude-code-agent/build/workspace/");
+    expect(reviewerResult).toContain("reviewer/claude-code-agent/build/workspace/");
   });
 
   // ── Base Image Tests ──────────────────────────────────────────────────
@@ -337,7 +337,7 @@ describe("generateAgentDockerfile", () => {
     const agent = makeNoteTakerAgent();
     const result = generateAgentDockerfile(agent, agent.roles[0], { hasHome: false });
 
-    expect(result).not.toContain("COPY writer/claude-code/home/");
+    expect(result).not.toContain("COPY writer/claude-code-agent/home/");
     expect(result).not.toContain("mason-from-build");
   });
 
@@ -352,7 +352,7 @@ describe("generateAgentDockerfile", () => {
     const agent = makeNoteTakerAgent();
     const result = generateAgentDockerfile(agent, agent.roles[0], { hasHome: true });
 
-    expect(result).toContain("COPY writer/claude-code/home/ /home/mason/");
+    expect(result).toContain("COPY writer/claude-code-agent/home/ /home/mason/");
     expect(result).toContain("chown -R mason:mason /home/mason");
     expect(result).toContain("cp -a /home/mason /home/mason-from-build");
   });
@@ -361,7 +361,7 @@ describe("generateAgentDockerfile", () => {
     const agent = makeNoteTakerAgent();
     const reviewerResult = generateAgentDockerfile(agent, agent.roles[1], { hasHome: true });
 
-    expect(reviewerResult).toContain("COPY reviewer/claude-code/home/ /home/mason/");
+    expect(reviewerResult).toContain("COPY reviewer/claude-code-agent/home/ /home/mason/");
   });
 
   // ── Role Type Tests ────────────────────────────────────────────────────

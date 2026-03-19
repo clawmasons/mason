@@ -78,6 +78,38 @@ export function sanitizeVolumeName(ignorePath: string): string {
 }
 
 /**
+ * Sanitize a file entry name into a Docker Compose config name.
+ *
+ * E.g. `.mcp.json` → `overlay-mcp-json`, `AGENTS.md` → `overlay-agents-md`.
+ */
+function sanitizeOverlayConfigName(entry: string): string {
+  const cleaned = entry
+    .toLowerCase()
+    .replace(/[/\\]/g, "-")
+    .replace(/\./g, "-")
+    .replace(/[^a-zA-Z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `overlay-${cleaned}`;
+}
+
+/**
+ * Sanitize a file mask path into a Docker Compose config name.
+ *
+ * E.g. `.env` → `mask-env`, `.env.local` → `mask-env-local`.
+ */
+function sanitizeMaskConfigName(entry: string): string {
+  const cleaned = entry
+    .toLowerCase()
+    .replace(/[/\\]/g, "-")
+    .replace(/\./g, "-")
+    .replace(/[^a-zA-Z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `mask-${cleaned}`;
+}
+
+/**
  * Classify ignore paths and generate volume mask entries.
  *
  * - Paths ending with `/` are classified as directories (masked with named empty volumes).
@@ -158,7 +190,7 @@ export function ensureSentinelFile(
 export interface GenerateBuildDirOptions {
   /** The resolved Role to generate for. */
   role: Role;
-  /** Target agent type (e.g., "claude-code"). */
+  /** Target agent type (e.g., "claude-code-agent"). */
   agentType: string;
   /** Absolute path to the project root. */
   projectDir: string;
@@ -346,7 +378,7 @@ export interface SessionComposeOptions {
   dockerDir: string;
   /** Role short name. */
   roleName: string;
-  /** Agent type (e.g., "claude-code"). */
+  /** Agent type (e.g., "claude-code-agent"). */
   agentType: string;
   /** Agent name for service naming. */
   agentName: string;
@@ -380,8 +412,18 @@ export interface SessionComposeOptions {
   workspacePath?: string;
   /** Absolute path to {agentDir}/build/workspace/project/ — files here get per-entry overlay mounts. */
   buildWorkspaceProjectPath?: string;
-  /** Names of files/dirs inside buildWorkspaceProjectPath to mount as overlays. */
-  buildWorkspaceProjectEntries?: string[];
+  /** File entries inside buildWorkspaceProjectPath — mounted via Docker Compose configs (VirtioFS-safe). */
+  buildWorkspaceProjectFileEntries?: string[];
+  /** Directory entries inside buildWorkspaceProjectPath — mounted as bind-mount overlays. */
+  buildWorkspaceProjectDirEntries?: string[];
+  /** Override bind-mount path for /home/mason/ (e.g. --home flag). */
+  homeOverride?: string;
+  /** VS Code server host path to mount at /home/mason/.vscode-server. */
+  vscodeServerHostPath?: string;
+  /** Set AGENT_COMMAND_OVERRIDE=bash in agent environment. */
+  bashMode?: boolean;
+  /** Set AGENT_ENTRY_VERBOSE=1 in agent environment. */
+  verbose?: boolean;
 }
 
 /**
@@ -418,18 +460,28 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
     hostGid,
     workspacePath,
     buildWorkspaceProjectPath,
-    buildWorkspaceProjectEntries = [],
+    buildWorkspaceProjectFileEntries = [],
+    buildWorkspaceProjectDirEntries = [],
+    homeOverride,
+    vscodeServerHostPath,
+    bashMode,
+    verbose,
   } = opts;
 
   // Unique compose project name derived from project directory
   const projectHash = crypto.createHash("sha256").update(projectDir).digest("hex").slice(0, 8);
   const composeName = `mason-${projectHash}`;
 
-  // Compute relative paths from session directory
-  const relDockerDir = path.relative(sessionDir, dockerDir);
-  const relProjectDir = path.relative(sessionDir, projectDir);
-  const relLogsDir = path.relative(sessionDir, logsDir);
-  const relSentinel = path.relative(sessionDir, path.join(projectDir, SENTINEL_RELATIVE_PATH));
+  // Compute relative paths from session directory.
+  // Prefix with ./ so Docker Compose treats them as bind mounts (not named volumes).
+  const rel = (to: string) => {
+    const r = path.relative(sessionDir, to);
+    return r.startsWith(".") ? r : `./${r}`;
+  };
+  const relDockerDir = rel(dockerDir);
+  const relProjectDir = rel(projectDir);
+  const relLogsDir = rel(logsDir);
+  const relSentinel = rel(path.join(projectDir, SENTINEL_RELATIVE_PATH));
 
   const proxyServiceName = `proxy-${roleName}`;
   const agentServiceName = `agent-${roleName}`;
@@ -438,6 +490,7 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
   const proxyEnvLines = [
     `      - CHAPTER_PROXY_TOKEN=${proxyToken}`,
     `      - CREDENTIAL_PROXY_TOKEN=${credentialProxyToken}`,
+    `      - PROJECT_DIR=${PROJECT_MOUNT_PATH}`,
   ];
   if (sessionType) {
     proxyEnvLines.push(`      - CHAPTER_SESSION_TYPE=${sessionType}`);
@@ -447,16 +500,21 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
   }
 
   // --- Agent volumes ---
-  const agentVolumeLines = [
-    `      - ${relProjectDir}:${PROJECT_MOUNT_PATH}:ro`,
-  ];
+  const agentVolumeLines: string[] = [];
 
-  // Volume masks: directories first (named volumes), then files (bind mounts)
+  // Home override (user-specified --home path, before other mounts)
+  if (homeOverride) {
+    const relHomeOverride = rel(homeOverride);
+    agentVolumeLines.push(`      - ${relHomeOverride}:/home/mason/`);
+  }
+
+  // Project mount (no :ro — agents need write access)
+  agentVolumeLines.push(`      - ${relProjectDir}:${PROJECT_MOUNT_PATH}`);
+
+  // Volume masks: directories only (named volumes); file masks routed through configs below
   for (const mask of volumeMasks) {
     if (mask.type === "directory") {
       agentVolumeLines.push(`      - ${mask.volumeName}:${mask.containerPath}`);
-    } else {
-      agentVolumeLines.push(`      - ${relSentinel}:${mask.containerPath}:ro`);
     }
   }
 
@@ -470,24 +528,65 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
 
   // Workspace directory mount (live bind mount for agent-launch.json)
   if (workspacePath) {
-    const relWorkspacePath = path.relative(sessionDir, workspacePath);
+    const relWorkspacePath = rel(workspacePath);
     agentVolumeLines.push(`      - ${relWorkspacePath}:/home/mason/workspace`);
   }
 
-  // Build workspace overlay mounts (per-file mounts into /home/mason/workspace/project/)
-  if (buildWorkspaceProjectPath && buildWorkspaceProjectEntries.length > 0) {
-    for (const entry of buildWorkspaceProjectEntries) {
+  // Directory overlay mounts (bind mounts — VirtioFS-safe for directories)
+  if (buildWorkspaceProjectPath && buildWorkspaceProjectDirEntries.length > 0) {
+    for (const entry of buildWorkspaceProjectDirEntries) {
       const hostEntryPath = path.join(buildWorkspaceProjectPath, entry);
-      const relEntryPath = path.relative(sessionDir, hostEntryPath);
+      const relEntryPath = rel(hostEntryPath);
       agentVolumeLines.push(`      - ${relEntryPath}:/home/mason/workspace/project/${entry}`);
     }
   }
 
-  // Home directory mount (materialized host config)
+  // VS Code server persistent mount (dev-container mode)
+  if (vscodeServerHostPath) {
+    const relVscodePath = rel(vscodeServerHostPath);
+    agentVolumeLines.push(`      - ${relVscodePath}:/home/mason/.vscode-server`);
+  }
+
+  // Home directory mount (materialized host config from build dir)
   if (homePath) {
-    const relHomePath = path.relative(sessionDir, homePath);
+    const relHomePath = rel(homePath);
     agentVolumeLines.push(`      - ${relHomePath}:/home/mason`);
   }
+
+  // --- File overlay & mask configs (Docker Compose configs — mounted as tmpfs, VirtioFS-safe) ---
+  const configEntries: Array<{ name: string; relPath: string; target: string }> = [];
+
+  // Overlay file configs (materialized workspace files)
+  if (buildWorkspaceProjectPath && buildWorkspaceProjectFileEntries.length > 0) {
+    for (const entry of buildWorkspaceProjectFileEntries) {
+      configEntries.push({
+        name: sanitizeOverlayConfigName(entry),
+        relPath: rel(path.join(buildWorkspaceProjectPath, entry)),
+        target: `/home/mason/workspace/project/${entry}`,
+      });
+    }
+  }
+
+  // File mask configs (sentinel empty file → container path, VirtioFS-safe)
+  for (const mask of volumeMasks) {
+    if (mask.type === "file") {
+      configEntries.push({
+        name: sanitizeMaskConfigName(mask.hostPath),
+        relPath: relSentinel,
+        target: mask.containerPath,
+      });
+    }
+  }
+
+  const serviceConfigsBlock = configEntries.length > 0
+    ? `    configs:\n${configEntries.map((c) =>
+        `      - source: ${c.name}\n        target: ${c.target}`
+      ).join("\n")}\n`
+    : "";
+
+  const topLevelConfigsSection = configEntries.length > 0
+    ? `\nconfigs:\n${configEntries.map((c) => `  ${c.name}:\n    file: ${c.relPath}`).join("\n")}\n`
+    : "";
 
   // --- Agent environment ---
   const agentEnvLines = [
@@ -496,6 +595,12 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
   ];
   if (credentialKeys && credentialKeys.length > 0) {
     agentEnvLines.push(`      - AGENT_CREDENTIALS=${JSON.stringify(credentialKeys)}`);
+  }
+  if (bashMode) {
+    agentEnvLines.push(`      - AGENT_COMMAND_OVERRIDE=bash`);
+  }
+  if (verbose) {
+    agentEnvLines.push(`      - AGENT_ENTRY_VERBOSE=1`);
   }
 
   // --- Command override ---
@@ -524,7 +629,7 @@ services:
     volumes:
       - ${relProjectDir}:${PROJECT_MOUNT_PATH}:ro
       - ${relLogsDir}:/logs
-      - ${path.relative(sessionDir, path.join(dockerBuildDir, "mcp-proxy", ".cache"))}:/app/.cache
+      - ${rel(path.join(dockerBuildDir, "mcp-proxy", ".cache"))}:/app/.cache
     environment:
 ${proxyEnvLines.join("\n")}
     ports:
@@ -540,7 +645,7 @@ ${proxyEnvLines.join("\n")}
         HOST_GID: "${hostGid ?? "1000"}"
     volumes:
 ${agentVolumeLines.join("\n")}
-    depends_on:
+${serviceConfigsBlock}    depends_on:
       - ${proxyServiceName}
     environment:
 ${agentEnvLines.join("\n")}${commandLine}
@@ -548,7 +653,7 @@ ${agentEnvLines.join("\n")}${commandLine}
     tty: true
     init: true
     restart: "no"
-${volumesSection}`;
+${topLevelConfigsSection}${volumesSection}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -564,7 +669,7 @@ export interface CreateSessionOptions {
   dockerDir: string;
   /** Role definition. */
   role: Role;
-  /** Agent type (e.g., "claude-code"). */
+  /** Agent type (e.g., "claude-code-agent"). */
   agentType: string;
   /** Agent name for proxy CMD. */
   agentName: string;
@@ -582,6 +687,16 @@ export interface CreateSessionOptions {
   hostUid?: string;
   /** Host user GID for container user matching. */
   hostGid?: string;
+  /** Override bind-mount path for /home/mason/ (e.g. --home flag). */
+  homeOverride?: string;
+  /** VS Code server host path to mount at /home/mason/.vscode-server. */
+  vscodeServerHostPath?: string;
+  /** Set AGENT_COMMAND_OVERRIDE=bash in agent environment. */
+  bashMode?: boolean;
+  /** Set AGENT_ENTRY_VERBOSE=1 in agent environment. */
+  verbose?: boolean;
+  /** Pre-determined session ID (overrides random generation, for testing). */
+  sessionId?: string;
 }
 
 export interface SessionResult {
@@ -626,7 +741,7 @@ export function createSessionDirectory(
   const roleName = getAppShortName(role.metadata.name);
 
   // Generate session ID
-  const sessionId = deps.randomBytes(4).toString("hex");
+  const sessionId = opts.sessionId ?? deps.randomBytes(4).toString("hex");
 
   // Create session directory
   const sessionDir = path.join(projectDir, ".mason", "sessions", sessionId);
@@ -661,10 +776,18 @@ export function createSessionDirectory(
   const workspacePath = path.join(opts.dockerBuildDir, opts.agentType, "workspace");
   const buildWorkspaceProjectPath = path.join(opts.dockerBuildDir, opts.agentType, "build", "workspace", "project");
 
-  // Enumerate build workspace project entries (skip in test mode — fsDeps means no real FS)
-  let buildWorkspaceProjectEntries: string[] = [];
+  // Enumerate and classify build workspace project entries (skip in test mode — fsDeps means no real FS)
+  const buildWorkspaceProjectFileEntries: string[] = [];
+  const buildWorkspaceProjectDirEntries: string[] = [];
   if (!fsDeps && fs.existsSync(buildWorkspaceProjectPath)) {
-    buildWorkspaceProjectEntries = fs.readdirSync(buildWorkspaceProjectPath);
+    for (const entry of fs.readdirSync(buildWorkspaceProjectPath)) {
+      const entryPath = path.join(buildWorkspaceProjectPath, entry);
+      if (fs.statSync(entryPath).isDirectory()) {
+        buildWorkspaceProjectDirEntries.push(entry);
+      } else {
+        buildWorkspaceProjectFileEntries.push(entry);
+      }
+    }
   }
 
   // Generate compose file
@@ -679,7 +802,8 @@ export function createSessionDirectory(
     homePath: homeExists ? homePath : undefined,
     workspacePath,
     buildWorkspaceProjectPath,
-    buildWorkspaceProjectEntries,
+    buildWorkspaceProjectFileEntries,
+    buildWorkspaceProjectDirEntries,
   });
 
   const composeFile = path.join(sessionDir, "docker-compose.yaml");

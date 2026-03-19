@@ -7,7 +7,7 @@ function makeMember(overrides: Partial<ResolvedAgent> = {}): ResolvedAgent {
     version: "1.0.0",
     agentName: "Repo Ops",
     slug: "repo-ops",
-    runtimes: ["claude-code"],
+    runtimes: ["claude-code-agent"],
     credentials: [],
     roles: [],
     ...overrides,

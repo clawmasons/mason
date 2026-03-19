@@ -61,7 +61,7 @@ describe("parseChapterField", () => {
       type: "agent",
       name: "Note Taker",
       slug: "note-taker",
-      runtimes: ["claude-code"],
+      runtimes: ["claude-code-agent"],
       roles: ["@clawmasons/role-issue-manager"],
     });
     expect(result.success).toBe(false);

@@ -32,7 +32,7 @@ The auto-created `.mason/config.json` SHALL contain the following content exactl
 {
   "agents": {
     "claude": {
-      "package": "@clawmasons/claude-code"
+      "package": "@clawmasons/claude-code-agent"
     },
     "pi-mono-agent": {
       "package": "@clawmasons/pi-mono-agent"

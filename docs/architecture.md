@@ -158,7 +158,7 @@ The same role definition is translated into runtime-specific configurations via 
 
 | Runtime | Aliases | Generated Artifacts |
 |---------|---------|-------------------|
-| **claude-code** | `claude` | `.claude/` directory, `AGENTS.md`, `settings.json`, slash commands, skill files, Dockerfile |
+| **claude-code-agent** | `claude` | `.claude/` directory, `AGENTS.md`, `settings.json`, slash commands, skill files, Dockerfile |
 | **pi-coding-agent** | `pi` | pi-coding-agent configuration, instruction files, Dockerfile |
 | **mcp-agent** | `mcp` | Minimal config for testing (no LLM required) |
 

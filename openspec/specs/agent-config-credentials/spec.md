@@ -5,12 +5,12 @@
 Each agent entry in `.mason/config.json` SHALL support an optional `credentials` field as an array of environment variable name strings. These credentials are merged with the agent SDK's declared `runtime.credentials` and any role-declared credentials when launching the agent.
 
 #### Scenario: Agent entry with credentials field parsed correctly
-- **WHEN** `.mason/config.json` declares `"claude": { "package": "@clawmasons/claude-code", "credentials": ["MY_API_KEY"] }`
+- **WHEN** `.mason/config.json` declares `"claude": { "package": "@clawmasons/claude-code-agent", "credentials": ["MY_API_KEY"] }`
 - **THEN** the CLI SHALL parse the `credentials` array without error
 - **AND** `credentials` SHALL be accessible as `["MY_API_KEY"]` on the resolved agent config entry
 
 #### Scenario: Agent entry without credentials field defaults to empty
-- **WHEN** `.mason/config.json` declares `"claude": { "package": "@clawmasons/claude-code" }`
+- **WHEN** `.mason/config.json` declares `"claude": { "package": "@clawmasons/claude-code-agent" }`
 - **THEN** `credentials` SHALL be `undefined` (treated as empty) on the resolved config entry
 - **AND** no warning SHALL be emitted
 
@@ -29,7 +29,7 @@ Each agent entry in `.mason/config.json` SHALL support an optional `credentials`
 When an agent is launched, the CLI SHALL merge credentials from three sources in order: agent SDK `runtime.credentials`, agent config `credentials`, and role `governance.credentials` plus app credentials. Duplicate keys SHALL be deduplicated — the first occurrence wins.
 
 #### Scenario: Agent config credential appears in agent-launch.json
-- **WHEN** `.mason/config.json` declares `"claude": { "package": "@clawmasons/claude-code", "credentials": ["EXTRA_TOKEN"] }`
+- **WHEN** `.mason/config.json` declares `"claude": { "package": "@clawmasons/claude-code-agent", "credentials": ["EXTRA_TOKEN"] }`
 - **AND** the role does not declare `EXTRA_TOKEN`
 - **THEN** `agent-launch.json` SHALL include `EXTRA_TOKEN` as an env credential
 

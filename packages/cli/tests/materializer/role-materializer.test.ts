@@ -7,7 +7,7 @@ import {
   getRegisteredAgentTypes,
   MaterializerError,
 } from "../../src/materializer/role-materializer.js";
-import { claudeCodeMaterializer } from "@clawmasons/claude-code";
+import { claudeCodeMaterializer } from "@clawmasons/claude-code-agent";
 import { mcpAgentMaterializer } from "@clawmasons/mcp-agent/agent-package";
 import { piCodingAgentMaterializer } from "@clawmasons/pi-coding-agent";
 
@@ -63,7 +63,7 @@ function makeTestRole(): Role {
     resources: [],
     source: {
       type: "local",
-      agentDialect: "claude-code",
+      agentDialect: "claude-code-agent",
       path: "/projects/cool-app/.claude/roles/create-prd",
     },
   };
@@ -75,8 +75,8 @@ function makeTestRole(): Role {
 
 describe("materializer registry", () => {
   describe("getMaterializer", () => {
-    it("returns claude-code materializer for 'claude-code'", () => {
-      expect(getMaterializer("claude-code")).toBe(claudeCodeMaterializer);
+    it("returns claude-code-agent materializer for 'claude-code-agent'", () => {
+      expect(getMaterializer("claude-code-agent")).toBe(claudeCodeMaterializer);
     });
 
     it("returns pi-coding-agent materializer for 'pi-coding-agent'", () => {
@@ -95,7 +95,7 @@ describe("materializer registry", () => {
   describe("getRegisteredAgentTypes", () => {
     it("includes all three built-in agent types", () => {
       const types = getRegisteredAgentTypes();
-      expect(types).toContain("claude-code");
+      expect(types).toContain("claude-code-agent");
       expect(types).toContain("pi-coding-agent");
       expect(types).toContain("mcp-agent");
     });
@@ -114,7 +114,7 @@ describe("materializeForAgent", () => {
   describe("Claude Code materialization from Role", () => {
     it("produces .mcp.json", () => {
       const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code");
+      const result = materializeForAgent(role, "claude-code-agent");
 
       expect(result.has(".mcp.json")).toBe(true);
       const mcp = JSON.parse(result.get(".mcp.json")!);
@@ -124,7 +124,7 @@ describe("materializeForAgent", () => {
 
     it("produces .claude/settings.json with permissions", () => {
       const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code");
+      const result = materializeForAgent(role, "claude-code-agent");
 
       expect(result.has(".claude/settings.json")).toBe(true);
       const settings = JSON.parse(result.get(".claude/settings.json")!);
@@ -133,7 +133,7 @@ describe("materializeForAgent", () => {
 
     it("produces .claude/commands/ for each task", () => {
       const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code");
+      const result = materializeForAgent(role, "claude-code-agent");
 
       expect(result.has(".claude/commands/define-change.md")).toBe(true);
       expect(result.has(".claude/commands/review-change.md")).toBe(true);
@@ -141,7 +141,7 @@ describe("materializeForAgent", () => {
 
     it("produces AGENTS.md", () => {
       const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code");
+      const result = materializeForAgent(role, "claude-code-agent");
 
       expect(result.has("AGENTS.md")).toBe(true);
       const agentsMd = result.get("AGENTS.md")!;
@@ -150,14 +150,14 @@ describe("materializeForAgent", () => {
 
     it("produces .claude/skills/ directory for skills", () => {
       const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code");
+      const result = materializeForAgent(role, "claude-code-agent");
 
       expect(result.has(".claude/skills/prd-writing/SKILL.md")).toBe(true);
     });
 
     it("uses default proxy endpoint when none provided", () => {
       const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code");
+      const result = materializeForAgent(role, "claude-code-agent");
 
       const mcp = JSON.parse(result.get(".mcp.json")!);
       expect(mcp.mcpServers.chapter.url).toContain("http://mcp-proxy:9090");
@@ -165,7 +165,7 @@ describe("materializeForAgent", () => {
 
     it("uses custom proxy endpoint when provided", () => {
       const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code", "http://custom-proxy:8080");
+      const result = materializeForAgent(role, "claude-code-agent", "http://custom-proxy:8080");
 
       const mcp = JSON.parse(result.get(".mcp.json")!);
       expect(mcp.mcpServers.chapter.url).toContain("http://custom-proxy:8080");
@@ -174,7 +174,7 @@ describe("materializeForAgent", () => {
     it("includes proxy token when provided", () => {
       const role = makeTestRole();
       const token = "test-token-123";
-      const result = materializeForAgent(role, "claude-code", undefined, token);
+      const result = materializeForAgent(role, "claude-code-agent", undefined, token);
 
       const mcp = JSON.parse(result.get(".mcp.json")!);
       expect(mcp.mcpServers.chapter.headers.Authorization).toBe("Bearer test-token-123");
@@ -182,7 +182,7 @@ describe("materializeForAgent", () => {
 
     it("supports ACP mode (uses ACP command in agent-launch.json, no .chapter/acp.json)", () => {
       const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code", undefined, undefined, { acpMode: true });
+      const result = materializeForAgent(role, "claude-code-agent", undefined, undefined, { acpMode: true });
 
       expect(result.has(".chapter/acp.json")).toBe(false);
       const launchConfig = JSON.parse(result.get("agent-launch.json")!);
@@ -191,7 +191,7 @@ describe("materializeForAgent", () => {
 
     it("includes agent-config credentials in agent-launch.json", () => {
       const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code", undefined, undefined, {
+      const result = materializeForAgent(role, "claude-code-agent", undefined, undefined, {
         agentConfigCredentials: ["MY_PROJECT_KEY"],
       });
 
@@ -204,7 +204,7 @@ describe("materializeForAgent", () => {
     it("deduplicates agent-config credentials already declared in role governance", () => {
       const role = makeTestRole();
       role.governance.credentials = ["SHARED_KEY"];
-      const result = materializeForAgent(role, "claude-code", undefined, undefined, {
+      const result = materializeForAgent(role, "claude-code-agent", undefined, undefined, {
         agentConfigCredentials: ["SHARED_KEY"],
       });
 
@@ -215,7 +215,7 @@ describe("materializeForAgent", () => {
 
     it("deduplicates agent-config credentials already declared in SDK runtime.credentials", () => {
       const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code", undefined, undefined, {
+      const result = materializeForAgent(role, "claude-code-agent", undefined, undefined, {
         agentConfigCredentials: ["CLAUDE_CODE_OAUTH_TOKEN"],
       });
 
@@ -227,16 +227,16 @@ describe("materializeForAgent", () => {
 
   describe("Cross-agent materialization (Claude role -> Codex output)", () => {
     it("produces Codex materializer output for a Claude-dialect role", () => {
-      // The role was authored in .claude/ (claude-code dialect) but we
+      // The role was authored in .claude/ (claude-code-agent dialect) but we
       // materialize it for pi-coding-agent (which has a dialect-agnostic
       // materializer). This proves cross-agent materialization works.
       const role = makeTestRole();
-      // Use claude-code as target since it's a registered dialect.
+      // Use claude-code-agent as target since it's a registered dialect.
       // Cross-agent means the role's source dialect differs from the target.
-      // Change the source dialect to codex to prove it still materializes for claude-code.
+      // Change the source dialect to codex to prove it still materializes for claude-code-agent.
       role.source.agentDialect = "codex";
 
-      const result = materializeForAgent(role, "claude-code");
+      const result = materializeForAgent(role, "claude-code-agent");
 
       // Claude Code materializer output
       expect(result.has(".mcp.json")).toBe(true);
@@ -246,10 +246,10 @@ describe("materializeForAgent", () => {
 
     it("AGENTS.md reflects the role data regardless of source dialect", () => {
       const role = makeTestRole();
-      // Source dialect is codex, but we materialize for claude-code
+      // Source dialect is codex, but we materialize for claude-code-agent
       role.source.agentDialect = "codex";
 
-      const result = materializeForAgent(role, "claude-code");
+      const result = materializeForAgent(role, "claude-code-agent");
 
       const agentsMd = result.get("AGENTS.md")!;
       expect(agentsMd).toContain("create-prd");
@@ -259,10 +259,10 @@ describe("materializeForAgent", () => {
     it("same role produces different output for different agent types", () => {
       const role = makeTestRole();
 
-      const claudeResult = materializeForAgent(role, "claude-code");
+      const claudeResult = materializeForAgent(role, "claude-code-agent");
       // Codex is a registered dialect but has no dedicated materializer yet,
-      // so we compare claude-code vs aider (if materializer existed).
-      // For now, just verify claude-code produces the expected files.
+      // so we compare claude-code-agent vs aider (if materializer existed).
+      // For now, just verify claude-code-agent produces the expected files.
       expect(claudeResult.has(".claude/settings.json")).toBe(true);
       expect(claudeResult.has(".claude/commands/define-change.md")).toBe(true);
     });
@@ -274,10 +274,10 @@ describe("materializeForAgent", () => {
       const proxyEndpoint = "http://mcp-proxy:9090";
 
       // New path: materializeForAgent
-      const newResult = materializeForAgent(role, "claude-code", proxyEndpoint);
+      const newResult = materializeForAgent(role, "claude-code-agent", proxyEndpoint);
 
       // Old path: manually adapt + materialize
-      const resolvedAgent = adaptRoleToResolvedAgent(role, "claude-code");
+      const resolvedAgent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       const oldResult = claudeCodeMaterializer.materializeWorkspace(
         resolvedAgent,
         proxyEndpoint,
@@ -315,7 +315,7 @@ describe("materializeForAgent", () => {
         expect.unreachable("should have thrown");
       } catch (err) {
         const msg = (err as Error).message;
-        expect(msg).toContain("claude-code");
+        expect(msg).toContain("claude-code-agent");
         expect(msg).toContain("mcp-agent");
         expect(msg).toContain("pi-coding-agent");
       }
@@ -347,12 +347,12 @@ describe("materializeForAgent", () => {
         resources: [],
         source: {
           type: "local",
-          agentDialect: "claude-code",
+          agentDialect: "claude-code-agent",
           path: "/tmp/minimal",
         },
       };
 
-      const result = materializeForAgent(minimalRole, "claude-code");
+      const result = materializeForAgent(minimalRole, "claude-code-agent");
 
       expect(result.has(".mcp.json")).toBe(true);
       expect(result.has(".claude/settings.json")).toBe(true);

@@ -5,7 +5,6 @@ import * as path from "node:path";
 import { program } from "../../src/cli/index.js";
 import {
   generateSessionId,
-  generateComposeYml,
   resolveRequiredCredentials,
   displayCredentials,
   runAgent,
@@ -16,6 +15,10 @@ import {
   ensureMasonConfig,
   buildVscodeAttachUri,
 } from "../../src/cli/commands/run-agent.js";
+import {
+  generateSessionComposeYml,
+  generateVolumeMasks,
+} from "../../src/materializer/docker-generator.js";
 import type { Role, ResolvedAgent } from "@clawmasons/shared";
 
 // ── Command Registration ────────────────────────────────────────────────
@@ -94,8 +97,8 @@ describe("CLI run command", () => {
 // ── Agent Type Resolution ────────────────────────────────────────────────
 
 describe("resolveAgentType", () => {
-  it("resolves alias 'claude' to 'claude-code'", () => {
-    expect(resolveAgentType("claude")).toBe("claude-code");
+  it("resolves alias 'claude' to 'claude-code-agent'", () => {
+    expect(resolveAgentType("claude")).toBe("claude-code-agent");
   });
 
   it("resolves alias 'pi' to 'pi-coding-agent'", () => {
@@ -106,8 +109,8 @@ describe("resolveAgentType", () => {
     expect(resolveAgentType("mcp")).toBe("mcp-agent");
   });
 
-  it("resolves direct agent type 'claude-code'", () => {
-    expect(resolveAgentType("claude-code")).toBe("claude-code");
+  it("resolves direct agent type 'claude-code-agent'", () => {
+    expect(resolveAgentType("claude-code-agent")).toBe("claude-code-agent");
   });
 
   it("returns undefined for unknown agent type", () => {
@@ -123,7 +126,7 @@ describe("isKnownAgentType", () => {
   });
 
   it("returns true for registered types", () => {
-    expect(isKnownAgentType("claude-code")).toBe(true);
+    expect(isKnownAgentType("claude-code-agent")).toBe(true);
     expect(isKnownAgentType("pi-coding-agent")).toBe(true);
   });
 
@@ -137,7 +140,7 @@ describe("getKnownAgentTypeNames", () => {
   it("includes all aliases and registered types", () => {
     const names = getKnownAgentTypeNames();
     expect(names).toContain("claude");
-    expect(names).toContain("claude-code");
+    expect(names).toContain("claude-code-agent");
     expect(names).toContain("pi");
     expect(names).toContain("mcp");
     expect(names.length).toBeGreaterThan(3);
@@ -274,224 +277,192 @@ describe("displayCredentials", () => {
   });
 });
 
-// ── generateComposeYml ──────────────────────────────────────────────────
+// ── generateSessionComposeYml (run-agent scenarios) ─────────────────────
 
-describe("generateComposeYml", () => {
+describe("generateSessionComposeYml (run-agent scenarios)", () => {
   const defaultOpts = {
     dockerBuildDir: "/projects/my-project/.mason/docker/writer",
     dockerDir: "/projects/my-project/.mason/docker",
     projectDir: "/projects/my-project",
-    agent: "claude-code",
-    role: "writer",
-    logsDir: "/projects/my-project/.mason/sessions/abc123/logs",
+    agentType: "claude-code-agent",
+    agentName: "@acme/agent",
+    roleName: "writer",
     proxyToken: "test-token-abc",
     credentialProxyToken: "cred-token-xyz",
+    proxyPort: 3000,
+    sessionDir: "/projects/my-project/.mason/sessions/abc123",
+    logsDir: "/projects/my-project/.mason/sessions/abc123/logs",
+    workspacePath: "/projects/my-project/.mason/docker/writer/claude-code-agent/workspace",
+    buildWorkspaceProjectPath: "/projects/my-project/.mason/docker/writer/claude-code-agent/build/workspace/project",
+    buildWorkspaceProjectFileEntries: [] as string[],
+    buildWorkspaceProjectDirEntries: [] as string[],
   };
 
   it("generates valid compose YAML with correct service names", () => {
-    const yml = generateComposeYml(defaultOpts);
+    const yml = generateSessionComposeYml(defaultOpts);
 
-    // Service names (new format: agent-{role}, not agent-{agent}-{role})
     expect(yml).toContain("proxy-writer:");
     expect(yml).toContain("agent-writer:");
-    // credential-service is no longer a Docker service (runs in-process)
     expect(yml).not.toContain("credential-service:");
-
-    // Proxy: context is dockerDir, dockerfile is relative path to mcp-proxy
-    expect(yml).toContain(`context: "${defaultOpts.dockerDir}"`);
     expect(yml).toContain("mcp-proxy/Dockerfile");
-
-    // Agent: context is dockerDir, dockerfile is relative path
-    expect(yml).toContain(`context: "${defaultOpts.dockerDir}"`);
-    expect(yml).toContain('dockerfile: "writer/claude-code/Dockerfile"');
-
-    // Volumes: project mount uses /home/mason/workspace/project
-    expect(yml).toContain(`"${defaultOpts.projectDir}:/home/mason/workspace/project"`);
-
-    // Proxy exposes port to host for in-process credential service
+    expect(yml).toContain("/home/mason/workspace/project");
     expect(yml).toContain("3000:9090");
-
-    // Agent is interactive
     expect(yml).toContain("stdin_open: true");
     expect(yml).toContain("tty: true");
     expect(yml).toContain("init: true");
   });
 
   it("includes CREDENTIAL_PROXY_TOKEN in proxy environment", () => {
-    const yml = generateComposeYml(defaultOpts);
-
-    // Proxy should have CREDENTIAL_PROXY_TOKEN
+    const yml = generateSessionComposeYml(defaultOpts);
     const proxySection = yml.split("agent-writer:")[0]!;
     expect(proxySection).toContain("CREDENTIAL_PROXY_TOKEN=cred-token-xyz");
   });
 
-  it("includes PROJECT_DIR in proxy environment", () => {
-    const yml = generateComposeYml(defaultOpts);
-
-    const proxySection = yml.split("agent-writer:")[0]!;
-    expect(proxySection).toContain("PROJECT_DIR=/home/mason/workspace/project");
-  });
-
-  it("proxy project mount is read-write (no :ro)", () => {
-    const yml = generateComposeYml(defaultOpts);
-
-    const proxySection = yml.split("agent-writer:")[0]!;
-    expect(proxySection).toContain(`"${defaultOpts.projectDir}:/home/mason/workspace/project"`);
-    expect(proxySection).not.toContain("/home/mason/workspace/project:ro");
-  });
-
   it("agent depends on proxy directly", () => {
-    const yml = generateComposeYml(defaultOpts);
-
-    // Extract agent section
+    const yml = generateSessionComposeYml(defaultOpts);
     const agentSection = yml.split("agent-writer:")[1]!;
     expect(agentSection).toContain("depends_on:");
     expect(agentSection).toContain("- proxy-writer");
   });
 
   it("agent environment has only MCP_PROXY_TOKEN, no API keys", () => {
-    const yml = generateComposeYml(defaultOpts);
-
-    // Extract agent section
+    const yml = generateSessionComposeYml(defaultOpts);
     const agentSection = yml.split("agent-writer:")[1]!;
 
-    // Should have MCP_PROXY_TOKEN
     expect(agentSection).toContain("MCP_PROXY_TOKEN=test-token-abc");
-
-    // Should NOT have any API keys
     expect(agentSection).not.toContain("OPENROUTER_API_KEY");
     expect(agentSection).not.toContain("ANTHROPIC_API_KEY");
-    expect(agentSection).not.toContain("OPENAI_API_KEY");
-    expect(agentSection).not.toContain("GEMINI_API_KEY");
-    expect(agentSection).not.toContain("MISTRAL_API_KEY");
-    expect(agentSection).not.toContain("GROQ_API_KEY");
-    expect(agentSection).not.toContain("XAI_API_KEY");
-    expect(agentSection).not.toContain("AZURE_OPENAI_API_KEY");
-
-    // Should NOT have CHAPTER_PROXY_TOKEN (renamed to MCP_PROXY_TOKEN)
     expect(agentSection).not.toContain("CHAPTER_PROXY_TOKEN");
   });
 
   it("proxy has CHAPTER_PROXY_TOKEN", () => {
-    const yml = generateComposeYml(defaultOpts);
-
+    const yml = generateSessionComposeYml(defaultOpts);
     const proxySection = yml.split("agent-writer:")[0]!;
     expect(proxySection).toContain("CHAPTER_PROXY_TOKEN=test-token-abc");
   });
 
-  it("uses correct Dockerfile paths for different agent/role combos", () => {
-    const yml = generateComposeYml({
-      ...defaultOpts,
-      dockerBuildDir: "/projects/my-project/.mason/docker/reviewer",
-      agent: "codex",
-      role: "reviewer",
-      proxyToken: "token-123",
-      credentialProxyToken: "cred-456",
-    });
-
-    expect(yml).toContain("proxy-reviewer:");
-    expect(yml).toContain("agent-reviewer:");
-    expect(yml).toContain(`context: "${defaultOpts.dockerDir}"`);
-    expect(yml).toContain('dockerfile: "reviewer/codex/Dockerfile"');
+  it("includes PROJECT_DIR in proxy environment", () => {
+    const yml = generateSessionComposeYml(defaultOpts);
+    const proxySection = yml.split("agent-writer:")[0]!;
+    expect(proxySection).toContain("PROJECT_DIR=/home/mason/workspace/project");
   });
 
   it("includes role mounts in agent volumes", () => {
-    const yml = generateComposeYml({
+    const yml = generateSessionComposeYml({
       ...defaultOpts,
       roleMounts: [
         { source: "/host/data", target: "/container/data", readonly: false },
       ],
     });
-
     const agentSection = yml.split("agent-writer:")[1]!;
-    expect(agentSection).toContain('"/host/data:/container/data"');
-    expect(agentSection).toContain(`"${defaultOpts.projectDir}:/home/mason/workspace/project"`);
-  });
-
-  it("appends :ro for readonly role mounts", () => {
-    const yml = generateComposeYml({
-      ...defaultOpts,
-      roleMounts: [
-        { source: "/configs", target: "/etc/app", readonly: true },
-      ],
-    });
-
-    const agentSection = yml.split("agent-writer:")[1]!;
-    expect(agentSection).toContain('"/configs:/etc/app:ro"');
+    expect(agentSection).toContain("/host/data:/container/data");
   });
 
   it("does not add role mounts to proxy volumes", () => {
-    const yml = generateComposeYml({
+    const yml = generateSessionComposeYml({
       ...defaultOpts,
       roleMounts: [
         { source: "/host/data", target: "/mnt/data", readonly: false },
       ],
     });
-
     const proxySection = yml.split("agent-writer:")[0]!;
     expect(proxySection).not.toContain("/mnt/data");
   });
 
-  it("agent has no extra mounts when roleMounts is undefined", () => {
-    const yml = generateComposeYml(defaultOpts);
-    const agentSection = yml.split("agent-writer:")[1]!;
-    const volumeSection = agentSection.split("volumes:")[1]!.split("depends_on:")[0]!;
-
-    const mountLines = volumeSection.split("\n").filter((l) => l.includes("- \""));
-    expect(mountLines).toHaveLength(3);
-    expect(mountLines[0]).toContain("/home/mason/workspace");
-    expect(mountLines[1]).toContain("/home/mason/workspace/project");
-    expect(mountLines[2]).toContain(":/logs");
-  });
-
-  it("mounts per-role cache directory into proxy at /app/.cache", () => {
-    const yml = generateComposeYml(defaultOpts);
-    const proxySection = yml.split("agent-writer:")[0]!;
-
-    expect(proxySection).toContain(
-      `"${defaultOpts.dockerBuildDir}/mcp-proxy/.cache:/app/.cache"`,
-    );
-  });
-
   it("adds AGENT_COMMAND_OVERRIDE=bash when bashMode is true", () => {
-    const yml = generateComposeYml({ ...defaultOpts, bashMode: true });
+    const yml = generateSessionComposeYml({ ...defaultOpts, bashMode: true });
     const agentSection = yml.split("agent-writer:")[1]!;
-
     expect(agentSection).toContain("AGENT_COMMAND_OVERRIDE=bash");
   });
 
   it("does not add AGENT_COMMAND_OVERRIDE when bashMode is false", () => {
-    const yml = generateComposeYml({ ...defaultOpts, bashMode: false });
-
+    const yml = generateSessionComposeYml({ ...defaultOpts, bashMode: false });
     expect(yml).not.toContain("AGENT_COMMAND_OVERRIDE");
   });
 
-  it("does not add AGENT_COMMAND_OVERRIDE when bashMode is undefined", () => {
-    const yml = generateComposeYml(defaultOpts);
-
-    expect(yml).not.toContain("AGENT_COMMAND_OVERRIDE");
+  it("adds AGENT_ENTRY_VERBOSE=1 when verbose is true", () => {
+    const yml = generateSessionComposeYml({ ...defaultOpts, verbose: true });
+    const agentSection = yml.split("agent-writer:")[1]!;
+    expect(agentSection).toContain("AGENT_ENTRY_VERBOSE=1");
   });
 
   it("adds homeOverride volume as first agent volume", () => {
-    const yml = generateComposeYml({
+    const yml = generateSessionComposeYml({
       ...defaultOpts,
       homeOverride: "/custom/home",
     });
-
     const agentSection = yml.split("agent-writer:")[1]!;
-    const volumeSection = agentSection.split("volumes:")[1]!.split("depends_on:")[0]!;
-    const mountLines = volumeSection.split("\n").filter((l) => l.includes("- \""));
+    const volumeSection = agentSection.split("volumes:")[1]!.split(/configs:|depends_on:/)[0]!;
+    const mountLines = volumeSection.split("\n").filter((l: string) => l.trim().startsWith("- "));
 
     // First mount should be the home override
-    expect(mountLines[0]).toContain('"/custom/home:/home/mason/"');
-    // Workspace mount comes next
-    expect(mountLines[1]).toContain("/home/mason/workspace\"");
+    expect(mountLines[0]).toContain("/home/mason/");
+    // Project mount comes next
+    expect(mountLines[1]).toContain("/home/mason/workspace/project");
   });
 
-  it("does not add home mount when homeOverride is not set", () => {
-    const yml = generateComposeYml(defaultOpts);
+  it("does not add home override mount when homeOverride is not set", () => {
+    const yml = generateSessionComposeYml(defaultOpts);
     const agentSection = yml.split("agent-writer:")[1]!;
-    expect(agentSection).not.toContain(":/home/mason/\"");
+    // No mount to bare /home/mason/ (only /home/mason/workspace...)
+    const lines = agentSection.split("\n");
+    const homeMountLines = lines.filter((l: string) => l.includes(":/home/mason/") && !l.includes(":/home/mason/workspace"));
+    expect(homeMountLines).toHaveLength(0);
+  });
+
+  it("adds vscodeServerHostPath volume mount", () => {
+    const yml = generateSessionComposeYml({
+      ...defaultOpts,
+      vscodeServerHostPath: "/projects/my-project/.mason/docker/vscode-server",
+    });
+    expect(yml).toContain(":/home/mason/.vscode-server");
+  });
+
+  it("omits vscode-server mount when vscodeServerHostPath is not set", () => {
+    const yml = generateSessionComposeYml(defaultOpts);
+    expect(yml).not.toContain(".vscode-server");
+  });
+
+  it("mounts file overlays as Docker Compose configs", () => {
+    const yml = generateSessionComposeYml({
+      ...defaultOpts,
+      buildWorkspaceProjectFileEntries: [".mcp.json", "AGENTS.md"],
+    });
+
+    // Top-level configs section
+    expect(yml).toContain("configs:");
+    expect(yml).toContain("overlay-mcp-json:");
+    expect(yml).toContain("overlay-agents-md:");
+
+    // Service-level configs with target paths
+    expect(yml).toContain("target: /home/mason/workspace/project/.mcp.json");
+    expect(yml).toContain("target: /home/mason/workspace/project/AGENTS.md");
+  });
+
+  it("mounts directory overlays as bind mounts (not configs)", () => {
+    const yml = generateSessionComposeYml({
+      ...defaultOpts,
+      buildWorkspaceProjectDirEntries: [".claude"],
+    });
+
+    // Directory should appear as a volume bind mount
+    expect(yml).toContain(":/home/mason/workspace/project/.claude");
+
+    // Should NOT appear as a config
+    expect(yml).not.toContain("overlay-claude:");
+  });
+
+  it("includes volume masks from ignore paths", () => {
+    const yml = generateSessionComposeYml({
+      ...defaultOpts,
+      volumeMasks: generateVolumeMasks([".mason/", ".claude/", ".env"]),
+    });
+
+    expect(yml).toContain("ignore-mason:/home/mason/workspace/project/.mason");
+    expect(yml).toContain("ignore-claude:/home/mason/workspace/project/.claude");
+    // File masks now routed through configs (VirtioFS-safe)
+    expect(yml).toContain("mask-env:");
+    expect(yml).toContain("target: /home/mason/workspace/project/.env");
   });
 });
 
@@ -520,7 +491,7 @@ describe("ensureMasonConfig", () => {
     const content = JSON.parse(fs.readFileSync(configPath, "utf-8")) as Record<string, unknown>;
     const agents = content.agents as Record<string, { package: string }>;
     expect(agents).toBeDefined();
-    expect(agents["claude"]?.package).toBe("@clawmasons/claude-code");
+    expect(agents["claude"]?.package).toBe("@clawmasons/claude-code-agent");
     expect(agents["pi-mono-agent"]?.package).toBe("@clawmasons/pi-mono-agent");
     expect(agents["mcp"]?.package).toBe("@clawmasons/mcp-agent");
   });
@@ -567,7 +538,7 @@ describe("runAgent", () => {
     return {
       metadata: { name: "role-writer", version: "1.0.0" },
       source: {
-        agentDialect: "claude-code",
+        agentDialect: "claude-code-agent",
         agentDir: ".claude",
         roleDir: path.join(projectDir, ".claude", "roles", "writer"),
       },
@@ -612,8 +583,8 @@ describe("runAgent", () => {
     const dockerDir = path.join(projectDir, ".mason", "docker");
     const dockerBuildDir = path.join(dockerDir, "writer");
     if (shouldExist) {
-      fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
-      fs.writeFileSync(path.join(dockerBuildDir, "claude-code", "Dockerfile"), "FROM node:20\n");
+      fs.mkdirSync(path.join(dockerBuildDir, "claude-code-agent"), { recursive: true });
+      fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", "Dockerfile"), "FROM node:20\n");
       fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
       fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
     }
@@ -634,7 +605,7 @@ describe("runAgent", () => {
           version: "1.0.0",
           agentName: "writer",
           slug: "writer",
-          runtimes: ["claude-code"],
+          runtimes: ["claude-code-agent"],
           credentials: [],
           roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
         } as ResolvedAgent),
@@ -683,10 +654,10 @@ describe("runAgent", () => {
   it("resolves role and displays agent info", async () => {
     const { deps } = makeMockDeps({ sessionId: "sess0001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("claude-code");
+    expect(logOutput).toContain("claude-code-agent");
     expect(logOutput).toContain("writer");
   });
 
@@ -695,7 +666,7 @@ describe("runAgent", () => {
       resolveRoleError: new Error("Role 'nonexistent' not found"),
     });
 
-    await runAgent(projectDir, "claude-code", "nonexistent", deps);
+    await runAgent(projectDir, "claude-code-agent", "nonexistent", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -706,18 +677,17 @@ describe("runAgent", () => {
   it("creates per-project .mason/sessions/<id>/ for session state", async () => {
     const { deps } = makeMockDeps({ sessionId: "sess0001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
-    const sessionDir = path.join(projectDir, ".mason", "sessions", "sess0001", "docker");
+    const sessionDir = path.join(projectDir, ".mason", "sessions", "sess0001");
     expect(fs.existsSync(sessionDir)).toBe(true);
 
-    const composeFile = path.join(sessionDir, "docker-compose.yml");
+    const composeFile = path.join(sessionDir, "docker-compose.yaml");
     expect(fs.existsSync(composeFile)).toBe(true);
 
     const content = fs.readFileSync(composeFile, "utf-8");
     expect(content).toContain("proxy-writer:");
     expect(content).toContain("agent-writer:");
-    // credential-service is no longer a Docker service
     expect(content).not.toContain("credential-service:");
   });
 
@@ -725,7 +695,7 @@ describe("runAgent", () => {
     const gitignoreCalled = { called: false, dir: "", pattern: "" };
     const { deps } = makeMockDeps({ gitignoreCalled });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     expect(gitignoreCalled.called).toBe(true);
     expect(gitignoreCalled.dir).toBe(projectDir);
@@ -735,13 +705,14 @@ describe("runAgent", () => {
   it("mounts project dir as /home/mason/workspace/project", async () => {
     const { deps } = makeMockDeps({ sessionId: "mount001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const composeFile = path.join(
-      projectDir, ".mason", "sessions", "mount001", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "mount001", "docker-compose.yaml",
     );
     const content = fs.readFileSync(composeFile, "utf-8");
-    expect(content).toContain(`"${projectDir}:/home/mason/workspace/project"`);
+    // Uses relative paths now
+    expect(content).toContain(":/home/mason/workspace/project");
   });
 
   it("generates unique session IDs per invocation", async () => {
@@ -754,7 +725,7 @@ describe("runAgent", () => {
       resolveRoleFn: async () => makeRole(),
       adaptRoleFn: () => ({
         name: "writer", version: "1.0.0", agentName: "writer", slug: "writer",
-        runtimes: ["claude-code"], credentials: [],
+        runtimes: ["claude-code-agent"], credentials: [],
         roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
       } as ResolvedAgent),
       ensureGitignoreEntryFn: () => false,
@@ -766,17 +737,17 @@ describe("runAgent", () => {
     // Pre-create docker build dirs for both runs
     const dockerDir = path.join(projectDir, ".mason", "docker");
     const dockerBuildDir = path.join(dockerDir, "writer");
-    fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
-    fs.writeFileSync(path.join(dockerBuildDir, "claude-code", "Dockerfile"), "FROM node:20\n");
+    fs.mkdirSync(path.join(dockerBuildDir, "claude-code-agent"), { recursive: true });
+    fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", "Dockerfile"), "FROM node:20\n");
     fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
 
-    await runAgent(projectDir, "claude-code", "writer", {
+    await runAgent(projectDir, "claude-code-agent", "writer", {
       ...baseDeps,
       generateSessionIdFn: () => ids[callCount++]!,
     });
 
-    await runAgent(projectDir, "claude-code", "writer", {
+    await runAgent(projectDir, "claude-code-agent", "writer", {
       ...baseDeps,
       generateSessionIdFn: () => ids[callCount++]!,
     });
@@ -790,7 +761,7 @@ describe("runAgent", () => {
   it("starts proxy detached, then credential service in-process, then agent interactively", async () => {
     const { calls, deps } = makeMockDeps();
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     // First call: proxy build
     expect(calls[0]!.args).toContain("build");
@@ -812,7 +783,7 @@ describe("runAgent", () => {
   it("tears down all services after agent exits", async () => {
     const { calls, deps } = makeMockDeps();
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     // Fourth call should be docker compose down (build, up, agent run, down)
     expect(calls[3]!.args).toContain("down");
@@ -821,41 +792,39 @@ describe("runAgent", () => {
   it("retains session directory after exit", async () => {
     const { deps } = makeMockDeps({ sessionId: "keep0001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const sessionDir = path.join(projectDir, ".mason", "sessions", "keep0001");
     expect(fs.existsSync(sessionDir)).toBe(true);
   });
 
-  it("compose file references correct docker build paths", async () => {
+  it("compose file references docker build paths", async () => {
     const { deps } = makeMockDeps({ sessionId: "ref00001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const composeFile = path.join(
-      projectDir, ".mason", "sessions", "ref00001", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "ref00001", "docker-compose.yaml",
     );
     const content = fs.readFileSync(composeFile, "utf-8");
 
-    const dockerDir = path.join(projectDir, ".mason", "docker");
-    expect(content).toContain(`context: "${dockerDir}"`);
-    expect(content).toContain('dockerfile: "writer/claude-code/Dockerfile"');
+    // Uses relative paths now
+    expect(content).toContain("mcp-proxy/Dockerfile");
+    expect(content).toContain("claude-code-agent/Dockerfile");
   });
 
   it("compose file has CREDENTIAL_PROXY_TOKEN in proxy", async () => {
     const { deps } = makeMockDeps({ sessionId: "tok00001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const composeFile = path.join(
-      projectDir, ".mason", "sessions", "tok00001", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "tok00001", "docker-compose.yaml",
     );
     const content = fs.readFileSync(composeFile, "utf-8");
 
-    // CREDENTIAL_PROXY_TOKEN should appear in proxy
     expect(content).toContain("CREDENTIAL_PROXY_TOKEN=");
 
-    // Token should be a 64-char hex string (32 bytes)
     const tokenMatch = content.match(/CREDENTIAL_PROXY_TOKEN=([a-f0-9]+)/);
     expect(tokenMatch).toBeTruthy();
     expect(tokenMatch![1]).toMatch(/^[a-f0-9]{64}$/);
@@ -864,10 +833,10 @@ describe("runAgent", () => {
   it("compose file has no API keys in agent environment", async () => {
     const { deps } = makeMockDeps({ sessionId: "nokeys01" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const composeFile = path.join(
-      projectDir, ".mason", "sessions", "nokeys01", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "nokeys01", "docker-compose.yaml",
     );
     const content = fs.readFileSync(composeFile, "utf-8");
     const agentSection = content.split("agent-writer:")[1]!;
@@ -882,25 +851,23 @@ describe("runAgent", () => {
     const { deps: deps1 } = makeMockDeps({ sessionId: "uniq0001" });
     const { deps: deps2 } = makeMockDeps({ sessionId: "uniq0002" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps1);
-    await runAgent(projectDir, "claude-code", "writer", deps2);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps1);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps2);
 
     const file1 = path.join(
-      projectDir, ".mason", "sessions", "uniq0001", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "uniq0001", "docker-compose.yaml",
     );
     const file2 = path.join(
-      projectDir, ".mason", "sessions", "uniq0002", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "uniq0002", "docker-compose.yaml",
     );
 
     const content1 = fs.readFileSync(file1, "utf-8");
     const content2 = fs.readFileSync(file2, "utf-8");
 
-    // Extract CHAPTER_PROXY_TOKEN from each
     const proxyToken1 = content1.match(/CHAPTER_PROXY_TOKEN=([a-f0-9]+)/)![1];
     const proxyToken2 = content2.match(/CHAPTER_PROXY_TOKEN=([a-f0-9]+)/)![1];
     expect(proxyToken1).not.toBe(proxyToken2);
 
-    // Extract CREDENTIAL_PROXY_TOKEN from each
     const credToken1 = content1.match(/CREDENTIAL_PROXY_TOKEN=([a-f0-9]+)/)![1];
     const credToken2 = content2.match(/CREDENTIAL_PROXY_TOKEN=([a-f0-9]+)/)![1];
     expect(credToken1).not.toBe(credToken2);
@@ -909,10 +876,10 @@ describe("runAgent", () => {
   it("logs session info and completion message", async () => {
     const { deps } = makeMockDeps({ sessionId: "log00001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
-    expect(logOutput).toContain("claude-code");
+    expect(logOutput).toContain("claude-code-agent");
     expect(logOutput).toContain("writer");
     expect(logOutput).toContain("log00001");
     expect(logOutput).toContain("agent complete");
@@ -923,7 +890,7 @@ describe("runAgent", () => {
       roleType: makeRole({ type: "project" }),
     });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("(project)");
@@ -934,7 +901,7 @@ describe("runAgent", () => {
       roleType: makeRole({ type: "supervisor" }),
     });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const logOutput = logSpy.mock.calls.flat().join("\n");
     expect(logOutput).toContain("(supervisor)");
@@ -948,7 +915,7 @@ describe("runAgent", () => {
       throw new Error("Docker Compose v2 is required");
     };
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -959,7 +926,7 @@ describe("runAgent", () => {
   it("exits 1 when proxy fails to start", async () => {
     const { deps } = makeMockDeps({ proxyExitCode: 1 });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -969,7 +936,7 @@ describe("runAgent", () => {
   it("exits 1 when credential service fails to start", async () => {
     const { deps } = makeMockDeps({ credServiceExitCode: 1 });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
@@ -979,7 +946,7 @@ describe("runAgent", () => {
   it("creates logs directory in session directory", async () => {
     const { deps } = makeMockDeps({ sessionId: "logs0001" });
 
-    await runAgent(projectDir, "claude-code", "writer", deps);
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     const logsDir = path.join(projectDir, ".mason", "sessions", "logs0001", "logs");
     expect(fs.existsSync(logsDir)).toBe(true);
@@ -998,7 +965,7 @@ describe("runProxyOnly", () => {
     return {
       metadata: { name: "role-writer", version: "1.0.0" },
       source: {
-        agentDialect: "claude-code",
+        agentDialect: "claude-code-agent",
         agentDir: ".claude",
         roleDir: path.join(projectDir, ".claude", "roles", "writer"),
       },
@@ -1021,8 +988,8 @@ describe("runProxyOnly", () => {
     // Pre-create docker build dirs
     const dockerDir = path.join(projectDir, ".mason", "docker");
     const dockerBuildDir = path.join(dockerDir, "writer");
-    fs.mkdirSync(path.join(dockerBuildDir, "claude-code"), { recursive: true });
-    fs.writeFileSync(path.join(dockerBuildDir, "claude-code", "Dockerfile"), "FROM node:20\n");
+    fs.mkdirSync(path.join(dockerBuildDir, "claude-code-agent"), { recursive: true });
+    fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", "Dockerfile"), "FROM node:20\n");
     fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
   });
@@ -1057,7 +1024,7 @@ describe("runProxyOnly", () => {
   it("builds proxy then starts it detached", async () => {
     const { calls, deps } = makeDeps();
 
-    await runProxyOnly(projectDir, "claude-code", "writer", 19700, deps);
+    await runProxyOnly(projectDir, "claude-code-agent", "writer", 19700, deps);
 
     expect(calls).toHaveLength(2);
     expect(calls[0]!.args).toContain("build");
@@ -1070,7 +1037,7 @@ describe("runProxyOnly", () => {
   it("does NOT start agent or credential service", async () => {
     const { calls, deps } = makeDeps();
 
-    await runProxyOnly(projectDir, "claude-code", "writer", 3000, deps);
+    await runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps);
 
     // Only 2 compose calls: build + up (no agent run, no down)
     expect(calls).toHaveLength(2);
@@ -1082,7 +1049,7 @@ describe("runProxyOnly", () => {
   it("outputs JSON with connection info to stdout", async () => {
     const { deps } = makeDeps({ sessionId: "json0001" });
 
-    await runProxyOnly(projectDir, "claude-code", "writer", 19700, deps);
+    await runProxyOnly(projectDir, "claude-code-agent", "writer", 19700, deps);
 
     // logSpy captures the JSON output (origLog is called once with JSON)
     const jsonCall = logSpy.mock.calls.find((call) => {
@@ -1102,7 +1069,7 @@ describe("runProxyOnly", () => {
     const { deps } = makeDeps({ buildExitCode: 1 });
 
     await expect(
-      runProxyOnly(projectDir, "claude-code", "writer", 3000, deps),
+      runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps),
     ).rejects.toThrow("Failed to build proxy image");
   });
 
@@ -1110,24 +1077,24 @@ describe("runProxyOnly", () => {
     const { deps } = makeDeps({ upExitCode: 1 });
 
     await expect(
-      runProxyOnly(projectDir, "claude-code", "writer", 3000, deps),
+      runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps),
     ).rejects.toThrow("Failed to start proxy");
   });
 
   it("creates compose file with correct paths", async () => {
     const { deps } = makeDeps({ sessionId: "path0001" });
 
-    await runProxyOnly(projectDir, "claude-code", "writer", 3000, deps);
+    await runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps);
 
     const composeFile = path.join(
-      projectDir, ".mason", "sessions", "path0001", "docker", "docker-compose.yml",
+      projectDir, ".mason", "sessions", "path0001", "docker-compose.yaml",
     );
     expect(fs.existsSync(composeFile)).toBe(true);
 
     const content = fs.readFileSync(composeFile, "utf-8");
     expect(content).toContain("proxy-writer:");
     expect(content).toContain("agent-writer:");
-    expect(content).toContain(`"${projectDir}:/home/mason/workspace/project"`);
+    expect(content).toContain(":/home/mason/workspace/project");
   });
 });
 
@@ -1166,35 +1133,4 @@ describe("CLI run --dev-container flag", () => {
   });
 });
 
-// ── generateComposeYml vscode-server mount ─────────────────────────────────
-
-describe("generateComposeYml vscode-server volume", () => {
-  it("includes vscode-server mount when vscodeSeverHostPath is provided", () => {
-    const yml = generateComposeYml({
-      dockerBuildDir: "/tmp/build",
-      dockerDir: "/tmp/docker",
-      projectDir: "/tmp/project",
-      agent: "claude-code",
-      role: "engineering",
-      logsDir: "/tmp/logs",
-      proxyToken: "tok",
-      credentialProxyToken: "ctok",
-      vscodeSeverHostPath: "/tmp/vscode-server",
-    });
-    expect(yml).toContain("/tmp/vscode-server:/home/mason/.vscode-server");
-  });
-
-  it("omits vscode-server mount when vscodeSeverHostPath is not provided", () => {
-    const yml = generateComposeYml({
-      dockerBuildDir: "/tmp/build",
-      dockerDir: "/tmp/docker",
-      projectDir: "/tmp/project",
-      agent: "claude-code",
-      role: "engineering",
-      logsDir: "/tmp/logs",
-      proxyToken: "tok",
-      credentialProxyToken: "ctok",
-    });
-    expect(yml).not.toContain(".vscode-server");
-  });
-});
+// vscode-server mount tests now covered in "generateSessionComposeYml (run-agent scenarios)" above

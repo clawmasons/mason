@@ -60,7 +60,7 @@ const PROJECT_MOUNT_PATH = "/home/mason/workspace/project";
 export interface AcpSessionConfig {
   /** Workspace root directory */
   projectDir: string;
-  /** Agent short name (e.g., "claude-code") */
+  /** Agent short name (e.g., "claude-code-agent") */
   agent: string;
   /** Role short name (e.g., "writer") */
   role: string;

@@ -11,12 +11,12 @@ The system SHALL scan a project directory for existing agent configuration acros
 #### Scenario: Discover skills in Claude directory
 - **GIVEN** a project with `.claude/skills/my-skill/SKILL.md`
 - **WHEN** `scanProject(projectDir)` is called
-- **THEN** the result contains a skill entry with `name: "my-skill"`, the absolute path, and `dialect: "claude-code"`
+- **THEN** the result contains a skill entry with `name: "my-skill"`, the absolute path, and `dialect: "claude-code-agent"`
 
 #### Scenario: Discover commands in Claude directory
 - **GIVEN** a project with `.claude/commands/deploy.md`
 - **WHEN** `scanProject(projectDir)` is called
-- **THEN** the result contains a command entry with `name: "deploy"` and `dialect: "claude-code"`
+- **THEN** the result contains a command entry with `name: "deploy"` and `dialect: "claude-code-agent"`
 
 #### Scenario: Discover MCP servers from settings.json
 - **GIVEN** a project with `.claude/settings.json` containing `mcpServers: { "github": { "command": "npx", "args": ["-y", "@mcp/github"] } }`

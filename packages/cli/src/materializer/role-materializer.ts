@@ -12,7 +12,7 @@ import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, Ag
 import { createAgentRegistry, getAgent, getRegisteredAgentNames } from "@clawmasons/agent-sdk";
 
 // Built-in agent packages
-import claudeCodeAgent from "@clawmasons/claude-code";
+import claudeCodeAgent from "@clawmasons/claude-code-agent";
 import piCodingAgent from "@clawmasons/pi-coding-agent";
 import { default as mcpAgent } from "@clawmasons/mcp-agent/agent-package";
 
@@ -74,7 +74,7 @@ export function getAgentFromRegistry(agentType: string): AgentPackage | undefine
 /**
  * Look up a materializer by agent type.
  *
- * @param agentType - The agent type string (e.g., "claude-code", "mcp-agent")
+ * @param agentType - The agent type string (e.g., "claude-code-agent", "mcp-agent")
  * @returns The RuntimeMaterializer for that type, or undefined if not registered
  */
 export function getMaterializer(agentType: string): RuntimeMaterializer | undefined {
@@ -104,7 +104,7 @@ export function getRegisteredAgentTypes(): string[] {
  * 3. Invokes the materializer's existing workspace generation logic
  *
  * @param role - A validated Role from the ROLE_TYPES pipeline
- * @param agentType - The target agent type (e.g., "claude-code", "pi-coding-agent", "mcp-agent")
+ * @param agentType - The target agent type (e.g., "claude-code-agent", "pi-coding-agent", "mcp-agent")
  * @param proxyEndpoint - The MCP proxy endpoint URL (defaults to "http://mcp-proxy:9090")
  * @param proxyToken - Optional proxy authentication token
  * @param options - Optional materialization options (e.g., ACP mode)

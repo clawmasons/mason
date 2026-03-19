@@ -15,7 +15,7 @@ Revert the "member" package type (introduced in chapter-members PRD) back to a s
 
 **Summary:** This is the foundational schema change — all subsequent code depends on the correct package type. Rewrite `src/schemas/member.ts` → `src/schemas/agent.ts`, removing the discriminated union on `memberType` and replacing it with a flat agent schema. The agent schema contains: `type`, `name`, `slug`, `description`, `runtimes`, `roles`, `resources`, `proxy`, and `llm`. Remove all member-specific fields: `memberType`, `email`, `authProviders`, and the human member concept entirely. Update `src/resolver/types.ts`: rename `ResolvedMember` → `ResolvedAgent`, strip member-specific fields. Update `src/resolver/resolve.ts` (`resolveMember()` → `resolveAgent()`), `src/validator/validate.ts` (`validateMember()` → `validateAgent()`), materializers, and all CLI commands that reference the member type. Update `chapter-core/members/` packages and templates to use `"type": "agent"` with the new schema. Update all test files.
 
-**User Story:** As a package author, when I declare `"chapter": { "type": "agent", "name": "Note Taker", "slug": "note-taker", "runtimes": ["claude-code"], "roles": [...] }` in my package.json, the chapter system validates it correctly. Packages with `email`, `authProviders`, or `memberType` are rejected.
+**User Story:** As a package author, when I declare `"chapter": { "type": "agent", "name": "Note Taker", "slug": "note-taker", "runtimes": ["claude-code-agent"], "roles": [...] }` in my package.json, the chapter system validates it correctly. Packages with `email`, `authProviders`, or `memberType` are rejected.
 
 **Scope:**
 - Rename/rewrite: `src/schemas/member.ts` → `src/schemas/agent.ts` — flat agent schema (no discriminated union)
@@ -43,7 +43,7 @@ Remove dead CLI commands, member registry, and compose infrastructure. Refactor 
 
 **PRD refs:** REQ-008 (Remove `install`, `run`, `stop` Commands)
 
-**Summary:** Three parts: (1) delete the old `install`, `run`, `stop`, `enable`, and `disable` CLI commands plus the member registry and compose/lock infrastructure; (2) refactor the materializer to remove docker-specific methods, keeping only workspace materialization as the core contract for the "agent" type; (3) retain general-purpose docker utilities for reuse by `docker-init` and `run-agent`. The materializer has been iterated across two runtimes (claude-code, pi-coding-agent) and represents proven, working code for translating the chapter dependency graph into runtime-native workspace configurations. Docker-specific Dockerfile and compose generation will be re-introduced as a separate concern in CHANGE 5/6.
+**Summary:** Three parts: (1) delete the old `install`, `run`, `stop`, `enable`, and `disable` CLI commands plus the member registry and compose/lock infrastructure; (2) refactor the materializer to remove docker-specific methods, keeping only workspace materialization as the core contract for the "agent" type; (3) retain general-purpose docker utilities for reuse by `docker-init` and `run-agent`. The materializer has been iterated across two runtimes (claude-code-agent, pi-coding-agent) and represents proven, working code for translating the chapter dependency graph into runtime-native workspace configurations. Docker-specific Dockerfile and compose generation will be re-introduced as a separate concern in CHANGE 5/6.
 
 **User Story:** As a user, when I run `chapter install`, `chapter run`, `chapter stop`, `chapter enable`, or `chapter disable`, the command is not found. Only the core commands (`init`, `add`, `remove`, `list`, `validate`, `proxy`, `publish`) remain. The materializer module still exists but only handles workspace file generation.
 
@@ -79,10 +79,10 @@ Remove dead CLI commands, member registry, and compose infrastructure. Refactor 
 *Refactor — Materializer (keep, strip docker methods):*
 - Modify: `src/materializer/types.ts` — Remove `generateDockerfile`, `generateComposeService`, `generateConfigJson` from `RuntimeMaterializer` interface. Remove `ComposeServiceDef` type. Interface retains only `name` and `materializeWorkspace()`. Update `ResolvedMember` → `ResolvedAgent` (from CHANGE 1).
 - Modify: `src/materializer/common.ts` — Add `PROVIDER_ENV_VARS` (moved from pi-coding-agent.ts). Update `ResolvedMember` → `ResolvedAgent`. All functions retained: `formatPermittedTools`, `findRolesForTask`, `collectAllSkills`, `collectAllTasks`, `generateAgentsMd`, `generateSkillReadme`.
-- Modify: `src/materializer/claude-code.ts` — Remove `generateDockerfile()`, `generateComposeService()`, `generateConfigJson()`. Keep `materializeWorkspace()` and helpers (`generateMcpJson`, `generateSettingsJson`, `generateSlashCommand`). Update member → agent.
+- Modify: `src/materializer/claude-code-agent.ts` — Remove `generateDockerfile()`, `generateComposeService()`, `generateConfigJson()`. Keep `materializeWorkspace()` and helpers (`generateMcpJson`, `generateSettingsJson`, `generateSlashCommand`). Update member → agent.
 - Modify: `src/materializer/pi-coding-agent.ts` — Remove `generateDockerfile()`, `generateComposeService()`. Move `PROVIDER_ENV_VARS` to `common.ts`. Keep `materializeWorkspace()` and helpers. Update member → agent.
 - Modify: `src/materializer/index.ts` — Update exports.
-- Modify: `tests/materializer/claude-code.test.ts` — Remove docker method tests, keep workspace tests, update member → agent.
+- Modify: `tests/materializer/claude-code-agent.test.ts` — Remove docker method tests, keep workspace tests, update member → agent.
 - Modify: `tests/materializer/pi-coding-agent.test.ts` — Remove docker method tests, keep workspace tests, update member → agent.
 
 *Refactor — Docker utilities (keep general functions):*

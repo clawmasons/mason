@@ -39,7 +39,7 @@ describe("scanProject", () => {
       expect(result.skills).toHaveLength(1);
       expect(result.skills[0].name).toBe("my-skill");
       expect(result.skills[0].path).toBe(join(testDir, ".claude/skills/my-skill"));
-      expect(result.skills[0].dialect).toBe("claude-code");
+      expect(result.skills[0].dialect).toBe("claude-code-agent");
     });
 
     it("discovers skills across multiple dialects", async () => {
@@ -53,7 +53,7 @@ describe("scanProject", () => {
       const claudeSkill = result.skills.find((s) => s.name === "claude-skill");
       const codexSkill = result.skills.find((s) => s.name === "codex-skill");
 
-      expect(claudeSkill?.dialect).toBe("claude-code");
+      expect(claudeSkill?.dialect).toBe("claude-code-agent");
       expect(codexSkill?.dialect).toBe("codex");
     });
 
@@ -85,7 +85,7 @@ describe("scanProject", () => {
 
       expect(result.commands).toHaveLength(1);
       expect(result.commands[0].name).toBe("deploy");
-      expect(result.commands[0].dialect).toBe("claude-code");
+      expect(result.commands[0].dialect).toBe("claude-code-agent");
     });
 
     it("discovers commands in subdirectories", async () => {
@@ -126,7 +126,7 @@ describe("scanProject", () => {
       expect(result.mcpServers[0].command).toBe("npx");
       expect(result.mcpServers[0].args).toEqual(["-y", "@mcp/github"]);
       expect(result.mcpServers[0].env).toEqual({ GITHUB_TOKEN: "" });
-      expect(result.mcpServers[0].dialect).toBe("claude-code");
+      expect(result.mcpServers[0].dialect).toBe("claude-code-agent");
     });
 
     it("merges settings.json and settings.local.json", async () => {

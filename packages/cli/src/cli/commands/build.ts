@@ -130,7 +130,7 @@ export function registerBuildCommand(program: Command): void {
     .command("build")
     .description("Build Docker artifacts for roles in the workspace")
     .argument("[role]", "Role name to build (builds all if omitted)")
-    .option("--agent-type <type>", "Override agent type (e.g., mcp-agent, claude-code)")
+    .option("--agent-type <type>", "Override agent type (e.g., mcp-agent, claude-code-agent)")
     .action(async (role: string | undefined, options: { agentType?: string }) => {
       let agentType: string | undefined;
       if (options.agentType) {

@@ -29,17 +29,17 @@ When `chapter install <member>` is run for an agent member, the command SHALL ex
 11. Create `log/` directory for activity tracking
 
 #### Scenario: Successful agent install creates per-member directory structure
-- **WHEN** `chapter install` is run with a valid agent member (slug: `note-taker`) that declares `claude-code` runtime
+- **WHEN** `chapter install` is run with a valid agent member (slug: `note-taker`) that declares `claude-code-agent` runtime
 - **THEN** the output directory at `.chapter/members/note-taker/` SHALL contain:
   - `proxy/Dockerfile` (proxy build context)
   - `proxy/chapter/` (pre-built chapter artifacts)
-  - `claude-code/Dockerfile`
-  - `claude-code/.claude.json` (OOBE bypass, seeded at install time)
-  - `claude-code/.claude/` (empty directory for volume mount)
-  - `claude-code/workspace/.mcp.json`
-  - `claude-code/workspace/.claude/settings.json`
-  - `claude-code/workspace/.claude/commands/*.md` (one per task)
-  - `claude-code/workspace/AGENTS.md`
+  - `claude-code-agent/Dockerfile`
+  - `claude-code-agent/.claude.json` (OOBE bypass, seeded at install time)
+  - `claude-code-agent/.claude/` (empty directory for volume mount)
+  - `claude-code-agent/workspace/.mcp.json`
+  - `claude-code-agent/workspace/.claude/settings.json`
+  - `claude-code-agent/workspace/.claude/commands/*.md` (one per task)
+  - `claude-code-agent/workspace/AGENTS.md`
   - `docker-compose.yml`
   - `.env`
   - `chapter.lock.json`
@@ -81,20 +81,20 @@ The install command SHALL generate a cryptographically random token using `crypt
 - **THEN** the `.env` file SHALL contain `CHAPTER_PROXY_TOKEN=<64-char-hex-string>` where the value is non-empty
 
 #### Scenario: Token is baked into runtime settings
-- **WHEN** install completes successfully for a claude-code runtime
-- **THEN** `claude-code/workspace/.mcp.json` SHALL contain `Authorization: "Bearer <actual-token>"` with the real token, not an env var placeholder
+- **WHEN** install completes successfully for a claude-code-agent runtime
+- **THEN** `claude-code-agent/workspace/.mcp.json` SHALL contain `Authorization: "Bearer <actual-token>"` with the real token, not an env var placeholder
 
 ### Requirement: chapter install uses a materializer registry
 
-The install command SHALL maintain a registry mapping runtime names to `RuntimeMaterializer` instances. The `"claude-code"` materializer SHALL be pre-registered.
+The install command SHALL maintain a registry mapping runtime names to `RuntimeMaterializer` instances. The `"claude-code-agent"` materializer SHALL be pre-registered.
 
 #### Scenario: Unknown runtime produces warning
 - **WHEN** a member declares a runtime (e.g., `"codex"`) that has no registered materializer
 - **THEN** the command SHALL log a warning mentioning the skipped runtime and continue installing the remaining runtimes
 
 #### Scenario: Member with only known runtimes
-- **WHEN** a member declares only `"claude-code"` as its runtime
-- **THEN** the command SHALL materialize the claude-code workspace without warnings
+- **WHEN** a member declares only `"claude-code-agent"` as its runtime
+- **THEN** the command SHALL materialize the claude-code-agent workspace without warnings
 
 ### Requirement: chapter install supports custom output directory
 

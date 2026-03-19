@@ -195,7 +195,7 @@ Modify existing agent materializers to accept `Role` input (via the adapter from
 - New: `materializeForAgent(role: Role, agentType: string)` orchestration function
 - New tests: materialize a Role for Claude Code, verify generated workspace matches expectations. Materialize same Role for Codex, verify correct dialect output.
 
-**User Story:** As the CLI, I load a ROLE.md into ROLE_TYPES and pass it directly to `materializeForAgent('claude-code')`. The materializer generates the correct workspace without me needing to construct a ResolvedAgent manually.
+**User Story:** As the CLI, I load a ROLE.md into ROLE_TYPES and pass it directly to `materializeForAgent('claude-code-agent')`. The materializer generates the correct workspace without me needing to construct a ResolvedAgent manually.
 
 **Testable output:** `materializeForAgent` produces correct Docker workspace from ROLE_TYPES input. Cross-agent materialization works (Claude role → Codex output). Output matches what the old pipeline produces for equivalent input. `npx tsc --noEmit` compiles. `npx vitest run` passes.
 

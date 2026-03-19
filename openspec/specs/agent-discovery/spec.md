@@ -2,15 +2,15 @@
 
 ### Requirement: CLI discovers built-in agent packages via static imports
 
-The CLI SHALL discover built-in agent packages by importing them directly from its npm dependencies: `@clawmasons/claude-code`, `@clawmasons/pi-coding-agent`, `@clawmasons/mcp-agent`. These packages SHALL be listed in the CLI's `package.json` dependencies.
+The CLI SHALL discover built-in agent packages by importing them directly from its npm dependencies: `@clawmasons/claude-code-agent`, `@clawmasons/pi-coding-agent`, `@clawmasons/mcp-agent`. These packages SHALL be listed in the CLI's `package.json` dependencies.
 
 #### Scenario: Built-in agents are always available
 - **WHEN** the CLI starts and no `.mason/config.json` exists
-- **THEN** the agent registry SHALL contain `claude-code`, `pi-coding-agent`, and `mcp-agent`
+- **THEN** the agent registry SHALL contain `claude-code-agent`, `pi-coding-agent`, and `mcp-agent`
 
 #### Scenario: Built-in agent aliases are registered
-- **WHEN** the CLI starts and `@clawmasons/claude-code` declares `aliases: ["claude"]`
-- **THEN** both `"claude-code"` and `"claude"` SHALL resolve to the same `AgentPackage`
+- **WHEN** the CLI starts and `@clawmasons/claude-code-agent` declares `aliases: ["claude"]`
+- **THEN** both `"claude-code-agent"` and `"claude"` SHALL resolve to the same `AgentPackage`
 
 ### Requirement: CLI discovers third-party agent packages from config
 
@@ -47,12 +47,12 @@ For each entry, the CLI SHALL attempt a dynamic `import()` of the package name a
 The CLI SHALL maintain an agent registry as a `Map<string, AgentPackage>`. The registry SHALL be populated at startup with built-in agents first, then config-declared agents. Alias entries SHALL point to the same `AgentPackage` instance.
 
 #### Scenario: Registry lookup by name
-- **WHEN** `getAgent("claude-code")` is called
-- **THEN** it SHALL return the `AgentPackage` with `name: "claude-code"`
+- **WHEN** `getAgent("claude-code-agent")` is called
+- **THEN** it SHALL return the `AgentPackage` with `name: "claude-code-agent"`
 
 #### Scenario: Registry lookup by alias
 - **WHEN** `getAgent("claude")` is called
-- **THEN** it SHALL return the same `AgentPackage` as `getAgent("claude-code")`
+- **THEN** it SHALL return the same `AgentPackage` as `getAgent("claude-code-agent")`
 
 #### Scenario: Registry lookup for unknown agent
 - **WHEN** `getAgent("unknown")` is called
@@ -63,9 +63,9 @@ The CLI SHALL maintain an agent registry as a `Map<string, AgentPackage>`. The r
 When a config-declared agent has the same name as a built-in agent, the config-declared agent SHALL take precedence. This allows users to replace built-in agent implementations.
 
 #### Scenario: Override built-in agent
-- **WHEN** `.mason/config.json` declares `"claude-code": { "package": "@custom/claude-code" }`
-- **AND** `@custom/claude-code` exports a valid `AgentPackage` with `name: "claude-code"`
-- **THEN** the registry SHALL use the custom package instead of the built-in `@clawmasons/claude-code`
+- **WHEN** `.mason/config.json` declares `"claude-code-agent": { "package": "@custom/claude-code-agent" }`
+- **AND** `@custom/claude-code-agent` exports a valid `AgentPackage` with `name: "claude-code-agent"`
+- **THEN** the registry SHALL use the custom package instead of the built-in `@clawmasons/claude-code-agent`
 
 ### Requirement: getRegisteredAgentTypes returns all available agents
 
@@ -102,9 +102,9 @@ The `.mason/config.json` `agents` field SHALL be validated. Each entry MUST have
 The discovery module SHALL export a synchronous function `loadConfigAgentEntry(projectDir: string, agentName: string): AgentEntryConfig | undefined` that reads `.mason/config.json` and returns the raw config entry for the named agent, or `undefined` if the file does not exist or the agent is not declared. This function performs no dynamic imports and is safe to call before the async registry is initialised.
 
 #### Scenario: Entry exists and is returned
-- **WHEN** `.mason/config.json` declares `"claude": { "package": "@clawmasons/claude-code", "role": "writer" }`
+- **WHEN** `.mason/config.json` declares `"claude": { "package": "@clawmasons/claude-code-agent", "role": "writer" }`
 - **AND** `loadConfigAgentEntry(projectDir, "claude")` is called
-- **THEN** it SHALL return `{ package: "@clawmasons/claude-code", role: "writer" }`
+- **THEN** it SHALL return `{ package: "@clawmasons/claude-code-agent", role: "writer" }`
 
 #### Scenario: Agent not in config returns undefined
 - **WHEN** `.mason/config.json` does not declare `"unknown"`

@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { claudeCodeMaterializer } from "@clawmasons/claude-code";
+import { claudeCodeMaterializer } from "@clawmasons/claude-code-agent";
 import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
 
 function makeGithubApp(): ResolvedApp {
@@ -122,7 +122,7 @@ function makeRepoOpsAgent(): ResolvedAgent {
     agentName: "Repo Ops",
     slug: "repo-ops",
     description: "Repository operations agent for GitHub.",
-    runtimes: ["claude-code", "codex"],
+    runtimes: ["claude-code-agent", "codex"],
     credentials: [],
     roles: [issueManager, prReviewer],
     proxy: {
@@ -133,8 +133,8 @@ function makeRepoOpsAgent(): ResolvedAgent {
 }
 
 describe("claudeCodeMaterializer", () => {
-  it("has name 'claude-code'", () => {
-    expect(claudeCodeMaterializer.name).toBe("claude-code");
+  it("has name 'claude-code-agent'", () => {
+    expect(claudeCodeMaterializer.name).toBe("claude-code-agent");
   });
 
   describe("materializeWorkspace", () => {

@@ -5,11 +5,14 @@
   "description": "Mason — npm-native packaging, governance, and runtime portability for AI agents",
   "type": "module",
   "scripts": {
-    "build": "tsc -b packages/shared packages/proxy packages/cli && npm run build --workspace=packages/agent-sdk && npm run build --workspace=packages/mcp-agent && npm run build --workspace=packages/agent-entry && npm run build --workspace=packages/claude-code && npm run build --workspace=packages/pi-coding-agent && npm run build:proxy --workspace=packages/cli",
+    "build": "tsc -b packages/shared packages/proxy && npm run build --workspace=packages/agent-sdk && npm run build --workspace=packages/mcp-agent && npm run build:types --workspace=packages/mcp-agent && npm run build --workspace=packages/agent-entry && npm run build --workspace=packages/claude-code-agent && npm run build --workspace=packages/pi-coding-agent && tsc -b packages/cli && npm run build:proxy --workspace=packages/cli",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint packages/*/src/ packages/*/tests/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo",
+    "release": "./scripts/bump-and-publish-all.sh",
+    "publish": "./scripts/bump-and-publish-all.sh"
   },
   "license": "MIT",
   "workspaces": [
@@ -24,6 +27,7 @@
     "eslint": "^9.0.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.0.0",
+    "@changesets/cli": "^2.29.0",
     "vitest": "^3.0.0"
   },
   "dependencies": {

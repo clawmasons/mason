@@ -28,13 +28,13 @@ When the first positional argument doesn't match a known command but matches a k
 
 | Alias | Internal Type |
 |-------|--------------|
-| `claude` | `claude-code` |
+| `claude` | `claude-code-agent` |
 | `codex` | `codex` |
 | `aider` | `aider` |
 | `pi` | `pi-coding-agent` |
 | `mcp` | `mcp-agent` |
 
-Direct registry names (e.g., `claude-code`) also work.
+Direct registry names (e.g., `claude-code-agent`) also work.
 
 ### Backward Compatibility
 
@@ -73,5 +73,5 @@ Error: Role "@acme/role-create-prd" not found.
 Unknown agent types produce:
 ```
 Unknown agent type "unknown".
-Available agent types: aider, claude, claude-code, mcp, mcp-agent, pi, pi-coding-agent
+Available agent types: aider, claude, claude-code-agent, mcp, mcp-agent, pi, pi-coding-agent
 ```

@@ -139,7 +139,7 @@ async function tryValidateRole(
     // Try adapter round-trip to detect structural issues
     try {
       // Use a default agent type for validation
-      const agentType = role.source.agentDialect ?? "claude-code";
+      const agentType = role.source.agentDialect ?? "claude-code-agent";
       adaptRoleToResolvedAgent(role, agentType);
     } catch (err) {
       errors.push({

@@ -183,8 +183,8 @@ describe("mcpAgentMaterializer", () => {
   });
 
   describe("ACP_RUNTIME_COMMANDS", () => {
-    it("maps claude-code to claude-agent-acp", () => {
-      expect(ACP_RUNTIME_COMMANDS["claude-code"]).toBe("claude-agent-acp");
+    it("maps claude-code-agent to claude-agent-acp", () => {
+      expect(ACP_RUNTIME_COMMANDS["claude-code-agent"]).toBe("claude-agent-acp");
     });
 
     it("maps pi-coding-agent to pi-agent-acp", () => {

@@ -15,10 +15,10 @@ The system SHALL generate a Docker build directory at `.mason/docker/<role-name>
 - `docker-compose.yaml` — Reference compose file (informational only)
 
 #### Scenario: Build directory created for a role
-- **GIVEN** a valid `Role` with agent type "claude-code"
+- **GIVEN** a valid `Role` with agent type "claude-code-agent"
 - **WHEN** `generateRoleDockerBuildDir()` is called
-- **THEN** the directory `.mason/docker/<role-name>/claude-code/Dockerfile` SHALL exist
-- **AND** the directory `.mason/docker/<role-name>/claude-code/workspace/` SHALL contain materialized files
+- **THEN** the directory `.mason/docker/<role-name>/claude-code-agent/Dockerfile` SHALL exist
+- **AND** the directory `.mason/docker/<role-name>/claude-code-agent/workspace/` SHALL contain materialized files
 - **AND** the file `.mason/docker/<role-name>/mcp-proxy/Dockerfile` SHALL exist and use `node:22-slim`
 - **AND** the file `.mason/docker/<role-name>/docker-compose.yaml` SHALL exist
 

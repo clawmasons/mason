@@ -126,7 +126,7 @@ describe("role-based workflow", () => {
 
     it("generates agent Dockerfile", () => {
       expect(
-        fs.existsSync(path.join(dockerDir, "test-writer", "claude-code", "Dockerfile")),
+        fs.existsSync(path.join(dockerDir, "test-writer", "claude-code-agent", "Dockerfile")),
       ).toBe(true);
     });
   });

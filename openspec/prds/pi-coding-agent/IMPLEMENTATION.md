@@ -37,13 +37,13 @@ Add an optional `llm` field (provider + model) to the agent member schema, resol
 
 ### CHANGE 2: LLM Validation Rules — Pi Requires LLM, Claude Code Warns
 
-Add validation rules that enforce `llm` is required when runtime is `pi-coding-agent` and emit a warning when `llm` is set with `claude-code` runtime.
+Add validation rules that enforce `llm` is required when runtime is `pi-coding-agent` and emit a warning when `llm` is set with `claude-code-agent` runtime.
 
 **PRD refs:** REQ-002 (LLM Configuration Schema — validation acceptance criteria), PRD §3.5
 
-**Summary:** Add a new validation check category (e.g., `"llm-config"`) to the validator in `src/validator/validate.ts`. When `runtimes` includes `"pi-coding-agent"` and `llm` is absent, produce a validation error. When `runtimes` includes `"claude-code"` and `llm` is present, produce a validation warning. Update `src/validator/types.ts` if categories are enumerated. Add tests in `tests/validator/validate.test.ts`.
+**Summary:** Add a new validation check category (e.g., `"llm-config"`) to the validator in `src/validator/validate.ts`. When `runtimes` includes `"pi-coding-agent"` and `llm` is absent, produce a validation error. When `runtimes` includes `"claude-code-agent"` and `llm` is present, produce a validation warning. Update `src/validator/types.ts` if categories are enumerated. Add tests in `tests/validator/validate.test.ts`.
 
-**User Story:** As a package author, if I declare `runtimes: ["pi-coding-agent"]` without an `llm` field, `chapter validate` tells me I need to specify a provider and model. If I declare `llm` on a `claude-code` member, it warns me the field will be ignored.
+**User Story:** As a package author, if I declare `runtimes: ["pi-coding-agent"]` without an `llm` field, `chapter validate` tells me I need to specify a provider and model. If I declare `llm` on a `claude-code-agent` member, it warns me the field will be ignored.
 
 **Scope:**
 - Modify: `src/validator/types.ts` — add `"llm-config"` to `ValidationErrorCategory`, add `ValidationWarning` and `ValidationWarningCategory` types, add `warnings` to `ValidationResult`
@@ -55,7 +55,7 @@ Add validation rules that enforce `llm` is required when runtime is `pi-coding-a
 - Modify: `src/cli/commands/install.ts` — display warnings
 - Update tests: `tests/validator/validate.test.ts` — 8 new tests covering all llm-config validation cases
 
-**Testable output:** `chapter validate @member` with pi-coding-agent runtime and no `llm` shows an error. Same with claude-code runtime and `llm` present shows a warning. `npx tsc --noEmit` and `npx vitest run` pass.
+**Testable output:** `chapter validate @member` with pi-coding-agent runtime and no `llm` shows an error. Same with claude-code-agent runtime and `llm` present shows a warning. `npx tsc --noEmit` and `npx vitest run` pass.
 
 **Implemented** -- 2026-03-06
 
@@ -72,16 +72,16 @@ Implement `piCodingAgentMaterializer` satisfying the `RuntimeMaterializer` inter
 
 **PRD refs:** REQ-001 (Pi Coding Agent Materializer), PRD §4.2–§4.3
 
-**Summary:** Create `src/materializer/pi-coding-agent.ts`. Extract shared helpers from `claude-code.ts` into a common module (`src/materializer/common.ts`) — `formatPermittedTools()`, `findRolesForTask()`, `collectAllSkills()`, `collectAllTasks()`, `generateAgentsMd()`, `generateSkillReadme()`. The pi materializer's `materializeWorkspace()` generates: `AGENTS.md` (reusing shared helper), `.pi/settings.json` (model from `member.llm`), `.pi/extensions/chapter-mcp/package.json`, `.pi/extensions/chapter-mcp/index.ts` (with `pi.registerMcpServer()` + `pi.registerCommand()` per task), and `skills/{name}/README.md` (reusing shared helper). Create comprehensive unit tests.
+**Summary:** Create `src/materializer/pi-coding-agent.ts`. Extract shared helpers from `claude-code-agent.ts` into a common module (`src/materializer/common.ts`) — `formatPermittedTools()`, `findRolesForTask()`, `collectAllSkills()`, `collectAllTasks()`, `generateAgentsMd()`, `generateSkillReadme()`. The pi materializer's `materializeWorkspace()` generates: `AGENTS.md` (reusing shared helper), `.pi/settings.json` (model from `member.llm`), `.pi/extensions/chapter-mcp/package.json`, `.pi/extensions/chapter-mcp/index.ts` (with `pi.registerMcpServer()` + `pi.registerCommand()` per task), and `skills/{name}/README.md` (reusing shared helper). Create comprehensive unit tests.
 
 **User Story:** As a developer running `chapter install @coder` where coder uses `pi-coding-agent` runtime, the materializer produces a complete workspace directory that pi can load — with MCP proxy connectivity, task commands, and skill documentation all wired up.
 
 **Scope:**
 - New file: `src/materializer/common.ts` — extracted shared helpers
-- Modify: `src/materializer/claude-code.ts` — import helpers from common instead of local definitions
+- Modify: `src/materializer/claude-code-agent.ts` — import helpers from common instead of local definitions
 - New file: `src/materializer/pi-coding-agent.ts` — full materializer implementation
 - New test: `tests/materializer/pi-coding-agent.test.ts` — comprehensive tests (workspace files, content validation)
-- Update tests: `tests/materializer/claude-code.test.ts` — update imports if helpers moved
+- Update tests: `tests/materializer/claude-code-agent.test.ts` — update imports if helpers moved
 
 **Testable output:** `piCodingAgentMaterializer.materializeWorkspace()` returns Map with keys: `AGENTS.md`, `.pi/settings.json`, `.pi/extensions/chapter-mcp/package.json`, `.pi/extensions/chapter-mcp/index.ts`, `skills/{name}/README.md`. `.pi/settings.json` contains correct model ID. Extension code includes `registerMcpServer()` call with proxy endpoint. Extension code includes `registerCommand()` for each task with role context. `npx tsc --noEmit` and `npx vitest run` pass.
 
@@ -134,7 +134,7 @@ Register `piCodingAgentMaterializer` in the materializer registry and update `.e
 
 **Scope:**
 - Modify: `src/cli/commands/install.ts` — import `piCodingAgentMaterializer`, add to `materializerRegistry` Map
-- Update tests: `tests/cli/install.test.ts` — 11 new tests: pi-coding-agent member installs, workspace files, extension files, .env LLM key, docker-compose service, no .claude artifacts, multi-runtime (claude-code + pi), proxy token baking, settings.json model, success summary
+- Update tests: `tests/cli/install.test.ts` — 11 new tests: pi-coding-agent member installs, workspace files, extension files, .env LLM key, docker-compose service, no .claude artifacts, multi-runtime (claude-code-agent + pi), proxy token baking, settings.json model, success summary
 
 **Testable output:** `chapter install @member-with-pi-runtime` succeeds. `.chapter/members/<slug>/pi-coding-agent/workspace/` directory is scaffolded with all expected files. `.env` includes the LLM provider API key. Docker Compose includes pi-coding-agent service. `npx tsc --noEmit` and `npx vitest run` pass (733 tests, 0 failures).
 

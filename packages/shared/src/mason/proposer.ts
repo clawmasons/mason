@@ -22,7 +22,7 @@ export interface ProposeOptions {
   roleName?: string;
   /** Role description override (defaults to a placeholder) */
   description?: string;
-  /** Target dialect for the ROLE.md (defaults to "claude-code") */
+  /** Target dialect for the ROLE.md (defaults to "claude-code-agent") */
   targetDialect?: string;
 }
 

@@ -106,7 +106,7 @@ Rename the workspace config directory, global data directory, and all environmen
 - Modify: `src/compose/docker-compose.ts` — `FORGE_*` → `CHAPTER_*`, network name
 - Modify: `src/compose/env.ts` — `FORGE_*` → `CHAPTER_*`
 - Modify: `src/compose/lock.ts` — `forge.lock.json` → `chapter.lock.json`
-- Modify: `src/materializer/claude-code.ts` — `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`, `FORGE_ROLES` → `CHAPTER_ROLES`
+- Modify: `src/materializer/claude-code-agent.ts` — `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`, `FORGE_ROLES` → `CHAPTER_ROLES`
 - Modify: `src/generator/proxy-dockerfile.ts` — any forge references
 - Rename file: `tests/integration/forge-proxy.test.ts` → `tests/integration/chapter-proxy.test.ts`
 - Update all test files with updated env var names, paths, and class names
@@ -128,7 +128,7 @@ Rename the workspace config directory, global data directory, and all environmen
 - [lock-file-generation](../../specs/lock-file-generation/spec.md) -- `forge.lock.json` → `chapter.lock.json`
 - [proxy-cli](../../specs/proxy-cli/spec.md) -- `~/.forge/forge.db` → `~/.chapter/data/chapter.db`, `ForgeProxyServer` → `ChapterProxyServer`
 - [proxy-server](../../specs/proxy-server/spec.md) -- `ForgeProxyServer` → `ChapterProxyServer`, MCP name `"forge"` → `"chapter"`
-- [claude-code-materializer](../../specs/claude-code-materializer/spec.md) -- `FORGE_*` → `CHAPTER_*`, `agent-net` → `chapter-net`, `mcpServers.forge` → `mcpServers.chapter`
+- [claude-code-agent-materializer](../../specs/claude-code-agent-materializer/spec.md) -- `FORGE_*` → `CHAPTER_*`, `agent-net` → `chapter-net`, `mcpServers.forge` → `mcpServers.chapter`
 - [install-command](../../specs/install-command/spec.md) -- `FORGE_PROXY_TOKEN` → `CHAPTER_PROXY_TOKEN`, `.forge/agents/` → `.chapter/agents/`
 - [build-command](../../specs/build-command/spec.md) -- `forge.lock.json` → `chapter.lock.json`
 - [run-command](../../specs/run-command/spec.md) -- `.forge/agents/` → `.chapter/agents/`
@@ -180,7 +180,7 @@ Update all user-facing strings from "forge" to "chapter" across CLI output, help
 - [permissions-command](../../specs/permissions-command/spec.md) -- command references use "chapter"
 - [proxy-cli](../../specs/proxy-cli/spec.md) -- command references use "chapter"
 - [docker-compose-generation](../../specs/docker-compose-generation/spec.md) -- proxy references use "chapter"
-- [claude-code-materializer](../../specs/claude-code-materializer/spec.md) -- generated content references "chapter"
+- [claude-code-agent-materializer](../../specs/claude-code-agent-materializer/spec.md) -- generated content references "chapter"
 - [mcp-proxy-integration-test](../../specs/mcp-proxy-integration-test/spec.md) -- test description uses "chapter"
 - [graph-validation](../../specs/graph-validation/spec.md) -- command references use "chapter"
 - [proxy-config-generation](../../specs/proxy-config-generation/spec.md) -- proxy name uses "chapter"
@@ -243,14 +243,14 @@ Update `chapter install` to scaffold per-member directories under `.chapter/memb
 
 **Summary:** Updated the install pipeline in `src/cli/commands/install.ts` to use `member.slug` for directory naming, create `log/` directories for all members, rename the proxy build context from `chapter-proxy/` to `proxy/`, and handle human member installs (log/ only, no docker artifacts). Updated `src/compose/docker-compose.ts` to reference `build: ./proxy` and `./proxy/logs:/logs`. Updated all related tests and the E2E integration test. No changes needed to `docker-utils.ts`, `run.ts`, or `stop.ts` (they already used `resolveMemberDir()` which derives from package name, aligning with slug).
 
-**User Story:** As a user, when I run `chapter install @acme/member-note-taker`, the scaffolded directory is at `.chapter/members/note-taker/` with `log/`, `proxy/`, and `claude-code/` subdirectories. When I install a human member, only `log/` is created.
+**User Story:** As a user, when I run `chapter install @acme/member-note-taker`, the scaffolded directory is at `.chapter/members/note-taker/` with `log/`, `proxy/`, and `claude-code-agent/` subdirectories. When I install a human member, only `log/` is created.
 
 **Scope:**
 - Modify: `src/cli/commands/install.ts` — use member.slug for dir naming, create log/, handle human members, rename chapter-proxy/ to proxy/
 - Modify: `src/compose/docker-compose.ts` — build path `./proxy`, log mount `./proxy/logs:/logs`
 - Updated tests: `tests/cli/install.test.ts`, `tests/compose/docker-compose.test.ts`, `tests/compose/lock.test.ts`, `tests/integration/install-flow.test.ts`
 
-**Testable output:** `chapter install @member-note-taker` creates `.chapter/members/note-taker/log/`, `.chapter/members/note-taker/proxy/Dockerfile`, `.chapter/members/note-taker/claude-code/workspace/`. Human member install creates only `.chapter/members/<slug>/log/`. All 583 tests pass. Docker Compose generation references `build: ./proxy`.
+**Testable output:** `chapter install @member-note-taker` creates `.chapter/members/note-taker/log/`, `.chapter/members/note-taker/proxy/Dockerfile`, `.chapter/members/note-taker/claude-code-agent/workspace/`. Human member install creates only `.chapter/members/<slug>/log/`. All 583 tests pass. Docker Compose generation references `build: ./proxy`.
 
 **Implemented** -- [Archived Change](../../changes/archive/2026-03-06-per-member-directory-structure/)
 

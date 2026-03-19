@@ -61,7 +61,7 @@ function makeAgent(roles: ResolvedRole[]): ResolvedAgent {
     agentName: "Test Agent",
     slug: "test-agent",
     description: "A test agent.",
-    runtimes: ["claude-code"],
+    runtimes: ["claude-code-agent"],
     credentials: [],
     roles,
     proxy: { port: 9090, type: "sse" },

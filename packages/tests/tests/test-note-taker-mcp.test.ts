@@ -57,14 +57,14 @@ describe("role-based note-taker e2e", () => {
     it("generates agent Dockerfile for writer role", () => {
       expect(
         fs.existsSync(
-          path.join(dockerDir, "test-writer", "claude-code", "Dockerfile"),
+          path.join(dockerDir, "test-writer", "claude-code-agent", "Dockerfile"),
         ),
       ).toBe(true);
     });
 
     it("generates workspace for writer role", () => {
       const wsDir = path.join(
-        dockerDir, "test-writer", "claude-code", "workspace",
+        dockerDir, "test-writer", "claude-code-agent", "workspace",
       );
       expect(fs.existsSync(wsDir)).toBe(true);
     });

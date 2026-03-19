@@ -9,7 +9,7 @@ The system SHALL maintain a registry of agent dialects, mapping directory names 
 
 #### Scenario: Look up Claude Code dialect by directory
 - **WHEN** `getDialectByDirectory("claude")` is called
-- **THEN** returns a dialect entry with `name: "claude-code"` and `fieldMapping.tasks: "commands"`
+- **THEN** returns a dialect entry with `name: "claude-code-agent"` and `fieldMapping.tasks: "commands"`
 
 #### Scenario: Look up dialect by name
 - **WHEN** `getDialect("codex")` is called
@@ -47,7 +47,7 @@ The system SHALL detect the agent dialect from the ROLE.md file's directory path
 
 #### Scenario: Claude Code directory
 - **WHEN** ROLE.md is at `project/.claude/roles/my-role/ROLE.md`
-- **THEN** dialect is detected as `claude-code`
+- **THEN** dialect is detected as `claude-code-agent`
 
 #### Scenario: Codex directory
 - **WHEN** ROLE.md is at `project/.codex/roles/my-role/ROLE.md`
