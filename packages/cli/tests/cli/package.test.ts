@@ -255,6 +255,27 @@ describe("runPackage — package.json generation", () => {
     expect((pkgJson.chapter as Record<string, unknown>).type).toBe("role");
   });
 
+  it("uses `package` metadata field as npm package name when specified", async () => {
+    const roleDir = join(testDir, ".mason", "roles", "scoped-role");
+    await mkdir(roleDir, { recursive: true });
+    const roleMd = `---\nname: scoped-role\ndescription: A scoped role\npackage: "@myorg/my-role"\n---\n\nInstructions.`;
+    await writeFile(join(roleDir, "ROLE.md"), roleMd);
+
+    const { spawnSync } = await import("node:child_process");
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, pid: 1, output: [], stdout: Buffer.from(""), stderr: Buffer.from(""), signal: null });
+
+    await runPackage(testDir, "scoped-role");
+
+    const pkgJson = JSON.parse(
+      await readFile(
+        join(testDir, ".mason", "roles", "scoped-role", "build", "package.json"),
+        "utf-8",
+      ),
+    ) as Record<string, unknown>;
+
+    expect(pkgJson.name).toBe("@myorg/my-role");
+  });
+
   it("merges user-supplied package.json preserving devDependencies", async () => {
     await createMasonRole({
       name: "custom-role",

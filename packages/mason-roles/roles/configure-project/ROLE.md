@@ -9,7 +9,9 @@ apps:
 container: {}
 
 risk: HIGH
-
+package: "@clawmasons/role-configure-project"
+sources:
+  - ./
 credentials:
   - CLAUDE_CODE_OAUTH_TOKEN
 ---
