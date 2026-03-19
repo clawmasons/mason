@@ -1,6 +1,6 @@
 {
   "name": "@clawmasons/agent-sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "SDK for building Mason Chapter agent packages",
   "type": "module",
   "main": "./dist/index.js",
@@ -20,6 +20,6 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@clawmasons/shared": "^0.1.1"
+    "@clawmasons/shared": "^0.1.2"
   }
 }
