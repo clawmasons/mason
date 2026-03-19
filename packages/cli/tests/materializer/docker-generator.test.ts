@@ -452,7 +452,8 @@ describe("generateSessionComposeYml", () => {
     logsDir: "/project/.mason/sessions/abc12345/logs",
     workspacePath: "/project/.mason/docker/create-prd/claude-code-agent/workspace",
     buildWorkspaceProjectPath: "/project/.mason/docker/create-prd/claude-code-agent/build/workspace/project",
-    buildWorkspaceProjectEntries: [".mcp.json", ".claude", "AGENTS.md"],
+    buildWorkspaceProjectFileEntries: [".mcp.json", "AGENTS.md"],
+    buildWorkspaceProjectDirEntries: [".claude"],
   };
 
   it("generates valid YAML with proxy and agent services", () => {
@@ -470,10 +471,12 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain("ignore-claude:/home/mason/workspace/project/.claude");
   });
 
-  it("includes volume masking for files as sentinel bind mounts", () => {
+  it("includes volume masking for files as Docker Compose configs (VirtioFS-safe)", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
-    expect(yml).toContain("/home/mason/workspace/project/.env:ro");
+    // File masks should appear as configs, not bind mounts
+    expect(yml).toContain("mask-env:");
+    expect(yml).toContain("target: /home/mason/workspace/project/.env");
     expect(yml).toContain("empty-file");
   });
 
@@ -485,10 +488,13 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain("  ignore-claude:");
   });
 
-  it("mounts project read-only at /home/mason/workspace/project", () => {
+  it("mounts project at /home/mason/workspace/project without :ro (agents need write access)", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
-    expect(yml).toContain("/home/mason/workspace/project:ro");
+    // Agent project mount should NOT have :ro
+    const agentSection = yml.split("agent-create-prd:")[1]!;
+    expect(agentSection).toContain(":/home/mason/workspace/project\n");
+    expect(agentSection).not.toContain("/home/mason/workspace/project:ro");
   });
 
   it("mounts workspace path to /home/mason/workspace when workspacePath provided", () => {
@@ -497,22 +503,38 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain(":/home/mason/workspace\n");
   });
 
-  it("emits per-entry overlay mounts for build workspace project entries", () => {
+  it("emits file overlays as Docker Compose configs (VirtioFS-safe)", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
-    expect(yml).toContain(":/home/mason/workspace/project/.mcp.json");
-    expect(yml).toContain(":/home/mason/workspace/project/.claude");
-    expect(yml).toContain(":/home/mason/workspace/project/AGENTS.md");
+    // Top-level configs section
+    expect(yml).toContain("configs:");
+    expect(yml).toContain("overlay-mcp-json:");
+    expect(yml).toContain("overlay-agents-md:");
+
+    // Service-level configs in agent service
+    expect(yml).toContain("target: /home/mason/workspace/project/.mcp.json");
+    expect(yml).toContain("target: /home/mason/workspace/project/AGENTS.md");
   });
 
-  it("does not emit overlay mounts when buildWorkspaceProjectEntries is empty", () => {
+  it("emits directory overlays as bind mounts", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+
+    // .claude is a directory entry — should appear as bind mount volume
+    expect(yml).toContain(":/home/mason/workspace/project/.claude");
+
+    // Should NOT appear as a config
+    expect(yml).not.toContain("overlay-claude:");
+  });
+
+  it("does not emit overlay mounts when entries are empty", () => {
     const yml = generateSessionComposeYml({
       ...baseOpts,
-      buildWorkspaceProjectEntries: [],
+      buildWorkspaceProjectFileEntries: [],
+      buildWorkspaceProjectDirEntries: [],
     });
 
-    // Should have workspace mount but no overlay mounts for specific files
     expect(yml).not.toContain(":/home/mason/workspace/project/.mcp.json");
+    expect(yml).not.toContain("overlay-");
   });
 
   it("uses relative paths from session directory", () => {
@@ -537,6 +559,12 @@ describe("generateSessionComposeYml", () => {
         }
       }
     }
+  });
+
+  it("includes PROJECT_DIR in proxy environment", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+    const proxySection = yml.split("agent-create-prd:")[0]!;
+    expect(proxySection).toContain("PROJECT_DIR=/home/mason/workspace/project");
   });
 
   it("includes tokens in environment", () => {
@@ -627,6 +655,41 @@ describe("generateSessionComposeYml", () => {
         expect(line).toContain("/home/mason/workspace/project/");
       }
     }
+  });
+
+  it("adds homeOverride volume before project mount", () => {
+    const yml = generateSessionComposeYml({
+      ...baseOpts,
+      homeOverride: "/custom/home",
+    });
+    const agentSection = yml.split("agent-create-prd:")[1]!;
+    const volumeSection = agentSection.split("volumes:")[1]!.split(/configs:|depends_on:/)[0]!;
+    const mountLines = volumeSection.split("\n").filter((l) => l.trim().startsWith("- "));
+
+    // First mount should be the home override
+    expect(mountLines[0]).toContain(":/home/mason/");
+    // Project mount comes next
+    expect(mountLines[1]).toContain(":/home/mason/workspace/project");
+  });
+
+  it("adds bashMode AGENT_COMMAND_OVERRIDE env var", () => {
+    const yml = generateSessionComposeYml({ ...baseOpts, bashMode: true });
+    const agentSection = yml.split("agent-create-prd:")[1]!;
+    expect(agentSection).toContain("AGENT_COMMAND_OVERRIDE=bash");
+  });
+
+  it("adds verbose AGENT_ENTRY_VERBOSE env var", () => {
+    const yml = generateSessionComposeYml({ ...baseOpts, verbose: true });
+    const agentSection = yml.split("agent-create-prd:")[1]!;
+    expect(agentSection).toContain("AGENT_ENTRY_VERBOSE=1");
+  });
+
+  it("adds vscodeServerHostPath volume mount", () => {
+    const yml = generateSessionComposeYml({
+      ...baseOpts,
+      vscodeServerHostPath: "/project/.mason/docker/vscode-server",
+    });
+    expect(yml).toContain(":/home/mason/.vscode-server");
   });
 });
 
@@ -727,8 +790,9 @@ describe("createSessionDirectory", () => {
     // Directory masks
     expect(content).toContain("ignore-mason:/home/mason/workspace/project/.mason");
     expect(content).toContain("ignore-claude:/home/mason/workspace/project/.claude");
-    // File mask
-    expect(content).toContain("/home/mason/workspace/project/.env:ro");
+    // File mask (now via configs)
+    expect(content).toContain("mask-env:");
+    expect(content).toContain("target: /home/mason/workspace/project/.env");
   });
 
   it("works with role that has no ignore paths", () => {

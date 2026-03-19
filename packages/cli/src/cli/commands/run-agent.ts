@@ -7,7 +7,6 @@ import { Readable, Writable } from "node:stream";
 import { spawn } from "node:child_process";
 import { checkDockerCompose } from "./docker-utils.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
-import { resolveRoleMountVolumes, type RoleMount } from "../../generator/mount-volumes.js";
 import type { ResolvedAgent, Role } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName } from "@clawmasons/shared";
 import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../../materializer/role-materializer.js";
@@ -16,7 +15,7 @@ import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../ac
 import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
 import { CredentialService, CredentialWSClient } from "@clawmasons/credential-service";
 import { createFileLogger, type AcpLogger } from "../../acp/logger.js";
-import { generateRoleDockerBuildDir } from "../../materializer/docker-generator.js";
+import { generateRoleDockerBuildDir, createSessionDirectory, getHostIds } from "../../materializer/docker-generator.js";
 import { ensureProxyDependencies, synthesizeRolePackages } from "../../materializer/proxy-dependencies.js";
 
 // ── Local type alias (mirrors DevContainerCustomizations from agent-sdk) ──────
@@ -166,131 +165,6 @@ export function displayCredentials(
     const uniqueDeclarers = [...new Set(declarers)];
     console.log(`    ${key}  (declared by: ${uniqueDeclarers.join(", ")})`);
   }
-}
-
-/**
- * Generate a docker-compose.yml for a run-agent interactive session.
- *
- * Uses the project-local docker build directory layout:
- *   .mason/docker/{role}/
- *     {agent-type}/Dockerfile
- *     mcp-proxy/Dockerfile
- */
-export function generateComposeYml(opts: {
-  dockerBuildDir: string;
-  dockerDir: string;
-  projectDir: string;
-  agent: string;
-  role: string;
-  logsDir: string;
-  proxyToken: string;
-  credentialProxyToken: string;
-  proxyPort?: number;
-  roleMounts?: RoleMount[];
-  credentialKeys?: string[];
-  bashMode?: boolean;
-  verbose?: boolean;
-  homeOverride?: string;
-  /** Path to the vscode-server host directory to mount into the agent container. */
-  vscodeSeverHostPath?: string;
-}): string {
-  const { dockerBuildDir, dockerDir, projectDir, agent, role, logsDir, proxyToken, credentialProxyToken, proxyPort = 3000, roleMounts, credentialKeys } = opts;
-
-  // Per-role cache directory for NODE_COMPILE_CACHE and NPM_CONFIG_CACHE
-  const cacheDir = path.join(dockerBuildDir, "mcp-proxy", ".cache");
-
-  // Proxy: context is dockerDir (has node_modules), dockerfile is role-specific
-  const proxyDockerfile = path.relative(dockerDir, path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"));
-  // Agent: context is dockerDir (has node_modules), dockerfile is role/agent-type specific
-  const agentDockerfile = path.relative(dockerDir, path.join(dockerBuildDir, agent, "Dockerfile"));
-
-  const proxyServiceName = `proxy-${role}`;
-  const agentServiceName = `agent-${role}`;
-
-  // Unique compose project name derived from project directory
-  const projectHash = crypto.createHash("sha256").update(projectDir).digest("hex").slice(0, 8);
-  const composeName = `mason-${projectHash}`;
-
-  // Build agent volume lines
-  const agentVolumeLines: string[] = [];
-
-  // 0. Optional home override — bind-mounts over /home/mason/ so agent config
-  //    files (e.g. ~/.claude/) are visible inside the container.
-  if (opts.homeOverride) {
-    agentVolumeLines.push(`      - "${opts.homeOverride}:/home/mason/"`);
-  }
-
-  // 1. Workspace mount — provides agent-launch.json at /home/mason/workspace/agent-launch.json
-  const workspacePath = path.join(dockerBuildDir, agent, "workspace");
-  agentVolumeLines.push(`      - "${workspacePath}:/home/mason/workspace"`);
-
-  // 2. Project dir mount
-  agentVolumeLines.push(`      - "${projectDir}:/home/mason/workspace/project"`);
-
-  // 3. Per-file overlay mounts — inject config files into /home/mason/workspace/project/
-  const buildWorkspaceProjectDir = path.join(dockerBuildDir, agent, "build", "workspace", "project");
-  if (fs.existsSync(buildWorkspaceProjectDir)) {
-    for (const entry of fs.readdirSync(buildWorkspaceProjectDir)) {
-      const srcPath = path.join(buildWorkspaceProjectDir, entry);
-      const projectEntryPath = path.join(projectDir, entry);
-      // On macOS with virtiofs, bind-mounting a file on top of an existing project file
-      // fails ("mountpoint is outside of rootfs"). Write the generated content directly instead.
-      if (fs.statSync(srcPath).isFile() && fs.existsSync(projectEntryPath)) {
-        fs.copyFileSync(srcPath, projectEntryPath);
-      } else {
-        agentVolumeLines.push(`      - "${srcPath}:/home/mason/workspace/project/${entry}"`);
-      }
-    }
-  }
-
-  // 4. VS Code Server persistent mount (dev-container mode only)
-  if (opts.vscodeSeverHostPath) {
-    agentVolumeLines.push(`      - "${opts.vscodeSeverHostPath}:/home/mason/.vscode-server"`);
-  }
-
-  // 5. Logs dir mount
-  agentVolumeLines.push(`      - "${logsDir}:/logs"`);
-
-  // 6. Role-declared extra mounts
-  for (const vol of resolveRoleMountVolumes(roleMounts)) {
-    agentVolumeLines.push(`      - "${vol}"`);
-  }
-
-  return `# Generated by mason run-agent
-name: ${composeName}
-services:
-  ${proxyServiceName}:
-    build:
-      context: "${dockerDir}"
-      dockerfile: "${proxyDockerfile}"
-    volumes:
-      - "${projectDir}:/home/mason/workspace/project"
-      - "${logsDir}:/logs"
-      - "${cacheDir}:/app/.cache"
-    environment:
-      - CHAPTER_PROXY_TOKEN=${proxyToken}
-      - CREDENTIAL_PROXY_TOKEN=${credentialProxyToken}
-      - PROJECT_DIR=/home/mason/workspace/project${credentialKeys && credentialKeys.length > 0 ? `\n      - CHAPTER_DECLARED_CREDENTIALS=${JSON.stringify(credentialKeys)}` : ""}
-    ports:
-      - "${proxyPort}:9090"
-    restart: "no"
-
-  ${agentServiceName}:
-    build:
-      context: "${dockerDir}"
-      dockerfile: "${agentDockerfile}"
-    volumes:
-${agentVolumeLines.join("\n")}
-    depends_on:
-      - ${proxyServiceName}
-    environment:
-      - MCP_PROXY_TOKEN=${proxyToken}
-      - MCP_PROXY_URL=http://${proxyServiceName}:9090${credentialKeys && credentialKeys.length > 0 ? `\n      - AGENT_CREDENTIALS=${JSON.stringify(credentialKeys)}` : ""}${opts.bashMode ? `\n      - AGENT_COMMAND_OVERRIDE=bash` : ""}${opts.verbose ? `\n      - AGENT_ENTRY_VERBOSE=1` : ""}
-    stdin_open: true
-    tty: true
-    init: true
-    restart: "no"
-`;
 }
 
 /**
@@ -758,6 +632,29 @@ export async function runAgent(
   }
 }
 
+// ── Shared Helpers ────────────────────────────────────────────────────
+
+/**
+ * Collect declared credential keys from SDK defaults, agent config, role governance, and app-level.
+ */
+function collectDeclaredCredentialKeys(
+  agentType: string,
+  agentConfigCredentials: string[] | undefined,
+  roleType: Role,
+): string[] {
+  const agentPkg = getAgentFromRegistry(agentType);
+  const sdkCredKeys = agentPkg?.runtime?.credentials?.map((c) => c.key) ?? [];
+  const keys = [...sdkCredKeys, ...(agentConfigCredentials ?? []), ...(roleType.governance?.credentials ?? [])];
+  for (const app of roleType.apps ?? []) {
+    for (const key of app.credentials ?? []) {
+      if (!keys.includes(key)) {
+        keys.push(key);
+      }
+    }
+  }
+  return keys;
+}
+
 // ── Interactive Mode ──────────────────────────────────────────────────
 
 async function runAgentInteractiveMode(
@@ -802,56 +699,33 @@ async function runAgentInteractiveMode(
     // 5. Ensure .mason is in project's .gitignore
     ensureGitignore(projectDir, ".mason");
 
-    // 6. Generate session ID and create session directory
-    const sessionId = (deps?.generateSessionIdFn ?? generateSessionId)();
-    const sessionDir = path.join(projectDir, ".mason", "sessions", sessionId);
-    const dockerSessionDir = path.join(sessionDir, "docker");
-    fs.mkdirSync(dockerSessionDir, { recursive: true });
-
-    const logsDir = path.join(sessionDir, "logs");
-    fs.mkdirSync(logsDir, { recursive: true });
-
-    console.log(`  Session: ${sessionId}`);
-
-    // 7. Generate tokens and docker-compose.yml
-    const proxyToken = crypto.randomBytes(32).toString("hex");
-    const credentialProxyToken = crypto.randomBytes(32).toString("hex");
-
-    // Collect declared credential keys: SDK defaults, agent config, role governance, app-level
-    const agentPkgForCreds = getAgentFromRegistry(agentType);
-    const sdkCredKeys = agentPkgForCreds?.runtime?.credentials?.map((c) => c.key) ?? [];
-    const declaredCredentialKeys = [...sdkCredKeys, ...(agentConfigCredentials ?? []), ...(roleType.governance?.credentials ?? [])];
-    for (const app of roleType.apps ?? []) {
-      for (const key of app.credentials ?? []) {
-        if (!declaredCredentialKeys.includes(key)) {
-          declaredCredentialKeys.push(key);
-        }
-      }
-    }
-
-    const composeContent = generateComposeYml({
+    // 6. Create session directory with compose file
+    const { uid, gid } = getHostIds();
+    const declaredCredentialKeys = collectDeclaredCredentialKeys(agentType, agentConfigCredentials, roleType);
+    const sessionIdOverride = (deps?.generateSessionIdFn ?? generateSessionId)();
+    const session = createSessionDirectory({
+      projectDir,
       dockerBuildDir,
       dockerDir,
-      projectDir,
-      agent: agentType,
-      role: roleName,
-      logsDir,
-      proxyToken,
-      credentialProxyToken,
+      role: roleType,
+      agentType,
+      agentName: roleName,
       proxyPort,
       roleMounts: roleType.container?.mounts,
       credentialKeys: declaredCredentialKeys,
+      hostUid: uid,
+      hostGid: gid,
+      homeOverride,
       bashMode,
       verbose,
-      homeOverride,
+      sessionId: sessionIdOverride,
     });
 
-    const composeFile = path.join(dockerSessionDir, "docker-compose.yml");
-    fs.writeFileSync(composeFile, composeContent);
-    console.log(`  Compose: .mason/sessions/${sessionId}/docker/docker-compose.yml`);
+    const { sessionId, composeFile, credentialProxyToken, proxyServiceName, agentServiceName } = session;
+    console.log(`  Session: ${sessionId}`);
+    console.log(`  Compose: .mason/sessions/${sessionId}/docker-compose.yaml`);
 
-    // 8. Build and start proxy detached
-    const proxyServiceName = `proxy-${roleName}`;
+    // 7. Build and start proxy detached
     console.log(`\n  Building proxy (${proxyServiceName})...`);
 
     const buildArgs = ["build"];
@@ -904,7 +778,6 @@ async function runAgentInteractiveMode(
     }
 
     // 10. Start agent interactively
-    const agentServiceName = `agent-${roleName}`;
     console.log(`  Starting agent (${agentServiceName})...\n`);
 
     // When stdin is not a TTY (e.g. piped from a test), pass -T to disable
@@ -1010,10 +883,10 @@ async function runAgentDevContainerMode(
     ensureGitignore(projectDir, ".mason");
 
     // 5. Create vscode-server persistent directory and write static server-env-setup
-    const vscodeSeverHostPath = path.join(projectDir, ".mason", "docker", "vscode-server");
-    fs.mkdirSync(vscodeSeverHostPath, { recursive: true });
+    const vscodeServerHostPath = path.join(projectDir, ".mason", "docker", "vscode-server");
+    fs.mkdirSync(vscodeServerHostPath, { recursive: true });
 
-    const serverEnvSetupPath = path.join(vscodeSeverHostPath, "server-env-setup");
+    const serverEnvSetupPath = path.join(vscodeServerHostPath, "server-env-setup");
     const serverEnvSetupContent = [
       "#!/bin/sh",
       "_LOG=/logs/server-env-setup.log",
@@ -1032,58 +905,39 @@ async function runAgentDevContainerMode(
       fs.writeFileSync(serverEnvSetupPath, serverEnvSetupContent, { mode: 0o755 });
     }
 
-    // 6. Generate session ID and directories
-    const sessionId = (deps?.generateSessionIdFn ?? generateSessionId)();
-    const sessionDir = path.join(projectDir, ".mason", "sessions", sessionId);
-    const dockerSessionDir = path.join(sessionDir, "docker");
-    fs.mkdirSync(dockerSessionDir, { recursive: true });
-    const logsDir = path.join(sessionDir, "logs");
-    fs.mkdirSync(logsDir, { recursive: true });
-
-    console.log(`  Session: ${sessionId}`);
-
-    // 7. Generate tokens and compose file
-    const proxyToken = crypto.randomBytes(32).toString("hex");
-    const credentialProxyToken = crypto.randomBytes(32).toString("hex");
-
-    const agentPkgForCreds = getAgentFromRegistry(agentType);
-    const sdkCredKeys = agentPkgForCreds?.runtime?.credentials?.map((c) => c.key) ?? [];
-    const declaredCredentialKeys = [...sdkCredKeys, ...(agentConfigCredentials ?? []), ...(roleType.governance?.credentials ?? [])];
-    for (const app of roleType.apps ?? []) {
-      for (const key of app.credentials ?? []) {
-        if (!declaredCredentialKeys.includes(key)) declaredCredentialKeys.push(key);
-      }
-    }
-
-    // Derive compose project name to know the container name for VSCode attach
-    const projectHash = crypto.createHash("sha256").update(projectDir).digest("hex").slice(0, 8);
-    const composeName = `mason-${projectHash}`;
-    const agentServiceName = `agent-${roleName}`;
-    const containerName = deriveContainerName(composeName, agentServiceName);
-
-    const composeContent = generateComposeYml({
+    // 6. Create session directory with compose file
+    const { uid, gid } = getHostIds();
+    const declaredCredentialKeys = collectDeclaredCredentialKeys(agentType, agentConfigCredentials, roleType);
+    const sessionIdOverride = (deps?.generateSessionIdFn ?? generateSessionId)();
+    const session = createSessionDirectory({
+      projectDir,
       dockerBuildDir,
       dockerDir,
-      projectDir,
-      agent: agentType,
-      role: roleName,
-      logsDir,
-      proxyToken,
-      credentialProxyToken,
+      role: roleType,
+      agentType,
+      agentName: roleName,
       proxyPort,
       roleMounts: roleType.container?.mounts,
       credentialKeys: declaredCredentialKeys,
-      verbose,
+      hostUid: uid,
+      hostGid: gid,
       homeOverride,
-      vscodeSeverHostPath,
+      vscodeServerHostPath,
+      verbose,
+      sessionId: sessionIdOverride,
     });
 
-    const composeFile = path.join(dockerSessionDir, "docker-compose.yml");
-    fs.writeFileSync(composeFile, composeContent);
-    console.log(`  Compose: .mason/sessions/${sessionId}/docker/docker-compose.yml`);
+    const { sessionId, composeFile, credentialProxyToken, proxyServiceName, agentServiceName } = session;
 
-    // 8. Build and start proxy
-    const proxyServiceName = `proxy-${roleName}`;
+    // Derive compose project name for container name (VSCode attach)
+    const projectHash = crypto.createHash("sha256").update(projectDir).digest("hex").slice(0, 8);
+    const composeName = `mason-${projectHash}`;
+    const containerName = deriveContainerName(composeName, agentServiceName);
+
+    console.log(`  Session: ${sessionId}`);
+    console.log(`  Compose: .mason/sessions/${sessionId}/docker-compose.yaml`);
+
+    // 7. Build and start proxy
     console.log(`\n  Building proxy (${proxyServiceName})...`);
     const buildArgs = ["build"];
     if (buildMode) buildArgs.push("--no-cache");
@@ -1230,38 +1084,26 @@ export async function runProxyOnly(
   // 5. Ensure .mason is in project's .gitignore
   ensureGitignore(projectDir, ".mason");
 
-  // 6. Generate session ID and create session directory
-  const sessionId = (deps?.generateSessionIdFn ?? generateSessionId)();
-  const sessionDir = path.join(projectDir, ".mason", "sessions", sessionId);
-  const dockerSessionDir = path.join(sessionDir, "docker");
-  fs.mkdirSync(dockerSessionDir, { recursive: true });
-
-  const logsDir = path.join(sessionDir, "logs");
-  fs.mkdirSync(logsDir, { recursive: true });
-
-  // 7. Generate tokens and docker-compose.yml
-  const proxyToken = crypto.randomBytes(32).toString("hex");
-  const credentialProxyToken = crypto.randomBytes(32).toString("hex");
-
-  const composeContent = generateComposeYml({
+  // 6. Create session directory with compose file
+  const { uid, gid } = getHostIds();
+  const sessionIdOverride = (deps?.generateSessionIdFn ?? generateSessionId)();
+  const session = createSessionDirectory({
+    projectDir,
     dockerBuildDir,
     dockerDir,
-    projectDir,
-    agent: agentType,
-    role: roleName,
-    logsDir,
-    proxyToken,
-    credentialProxyToken,
+    role: roleType,
+    agentType,
+    agentName: roleName,
     proxyPort,
     roleMounts: roleType.container?.mounts,
+    hostUid: uid,
+    hostGid: gid,
+    sessionId: sessionIdOverride,
   });
 
-  const composeFile = path.join(dockerSessionDir, "docker-compose.yml");
-  fs.writeFileSync(composeFile, composeContent);
+  const { sessionId, composeFile, proxyToken, proxyServiceName } = session;
 
-  // 8. Build and start proxy detached
-  const proxyServiceName = `proxy-${roleName}`;
-
+  // 7. Build and start proxy detached
   const buildCode = await execCompose(composeFile, ["build", proxyServiceName]);
   if (buildCode !== 0) {
     throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
