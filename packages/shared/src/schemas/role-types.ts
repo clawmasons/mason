@@ -12,6 +12,7 @@ export const roleMetadataSchema = z.object({
   description: z.string(),
   version: z.string().optional(),
   scope: z.string().optional(),
+  package: z.string().optional(),
 });
 
 export const taskRefSchema = z.object({

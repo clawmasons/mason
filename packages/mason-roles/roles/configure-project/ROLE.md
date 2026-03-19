@@ -9,6 +9,7 @@ apps:
 container: {}
 
 risk: HIGH
+package: "@clawmasons/role-configure-project"
 sources:
   - ./
 credentials:

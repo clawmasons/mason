@@ -319,9 +319,10 @@ async function writePackageJson(
   const userPkgPath = join(role.source.path!, "package.json");
 
   let base: Record<string, unknown> = {
-    name: role.metadata.scope
-      ? `@${role.metadata.scope.replace(/\./g, "-")}/${roleName}`
-      : roleName,
+    name: role.metadata.package
+      ?? (role.metadata.scope
+        ? `@${role.metadata.scope.replace(/\./g, "-")}/${roleName}`
+        : roleName),
     version: role.metadata.version ?? "1.0.0",
     description: role.metadata.description,
   };

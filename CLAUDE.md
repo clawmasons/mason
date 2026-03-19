@@ -19,8 +19,16 @@
 - Review lessons at session start for relevant project
 
 ### 4. Verification Before Done
-- **Every code change must**: compile (`npx tsc --noEmit`), pass the linter (`npx eslint src/ tests/`), and pass tests (`npx vitest run`)
-- All branches targeted to merge to main must past the e2e tests `cd /Users/greff/Projects/clawmasons/chapter/packages/tests && npx vitest run --config vitest.config.ts 2>&1`.
+- **Every code change must**: compile (`npx tsc --noEmit`), pass the linter (`npx eslint src/ tests/`), and pass unit tests
+- **Unit tests** (run for the package you changed): `npx vitest run packages/<name>/tests/`
+  - Example: `npx vitest run packages/cli/tests/` or `npx vitest run packages/shared/tests/`
+  - NEVER use bare `npx vitest run` from repo root — it includes e2e tests with the wrong config
+- **E2E tests** (run only before merging to main): `cd packages/tests && npx vitest run --config vitest.config.ts`
+  - NEVER run e2e from the repo root
+- **Test process rules**:
+  - NEVER run more than one vitest process at a time
+  - NEVER run vitest with `run_in_background: true` — always wait for it in the foreground
+  - If an invocation fails, verify no prior vitest is still running before retrying
 - Never mark a task complete without proving it works
 - Diff behavior between main and your changes when relevant
 - Ask yourself: "Would a staff engineer approve this?"

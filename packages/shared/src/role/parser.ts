@@ -57,6 +57,7 @@ export async function readMaterializedRole(rolePath: string): Promise<Role> {
     description: frontmatter.description as string | undefined,
     version: frontmatter.version as string | undefined,
     scope: frontmatter.scope as string | undefined,
+    package: frontmatter.package as string | undefined,
   };
 
   if (!metadata.description) {
