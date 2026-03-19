@@ -9,7 +9,8 @@ apps:
 container: {}
 
 risk: HIGH
-
+sources:
+  - ./
 credentials:
   - CLAUDE_CODE_OAUTH_TOKEN
 ---

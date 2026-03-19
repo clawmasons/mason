@@ -1,11 +1,10 @@
 /**
- * mason package — Build and pack a role from .mason/roles/<name>/ into a
- * distributable npm .tgz package.
+ * mason package — Build and pack a role into a distributable npm .tgz package.
  *
  * Steps:
- * 1. Load ROLE.md from .mason/roles/<name>/ROLE.md
+ * 1. Load ROLE.md from roles/<name>/ROLE.md or .mason/roles/<name>/ROLE.md
  * 2. Validate all task/skill refs can be resolved from role.sources
- * 3. Assemble build directory at .mason/roles/<name>/build/
+ * 3. Assemble build directory at <role-dir>/build/
  * 4. Generate/merge package.json in build dir
  * 5. Run npm install, npm run build (if script exists), npm pack
  */
@@ -21,9 +20,9 @@ import {
   readdir,
 } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join, resolve as pathResolve, basename, extname } from "node:path";
+import { join, resolve as pathResolve, basename, dirname, extname } from "node:path";
 import { spawnSync } from "node:child_process";
-import { resolveRole, RoleDiscoveryError } from "@clawmasons/shared";
+import { resolveRole, RoleDiscoveryError, readMaterializedRole } from "@clawmasons/shared";
 import { getDialectByDirectory } from "@clawmasons/shared";
 import type { Role, TaskRef, SkillRef } from "@clawmasons/shared";
 
@@ -34,7 +33,7 @@ import type { Role, TaskRef, SkillRef } from "@clawmasons/shared";
 export function registerPackageCommand(program: Command): void {
   program
     .command("package")
-    .description("Build and pack a role from .mason/roles/<name>/ into an npm package")
+    .description("Build and pack a role into an npm package (checks roles/<name>/ then .mason/roles/<name>/)")
     .requiredOption("--role <name>", "Role name to package")
     .action(async (options: { role: string }) => {
       await runPackage(process.cwd(), options.role);
@@ -50,31 +49,35 @@ export async function runPackage(
   roleName: string,
 ): Promise<void> {
   try {
-    // 1. Load role from .mason/roles/<name>/ROLE.md
+    // 1. Load role — try roles/<name>/ROLE.md first, fall back to .mason/roles/<name>/ROLE.md
     console.log(`\n  Loading role "${roleName}"...`);
     let role: Role;
-    try {
-      role = await resolveRole(roleName, projectDir);
-    } catch (err) {
-      if (err instanceof RoleDiscoveryError) {
-        const expectedPath = join(
-          projectDir,
-          ".mason",
-          "roles",
-          roleName,
-          "ROLE.md",
-        );
-        throw new Error(
-          `Role "${roleName}" not found. Expected ROLE.md at: ${expectedPath}`,
-        );
+    const cwdRolePath = join(projectDir, "roles", roleName, "ROLE.md");
+    if (existsSync(cwdRolePath)) {
+      role = await readMaterializedRole(cwdRolePath);
+      // Auto-add cwd as a source so sibling skills/tasks directories are found
+      if (role.sources.length === 0) {
+        role = { ...role, sources: ["./"] };
       }
-      throw err;
+    } else {
+      try {
+        role = await resolveRole(roleName, projectDir);
+      } catch (err) {
+        if (err instanceof RoleDiscoveryError) {
+          throw new Error(
+            `Role "${roleName}" not found. Looked in:\n` +
+              `  - ${join(projectDir, "roles", roleName, "ROLE.md")}\n` +
+              `  - ${join(projectDir, ".mason", "roles", roleName, "ROLE.md")}`,
+          );
+        }
+        throw err;
+      }
     }
 
     if (role.source.type !== "local") {
       throw new Error(
         `Role "${roleName}" is an installed package, not a local role. ` +
-          `mason package only works with local roles in .mason/roles/.`,
+          `mason package only works with local roles.`,
       );
     }
 
@@ -96,7 +99,7 @@ export async function runPackage(
     }
 
     // 3. Assemble build directory
-    const buildDir = join(projectDir, ".mason", "roles", roleName, "build");
+    const buildDir = join(role.source.path!, "build");
     console.log(`  Assembling build directory: ${buildDir}`);
     await assembleBuild(role, buildDir, resolvedTasks, resolvedSkills);
 
@@ -313,7 +316,7 @@ async function writePackageJson(
   projectDir: string,
   buildDir: string,
 ): Promise<void> {
-  const userPkgPath = join(projectDir, ".mason", "roles", roleName, "package.json");
+  const userPkgPath = join(role.source.path!, "package.json");
 
   let base: Record<string, unknown> = {
     name: role.metadata.scope

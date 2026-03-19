@@ -189,10 +189,15 @@ export function detectDialect(roleDir: string, rolePath: string): DialectEntry {
   // Get the agent directory name (e.g., ".claude" → "claude")
   const agentDirName = basename(agentDir);
   if (!agentDirName.startsWith(".")) {
-    throw new RoleParseError(
-      `Agent directory must start with a dot (got "${agentDirName}")`,
-      rolePath,
-    );
+    // Not inside a dot-directory (e.g. {cwd}/roles/<name>/) — default to mason dialect
+    const dialect = getDialectByDirectory("mason");
+    if (!dialect) {
+      throw new RoleParseError(
+        `Default "mason" dialect not found in dialect registry`,
+        rolePath,
+      );
+    }
+    return dialect;
   }
 
   const directoryKey = agentDirName.substring(1); // strip the dot

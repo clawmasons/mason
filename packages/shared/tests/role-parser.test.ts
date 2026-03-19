@@ -311,12 +311,11 @@ describe("detectDialect", () => {
     );
   });
 
-  it("rejects path with non-dot agent directory", async () => {
+  it("defaults to mason dialect for non-dot agent directory", async () => {
     const roleDir = join(testDir, "claude", "roles", "my-role");
     await mkdir(roleDir, { recursive: true });
-    expect(() => detectDialect(roleDir, join(roleDir, "ROLE.md"))).toThrow(
-      RoleParseError,
-    );
+    const dialect = detectDialect(roleDir, join(roleDir, "ROLE.md"));
+    expect(dialect.name).toBe("mason");
   });
 
   it("rejects unknown agent directory", async () => {

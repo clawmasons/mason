@@ -179,3 +179,21 @@ The `ChapterProxyServerConfig` interface SHALL accept an optional `approvalPatte
 #### Scenario: Config without approval patterns disables approval workflow
 - **WHEN** `ChapterProxyServer` is constructed without `approvalPatterns`
 - **THEN** no tool calls require approval
+
+### Requirement: ChapterProxyServer exposes a /health endpoint
+The `ChapterProxyServer` SHALL handle `GET /health` without authentication. When the server is ready and the project filesystem is accessible, it SHALL respond `200 OK` with body `"ok"`. When `PROJECT_DIR` is set but the directory is not yet accessible (e.g. during VirtioFS mount initialisation), it SHALL respond `503 Service Unavailable` with body `"filesystem not ready"`.
+
+This allows mason's `waitForProxyHealth` poller to gate agent container startup until Docker Desktop has fully registered the project directory's VirtioFS `host_mark` path. Config file mounts in the agent container require this registration to be complete; starting the agent before it is ready causes a transient runc error.
+
+#### Scenario: Healthy response
+- **WHEN** `GET /health` is called and `PROJECT_DIR` is not set
+- **THEN** the server responds `200 OK` with body `"ok"` — no auth required
+
+#### Scenario: Healthy response with accessible filesystem
+- **WHEN** `GET /health` is called and `PROJECT_DIR` is set to a directory that exists
+- **THEN** the server responds `200 OK` with body `"ok"`
+
+#### Scenario: Filesystem not ready
+- **WHEN** `GET /health` is called and `PROJECT_DIR` is set to a path that does not yet exist
+- **THEN** the server responds `503 Service Unavailable` with body `"filesystem not ready"`
+- **AND** mason's health poller retries until the directory becomes accessible

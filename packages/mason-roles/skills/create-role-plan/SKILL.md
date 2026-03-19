@@ -59,12 +59,13 @@ Repeat for each proposed role.
 - [ ] Write system prompt body in each ROLE.md
 - [ ] Configure MCP server tool allow/deny lists
 - [ ] Add container ignore paths (`.mason/`, `.claude/`, `.env` at minimum)
+- [ ] Find any command that the skills use and add os dependencies for either apt or npm to install the commands
 - [ ] Add a an "alias" to .mason/config.json to run this role with the current agent
 ## Testing
 
 How to launch and verify each role with mason:
 
-1. **Launch a role**: `mason run .mason/roles/{role-name}`
+1. **Launch a role**: Give instructions on how to run with the role`mason run --agent {agent-name} --role {role-name} --verbose`
 2. **Smoke test checklist**:
    - [ ] Role loads without credential errors
    - [ ] MCP servers connect and listed tools match allow list

@@ -150,3 +150,7 @@ tasks
 
 e2e
 
+.mason/docker
+.mason/sessions
+
+packages/mason-roles/roles/**/build

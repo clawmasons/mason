@@ -92,10 +92,11 @@ if [[ "$DRY_RUN" == true ]]; then
 fi
 
 
-npx changeset publish
+npx changeset publish --no-git-tag
 echo "==> Published to npm"
 
-git push origin HEAD --follow-tags
-echo "==> Pushed to remote with tags"
+git push origin HEAD
+echo "==> Pushed to remote"
 
 echo "==> Done! All packages published at v${NEW_VERSION}"
+echo "==> After squash-merging to main, run: ./scripts/tag-release.sh"

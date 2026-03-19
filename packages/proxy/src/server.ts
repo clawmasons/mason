@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { createServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -120,7 +121,15 @@ export class ChapterProxyServer {
       const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
 
       // Health endpoint — no auth required
+      // Also checks PROJECT_DIR is accessible to ensure VirtioFS host_mark registration
+      // is complete before the agent container starts mounting config files over it.
       if (req.method === "GET" && url.pathname === "/health") {
+        const projectDir = process.env.PROJECT_DIR;
+        if (projectDir && !existsSync(projectDir)) {
+          res.writeHead(503, { "Content-Type": "text/plain" });
+          res.end("filesystem not ready");
+          return;
+        }
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("ok");
         return;
