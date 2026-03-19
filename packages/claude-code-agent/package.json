@@ -1,6 +1,6 @@
 {
   "name": "@clawmasons/claude-code-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Claude Code agent package for Mason Chapter",
   "type": "module",
   "main": "./dist/index.js",
@@ -20,7 +20,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@clawmasons/agent-sdk": "0.1.0",
-    "@clawmasons/shared": "0.1.0"
+    "@clawmasons/agent-sdk": "^0.1.1",
+    "@clawmasons/shared": "^0.1.1"
   }
 }

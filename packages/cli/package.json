@@ -1,6 +1,6 @@
 {
   "name": "@clawmasons/mason",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Mason — AI agent packaging, governance, and runtime orchestration",
   "type": "module",
   "bin": {
@@ -21,7 +21,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "build:proxy": "tsx esbuild.proxy.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "cd ../.. && npm run build"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
@@ -34,12 +35,13 @@
   "license": "MIT",
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.16.0",
-    "@clawmasons/shared": "0.1.0",
-    "@clawmasons/agent-sdk": "0.1.0",
-    "@clawmasons/claude-code-agent": "0.1.0",
-    "@clawmasons/pi-coding-agent": "0.1.0",
-    "@clawmasons/proxy": "0.1.0",
-    "@clawmasons/credential-service": "0.1.0",
+    "@clawmasons/shared": "^0.1.1",
+    "@clawmasons/agent-sdk": "^0.1.1",
+    "@clawmasons/claude-code-agent": "^0.1.1",
+    "@clawmasons/pi-coding-agent": "^0.1.1",
+    "@clawmasons/proxy": "^0.1.1",
+    "@clawmasons/mcp-agent": "^0.1.1",
+    "@clawmasons/credential-service": "^0.1.1",
     "commander": "^14.0.3"
   }
 }

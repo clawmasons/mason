@@ -19,6 +19,10 @@
   "references": [
     { "path": "../shared" },
     { "path": "../proxy" },
-    { "path": "../credential-service" }
+    { "path": "../credential-service" },
+    { "path": "../agent-sdk" },
+    { "path": "../mcp-agent" },
+    { "path": "../claude-code-agent" },
+    { "path": "../pi-coding-agent" }
   ]
 }

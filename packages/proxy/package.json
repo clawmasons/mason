@@ -1,6 +1,6 @@
 {
   "name": "@clawmasons/proxy",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Clawmasons Chapter MCP proxy server",
   "type": "module",
   "main": "./dist/index.js",
@@ -20,7 +20,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@clawmasons/shared": "0.1.0",
+    "@clawmasons/shared": "^0.1.1",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "better-sqlite3": "^12.6.2",
     "ws": "^8.19.0"
