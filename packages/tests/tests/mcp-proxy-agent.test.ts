@@ -168,7 +168,7 @@ describe("mcp-proxy-agent: agent↔proxy via CLI", () => {
       180_000, // includes docker build + proxy startup + credential resolution
     );
 
-    expect(readyOutput).toContain("[mcp-agent]");
+    expect(readyOutput).toContain("Agent: mcp-agent");
 
     console.log(readyOutput);
     
