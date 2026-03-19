@@ -12,7 +12,7 @@
  * 7. Validate through roleSchema
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join, basename, resolve } from "node:path";
 import { roleSchema } from "../schemas/role-types.js";
 import type { Role } from "../types/role.js";
@@ -30,6 +30,22 @@ export class PackageReadError extends Error {
   ) {
     super(`${message} (at ${packagePath})`);
     this.name = "PackageReadError";
+  }
+}
+
+/**
+ * Error thrown when a role package is missing bundled dependency subdirectories.
+ * All missing paths are collected before throwing (never fail-fast).
+ */
+export class PackageDependencyError extends Error {
+  constructor(
+    public readonly roleMdPath: string,
+    public readonly missingPaths: string[],
+  ) {
+    super(
+      `Role at ${roleMdPath} has missing dependencies:\n${missingPaths.map((p) => `  - ${p}`).join("\n")}`,
+    );
+    this.name = "PackageDependencyError";
   }
 }
 
@@ -120,6 +136,9 @@ export async function readPackagedRole(packagePath: string): Promise<Role> {
     dialect.fieldMapping.skills,
     packagePath,
   );
+
+  // 6a. Validate bundled dependency subdirectories
+  await validateBundledDependencies(roleMdPath, packagePath, skills);
 
   // 7. Container requirements (pass-through)
   const container = frontmatter.container ?? {};
@@ -290,4 +309,45 @@ function normalizeSkills(
     }
     return { name: String(item) };
   });
+}
+
+/**
+ * Validate that all bundled skill subdirectories referenced in the role exist
+ * within the package. Collects ALL missing paths before throwing.
+ *
+ * A skill is a bundled dep if its `ref` is not an absolute path (not resolved
+ * from `./` or `../`) and not a scoped package name (doesn't start with `@`).
+ * Tasks are descriptive items, not package dependencies, so they are not checked.
+ */
+async function validateBundledDependencies(
+  roleMdPath: string,
+  packagePath: string,
+  skills: Array<Record<string, unknown>>,
+): Promise<void> {
+  const missing: string[] = [];
+
+  for (const skill of skills) {
+    const ref = skill.ref as string | undefined;
+    if (!ref) continue;
+    // Skip already-resolved absolute paths (came from ./ or ../ refs)
+    if (ref.startsWith("/")) continue;
+    // Skip scoped package references (@org/name)
+    if (ref.startsWith("@")) continue;
+    const expectedPath = join(packagePath, "skills", ref);
+    const exists = await directoryExists(expectedPath);
+    if (!exists) missing.push(expectedPath);
+  }
+
+  if (missing.length > 0) {
+    throw new PackageDependencyError(roleMdPath, missing);
+  }
+}
+
+async function directoryExists(path: string): Promise<boolean> {
+  try {
+    const s = await stat(path);
+    return s.isDirectory();
+  } catch {
+    return false;
+  }
 }

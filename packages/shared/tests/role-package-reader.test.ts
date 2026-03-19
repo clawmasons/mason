@@ -6,6 +6,7 @@ import {
   readPackagedRole,
   readMaterializedRole,
   PackageReadError,
+  PackageDependencyError,
 } from "@clawmasons/shared";
 
 // ---------------------------------------------------------------------------
@@ -535,6 +536,7 @@ skills:
 ---
 
 Instructions.`,
+      extraFiles: { "skills/simple-skill/.keep": "" },
     });
 
     const role = await readPackagedRole(pkgDir);
@@ -564,5 +566,140 @@ Instructions.`,
     expect(role.skills).toHaveLength(2);
     expect(role.skills[0].ref).toBe(join(pkgDir, "lib", "my-skill"));
     expect(role.skills[1].ref).toBe(join(pkgDir, "..", "sibling-pkg", "skill"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bundled dependency validation
+// ---------------------------------------------------------------------------
+
+describe("readPackagedRole — bundled dependency validation", () => {
+  it("loads successfully when all bundled skill subdirs exist", async () => {
+    const pkgDir = await createMockPackage({
+      name: "@acme/role-validated",
+      chapterType: "role",
+      roleMd: `---
+name: validated
+description: Role with bundled skills
+skills:
+  - create-plan
+  - run-tests
+---
+Instructions.`,
+      extraFiles: {
+        "skills/create-plan/.keep": "",
+        "skills/run-tests/.keep": "",
+      },
+    });
+
+    const role = await readPackagedRole(pkgDir);
+    expect(role.skills).toHaveLength(2);
+  });
+
+  it("throws PackageDependencyError when a plain-name skill subdir is missing", async () => {
+    const pkgDir = await createMockPackage({
+      name: "@acme/role-missing-skill",
+      chapterType: "role",
+      roleMd: `---
+name: missing-skill
+description: Role with a missing bundled skill
+skills:
+  - create-plan
+---
+Instructions.`,
+    });
+
+    await expect(readPackagedRole(pkgDir)).rejects.toThrow(
+      PackageDependencyError,
+    );
+  });
+
+  it("collects ALL missing skill paths before throwing", async () => {
+    const pkgDir = await createMockPackage({
+      name: "@acme/role-multi-missing",
+      chapterType: "role",
+      roleMd: `---
+name: multi-missing
+description: Role with multiple missing bundled skills
+skills:
+  - skill-a
+  - skill-b
+  - skill-c
+---
+Instructions.`,
+      extraFiles: { "skills/skill-b/.keep": "" },
+    });
+
+    let caught: PackageDependencyError | undefined;
+    try {
+      await readPackagedRole(pkgDir);
+    } catch (e) {
+      if (e instanceof PackageDependencyError) caught = e;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught!.missingPaths).toHaveLength(2);
+    expect(caught!.missingPaths.some((p) => p.endsWith("skills/skill-a"))).toBe(true);
+    expect(caught!.missingPaths.some((p) => p.endsWith("skills/skill-c"))).toBe(true);
+  });
+
+  it("exposes roleMdPath in PackageDependencyError", async () => {
+    const pkgDir = await createMockPackage({
+      name: "@acme/role-check-path",
+      chapterType: "role",
+      roleMd: `---
+name: check-path
+description: Role to check error path
+skills:
+  - missing-skill
+---
+Instructions.`,
+    });
+
+    let caught: PackageDependencyError | undefined;
+    try {
+      await readPackagedRole(pkgDir);
+    } catch (e) {
+      if (e instanceof PackageDependencyError) caught = e;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught!.roleMdPath).toContain("ROLE.md");
+  });
+
+  it("does not validate scoped package skill refs", async () => {
+    const pkgDir = await createMockPackage({
+      name: "@acme/role-scoped-skills",
+      chapterType: "role",
+      roleMd: `---
+name: scoped-skills
+description: Role with only scoped package skills
+skills:
+  - '@acme/skill-prd-writing'
+  - '@org/other-skill'
+---
+Instructions.`,
+    });
+
+    // Should NOT throw — scoped refs are not validated as subdirs
+    await expect(readPackagedRole(pkgDir)).resolves.toBeDefined();
+  });
+
+  it("does not validate path-relative skill refs", async () => {
+    const pkgDir = await createMockPackage({
+      name: "@acme/role-relative-skills",
+      chapterType: "role",
+      roleMd: `---
+name: relative-skills
+description: Role with relative path skills
+skills:
+  - ./skills/my-local-skill
+---
+Instructions.`,
+      extraFiles: { "skills/my-local-skill/index.md": "skill content" },
+    });
+
+    // Relative paths are resolved absolutely — not checked as bundled plain names
+    await expect(readPackagedRole(pkgDir)).resolves.toBeDefined();
   });
 });

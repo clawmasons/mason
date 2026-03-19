@@ -75,6 +75,7 @@ export {
   scanBundledResources,
   readPackagedRole,
   PackageReadError,
+  PackageDependencyError,
   adaptRoleToResolvedAgent,
   AdapterError,
   discoverRoles,

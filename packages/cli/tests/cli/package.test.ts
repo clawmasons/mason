@@ -20,6 +20,9 @@ beforeEach(async () => {
   // Prevent real npm calls from executing
   vi.mock("node:child_process", () => ({
     spawnSync: vi.fn().mockReturnValue({ status: 0 }),
+    exec: vi.fn((_cmd: string, cb: (err: Error) => void) => {
+      cb(new Error("mocked"));
+    }),
   }));
 });
 

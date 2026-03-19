@@ -1,6 +1,2 @@
-roles/**/build
-roles/**/dist
-docker
-sessions
 docker/
 sessions/
