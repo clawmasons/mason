@@ -652,7 +652,7 @@ ${agentEnvLines.join("\n")}${commandLine}
     stdin_open: true
     tty: true
     init: true
-    restart: "no"
+    restart: "on-failure:3"
 ${topLevelConfigsSection}${volumesSection}`;
 }
 

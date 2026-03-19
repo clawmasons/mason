@@ -32,6 +32,7 @@ An absolute path to a package directory (e.g., `node_modules/@acme/role-create-p
 6. **Extract metadata** — `name` from frontmatter (fallback: package.json name), `version` from frontmatter (fallback: package.json version)
 7. **Normalize fields** — tasks, apps, skills using the resolved dialect mapping
 8. **Resolve skill paths** — local paths (`./`, `../`) resolve relative to package directory; package names kept as-is
+8a. **Validate dependency subdirectories** — collect all plain-name (no `./`/`../`) skills and tasks; check each exists as a subdirectory in the package; if any are missing, throw `PackageDependencyError` with all missing paths collected
 9. **Scan bundled resources** — reuse `scanBundledResources()` from `resource-scanner.ts`
 10. **Set source** — `{ type: 'package', packageName: <package.json name> }`
 11. **Validate** — pass through `roleSchema.parse()`
@@ -53,6 +54,7 @@ A validated `Role` object with `source.type = 'package'`.
 | Missing description in ROLE.md | `PackageReadError` | "missing required field: description" |
 | Unknown dialect | `PackageReadError` | 'Unknown dialect "..."' |
 | Malformed YAML | `RoleParseError` | (from parseFrontmatter) |
+| Missing bundled dependency paths | `PackageDependencyError` | includes roleMdPath + list of missing paths |
 
 All `PackageReadError` messages include the package path.
 

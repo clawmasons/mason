@@ -154,3 +154,4 @@ e2e
 .mason/sessions
 
 packages/mason-roles/roles/**/build
+.mason

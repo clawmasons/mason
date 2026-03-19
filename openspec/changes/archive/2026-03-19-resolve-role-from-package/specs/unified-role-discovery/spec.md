@@ -24,21 +24,15 @@
 - **THEN** a `RoleDiscoveryError` SHALL be thrown
 - **AND** the function SHALL NOT attempt to read from `CLAWMASONS_HOME`
 
-#### Scenario: resolveRole with package name skips local scan and checks global
-- **WHEN** `resolveRole("@clawmasons/role-writer", "/home/user/my-project")` is called
-- **AND** the package is not in local `node_modules/`
-- **AND** the package is installed globally
-- **THEN** the role SHALL be returned from global node_modules
-- **AND** `.mason/roles/` SHALL NOT be scanned
-
 #### Scenario: Dialect-specific directories are not searched
 - **WHEN** `discoverRoles("/home/user/my-project")` is called
 - **AND** `/home/user/my-project/.claude/roles/writer/ROLE.md` exists
 - **AND** `/home/user/my-project/.mason/roles/writer/ROLE.md` does not exist
 - **THEN** the result SHALL NOT include a Role for "writer"
 
-## REMOVED Requirements
-
-### Requirement: (implicit) Local roles discovered from dialect-specific agent directories
-**Reason**: Local role discovery is now exclusively from `.mason/roles/`. Dialect directories (`.claude/roles/`, `.codex/roles/`, `.aider/roles/`) are no longer scanned for ROLE.md files. This simplifies the discovery model and decouples roles from the agent they are deployed to.
-**Migration**: Move any ROLE.md files from `.<agent>/roles/<name>/ROLE.md` to `.mason/roles/<name>/ROLE.md`. The file content is unchanged.
+#### Scenario: resolveRole with package name skips local scan and checks global
+- **WHEN** `resolveRole("@clawmasons/role-writer", "/home/user/my-project")` is called
+- **AND** the package is not in local `node_modules/`
+- **AND** the package is installed globally
+- **THEN** the role SHALL be returned from global node_modules
+- **AND** `.mason/roles/` SHALL NOT be scanned
