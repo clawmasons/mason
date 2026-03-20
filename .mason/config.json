@@ -1,7 +1,8 @@
 {
-  "project": "chapter",
+  "project": "mason",
   "aliases": {
     "dev": "mason run --agent claude --role developer",
-    "lead": "mason run --agent claude --role lead"
+    "lead": "mason run --agent claude --role lead --verbose",
+    "lead-dev-container": "mason run --agent claude --role lead --verbose --dev-container"
   }
 }

@@ -349,32 +349,32 @@ describe("generateAgentLaunchJson", () => {
     expect(config.command).toBe("test-runtime");
   });
 
-  it("appends instructions to args when supportsInitialPrompt is true", () => {
+  it("appends instructions as --append-system-prompt flag pair when supportsAppendSystemPrompt is true", () => {
     const pkg = makeAgentPackage({
-      runtime: { command: "cmd", args: ["--flag"], supportsInitialPrompt: true },
+      runtime: { command: "cmd", args: ["--flag"], supportsAppendSystemPrompt: true },
     });
     const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, "Do the thing"));
-    expect(config.args).toEqual(["--flag", "Do the thing"]);
+    expect(config.args).toEqual(["--flag", "--append-system-prompt", "Do the thing"]);
   });
 
   it("does not add instructions in ACP mode", () => {
     const pkg = makeAgentPackage({
-      runtime: { command: "cmd", args: ["--flag"], supportsInitialPrompt: true },
+      runtime: { command: "cmd", args: ["--flag"], supportsAppendSystemPrompt: true },
       acp: { command: "cmd-acp" },
     });
     const config = JSON.parse(generateAgentLaunchJson(pkg, [], true, "Do the thing"));
     expect(config.args).toBeUndefined();
   });
 
-  it("does not add instructions when supportsInitialPrompt is false", () => {
+  it("does not add instructions when supportsAppendSystemPrompt is false", () => {
     const pkg = makeAgentPackage({
-      runtime: { command: "cmd", args: ["--flag"], supportsInitialPrompt: false },
+      runtime: { command: "cmd", args: ["--flag"], supportsAppendSystemPrompt: false },
     });
     const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, "Do the thing"));
     expect(config.args).toEqual(["--flag"]);
   });
 
-  it("does not add instructions when supportsInitialPrompt is absent", () => {
+  it("does not add instructions when supportsAppendSystemPrompt is absent", () => {
     const pkg = makeAgentPackage({
       runtime: { command: "cmd", args: ["--flag"] },
     });
@@ -384,7 +384,7 @@ describe("generateAgentLaunchJson", () => {
 
   it("does not add instructions when instructions is undefined", () => {
     const pkg = makeAgentPackage({
-      runtime: { command: "cmd", args: ["--flag"], supportsInitialPrompt: true },
+      runtime: { command: "cmd", args: ["--flag"], supportsAppendSystemPrompt: true },
     });
     const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined));
     expect(config.args).toEqual(["--flag"]);
@@ -412,10 +412,10 @@ describe("generateAgentLaunchJson", () => {
 
   it("appends agentArgs after instructions", () => {
     const pkg = makeAgentPackage({
-      runtime: { command: "cmd", supportsInitialPrompt: true },
+      runtime: { command: "cmd", supportsAppendSystemPrompt: true },
     });
     const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, "Do the thing", ["--max-turns", "5"]));
-    expect(config.args).toEqual(["Do the thing", "--max-turns", "5"]);
+    expect(config.args).toEqual(["--append-system-prompt", "Do the thing", "--max-turns", "5"]);
   });
 });
 

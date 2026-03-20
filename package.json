@@ -1,5 +1,5 @@
 {
-  "name": "@clawmasons/chapter-monorepo",
+  "name": "@clawmasons/mason-monorepo",
   "version": "0.1.0",
   "private": true,
   "description": "Mason — npm-native packaging, governance, and runtime portability for AI agents",

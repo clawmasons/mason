@@ -147,8 +147,8 @@ export function generateAgentLaunchJson(
     args = agentPkg.runtime?.args;
   }
 
-  if (instructions && !acpMode && agentPkg.runtime?.supportsInitialPrompt) {
-    args = [...(args ?? []), instructions];
+  if (instructions && !acpMode && agentPkg.runtime?.supportsAppendSystemPrompt) {
+    args = [...(args ?? []), "--append-system-prompt", instructions];
   }
 
   // Append alias-level agent-args after all other resolved args
