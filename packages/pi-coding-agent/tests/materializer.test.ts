@@ -381,10 +381,48 @@ describe("piCodingAgentMaterializer", () => {
         expect(cred).toBeDefined();
         expect(cred.type).toBe("env");
       });
+
+      it("appends initialPrompt as final positional in args", () => {
+        const agent = makePiAgent();
+        const result = piCodingAgentMaterializer.materializeWorkspace(
+          agent, "http://mcp-proxy:9090", undefined, { initialPrompt: "do this task" },
+        );
+
+        const config = JSON.parse(result.get("agent-launch.json")!);
+        expect(config.args).toBeDefined();
+        expect(config.args[config.args.length - 1]).toBe("do this task");
+      });
+
+      it("omits initialPrompt from args when not provided", () => {
+        const agent = makePiAgent();
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const config = JSON.parse(result.get("agent-launch.json")!);
+        expect(config.args).toBeUndefined();
+      });
+    });
+
+    describe(".pi/APPEND_SYSTEM.md", () => {
+      it("emits .pi/APPEND_SYSTEM.md when first role has instructions", () => {
+        const agent = makePiAgent();
+        agent.roles[0].instructions = "You are a helpful assistant focused on triage.";
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        expect(result.has(".pi/APPEND_SYSTEM.md")).toBe(true);
+        expect(result.get(".pi/APPEND_SYSTEM.md")).toBe("You are a helpful assistant focused on triage.");
+      });
+
+      it("omits .pi/APPEND_SYSTEM.md when first role has no instructions", () => {
+        const agent = makePiAgent();
+        agent.roles[0].instructions = undefined;
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        expect(result.has(".pi/APPEND_SYSTEM.md")).toBe(false);
+      });
     });
 
     describe("result completeness", () => {
-      it("contains all expected files for pi agent", () => {
+      it("contains all expected files for pi agent without instructions", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 

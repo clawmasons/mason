@@ -206,6 +206,8 @@ export interface GenerateBuildDirOptions {
   agentConfigCredentials?: string[];
   /** Extra args from alias config to append to the agent invocation. */
   agentArgs?: string[];
+  /** Initial prompt passed to the agent as the first user message at launch. */
+  initialPrompt?: string;
 }
 
 export interface BuildDirResult {
@@ -287,10 +289,11 @@ export function generateRoleDockerBuildDir(
   // - project role: everything else → {agentDir}/build/workspace/project/  (per-file overlay mounts)
   // - supervisor role: everything else → {agentDir}/home/         (merged into home mount at /home/mason/)
   const proxyEp = proxyEndpoint ?? `http://proxy-${roleName}:9090`;
-  const materializeOpts = (opts.agentConfigCredentials?.length || opts.agentArgs?.length)
+  const materializeOpts = (opts.agentConfigCredentials?.length || opts.agentArgs?.length || opts.initialPrompt)
     ? {
         ...(opts.agentConfigCredentials?.length ? { agentConfigCredentials: opts.agentConfigCredentials } : {}),
         ...(opts.agentArgs?.length ? { agentArgs: opts.agentArgs } : {}),
+        ...(opts.initialPrompt ? { initialPrompt: opts.initialPrompt } : {}),
       }
     : undefined;
   const workspaceDir = path.join(agentDir, "workspace");

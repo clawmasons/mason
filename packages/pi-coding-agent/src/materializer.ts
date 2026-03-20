@@ -204,10 +204,16 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
       );
     }
 
+    // .pi/APPEND_SYSTEM.md — role instructions into system prompt
+    const instructions = agent.roles[0]?.instructions;
+    if (instructions) {
+      result.set(".pi/APPEND_SYSTEM.md", instructions);
+    }
+
     // agent-launch.json — tells agent-entry how to bootstrap this agent
     result.set(
       "agent-launch.json",
-      generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode, undefined, options?.agentArgs),
+      generateAgentLaunchJson(_agentPkg, agent.credentials, options?.acpMode, undefined, options?.agentArgs, options?.initialPrompt),
     );
 
     return result;

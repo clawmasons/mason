@@ -16,65 +16,32 @@ chapter/
     placeholders/         # Stub packages for testing
     tests/                # End-to-end test suite
   scripts/                # CLI entry point and dev scripts
-  dist/                   # Packed .tgz files (generated)
-  docker/                 # Docker artifacts (generated)
-  skills/                 # Built-in skills (e.g., mason)
 ```
 
-## Architecture
+## Quickstart
 
-### ROLE_TYPES Pipeline
+1. Install prerequisites
 
-The core architecture follows a transformation pipeline:
+  - Docker
+  - Node/NPM
+  - Vscode
+  - Claude Code with 
 
-```
-ROLE.md (agent-specific dialect)
-    ↓ readMaterializedRole()
-ROLE_TYPES (generic in-memory representation)
-    ↓ materializeForAgent()
-Docker build directory (agent-native workspace)
-```
-
-Key components:
-
-- **Dialect Registry** (`packages/shared/src/role/dialect-registry.ts`) — Maps agent-specific field names (e.g., Claude's `commands`, Codex's `instructions`) to generic ROLE_TYPES names (`tasks`, `apps`, `skills`).
-- **ROLE.md Parser** (`packages/shared/src/role/parser.ts`) — Parses YAML frontmatter + markdown body, normalizes via dialect registry.
-- **Package Reader** (`packages/shared/src/role/package-reader.ts`) — Loads NPM role packages into the same ROLE_TYPES representation.
-- **Role Discovery** (`packages/shared/src/role/discovery.ts`) — Finds roles from all sources (local ROLE.md + installed NPM packages) with local-over-package precedence.
-- **Adapter** (`packages/shared/src/role/adapter.ts`) — Bridges ROLE_TYPES to the existing materializer interface.
-- **Materializer** (`packages/cli/src/materializer/`) — Generates Docker build directories from ROLE_TYPES input.
-
-### Package Types
-
-| Type | `chapter.type` | Purpose |
-|------|---------------|---------|
-| **Role** | `role` | Deployable unit — tasks, tools, permissions, system prompt |
-| **App** | `app` | MCP server providing tools |
-| **Skill** | `skill` | Knowledge artifacts (prompts, conventions) |
-| **Task** | `task` | Unit of work for the agent |
-
-Each package has a `chapter` field in its `package.json` that declares its type and configuration.
-
-## Setup
+2. Clone, build and laucnh a dev-container with the the "lead" role
 
 ```bash
+git clone git@github.com:clawmasons/mason.git
 npm install          # install dependencies
 npm run build        # compile TypeScript
-npm run typecheck    # type-check without emitting
-npm run lint         # run ESLint
-npm test             # run unit tests
+./scripts/mason.js lead-dev-container
+
 ```
+Select "y" to launch vscode
 
-## Using a Local Build
+## Next Steps
 
-```bash
-# Build from source
-npm install && npm run build
+Op
 
-# Link globally, then use in a consuming project
-cd packages/cli && npm link
-cd /path/to/project && npm link @clawmasons/chapter
-```
 
 ## E2E Tests
 

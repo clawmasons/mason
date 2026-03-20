@@ -1,23 +1,4 @@
-# Spec: configure-command
-
-## Purpose
-
-Defines the `mason configure` top-level CLI command — a built-in alias for `mason run --role @clawmasons/role-configure-project` that makes project onboarding the natural first action without requiring users to know the role reference.
-
-## Requirements
-
-### Requirement: configure command is registered as a top-level CLI command
-
-The CLI SHALL register a `configure` command at the top level (alongside `run`). It SHALL accept all options that `run` accepts except `--role`. The role SHALL be hardcoded to `@clawmasons/role-configure-project`.
-
-#### Scenario: Command registration
-- **WHEN** the CLI program is initialized
-- **THEN** `mason configure` SHALL be available as a top-level command
-- **AND** `mason configure --help` SHALL list all `run` options except `--role`
-
-#### Scenario: Role is not an accepted option
-- **WHEN** `mason configure --role something` is executed
-- **THEN** Commander SHALL print an "unknown option" error and exit with code 1
+## MODIFIED Requirements
 
 ### Requirement: configure delegates to run with the configure-project role
 

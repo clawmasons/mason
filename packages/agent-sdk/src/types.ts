@@ -18,6 +18,8 @@ export interface MaterializeOptions {
   agentConfigCredentials?: string[];
   /** Extra args from alias config appended to the agent invocation after all mason-resolved args. */
   agentArgs?: string[];
+  /** Initial prompt passed to the agent as the first user message at launch. */
+  initialPrompt?: string;
 }
 
 /**
@@ -112,8 +114,8 @@ export interface RuntimeConfig {
     type: "env" | "file";
     path?: string;
   }>;
-  /** When true, the runtime accepts role instructions as a trailing positional argument. */
-  supportsInitialPrompt?: boolean;
+  /** When true, the runtime accepts role instructions via --append-system-prompt <text>. */
+  supportsAppendSystemPrompt?: boolean;
 }
 
 /**
