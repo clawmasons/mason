@@ -16,6 +16,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Role } from "@clawmasons/shared";
+import { CLI_NAME_LOWERCASE } from "@clawmasons/shared";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -415,7 +416,7 @@ export function ensureProxyDependencies(
 /**
  * Copy the pre-built proxy bundle into the Docker build context.
  *
- * The bundle is built by `npm run build:proxy` in @clawmasons/chapter
+ * The bundle is built by `npm run build:proxy` in @clawmasons/mason
  * and lives at `packages/cli/dist/proxy-bundle.js`. Inside Docker
  * this replaces the multi-file ESM resolution chain for faster boot.
  */
@@ -473,7 +474,7 @@ export function synthesizeRolePackages(
     const pkgJson = {
       name: app.name,
       version: "0.0.0",
-      chapter: {
+      [CLI_NAME_LOWERCASE]: {
         type: "app",
         transport: app.transport ?? "stdio",
         command: app.command,
@@ -512,7 +513,7 @@ export function synthesizeRolePackages(
     const rolePkgJson = {
       name: roleName,
       version: role.metadata.version ?? "0.0.0",
-      chapter: {
+      [CLI_NAME_LOWERCASE]: {
         type: "role",
         description: role.metadata.description,
         risk: role.governance.risk ?? "LOW",

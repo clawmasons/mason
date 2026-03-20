@@ -1,106 +1,72 @@
-# Spec: e2e-chapter-workflow
+# E2E Mason Workflow — Init, Install, Enable/Disable Lifecycle
 
-## Purpose
-
-End-to-end integration test that validates the full chapter lifecycle from workspace initialization through member installation, registry management, enable/disable workflow, and forge-remnant verification. Uses local tgz packages to test the complete user journey without a registry.
+The E2E test exercises the complete mason CLI workflow including init, validate, list, install, disable, enable, and verifies no legacy naming remains in generated artifacts.
 
 ## Requirements
 
-### Requirement: E2E test exercises the complete chapter init and install flow
+### Requirement: E2E test exercises the complete mason init and install flow
+The integration test SHALL exercise the complete mason lifecycle as sequential steps, each depending on the previous. All CLI invocations SHALL use `mason` (the CLI binary name) instead of `chapter`.
 
-The integration test (`tests/integration/install-flow.test.ts`) SHALL exercise the complete chapter lifecycle as sequential steps, each depending on the previous.
-
-#### Scenario: Init creates workspace with chapter scaffold
-- **WHEN** `chapter init --template note-taker` is run in a temp directory
-- **THEN** `.chapter/` directory SHALL be created with `config.json`
+#### Scenario: Init creates workspace with mason scaffold
+- **WHEN** `mason init --template note-taker` is run in a temp directory
+- **THEN** `.mason/` directory SHALL be created with `config.json`
 - **AND** `members/note-taker/package.json` SHALL exist with the project-scoped name
 
 #### Scenario: Validate confirms member graph is valid
-- **WHEN** `chapter validate @<scope>/member-note-taker` is run
+- **WHEN** `mason validate @<scope>/member-note-taker` is run
 - **THEN** the output SHALL contain "is valid"
 
 #### Scenario: List shows member dependency tree
-- **WHEN** `chapter list --json` is run
-- **THEN** the output SHALL contain the member with roles referencing chapter-core components (task, skill, app)
+- **WHEN** `mason list --json` is run
+- **THEN** the output SHALL contain the member with roles referencing components (task, skill, app)
 
 #### Scenario: Install generates deployment artifacts
-- **WHEN** `chapter install @<scope>/member-note-taker` is run
-- **THEN** `.chapter/members/note-taker/` SHALL contain proxy/Dockerfile, docker-compose.yml, log/ directory, and claude-code-agent workspace
+- **WHEN** `mason install @<scope>/member-note-taker` is run
+- **THEN** `.clawmasons/members/note-taker/` SHALL contain proxy/Dockerfile, docker-compose.yml, log/ directory, and agent workspace
 
 ### Requirement: E2E test verifies the members registry after install
-
-After a successful `chapter install`, the `.chapter/members.json` file SHALL be populated with the correct member entry.
+The test SHALL verify that the members registry at `.mason/members.json` is created and contains the installed member with correct metadata.
 
 #### Scenario: Members registry contains installed member
-- **WHEN** `chapter install` has completed successfully for an agent member with slug `note-taker`
-- **THEN** `.chapter/members.json` SHALL exist and be valid JSON
-- **AND** it SHALL contain an entry keyed by `note-taker`
-- **AND** the entry SHALL have `status: "enabled"`
-- **AND** the entry SHALL have `memberType: "agent"`
-- **AND** the entry SHALL have a non-empty `package` field matching the scoped package name
-- **AND** the entry SHALL have a valid ISO 8601 `installedAt` timestamp
+- **WHEN** `.mason/members.json` is read after install
+- **THEN** it contains an entry for the installed member with status "enabled"
 
-### Requirement: E2E test verifies per-member directory structure completeness
-
-After install, the integration test SHALL verify the complete per-member directory layout for agent members.
-
-#### Scenario: All required directories and files exist
-- **WHEN** `chapter install` has completed for an agent member with slug `note-taker` and runtime `claude-code-agent`
-- **THEN** the following SHALL exist:
-  - `.chapter/members/note-taker/log/` (activity log directory)
-  - `.chapter/members/note-taker/proxy/Dockerfile` (proxy build context)
-  - `.chapter/members/note-taker/proxy/chapter/dist/` (pre-built chapter artifacts)
-  - `.chapter/members/note-taker/proxy/chapter/package.json` (for Docker build)
-  - `.chapter/members/note-taker/claude-code-agent/Dockerfile` (runtime Dockerfile)
-  - `.chapter/members/note-taker/claude-code-agent/workspace/` (runtime workspace)
-  - `.chapter/members/note-taker/claude-code-agent/workspace/.claude/settings.json`
-  - `.chapter/members/note-taker/claude-code-agent/workspace/AGENTS.md`
-  - `.chapter/members/note-taker/docker-compose.yml`
-  - `.chapter/members/note-taker/.env`
-  - `.chapter/members/note-taker/chapter.lock.json`
-
-### Requirement: E2E test verifies chapter disable updates the registry
-
-The integration test SHALL verify that `chapter disable` correctly sets the member status to "disabled" in the registry.
+### Requirement: E2E test verifies mason disable updates the registry
+The test SHALL verify that `mason disable` sets the member status to "disabled" in the registry.
 
 #### Scenario: Disable sets status to disabled
-- **WHEN** `runDisable(rootDir, "@note-taker")` is called after a successful install
-- **THEN** `.chapter/members.json` SHALL show status `"disabled"` for slug `note-taker`
-- **AND** all other fields (package, memberType, installedAt) SHALL be preserved
+- **WHEN** `mason disable @<scope>/member-note-taker` is run
+- **THEN** the member's status in `.mason/members.json` is "disabled"
 
 ### Requirement: E2E test verifies disabled member cannot be run
-
-The integration test SHALL verify that the run command's guard logic prevents starting a disabled member.
+The test SHALL verify that attempting to run a disabled member produces an error.
 
 #### Scenario: getMember returns disabled status
-- **WHEN** the member has been disabled
-- **THEN** `getMember(chapterDir, "note-taker")` SHALL return an entry with `status: "disabled"`
-- **AND** the run command (tested via unit tests) SHALL reject the member with an error
+- **WHEN** a disabled member is queried
+- **THEN** the status SHALL be "disabled"
 
-### Requirement: E2E test verifies chapter enable re-enables the member
-
-The integration test SHALL verify that `chapter enable` correctly sets the member status back to "enabled".
+### Requirement: E2E test verifies mason enable re-enables the member
+The test SHALL verify that `mason enable` restores the member to "enabled" status.
 
 #### Scenario: Enable restores enabled status
-- **WHEN** `runEnable(rootDir, "@note-taker")` is called after the member was disabled
-- **THEN** `.chapter/members.json` SHALL show status `"enabled"` for slug `note-taker`
+- **WHEN** `mason enable @<scope>/member-note-taker` is run
+- **THEN** the member's status in `.mason/members.json` is "enabled"
 
-### Requirement: E2E test verifies no forge references in generated files
+### Requirement: E2E test verifies no legacy naming in generated files
+The test SHALL verify that generated files contain no references to the previous "forge" or "chapter" naming.
 
-After the full workflow, the integration test SHALL scan all generated config files under `.chapter/` to verify no "forge" references have leaked through.
+#### Scenario: No legacy names in docker-compose.yml
+- **WHEN** the generated `docker-compose.yml` is read
+- **THEN** it SHALL NOT contain the strings "forge" or "chapter" (case-insensitive)
 
-#### Scenario: No forge in docker-compose.yml
-- **WHEN** `docker-compose.yml` is read from the install output
-- **THEN** it SHALL NOT contain the string "forge" (case-insensitive)
+#### Scenario: No legacy names in .env
+- **WHEN** the generated `.env` is read
+- **THEN** it SHALL NOT contain "FORGE_" or "CHAPTER_" prefixed variables
 
-#### Scenario: No forge in .env
-- **WHEN** `.env` is read from the install output
-- **THEN** it SHALL NOT contain the string "forge" (case-insensitive)
+#### Scenario: No legacy names in lock file
+- **WHEN** the generated `mason.lock.json` is read
+- **THEN** it SHALL NOT contain "forge" or "chapter"
 
-#### Scenario: No forge in chapter.lock.json
-- **WHEN** `chapter.lock.json` is read from the install output
-- **THEN** it SHALL NOT contain the string "forge" (case-insensitive)
-
-#### Scenario: No forge in members.json
-- **WHEN** `.chapter/members.json` is read
-- **THEN** it SHALL NOT contain the string "forge" (case-insensitive)
+#### Scenario: No legacy names in members.json
+- **WHEN** the generated `members.json` is read
+- **THEN** it SHALL NOT contain "forge" or "chapter"

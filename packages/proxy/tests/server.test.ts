@@ -3,7 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Tool, Resource, Prompt, CallToolResult, ReadResourceResult, GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
-import { ChapterProxyServer } from "../src/server.js";
+import { ProxyServer } from "../src/server.js";
 import type { ToolRouter, RouteEntry, ResourceRouter, PromptRouter, PromptRouteEntry } from "../src/router.js";
 import type { UpstreamManager } from "../src/upstream.js";
 import { openDatabase, queryAuditLog, updateApprovalStatus } from "../src/db.js";
@@ -117,8 +117,8 @@ function getPort(): number {
 
 // ── SSE Transport Tests ─────────────────────────────────────────────
 
-describe("ChapterProxyServer (SSE)", () => {
-  let server: ChapterProxyServer;
+describe("ProxyServer (SSE)", () => {
+  let server: ProxyServer;
   let client: Client;
 
   afterEach(async () => {
@@ -132,7 +132,7 @@ describe("ChapterProxyServer (SSE)", () => {
     const router = createMockRouter(tools, new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
+    server = new ProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -151,7 +151,7 @@ describe("ChapterProxyServer (SSE)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
+    server = new ProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -169,7 +169,7 @@ describe("ChapterProxyServer (SSE)", () => {
       content: [{ type: "text", text: "PR #42 created" }],
     });
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
+    server = new ProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -192,7 +192,7 @@ describe("ChapterProxyServer (SSE)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
+    server = new ProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -217,7 +217,7 @@ describe("ChapterProxyServer (SSE)", () => {
       new Error("Connection refused"),
     );
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
+    server = new ProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -237,7 +237,7 @@ describe("ChapterProxyServer (SSE)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
+    server = new ProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     // Verify server is listening by connecting
@@ -256,7 +256,7 @@ describe("ChapterProxyServer (SSE)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port: getPort(), transport: "sse", router, upstream });
+    server = new ProxyServer({ port: getPort(), transport: "sse", router, upstream });
     await expect(server.stop()).resolves.toBeUndefined();
   });
 
@@ -265,7 +265,7 @@ describe("ChapterProxyServer (SSE)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
+    server = new ProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -276,8 +276,8 @@ describe("ChapterProxyServer (SSE)", () => {
 
 // ── Streamable HTTP Transport Tests ─────────────────────────────────
 
-describe("ChapterProxyServer (streamable-http)", () => {
-  let server: ChapterProxyServer;
+describe("ProxyServer (streamable-http)", () => {
+  let server: ProxyServer;
   let client: Client;
 
   afterEach(async () => {
@@ -291,7 +291,7 @@ describe("ChapterProxyServer (streamable-http)", () => {
     const router = createMockRouter(tools, new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream });
+    server = new ProxyServer({ port, transport: "streamable-http", router, upstream });
     await server.start();
 
     client = await connectClient(port, "streamable-http");
@@ -313,7 +313,7 @@ describe("ChapterProxyServer (streamable-http)", () => {
       content: [{ type: "text", text: "PR #42 created" }],
     });
 
-    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream });
+    server = new ProxyServer({ port, transport: "streamable-http", router, upstream });
     await server.start();
 
     client = await connectClient(port, "streamable-http");
@@ -335,7 +335,7 @@ describe("ChapterProxyServer (streamable-http)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream });
+    server = new ProxyServer({ port, transport: "streamable-http", router, upstream });
     await server.start();
 
     client = await connectClient(port, "streamable-http");
@@ -357,7 +357,7 @@ describe("ChapterProxyServer (streamable-http)", () => {
       new Error("Timeout waiting for response"),
     );
 
-    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream });
+    server = new ProxyServer({ port, transport: "streamable-http", router, upstream });
     await server.start();
 
     client = await connectClient(port, "streamable-http");
@@ -375,8 +375,8 @@ describe("ChapterProxyServer (streamable-http)", () => {
 
 // ── Auth + Health Endpoint Tests ─────────────────────────────────────
 
-describe("ChapterProxyServer (auth)", () => {
-  let server: ChapterProxyServer;
+describe("ProxyServer (auth)", () => {
+  let server: ProxyServer;
   let client: Client;
 
   afterEach(async () => {
@@ -389,7 +389,7 @@ describe("ChapterProxyServer (auth)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port, transport: "streamable-http", router, upstream, authToken: "secret",
     });
     await server.start();
@@ -404,7 +404,7 @@ describe("ChapterProxyServer (auth)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port, transport: "streamable-http", router, upstream, authToken: "secret",
     });
     await server.start();
@@ -422,7 +422,7 @@ describe("ChapterProxyServer (auth)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port, transport: "streamable-http", router, upstream, authToken: "secret",
     });
     await server.start();
@@ -444,7 +444,7 @@ describe("ChapterProxyServer (auth)", () => {
     const router = createMockRouter(tools, new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port, transport: "streamable-http", router, upstream, authToken: "my-secret",
     });
     await server.start();
@@ -471,7 +471,7 @@ describe("ChapterProxyServer (auth)", () => {
     const router = createMockRouter(tools, new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port, transport: "streamable-http", router, upstream,
     });
     await server.start();
@@ -486,7 +486,7 @@ describe("ChapterProxyServer (auth)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port, transport: "sse", router, upstream, authToken: "sse-secret",
     });
     await server.start();
@@ -499,8 +499,8 @@ describe("ChapterProxyServer (auth)", () => {
 
 // ── Audit Logging Integration Tests ──────────────────────────────────
 
-describe("ChapterProxyServer (audit logging)", () => {
-  let server: ChapterProxyServer;
+describe("ProxyServer (audit logging)", () => {
+  let server: ProxyServer;
   let client: Client;
   let db: Database.Database;
 
@@ -520,7 +520,7 @@ describe("ChapterProxyServer (audit logging)", () => {
       content: [{ type: "text", text: "PR #42 created" }],
     });
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port,
       transport: "sse",
       router,
@@ -552,7 +552,7 @@ describe("ChapterProxyServer (audit logging)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port,
       transport: "sse",
       router,
@@ -579,7 +579,7 @@ describe("ChapterProxyServer (audit logging)", () => {
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream(undefined, new Error("Connection refused"));
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port,
       transport: "sse",
       router,
@@ -608,7 +608,7 @@ describe("ChapterProxyServer (audit logging)", () => {
     });
 
     // No db provided
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream });
+    server = new ProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -624,8 +624,8 @@ describe("ChapterProxyServer (audit logging)", () => {
 
 // ── Approval Workflow Integration Tests ──────────────────────────────
 
-describe("ChapterProxyServer (approval workflow)", () => {
-  let server: ChapterProxyServer;
+describe("ProxyServer (approval workflow)", () => {
+  let server: ProxyServer;
   let client: Client;
   let db: Database.Database;
 
@@ -645,7 +645,7 @@ describe("ChapterProxyServer (approval workflow)", () => {
       content: [{ type: "text", text: "Repo deleted" }],
     });
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port,
       transport: "sse",
       router,
@@ -691,7 +691,7 @@ describe("ChapterProxyServer (approval workflow)", () => {
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port,
       transport: "sse",
       router,
@@ -739,7 +739,7 @@ describe("ChapterProxyServer (approval workflow)", () => {
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port,
       transport: "sse",
       router,
@@ -778,7 +778,7 @@ describe("ChapterProxyServer (approval workflow)", () => {
       content: [{ type: "text", text: "repos listed" }],
     });
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port,
       transport: "sse",
       router,
@@ -808,8 +808,8 @@ describe("ChapterProxyServer (approval workflow)", () => {
 
 // ── Resource Passthrough Tests ──────────────────────────────────────
 
-describe("ChapterProxyServer (resources)", () => {
-  let server: ChapterProxyServer;
+describe("ProxyServer (resources)", () => {
+  let server: ProxyServer;
   let client: Client;
 
   afterEach(async () => {
@@ -824,7 +824,7 @@ describe("ChapterProxyServer (resources)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
+    server = new ProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -844,7 +844,7 @@ describe("ChapterProxyServer (resources)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
+    server = new ProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -861,7 +861,7 @@ describe("ChapterProxyServer (resources)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
+    server = new ProxyServer({ port, transport: "sse", router, upstream, resourceRouter });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -875,7 +875,7 @@ describe("ChapterProxyServer (resources)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream, resourceRouter });
+    server = new ProxyServer({ port, transport: "streamable-http", router, upstream, resourceRouter });
     await server.start();
 
     client = await connectClient(port, "streamable-http");
@@ -888,8 +888,8 @@ describe("ChapterProxyServer (resources)", () => {
 
 // ── Prompt Passthrough Tests ────────────────────────────────────────
 
-describe("ChapterProxyServer (prompts)", () => {
-  let server: ChapterProxyServer;
+describe("ProxyServer (prompts)", () => {
+  let server: ProxyServer;
   let client: Client;
 
   afterEach(async () => {
@@ -904,7 +904,7 @@ describe("ChapterProxyServer (prompts)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream, promptRouter });
+    server = new ProxyServer({ port, transport: "sse", router, upstream, promptRouter });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -928,7 +928,7 @@ describe("ChapterProxyServer (prompts)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream, promptRouter });
+    server = new ProxyServer({ port, transport: "sse", router, upstream, promptRouter });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -948,7 +948,7 @@ describe("ChapterProxyServer (prompts)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "sse", router, upstream, promptRouter });
+    server = new ProxyServer({ port, transport: "sse", router, upstream, promptRouter });
     await server.start();
 
     client = await connectClient(port, "sse");
@@ -962,7 +962,7 @@ describe("ChapterProxyServer (prompts)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream, promptRouter });
+    server = new ProxyServer({ port, transport: "streamable-http", router, upstream, promptRouter });
     await server.start();
 
     client = await connectClient(port, "streamable-http");
@@ -975,8 +975,8 @@ describe("ChapterProxyServer (prompts)", () => {
 
 // ── Ready Gate Tests ─────────────────────────────────────────────────
 
-describe("ChapterProxyServer (readyGate)", () => {
-  let server: ChapterProxyServer;
+describe("ProxyServer (readyGate)", () => {
+  let server: ProxyServer;
   let client: Client;
 
   afterEach(async () => {
@@ -992,7 +992,7 @@ describe("ChapterProxyServer (readyGate)", () => {
     const router = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream, readyGate });
+    server = new ProxyServer({ port, transport: "streamable-http", router, upstream, readyGate });
     await server.start();
 
     // Health should respond immediately
@@ -1012,7 +1012,7 @@ describe("ChapterProxyServer (readyGate)", () => {
     const router = createMockRouter(tools, new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port, transport: "streamable-http", router, upstream, readyGate,
       credentialProxyToken: "test-cred-token",
     });
@@ -1039,7 +1039,7 @@ describe("ChapterProxyServer (readyGate)", () => {
     const router = createMockRouter(tools, new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port, transport: "streamable-http", router, upstream, readyGate,
       credentialProxyToken: "test-cred-token",
     });
@@ -1069,7 +1069,7 @@ describe("ChapterProxyServer (readyGate)", () => {
     const router = createMockRouter([route.tool], routes);
     const upstream = createMockUpstream({ content: [{ type: "text", text: "PR created" }] });
 
-    server = new ChapterProxyServer({ port, transport: "streamable-http", router, upstream, readyGate });
+    server = new ProxyServer({ port, transport: "streamable-http", router, upstream, readyGate });
     await server.start();
 
     client = await connectClient(port, "streamable-http");
@@ -1102,7 +1102,7 @@ describe("ChapterProxyServer (readyGate)", () => {
     const emptyRouter = createMockRouter([], new Map());
     const upstream = createMockUpstream();
 
-    server = new ChapterProxyServer({ port, transport: "streamable-http", router: emptyRouter, upstream, readyGate });
+    server = new ProxyServer({ port, transport: "streamable-http", router: emptyRouter, upstream, readyGate });
     await server.start();
 
     // Update routing and resolve gate

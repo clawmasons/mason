@@ -11,7 +11,7 @@ describe("hasGitignoreEntry", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-gitignore-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-gitignore-test-"));
   });
 
   afterEach(() => {
@@ -63,7 +63,7 @@ describe("ensureGitignoreEntry", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-gitignore-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-gitignore-test-"));
   });
 
   afterEach(() => {

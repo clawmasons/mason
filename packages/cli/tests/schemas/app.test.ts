@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { appChapterFieldSchema } from "@clawmasons/shared";
+import { appFieldSchema } from "@clawmasons/shared";
 
-describe("appChapterFieldSchema", () => {
+describe("appFieldSchema", () => {
   it("validates a valid stdio app", () => {
-    const result = appChapterFieldSchema.safeParse({
+    const result = appFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       command: "npx",
@@ -15,7 +15,7 @@ describe("appChapterFieldSchema", () => {
   });
 
   it("validates a valid remote SSE app", () => {
-    const result = appChapterFieldSchema.safeParse({
+    const result = appFieldSchema.safeParse({
       type: "app",
       transport: "sse",
       url: "https://mcp.amap.com/sse?key=abc",
@@ -26,7 +26,7 @@ describe("appChapterFieldSchema", () => {
   });
 
   it("validates a valid streamable-http app", () => {
-    const result = appChapterFieldSchema.safeParse({
+    const result = appFieldSchema.safeParse({
       type: "app",
       transport: "streamable-http",
       url: "https://example.com/mcp",
@@ -37,7 +37,7 @@ describe("appChapterFieldSchema", () => {
   });
 
   it("rejects stdio app missing command", () => {
-    const result = appChapterFieldSchema.safeParse({
+    const result = appFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       tools: ["foo"],
@@ -47,7 +47,7 @@ describe("appChapterFieldSchema", () => {
   });
 
   it("rejects sse app missing url", () => {
-    const result = appChapterFieldSchema.safeParse({
+    const result = appFieldSchema.safeParse({
       type: "app",
       transport: "sse",
       tools: ["foo"],
@@ -57,7 +57,7 @@ describe("appChapterFieldSchema", () => {
   });
 
   it("preserves env variables with interpolation syntax", () => {
-    const result = appChapterFieldSchema.safeParse({
+    const result = appFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       command: "npx",
@@ -75,7 +75,7 @@ describe("appChapterFieldSchema", () => {
   });
 
   it("validates PRD example: @clawmasons/app-github", () => {
-    const result = appChapterFieldSchema.safeParse({
+    const result = appFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       command: "npx",
@@ -99,7 +99,7 @@ describe("appChapterFieldSchema", () => {
   });
 
   it("validates PRD example: @clawmasons/app-amap", () => {
-    const result = appChapterFieldSchema.safeParse({
+    const result = appFieldSchema.safeParse({
       type: "app",
       transport: "sse",
       url: "https://mcp.amap.com/sse?key=${AMAP_KEY}",
@@ -110,7 +110,7 @@ describe("appChapterFieldSchema", () => {
   });
 
   it("validates credentials as array of strings", () => {
-    const result = appChapterFieldSchema.safeParse({
+    const result = appFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       command: "npx",
@@ -126,7 +126,7 @@ describe("appChapterFieldSchema", () => {
   });
 
   it("rejects non-string items in credentials array", () => {
-    const result = appChapterFieldSchema.safeParse({
+    const result = appFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       command: "npx",
@@ -139,7 +139,7 @@ describe("appChapterFieldSchema", () => {
   });
 
   it("defaults credentials to empty array when omitted", () => {
-    const result = appChapterFieldSchema.safeParse({
+    const result = appFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       command: "npx",
@@ -154,7 +154,7 @@ describe("appChapterFieldSchema", () => {
   });
 
   it("accepts optional description", () => {
-    const result = appChapterFieldSchema.safeParse({
+    const result = appFieldSchema.safeParse({
       type: "app",
       transport: "stdio",
       command: "npx",

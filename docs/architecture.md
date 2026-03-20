@@ -25,7 +25,7 @@ graph TB
 
 ## Role Startup Sequence
 
-When you run `mason run <agent-type> --role <name>`, the following sequence executes. See [Initialization](initialization.md) for details on how the `.mason` and chapter directories are set up before this point.
+When you run `mason run <agent-type> --role <name>`, the following sequence executes. See [Initialization](initialization.md) for details on how the `.mason` directory is set up before this point.
 
 ```mermaid
 sequenceDiagram
@@ -166,7 +166,7 @@ The materializer reads the resolved role graph and produces everything the runti
 
 ## Related
 
-- [Initialization](initialization.md) — How lodges, chapters, and runtime directories are set up
+- [Initialization](initialization.md) — How lodges and runtime directories are set up
 - [MCP Proxy](component-mcp-proxy.md) — Detailed proxy documentation
 - [Credential Service](component-credential-service.md) — How credentials are resolved
 - [Security](security.md) — The full security model

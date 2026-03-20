@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { roleChapterFieldSchema } from "@clawmasons/shared";
+import { roleFieldSchema } from "@clawmasons/shared";
 
-describe("roleChapterFieldSchema", () => {
+describe("roleFieldSchema", () => {
   it("validates a valid role with permissions", () => {
-    const result = roleChapterFieldSchema.safeParse({
+    const result = roleFieldSchema.safeParse({
       type: "role",
       permissions: {
         "@clawmasons/app-github": {
@@ -22,7 +22,7 @@ describe("roleChapterFieldSchema", () => {
   });
 
   it("validates role with deny wildcard", () => {
-    const result = roleChapterFieldSchema.safeParse({
+    const result = roleFieldSchema.safeParse({
       type: "role",
       permissions: {
         "@clawmasons/app-slack": {
@@ -40,7 +40,7 @@ describe("roleChapterFieldSchema", () => {
   });
 
   it("validates role with constraints", () => {
-    const result = roleChapterFieldSchema.safeParse({
+    const result = roleFieldSchema.safeParse({
       type: "role",
       permissions: {
         "@clawmasons/app-github": {
@@ -63,7 +63,7 @@ describe("roleChapterFieldSchema", () => {
   });
 
   it("rejects role without permissions", () => {
-    const result = roleChapterFieldSchema.safeParse({
+    const result = roleFieldSchema.safeParse({
       type: "role",
     });
     expect(result.success).toBe(false);
@@ -71,7 +71,7 @@ describe("roleChapterFieldSchema", () => {
 
   it("validates risk enum values", () => {
     for (const risk of ["HIGH", "MEDIUM", "LOW"]) {
-      const result = roleChapterFieldSchema.safeParse({
+      const result = roleFieldSchema.safeParse({
         type: "role",
         risk,
         permissions: {},
@@ -84,7 +84,7 @@ describe("roleChapterFieldSchema", () => {
   });
 
   it("rejects invalid risk value", () => {
-    const result = roleChapterFieldSchema.safeParse({
+    const result = roleFieldSchema.safeParse({
       type: "role",
       risk: "INVALID",
       permissions: {},
@@ -93,7 +93,7 @@ describe("roleChapterFieldSchema", () => {
   });
 
   it("defaults risk to LOW when omitted", () => {
-    const result = roleChapterFieldSchema.safeParse({
+    const result = roleFieldSchema.safeParse({
       type: "role",
       permissions: {},
     });
@@ -105,7 +105,7 @@ describe("roleChapterFieldSchema", () => {
 
   describe("mounts field", () => {
     it("validates role with valid mounts", () => {
-      const result = roleChapterFieldSchema.safeParse({
+      const result = roleFieldSchema.safeParse({
         type: "role",
         permissions: {},
         mounts: [
@@ -122,7 +122,7 @@ describe("roleChapterFieldSchema", () => {
     });
 
     it("validates mount with explicit readonly flag", () => {
-      const result = roleChapterFieldSchema.safeParse({
+      const result = roleFieldSchema.safeParse({
         type: "role",
         permissions: {},
         mounts: [
@@ -136,7 +136,7 @@ describe("roleChapterFieldSchema", () => {
     });
 
     it("rejects mount missing target", () => {
-      const result = roleChapterFieldSchema.safeParse({
+      const result = roleFieldSchema.safeParse({
         type: "role",
         permissions: {},
         mounts: [{ source: "/data" }],
@@ -145,7 +145,7 @@ describe("roleChapterFieldSchema", () => {
     });
 
     it("rejects mount missing source", () => {
-      const result = roleChapterFieldSchema.safeParse({
+      const result = roleFieldSchema.safeParse({
         type: "role",
         permissions: {},
         mounts: [{ target: "/mnt/data" }],
@@ -154,7 +154,7 @@ describe("roleChapterFieldSchema", () => {
     });
 
     it("validates empty mounts array", () => {
-      const result = roleChapterFieldSchema.safeParse({
+      const result = roleFieldSchema.safeParse({
         type: "role",
         permissions: {},
         mounts: [],
@@ -166,7 +166,7 @@ describe("roleChapterFieldSchema", () => {
     });
 
     it("validates multiple mounts", () => {
-      const result = roleChapterFieldSchema.safeParse({
+      const result = roleFieldSchema.safeParse({
         type: "role",
         permissions: {},
         mounts: [
@@ -183,7 +183,7 @@ describe("roleChapterFieldSchema", () => {
 
   describe("baseImage field", () => {
     it("validates role with baseImage", () => {
-      const result = roleChapterFieldSchema.safeParse({
+      const result = roleFieldSchema.safeParse({
         type: "role",
         permissions: {},
         baseImage: "node:22-bookworm",
@@ -195,7 +195,7 @@ describe("roleChapterFieldSchema", () => {
     });
 
     it("rejects non-string baseImage", () => {
-      const result = roleChapterFieldSchema.safeParse({
+      const result = roleFieldSchema.safeParse({
         type: "role",
         permissions: {},
         baseImage: 123,
@@ -206,7 +206,7 @@ describe("roleChapterFieldSchema", () => {
 
   describe("aptPackages field", () => {
     it("validates role with aptPackages", () => {
-      const result = roleChapterFieldSchema.safeParse({
+      const result = roleFieldSchema.safeParse({
         type: "role",
         permissions: {},
         aptPackages: ["git", "curl", "jq"],
@@ -218,7 +218,7 @@ describe("roleChapterFieldSchema", () => {
     });
 
     it("validates empty aptPackages array", () => {
-      const result = roleChapterFieldSchema.safeParse({
+      const result = roleFieldSchema.safeParse({
         type: "role",
         permissions: {},
         aptPackages: [],
@@ -232,7 +232,7 @@ describe("roleChapterFieldSchema", () => {
 
   describe("backwards compatibility", () => {
     it("validates role without new fields", () => {
-      const result = roleChapterFieldSchema.safeParse({
+      const result = roleFieldSchema.safeParse({
         type: "role",
         permissions: {
           "@clawmasons/app-github": {
@@ -251,7 +251,7 @@ describe("roleChapterFieldSchema", () => {
   });
 
   it("validates PRD example: @clawmasons/role-issue-manager", () => {
-    const result = roleChapterFieldSchema.safeParse({
+    const result = roleFieldSchema.safeParse({
       type: "role",
       description: "Manages GitHub issues: triage, label, assign.",
       tasks: [

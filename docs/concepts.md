@@ -20,7 +20,7 @@ Role (deployable unit / permission boundary)
 
 ## The Four Package Types
 
-Every component is a standard npm package with a `chapter` field in its `package.json`:
+Every component is a standard npm package with a `mason` field in its `package.json`:
 
 | Type | Purpose | Key Responsibility |
 |------|---------|-------------------|
@@ -53,11 +53,11 @@ credentials: ['GITHUB_TOKEN']
 You are a technical writer. Help create clear documentation.
 ```
 
-Or as a published npm package with a `chapter` field in `package.json`:
+Or as a published npm package with a `mason` field in `package.json`:
 
 ```json
 {
-  "chapter": {
+  "mason": {
     "type": "role",
     "tasks": ["@acme/task-take-notes"],
     "permissions": {
@@ -73,7 +73,7 @@ The role `@acme/role-writer` might reference the task `@acme/task-take-notes`, w
 
 ## Everything Is a package.json
 
-The `chapter` field in `package.json` is the single source of truth for each component's configuration. This means:
+The `mason` field in `package.json` is the single source of truth for each component's configuration. This means:
 
 - **Standard tooling** — npm install, publish, version, and workspace management all work
 - **Composability** — Reference other packages by npm name

@@ -1,5 +1,5 @@
 /**
- * `chapter build` command — generates project-local Docker build artifacts.
+ * `mason build` command — generates project-local Docker build artifacts.
  *
  * Discovers roles in the current workspace, resolves their agent types,
  * and generates Docker build directories at `.mason/docker/<role-name>/`.
@@ -123,7 +123,7 @@ export async function runBuild(
 }
 
 /**
- * Register the `build` subcommand under `chapter`.
+ * Register the `build` subcommand.
  */
 export function registerBuildCommand(program: Command): void {
   program

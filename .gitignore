@@ -155,3 +155,5 @@ e2e
 
 packages/mason-roles/roles/**/build
 .mason
+.codex
+.pi

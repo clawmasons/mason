@@ -1,13 +1,13 @@
 # Development
 
-Developer guide for contributing to the mason/chapter monorepo.
+Developer guide for contributing to the mason monorepo.
 
 ## Project Structure
 
 ```
-chapter/
+mason/
   packages/
-    cli/                  # @clawmasons/chapter — CLI and library
+    cli/                  # @clawmasons/mason — CLI and library
     shared/               # @clawmasons/shared — schemas, types, utilities
     proxy/                # @clawmasons/proxy — MCP proxy server
     credential-service/   # @clawmasons/credential-service — credential resolver
@@ -69,7 +69,7 @@ cd packages/tests && npx vitest run --config vitest.config.ts  # e2e tests
 
 ## Programmatic API
 
-Chapter exports its core modules for use as a library:
+Mason exports its core modules for use as a library:
 
 ```ts
 import {
@@ -78,15 +78,15 @@ import {
   resolveRole,
   materializeForAgent,
   claudeCodeMaterializer,
-} from "@clawmasons/chapter";
+} from "@clawmasons/mason";
 
 import {
-  parseChapterField,
+  parseField,
   computeToolFilters,
   readMaterializedRole,
   readPackagedRole,
   type Role,
-  type ChapterField,
+  type Field,
 } from "@clawmasons/shared";
 ```
 

@@ -8,12 +8,12 @@ export interface ToolFilter {
   list: string[];
 }
 
-/** Known chapter package type prefixes. */
+/** Known package type prefixes. */
 const TYPE_PREFIXES = ["app-", "member-", "agent-", "role-", "task-", "skill-"];
 
 /**
- * Extract a short name from a chapter package name.
- * Strips the npm scope and any known chapter type prefix.
+ * Extract a short name from a package name.
+ * Strips the npm scope and any known type prefix.
  *
  * Examples:
  *   "@clawmasons/app-github" → "github"

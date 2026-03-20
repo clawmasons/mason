@@ -40,8 +40,8 @@ describe("proxy/db", () => {
     });
 
     it("creates the database in a subdirectory when given a path", () => {
-      const tmpDir = mkdtempSync(join(tmpdir(), "chapter-db-subdir-"));
-      const subPath = join(tmpDir, "data", "chapter.db");
+      const tmpDir = mkdtempSync(join(tmpdir(), "mason-db-subdir-"));
+      const subPath = join(tmpDir, "data", "mason.db");
       const subDb = openDatabase(subPath);
       try {
         expect(existsSync(subPath)).toBe(true);
@@ -53,7 +53,7 @@ describe("proxy/db", () => {
 
     it("enables WAL mode", () => {
       // In-memory databases can't use WAL; test with a temp file
-      const tmpDir = mkdtempSync(join(tmpdir(), "chapter-db-test-"));
+      const tmpDir = mkdtempSync(join(tmpdir(), "mason-db-test-"));
       const filePath = join(tmpDir, "test.db");
       const fileDb = openDatabase(filePath);
       try {

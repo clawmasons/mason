@@ -23,7 +23,7 @@ import { existsSync } from "node:fs";
 import { join, resolve as pathResolve, basename, dirname, extname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { resolveRole, RoleDiscoveryError, readMaterializedRole } from "@clawmasons/shared";
-import { getDialectByDirectory } from "@clawmasons/shared";
+import { getDialectByDirectory, CLI_NAME_LOWERCASE } from "@clawmasons/shared";
 import type { Role, TaskRef, SkillRef } from "@clawmasons/shared";
 
 // ---------------------------------------------------------------------------
@@ -336,7 +336,7 @@ async function writePackageJson(
   }
 
   // Generated fields always win
-  base.chapter = { type: "role" };
+  base[CLI_NAME_LOWERCASE] = { type: "role" };
   base.files = ["ROLE.md", "tasks/", "skills/"];
 
   await writeFile(

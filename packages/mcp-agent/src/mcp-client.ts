@@ -2,7 +2,7 @@
  * Lightweight MCP client for the mcp-agent.
  *
  * Provides session initialization, tool listing, and tool calling
- * via the MCP streamable-http protocol over the chapter proxy.
+ * via the MCP streamable-http protocol over the proxy.
  */
 
 import type { ToolCaller, ToolDefinition, ToolCallResult } from "./tool-caller.js";

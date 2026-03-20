@@ -93,7 +93,7 @@ describe("matchServers", () => {
     expect(result.unmatched).toHaveLength(1);
     expect(result.unmatched[0]!.name).toBe("personal-notes");
     expect(result.unmatched[0]!.reason).toContain("personal-notes");
-    expect(result.unmatched[0]!.reason.toLowerCase()).toContain("no matching chapter app");
+    expect(result.unmatched[0]!.reason.toLowerCase()).toContain("no matching app");
   });
 
   it("returns empty result for empty mcpServers", () => {

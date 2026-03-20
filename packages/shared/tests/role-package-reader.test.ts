@@ -33,8 +33,8 @@ afterEach(async () => {
 async function createMockPackage(opts: {
   name: string;
   version?: string;
-  chapterType?: string;
-  chapterDialect?: string;
+  masonType?: string;
+  masonDialect?: string;
   roleMd?: string;
   extraFiles?: Record<string, string>;
 }): Promise<string> {
@@ -45,10 +45,10 @@ async function createMockPackage(opts: {
     name: opts.name,
     version: opts.version ?? "1.0.0",
   };
-  if (opts.chapterType !== undefined) {
-    pkgJson.chapter = {
-      type: opts.chapterType,
-      ...(opts.chapterDialect ? { dialect: opts.chapterDialect } : {}),
+  if (opts.masonType !== undefined) {
+    pkgJson.mason = {
+      type: opts.masonType,
+      ...(opts.masonDialect ? { dialect: opts.masonDialect } : {}),
     };
   }
   await writeFile(join(pkgDir, "package.json"), JSON.stringify(pkgJson, null, 2));
@@ -143,7 +143,7 @@ describe("readPackagedRole — valid packages", () => {
   it("reads a role package with generic field names", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-create-prd",
-      chapterType: "role",
+      masonType: "role",
       roleMd: GENERIC_ROLE_MD,
     });
 
@@ -190,11 +190,11 @@ describe("readPackagedRole — valid packages", () => {
     expect(role.source.path).toBeUndefined();
   });
 
-  it("reads a package with dialect-specific field names via chapter.dialect", async () => {
+  it("reads a package with dialect-specific field names via mason.dialect", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-claude-prd",
-      chapterType: "role",
-      chapterDialect: "claude-code-agent",
+      masonType: "role",
+      masonDialect: "claude-code-agent",
       roleMd: CLAUDE_DIALECT_ROLE_MD,
     });
 
@@ -215,7 +215,7 @@ describe("readPackagedRole — valid packages", () => {
   it("falls back to package.json name when frontmatter name is absent", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-unnamed",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 description: A role without explicit name
 ---
@@ -231,7 +231,7 @@ Instructions.`,
     const pkgDir = await createMockPackage({
       name: "@acme/role-versioned",
       version: "2.5.0",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: versioned-role
 description: A role without explicit version
@@ -247,7 +247,7 @@ Instructions.`,
   it("discovers bundled resources in the package directory", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-with-resources",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: with-resources
 description: Role with bundled files
@@ -272,7 +272,7 @@ Instructions.`,
   it("resolves local path skill references relative to package directory", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-local-skills",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: local-skills
 description: Role with local skill paths
@@ -293,7 +293,7 @@ Instructions.`,
   it("accepts a minimal role package", async () => {
     const pkgDir = await createMockPackage({
       name: "minimal-role",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: minimal
 description: A minimal role
@@ -373,7 +373,7 @@ Instructions for the role.`;
     // Create packaged role (generic field names)
     const pkgDir = await createMockPackage({
       name: "@acme/role-equiv",
-      chapterType: "role",
+      masonType: "role",
       roleMd,
     });
 
@@ -409,38 +409,38 @@ describe("readPackagedRole — error handling", () => {
     await expect(readPackagedRole(pkgDir)).rejects.toThrow("Missing package.json");
   });
 
-  it("throws PackageReadError when chapter.type is not role", async () => {
+  it("throws PackageReadError when mason.type is not role", async () => {
     const pkgDir = await createMockPackage({
       name: "not-a-role",
-      chapterType: "skill",
+      masonType: "skill",
       roleMd: "---\nname: x\ndescription: x\n---\nBody",
     });
 
     await expect(readPackagedRole(pkgDir)).rejects.toThrow(PackageReadError);
     await expect(readPackagedRole(pkgDir)).rejects.toThrow(
-      'does not have chapter.type = "role"',
+      'does not have mason.type = "role"',
     );
   });
 
-  it("throws PackageReadError when chapter field is missing", async () => {
-    const pkgDir = join(testDir, "no-chapter");
+  it("throws PackageReadError when mason field is missing", async () => {
+    const pkgDir = join(testDir, "no-mason");
     await mkdir(pkgDir, { recursive: true });
     await writeFile(
       join(pkgDir, "package.json"),
-      JSON.stringify({ name: "no-chapter" }),
+      JSON.stringify({ name: "no-mason" }),
     );
     await writeFile(join(pkgDir, "ROLE.md"), "---\nname: x\ndescription: x\n---\nBody");
 
     await expect(readPackagedRole(pkgDir)).rejects.toThrow(PackageReadError);
     await expect(readPackagedRole(pkgDir)).rejects.toThrow(
-      'does not have chapter.type = "role"',
+      'does not have mason.type = "role"',
     );
   });
 
   it("throws PackageReadError when ROLE.md is missing", async () => {
     const pkgDir = await createMockPackage({
       name: "missing-role-md",
-      chapterType: "role",
+      masonType: "role",
     });
 
     await expect(readPackagedRole(pkgDir)).rejects.toThrow(PackageReadError);
@@ -450,7 +450,7 @@ describe("readPackagedRole — error handling", () => {
   it("throws PackageReadError when ROLE.md has no description", async () => {
     const pkgDir = await createMockPackage({
       name: "no-desc",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: no-desc
 ---
@@ -471,11 +471,11 @@ Body.`,
     await expect(readPackagedRole(pkgDir)).rejects.toThrow("Invalid package.json");
   });
 
-  it("throws PackageReadError for unknown dialect in chapter.dialect", async () => {
+  it("throws PackageReadError for unknown dialect in mason.dialect", async () => {
     const pkgDir = await createMockPackage({
       name: "bad-dialect",
-      chapterType: "role",
-      chapterDialect: "nonexistent-dialect",
+      masonType: "role",
+      masonDialect: "nonexistent-dialect",
       roleMd: `---
 name: bad
 description: Bad dialect
@@ -504,7 +504,7 @@ Body.`,
   it("throws RoleParseError for malformed YAML in ROLE.md", async () => {
     const pkgDir = await createMockPackage({
       name: "bad-yaml-pkg",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: test
   bad: [indent
@@ -526,7 +526,7 @@ describe("readPackagedRole — dependency path resolution", () => {
   it("resolves package skill references as-is", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-with-deps",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: with-deps
 description: Role with package skill references
@@ -550,7 +550,7 @@ Instructions.`,
   it("resolves relative path references from the package directory", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-relative-deps",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: relative-deps
 description: Role with relative path deps
@@ -577,7 +577,7 @@ describe("readPackagedRole — bundled dependency validation", () => {
   it("loads successfully when all bundled skill subdirs exist", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-validated",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: validated
 description: Role with bundled skills
@@ -599,7 +599,7 @@ Instructions.`,
   it("throws PackageDependencyError when a plain-name skill subdir is missing", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-missing-skill",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: missing-skill
 description: Role with a missing bundled skill
@@ -617,7 +617,7 @@ Instructions.`,
   it("collects ALL missing skill paths before throwing", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-multi-missing",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: multi-missing
 description: Role with multiple missing bundled skills
@@ -646,7 +646,7 @@ Instructions.`,
   it("exposes roleMdPath in PackageDependencyError", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-check-path",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: check-path
 description: Role to check error path
@@ -670,7 +670,7 @@ Instructions.`,
   it("does not validate scoped package skill refs", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-scoped-skills",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: scoped-skills
 description: Role with only scoped package skills
@@ -688,7 +688,7 @@ Instructions.`,
   it("does not validate path-relative skill refs", async () => {
     const pkgDir = await createMockPackage({
       name: "@acme/role-relative-skills",
-      chapterType: "role",
+      masonType: "role",
       roleMd: `---
 name: relative-skills
 description: Role with relative path skills

@@ -1,7 +1,7 @@
 {
   "name": "@clawmasons/mcp-agent",
   "version": "0.1.3",
-  "description": "General-purpose MCP agent with REPL and ACP modes for testing and debugging the chapter proxy pipeline",
+  "description": "General-purpose MCP agent with REPL and ACP modes for testing and debugging the mason proxy pipeline",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

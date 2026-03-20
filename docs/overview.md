@@ -37,7 +37,7 @@ Custom agents can be registered in `.mason/config.json` by pointing to any npm p
 
 ### npm-Native Packaging
 
-Everything is a `package.json`. Roles, tasks, skills, and apps are standard npm packages with a `chapter` metadata field. Use npm workspaces, publish to registries, and compose roles from reusable components.
+Everything is a `package.json`. Roles, tasks, skills, and apps are standard npm packages with a `mason` metadata field. Use npm workspaces, publish to registries, and compose roles from reusable components.
 
 ### Editor Integration
 

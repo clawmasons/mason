@@ -32,31 +32,19 @@ describe("CLI entry point", () => {
     expect(acpCmd).toBeUndefined();
   });
 
-  it("has chapter subcommand group registered", () => {
-    const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
-    expect(chapterCmd).toBeDefined();
-    if (chapterCmd) {
-      expect(chapterCmd.description()).toContain("Chapter workspace");
-    }
-  });
-
-  it("chapter subcommand contains build, list, validate, permissions, proxy", () => {
-    const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
-    expect(chapterCmd).toBeDefined();
-    if (chapterCmd) {
-      const subcommandNames = chapterCmd.commands.map((cmd) => cmd.name());
-      expect(subcommandNames).toContain("build");
-      expect(subcommandNames).toContain("list");
-      expect(subcommandNames).toContain("validate");
-      expect(subcommandNames).toContain("permissions");
-      expect(subcommandNames).toContain("proxy");
-      // Removed commands
-      expect(subcommandNames).not.toContain("add");
-      expect(subcommandNames).not.toContain("pack");
-      expect(subcommandNames).not.toContain("remove");
-      expect(subcommandNames).not.toContain("init-role");
-      expect(subcommandNames).not.toContain("init");
-    }
+  it("has workspace commands registered at top level", () => {
+    const topLevelNames = program.commands.map((cmd) => cmd.name());
+    expect(topLevelNames).toContain("build");
+    expect(topLevelNames).toContain("list");
+    expect(topLevelNames).toContain("validate");
+    expect(topLevelNames).toContain("permissions");
+    expect(topLevelNames).toContain("proxy");
+    // Removed commands
+    expect(topLevelNames).not.toContain("add");
+    expect(topLevelNames).not.toContain("pack");
+    expect(topLevelNames).not.toContain("remove");
+    expect(topLevelNames).not.toContain("init-role");
+    expect(topLevelNames).not.toContain("init");
   });
 
   it("has top-level package command registered", () => {
@@ -73,9 +61,6 @@ describe("CLI entry point", () => {
     expect(topLevelNames).not.toContain("run-acp-agent");
     expect(topLevelNames).not.toContain("run-init");
     expect(topLevelNames).not.toContain("docker-init");
-    expect(topLevelNames).not.toContain("build");
-    expect(topLevelNames).not.toContain("list");
-    expect(topLevelNames).not.toContain("validate");
   });
 
   it("run command has --role option", () => {

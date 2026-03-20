@@ -574,7 +574,7 @@ describe("generateSessionComposeYml", () => {
   it("includes tokens in environment", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
-    expect(yml).toContain("CHAPTER_PROXY_TOKEN=test-proxy-token");
+    expect(yml).toContain("MASON_PROXY_TOKEN=test-proxy-token");
     expect(yml).toContain("CREDENTIAL_PROXY_TOKEN=test-cred-token");
     expect(yml).toContain("MCP_PROXY_TOKEN=test-proxy-token");
   });
@@ -598,7 +598,7 @@ describe("generateSessionComposeYml", () => {
       credentialKeys: ["GITHUB_TOKEN", "ANTHROPIC_API_KEY"],
     });
 
-    expect(yml).toContain("CHAPTER_DECLARED_CREDENTIALS=");
+    expect(yml).toContain("MASON_DECLARED_CREDENTIALS=");
     expect(yml).toContain("AGENT_CREDENTIALS=");
   });
 

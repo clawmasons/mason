@@ -14,7 +14,7 @@ A **skill** is a knowledge artifact — documentation, conventions, examples, or
   "name": "@acme.platform/skill-markdown-conventions",
   "version": "1.0.0",
   "description": "Markdown formatting conventions for consistent note structure",
-  "chapter": {
+  "mason": {
     "type": "skill",
     "artifacts": ["./SKILL.md"],
     "description": "Markdown formatting conventions for consistent note structure"

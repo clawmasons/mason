@@ -173,7 +173,7 @@ describe("requestApproval", () => {
 
     expect(result).toBe("denied");
     expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[chapter] approval request creation failed"),
+      expect.stringContaining("[mason] approval request creation failed"),
     );
 
     stderrSpy.mockRestore();
@@ -194,7 +194,7 @@ describe("requestApproval", () => {
 
     expect(result).toBe("denied");
     expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[chapter] approval request poll failed"),
+      expect.stringContaining("[mason] approval request poll failed"),
     );
 
     stderrSpy.mockRestore();

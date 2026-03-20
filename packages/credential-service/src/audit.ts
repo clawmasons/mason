@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { CLI_NAME_LOWERCASE } from "@clawmasons/shared";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ CREATE TABLE IF NOT EXISTS credential_audit (
 // ── Database ───────────────────────────────────────────────────────────
 
 const DEFAULT_DB_PATH = process.env.CREDENTIAL_DB_PATH
-  ?? join(homedir(), ".chapter", "data", "chapter.db");
+  ?? join(homedir(), `.${CLI_NAME_LOWERCASE}`, "data", `${CLI_NAME_LOWERCASE}.db`);
 
 /**
  * Open the credential audit database and ensure the table exists.

@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { parseChapterField } from "@clawmasons/shared";
+import { parseField } from "@clawmasons/shared";
 
-describe("parseChapterField", () => {
+describe("parseField", () => {
   it("parses an app by type discrimination", () => {
-    const result = parseChapterField({
+    const result = parseField({
       type: "app",
       transport: "stdio",
       command: "npx",
@@ -18,7 +18,7 @@ describe("parseChapterField", () => {
   });
 
   it("parses a skill by type discrimination", () => {
-    const result = parseChapterField({
+    const result = parseField({
       type: "skill",
       artifacts: ["./SKILL.md"],
       description: "A skill",
@@ -30,7 +30,7 @@ describe("parseChapterField", () => {
   });
 
   it("parses a task by type discrimination", () => {
-    const result = parseChapterField({
+    const result = parseField({
       type: "task",
       taskType: "subagent",
     });
@@ -41,7 +41,7 @@ describe("parseChapterField", () => {
   });
 
   it("parses a role by type discrimination", () => {
-    const result = parseChapterField({
+    const result = parseField({
       type: "role",
       permissions: {
         "@clawmasons/app-github": {
@@ -57,7 +57,7 @@ describe("parseChapterField", () => {
   });
 
   it("rejects deprecated agent type", () => {
-    const result = parseChapterField({
+    const result = parseField({
       type: "agent",
       name: "Note Taker",
       slug: "note-taker",
@@ -68,22 +68,22 @@ describe("parseChapterField", () => {
   });
 
   it("fails on unknown type", () => {
-    const result = parseChapterField({ type: "unknown" });
+    const result = parseField({ type: "unknown" });
     expect(result.success).toBe(false);
   });
 
   it("fails on missing type", () => {
-    const result = parseChapterField({});
+    const result = parseField({});
     expect(result.success).toBe(false);
   });
 
   it("fails on non-object input", () => {
-    const result = parseChapterField("not an object");
+    const result = parseField("not an object");
     expect(result.success).toBe(false);
   });
 
   it("fails on null input", () => {
-    const result = parseChapterField(null);
+    const result = parseField(null);
     expect(result.success).toBe(false);
   });
 });

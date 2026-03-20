@@ -69,7 +69,7 @@ These roles are created by `mason configure` or by hand. See [Role](role.md) for
 When you run `mason run <agent> --role <name>`, Mason searches for the role in two places:
 
 1. **Local roles** (highest priority) — `.mason/roles/<name>/ROLE.md`
-2. **Installed npm packages** — Any package in `node_modules/` with `chapter.type: "role"` in its `package.json`
+2. **Installed npm packages** — Any package in `node_modules/` with `mason.type: "role"` in its `package.json`
 
 Local roles take precedence over packaged roles with the same name. This lets you override a published role with a local customization.
 

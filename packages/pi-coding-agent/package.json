@@ -1,7 +1,7 @@
 {
   "name": "@clawmasons/pi-coding-agent",
   "version": "0.1.3",
-  "description": "Pi Coding Agent package for Mason Chapter",
+  "description": "Pi Coding Agent package for Mason",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

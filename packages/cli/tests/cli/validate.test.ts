@@ -6,11 +6,9 @@ import { program } from "../../src/cli/index.js";
 import { runValidate } from "../../src/cli/commands/validate.js";
 
 describe("CLI validate command", () => {
-  const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
+  const validateCmd = program.commands.find((cmd) => cmd.name() === "validate");
 
-  it("has the validate command registered under chapter", () => {
-    expect(chapterCmd).toBeDefined();
-    const validateCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "validate");
+  it("has the validate command registered", () => {
     expect(validateCmd).toBeDefined();
     if (validateCmd) {
       expect(validateCmd.description()).toContain("Validate");
@@ -18,7 +16,6 @@ describe("CLI validate command", () => {
   });
 
   it("validate command has --role option", () => {
-    const validateCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "validate");
     expect(validateCmd).toBeDefined();
     if (validateCmd) {
       const roleOption = validateCmd.options.find((opt) => opt.long === "--role");
@@ -27,7 +24,6 @@ describe("CLI validate command", () => {
   });
 
   it("validate command has --json option", () => {
-    const validateCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "validate");
     expect(validateCmd).toBeDefined();
     if (validateCmd) {
       const jsonOption = validateCmd.options.find((opt) => opt.long === "--json");
@@ -43,7 +39,7 @@ describe("runValidate", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-validate-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-validate-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});

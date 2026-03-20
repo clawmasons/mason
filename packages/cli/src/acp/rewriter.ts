@@ -1,10 +1,11 @@
+import { CLI_NAME_LOWERCASE } from "@clawmasons/shared";
 import type { MatchResult, MatchedServer, McpServerConfig } from "./matcher.js";
 
 /**
  * The result of rewriting ACP client mcpServers for the agent container.
  */
 export interface RewriteResult {
-  /** The rewritten mcpServers config with a single `chapter` proxy entry */
+  /** The rewritten mcpServers config with a single proxy entry */
   mcpServers: Record<string, McpServerConfig>;
   /** Credentials extracted from matched servers' env fields (for credential-service session overrides) */
   extractedCredentials: Record<string, string>;
@@ -36,13 +37,13 @@ export function extractCredentials(
 /**
  * Rewrite the ACP client's mcpServers config for the agent container.
  *
- * Replaces all matched MCP server entries with a single `chapter` entry
- * pointing to the chapter proxy's streamable-http endpoint. Extracts
+ * Replaces all matched MCP server entries with a single entry
+ * pointing to the proxy's streamable-http endpoint. Extracts
  * credentials from matched servers' env fields for injection into the
  * credential-service as session overrides.
  *
  * @param matchResult - The result from matchServers()
- * @param proxyUrl - The chapter proxy URL inside the Docker network (e.g., "http://proxy:3000/mcp")
+ * @param proxyUrl - The proxy URL inside the Docker network (e.g., "http://proxy:3000/mcp")
  * @param sessionToken - The session authentication token
  * @returns The rewritten mcpServers config and extracted credentials
  */
@@ -54,7 +55,7 @@ export function rewriteMcpConfig(
   const extractedCredentials = extractCredentials(matchResult.matched);
 
   const mcpServers: Record<string, McpServerConfig> = {
-    chapter: {
+    [CLI_NAME_LOWERCASE]: {
       url: proxyUrl,
       headers: {
         Authorization: `Bearer ${sessionToken}`,

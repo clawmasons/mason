@@ -1,13 +1,13 @@
-import type { ChapterField } from "./schemas/index.js";
+import type { Field } from "./schemas/index.js";
 
 /**
- * A chapter package discovered on the filesystem.
+ * A package discovered on the filesystem.
  */
 export interface DiscoveredPackage {
   name: string;
   version: string;
   packagePath: string;
-  chapterField: ChapterField;
+  field: Field;
 }
 
 /**

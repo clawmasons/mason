@@ -50,12 +50,10 @@ function makeRole(name: string) {
 
 // ── Command Registration ─────────────────────────────────────────────
 
-describe("chapter build command", () => {
-  const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
+describe("build command", () => {
+  const buildCmd = program.commands.find((cmd) => cmd.name() === "build");
 
-  it("is registered under chapter", () => {
-    expect(chapterCmd).toBeDefined();
-    const buildCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "build");
+  it("is registered", () => {
     expect(buildCmd).toBeDefined();
     if (buildCmd) {
       expect(buildCmd.description()).toContain("Docker");
@@ -63,7 +61,6 @@ describe("chapter build command", () => {
   });
 
   it("accepts an optional [role] argument", () => {
-    const buildCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "build");
     expect(buildCmd).toBeDefined();
     if (buildCmd) {
       const args = buildCmd.registeredArguments;
@@ -74,7 +71,6 @@ describe("chapter build command", () => {
   });
 
   it("has --agent-type option", () => {
-    const buildCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "build");
     expect(buildCmd).toBeDefined();
     if (buildCmd) {
       const opt = buildCmd.options.find((o) => o.long === "--agent-type");
@@ -100,7 +96,7 @@ describe("runBuild", () => {
   let runBuild: (projectDir: string, roleName?: string, agentTypeOverride?: string) => Promise<void>;
 
   beforeEach(async () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-build-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-build-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});

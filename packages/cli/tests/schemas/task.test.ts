@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { taskChapterFieldSchema } from "@clawmasons/shared";
+import { taskFieldSchema } from "@clawmasons/shared";
 
-describe("taskChapterFieldSchema", () => {
+describe("taskFieldSchema", () => {
   it("validates a valid subagent task", () => {
-    const result = taskChapterFieldSchema.safeParse({
+    const result = taskFieldSchema.safeParse({
       type: "task",
       taskType: "subagent",
       prompt: "./prompts/triage.md",
@@ -18,7 +18,7 @@ describe("taskChapterFieldSchema", () => {
   });
 
   it("validates a composite task", () => {
-    const result = taskChapterFieldSchema.safeParse({
+    const result = taskFieldSchema.safeParse({
       type: "task",
       taskType: "composite",
     });
@@ -26,7 +26,7 @@ describe("taskChapterFieldSchema", () => {
   });
 
   it("validates a script task", () => {
-    const result = taskChapterFieldSchema.safeParse({
+    const result = taskFieldSchema.safeParse({
       type: "task",
       taskType: "script",
     });
@@ -34,7 +34,7 @@ describe("taskChapterFieldSchema", () => {
   });
 
   it("validates a human task", () => {
-    const result = taskChapterFieldSchema.safeParse({
+    const result = taskFieldSchema.safeParse({
       type: "task",
       taskType: "human",
       prompt: "./prompts/approval.md",
@@ -43,7 +43,7 @@ describe("taskChapterFieldSchema", () => {
   });
 
   it("rejects task with invalid taskType", () => {
-    const result = taskChapterFieldSchema.safeParse({
+    const result = taskFieldSchema.safeParse({
       type: "task",
       taskType: "unknown",
     });
@@ -55,7 +55,7 @@ describe("taskChapterFieldSchema", () => {
   });
 
   it("accepts task with partial requires", () => {
-    const result = taskChapterFieldSchema.safeParse({
+    const result = taskFieldSchema.safeParse({
       type: "task",
       taskType: "subagent",
       requires: { apps: ["@clawmasons/app-github"] },
@@ -64,7 +64,7 @@ describe("taskChapterFieldSchema", () => {
   });
 
   it("validates PRD example: @clawmasons/task-triage-issue", () => {
-    const result = taskChapterFieldSchema.safeParse({
+    const result = taskFieldSchema.safeParse({
       type: "task",
       taskType: "subagent",
       prompt: "./prompts/triage.md",

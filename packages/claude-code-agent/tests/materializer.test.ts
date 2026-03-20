@@ -139,7 +139,7 @@ describe("claudeCodeMaterializer", () => {
 
   describe("materializeWorkspace", () => {
     describe(".claude.json (MCP config)", () => {
-      it("generates single chapter entry with default SSE proxy", () => {
+      it("generates single mason entry with default SSE proxy", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
@@ -147,29 +147,29 @@ describe("claudeCodeMaterializer", () => {
         expect(claudeJson).toBeDefined();
 
         const parsed = JSON.parse(claudeJson!);
-        expect(parsed.mcpServers.chapter).toBeDefined();
-        expect(parsed.mcpServers.chapter.type).toBe("sse");
-        expect(parsed.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/sse");
-        expect(Object.keys(parsed.mcpServers)).toEqual(["chapter"]);
+        expect(parsed.mcpServers.mason).toBeDefined();
+        expect(parsed.mcpServers.mason.type).toBe("sse");
+        expect(parsed.mcpServers.mason.url).toBe("http://mcp-proxy:9090/sse");
+        expect(Object.keys(parsed.mcpServers)).toEqual(["mason"]);
       });
 
-      it("generates single chapter entry with custom port", () => {
+      it("generates single mason entry with custom port", () => {
         const agent = makeRepoOpsAgent();
         agent.proxy = { port: 8080, type: "sse" };
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:8080");
 
         const parsed = JSON.parse(result.get(".claude.json")!);
-        expect(parsed.mcpServers.chapter.url).toBe("http://mcp-proxy:8080/sse");
+        expect(parsed.mcpServers.mason.url).toBe("http://mcp-proxy:8080/sse");
       });
 
-      it('generates chapter entry with http transport (streamable-http maps to "http" for Claude Code)', () => {
+      it('generates mason entry with http transport (streamable-http maps to "http" for Claude Code)', () => {
         const agent = makeRepoOpsAgent();
         agent.proxy = { port: 9090, type: "streamable-http" };
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const parsed = JSON.parse(result.get(".claude.json")!);
-        expect(parsed.mcpServers.chapter.type).toBe("http");
-        expect(parsed.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/mcp");
+        expect(parsed.mcpServers.mason.type).toBe("http");
+        expect(parsed.mcpServers.mason.url).toBe("http://mcp-proxy:9090/mcp");
       });
 
       it("includes placeholder auth header when no token provided", () => {
@@ -177,7 +177,7 @@ describe("claudeCodeMaterializer", () => {
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const parsed = JSON.parse(result.get(".claude.json")!);
-        expect(parsed.mcpServers.chapter.headers.Authorization).toBe("Bearer ${MCP_PROXY_TOKEN}");
+        expect(parsed.mcpServers.mason.headers.Authorization).toBe("Bearer ${MCP_PROXY_TOKEN}");
       });
 
       it("bakes actual token into auth header when proxyToken provided", () => {
@@ -186,7 +186,7 @@ describe("claudeCodeMaterializer", () => {
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", token);
 
         const parsed = JSON.parse(result.get(".claude.json")!);
-        expect(parsed.mcpServers.chapter.headers.Authorization).toBe("Bearer abc123def456");
+        expect(parsed.mcpServers.mason.headers.Authorization).toBe("Bearer abc123def456");
       });
 
       it("defaults to SSE when agent has no proxy field", () => {
@@ -195,8 +195,8 @@ describe("claudeCodeMaterializer", () => {
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const parsed = JSON.parse(result.get(".claude.json")!);
-        expect(parsed.mcpServers.chapter.type).toBe("sse");
-        expect(parsed.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/sse");
+        expect(parsed.mcpServers.mason.type).toBe("sse");
+        expect(parsed.mcpServers.mason.url).toBe("http://mcp-proxy:9090/sse");
       });
 
       it("does not emit .mcp.json", () => {
@@ -207,12 +207,12 @@ describe("claudeCodeMaterializer", () => {
     });
 
     describe("settings.json", () => {
-      it("includes single chapter permission", () => {
+      it("includes single mason permission", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const settings = JSON.parse(result.get(".claude/settings.json")!);
-        expect(settings.permissions.allow).toEqual(["mcp__chapter__*"]);
+        expect(settings.permissions.allow).toEqual(["mcp__mason__*"]);
         expect(settings.permissions.deny).toEqual([]);
       });
 
@@ -257,7 +257,7 @@ describe("claudeCodeMaterializer", () => {
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const triageCmd = result.get(".claude/commands/triage-issue.md")!;
-        expect(triageCmd).toContain("Generated by chapter from @clawmasons/task-triage-issue@0.3.1");
+        expect(triageCmd).toContain("Generated by mason from @clawmasons/task-triage-issue@0.3.1");
       });
 
       it("includes skill references when task has skills", () => {
@@ -439,11 +439,11 @@ describe("claudeCodeMaterializer", () => {
     });
 
     describe("ACP mode", () => {
-      it("does not generate .chapter/acp.json even in ACP mode", () => {
+      it("does not generate .mason/acp.json even in ACP mode", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
 
-        expect(result.has(".chapter/acp.json")).toBe(false);
+        expect(result.has(".mason/acp.json")).toBe(false);
       });
 
       it("still generates all standard workspace files in ACP mode", () => {
@@ -466,7 +466,7 @@ describe("claudeCodeMaterializer", () => {
       expect(claudeJsonStr).toBeDefined();
       const claudeJson = JSON.parse(claudeJsonStr!);
       expect(claudeJson.mcpServers).toBeDefined();
-      expect(claudeJson.mcpServers.chapter).toBeDefined();
+      expect(claudeJson.mcpServers.mason).toBeDefined();
     });
 
     it("does not emit .mcp.json", () => {
@@ -536,9 +536,9 @@ describe("claudeCodeMaterializer", () => {
         const claudeJson = JSON.parse(result.get(".claude.json")!);
         // Existing top-level fields preserved
         expect(claudeJson.hasCompletedOnboarding).toBe(true);
-        // Existing mcpServers preserved, new chapter entry added
+        // Existing mcpServers preserved, new mason entry added
         expect(claudeJson.mcpServers.existing).toBeDefined();
-        expect(claudeJson.mcpServers.chapter).toBeDefined();
+        expect(claudeJson.mcpServers.mason).toBeDefined();
       } finally {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
@@ -564,7 +564,7 @@ describe("claudeCodeMaterializer", () => {
     let tmpDir: string;
     let fakeHostHome: string;
     let homePath: string;
-    const projectDir = "/Users/greff/Projects/clawmasons/chapter";
+    const projectDir = "/Users/greff/Projects/clawmasons/mason";
 
     beforeEach(() => {
       tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "materialize-home-test-"));
@@ -692,7 +692,7 @@ describe("claudeCodeMaterializer", () => {
       it("filters and rewrites githubRepoPaths to container path", () => {
         fs.writeFileSync(path.join(fakeHostHome, ".claude.json"), JSON.stringify({
           githubRepoPaths: {
-            "clawmasons/chapter": [projectDir, `${projectDir}/e2e`],
+            "clawmasons/mason": [projectDir, `${projectDir}/e2e`],
             "clawmasons/other": ["/Users/greff/Projects/clawmasons/other"],
             "clawmasons/multi": ["/some/path", projectDir],
           },
@@ -702,7 +702,7 @@ describe("claudeCodeMaterializer", () => {
 
         const result = JSON.parse(fs.readFileSync(path.join(homePath, ".claude.json"), "utf-8"));
         // Matching repos rewritten to container path
-        expect(result.githubRepoPaths["clawmasons/chapter"]).toEqual(["/home/mason/workspace/project"]);
+        expect(result.githubRepoPaths["clawmasons/mason"]).toEqual(["/home/mason/workspace/project"]);
         // Repo with mixed paths kept (one path matched)
         expect(result.githubRepoPaths["clawmasons/multi"]).toEqual(["/home/mason/workspace/project"]);
         // Non-matching repo removed
@@ -711,7 +711,7 @@ describe("claudeCodeMaterializer", () => {
     });
 
     describe("projects directory path transformation", () => {
-      const flattenedPath = "-Users-greff-Projects-clawmasons-chapter";
+      const flattenedPath = "-Users-greff-Projects-clawmasons-mason";
 
       beforeEach(() => {
         // Create projects dir with multiple project subdirs

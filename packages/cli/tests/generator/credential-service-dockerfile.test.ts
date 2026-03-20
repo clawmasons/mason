@@ -73,6 +73,6 @@ describe("generateCredentialServiceDockerfile", () => {
     const result = generateCredentialServiceDockerfile();
 
     expect(result).toContain("Credential Service Dockerfile");
-    expect(result).toContain("mason chapter build");
+    expect(result).toContain("mason build");
   });
 });

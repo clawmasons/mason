@@ -122,7 +122,7 @@ Help the user set up their project for mason.
 Roles are discovered from two sources:
 
 1. **Local ROLE.md files** — Found in agent-specific directories (e.g., `.claude/roles/<name>/ROLE.md`)
-2. **Installed npm packages** — Role packages with `chapter.type: "role"` in `package.json`
+2. **Installed npm packages** — Role packages with `mason.type: "role"` in `package.json`
 
 Local roles take precedence over packaged roles with the same name. This allows you to override a published role with a local customization.
 
@@ -162,7 +162,7 @@ For packaged/published roles (npm packages), the role configuration lives in `pa
   "name": "@acme.platform/role-writer",
   "version": "1.0.0",
   "description": "Writer role — permission boundary for filesystem note operations",
-  "chapter": {
+  "mason": {
     "type": "role",
     "description": "Manages notes on the filesystem: read, write, list, and create directories.",
     "tasks": ["@acme.platform/task-take-notes"],

@@ -21,7 +21,7 @@ import { CredentialResolver } from "../src/resolver.js";
 // ── Helpers ─────────────────────────────────────────────────────────────
 
 function writeDotenv(content: string): string {
-  const dir = mkdtempSync(join(tmpdir(), "chapter-cred-resolver-"));
+  const dir = mkdtempSync(join(tmpdir(), "mason-cred-resolver-"));
   const filePath = join(dir, ".env");
   writeFileSync(filePath, content);
   return filePath;

@@ -5,7 +5,7 @@ import type { UnmatchedServer } from "../../src/acp/matcher.js";
 function makeUnmatched(overrides: Partial<UnmatchedServer> & { name: string }): UnmatchedServer {
   return {
     config: {},
-    reason: `No matching chapter App found for server "${overrides.name}"`,
+    reason: `No matching App found for server "${overrides.name}"`,
     ...overrides,
   };
 }
@@ -17,7 +17,7 @@ describe("formatWarning", () => {
 
     expect(warning).toContain('[mason run-acp-agent] WARNING: Dropping unmatched MCP server "personal-notes"');
     expect(warning).toContain("Agent will not have access to tools from this server");
-    expect(warning).toContain("To govern this server, create a chapter App package for it");
+    expect(warning).toContain("To govern this server, create an App package for it");
   });
 
   it("includes the server name in the warning", () => {
@@ -30,11 +30,11 @@ describe("formatWarning", () => {
   it("includes the reason from the unmatched server", () => {
     const server = makeUnmatched({
       name: "custom",
-      reason: "No matching chapter App found for server \"custom\"",
+      reason: "No matching App found for server \"custom\"",
     });
     const warning = formatWarning(server);
 
-    expect(warning).toContain('No matching chapter App found for server "custom"');
+    expect(warning).toContain('No matching App found for server "custom"');
   });
 
   it("produces a multi-line string", () => {
@@ -79,6 +79,6 @@ describe("generateWarnings", () => {
     const warning = warnings[0]!;
     expect(warning).toContain("[mason run-acp-agent] WARNING:");
     expect(warning).toContain("Agent will not have access to tools from this server");
-    expect(warning).toContain("To govern this server, create a chapter App package for it");
+    expect(warning).toContain("To govern this server, create an App package for it");
   });
 });

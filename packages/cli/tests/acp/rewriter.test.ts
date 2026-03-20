@@ -26,7 +26,7 @@ function makeMatched(overrides: Partial<MatchedServer> & { name: string }): Matc
 function makeUnmatched(overrides: Partial<UnmatchedServer> & { name: string }): UnmatchedServer {
   return {
     config: {},
-    reason: `No matching chapter App found for server "${overrides.name}"`,
+    reason: `No matching App found for server "${overrides.name}"`,
     ...overrides,
   };
 }
@@ -114,7 +114,7 @@ describe("rewriteMcpConfig", () => {
   const proxyUrl = "http://proxy:3000/mcp";
   const sessionToken = "test-session-token-123";
 
-  it("produces single chapter entry with correct URL and auth header", () => {
+  it("produces single mason entry with correct URL and auth header", () => {
     const matchResult = makeMatchResult([
       makeMatched({ name: "github", config: { env: { GITHUB_TOKEN: "ghp_abc" } } }),
       makeMatched({ name: "slack", config: { env: { SLACK_TOKEN: "xoxb-456" } } }),
@@ -122,8 +122,8 @@ describe("rewriteMcpConfig", () => {
 
     const result = rewriteMcpConfig(matchResult, proxyUrl, sessionToken);
 
-    expect(Object.keys(result.mcpServers)).toEqual(["chapter"]);
-    expect(result.mcpServers.chapter).toEqual({
+    expect(Object.keys(result.mcpServers)).toEqual(["mason"]);
+    expect(result.mcpServers.mason).toEqual({
       url: "http://proxy:3000/mcp",
       headers: { Authorization: "Bearer test-session-token-123" },
     });
@@ -143,14 +143,14 @@ describe("rewriteMcpConfig", () => {
     });
   });
 
-  it("produces valid chapter entry even with empty matched list", () => {
+  it("produces valid mason entry even with empty matched list", () => {
     const matchResult = makeMatchResult([]);
 
     const result = rewriteMcpConfig(matchResult, proxyUrl, sessionToken);
 
-    expect(Object.keys(result.mcpServers)).toEqual(["chapter"]);
-    expect(result.mcpServers.chapter!.url).toBe(proxyUrl);
-    expect(result.mcpServers.chapter!.headers).toEqual({
+    expect(Object.keys(result.mcpServers)).toEqual(["mason"]);
+    expect(result.mcpServers.mason!.url).toBe(proxyUrl);
+    expect(result.mcpServers.mason!.headers).toEqual({
       Authorization: `Bearer ${sessionToken}`,
     });
     expect(result.extractedCredentials).toEqual({});
@@ -174,8 +174,8 @@ describe("rewriteMcpConfig", () => {
 
     const result = rewriteMcpConfig(matchResult, proxyUrl, sessionToken);
 
-    // Only chapter entry, no personal-notes
-    expect(Object.keys(result.mcpServers)).toEqual(["chapter"]);
+    // Only mason entry, no personal-notes
+    expect(Object.keys(result.mcpServers)).toEqual(["mason"]);
     // Only github credentials, nothing from personal-notes
     expect(result.extractedCredentials).toEqual({ GITHUB_TOKEN: "ghp_abc" });
   });

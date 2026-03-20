@@ -118,8 +118,8 @@ describe("materializeForAgent", () => {
 
       expect(result.has(".claude.json")).toBe(true);
       const mcp = JSON.parse(result.get(".claude.json")!);
-      expect(mcp.mcpServers.chapter).toBeDefined();
-      expect(mcp.mcpServers.chapter.url).toContain("mcp-proxy:9090");
+      expect(mcp.mcpServers.mason).toBeDefined();
+      expect(mcp.mcpServers.mason.url).toContain("mcp-proxy:9090");
     });
 
     it("produces .claude/settings.json with permissions", () => {
@@ -128,7 +128,7 @@ describe("materializeForAgent", () => {
 
       expect(result.has(".claude/settings.json")).toBe(true);
       const settings = JSON.parse(result.get(".claude/settings.json")!);
-      expect(settings.permissions.allow).toEqual(["mcp__chapter__*"]);
+      expect(settings.permissions.allow).toEqual(["mcp__mason__*"]);
     });
 
     it("produces .claude/commands/ for each task", () => {
@@ -151,7 +151,7 @@ describe("materializeForAgent", () => {
       const result = materializeForAgent(role, "claude-code-agent");
 
       const mcp = JSON.parse(result.get(".claude.json")!);
-      expect(mcp.mcpServers.chapter.url).toContain("http://mcp-proxy:9090");
+      expect(mcp.mcpServers.mason.url).toContain("http://mcp-proxy:9090");
     });
 
     it("uses custom proxy endpoint when provided", () => {
@@ -159,7 +159,7 @@ describe("materializeForAgent", () => {
       const result = materializeForAgent(role, "claude-code-agent", "http://custom-proxy:8080");
 
       const mcp = JSON.parse(result.get(".claude.json")!);
-      expect(mcp.mcpServers.chapter.url).toContain("http://custom-proxy:8080");
+      expect(mcp.mcpServers.mason.url).toContain("http://custom-proxy:8080");
     });
 
     it("includes proxy token when provided", () => {
@@ -168,14 +168,14 @@ describe("materializeForAgent", () => {
       const result = materializeForAgent(role, "claude-code-agent", undefined, token);
 
       const mcp = JSON.parse(result.get(".claude.json")!);
-      expect(mcp.mcpServers.chapter.headers.Authorization).toBe("Bearer test-token-123");
+      expect(mcp.mcpServers.mason.headers.Authorization).toBe("Bearer test-token-123");
     });
 
-    it("supports ACP mode (uses ACP command in agent-launch.json, no .chapter/acp.json)", () => {
+    it("supports ACP mode (uses ACP command in agent-launch.json, no .mason/acp.json)", () => {
       const role = makeTestRole();
       const result = materializeForAgent(role, "claude-code-agent", undefined, undefined, { acpMode: true });
 
-      expect(result.has(".chapter/acp.json")).toBe(false);
+      expect(result.has(".mason/acp.json")).toBe(false);
       const launchConfig = JSON.parse(result.get("agent-launch.json")!);
       expect(launchConfig.command).toBe("claude-agent-acp");
     });

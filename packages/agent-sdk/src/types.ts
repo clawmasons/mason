@@ -25,7 +25,7 @@ export interface MaterializeOptions {
 /**
  * The contract all runtime materializers implement.
  *
- * A materializer translates the abstract chapter dependency graph into
+ * A materializer translates the abstract dependency graph into
  * a specific runtime's native configuration format.
  */
 export interface RuntimeMaterializer {

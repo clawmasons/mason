@@ -19,7 +19,7 @@ Optionally copy `.env.example` to `.env` and fill in values (e.g. `OPENROUTER_AP
 npm run setup
 ```
 
-This creates a temporary workspace from the fixtures in `fixtures/test-chapter/`, runs `chapter init` and `chapter install` for each fixture member, and saves the workspace path to `.last-workspace`.
+This creates a temporary workspace from the fixtures in `fixtures/test-mason/`, runs `mason init` and `mason install` for each fixture, and saves the workspace path to `.last-workspace`.
 
 To use a custom directory instead of a temp directory:
 
@@ -58,10 +58,10 @@ Inspect the built artifacts:
 
 ```bash
 ls .mason/docker/             # Generated Dockerfiles and compose per role
-cat chapter.lock.json              # Resolved dependency graph
+cat mason.lock.json                # Resolved dependency graph
 ls dist/                           # Packed tarballs
-mason chapter list            # Show available roles
-mason chapter validate        # Validate role definitions
+mason list                         # Show available roles
+mason validate                     # Validate role definitions
 ```
 
 ### Tear down

@@ -168,13 +168,13 @@ describe("piCodingAgentMaterializer", () => {
       });
     });
 
-    describe(".pi/extensions/chapter-mcp/package.json", () => {
+    describe(".pi/extensions/mason-mcp/package.json", () => {
       it("generates valid package.json with correct structure", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const pkg = JSON.parse(result.get(".pi/extensions/chapter-mcp/package.json")!);
-        expect(pkg.name).toBe("chapter-mcp");
+        const pkg = JSON.parse(result.get(".pi/extensions/mason-mcp/package.json")!);
+        expect(pkg.name).toBe("mason-mcp");
         expect(pkg.version).toBe("1.0.0");
         expect(pkg.type).toBe("module");
         expect(pkg.main).toBe("index.ts");
@@ -182,14 +182,14 @@ describe("piCodingAgentMaterializer", () => {
     });
 
     describe(".pi/mcp.json", () => {
-      it("contains chapter MCP server with proxy endpoint", () => {
+      it("contains mason MCP server with proxy endpoint", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const mcpJson = JSON.parse(result.get(".pi/mcp.json")!);
-        expect(mcpJson.mcpServers.chapter).toBeDefined();
-        expect(mcpJson.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/sse");
-        expect(mcpJson.mcpServers.chapter.type).toBe("sse");
+        expect(mcpJson.mcpServers.mason).toBeDefined();
+        expect(mcpJson.mcpServers.mason.url).toBe("http://mcp-proxy:9090/sse");
+        expect(mcpJson.mcpServers.mason.type).toBe("sse");
       });
 
       it("uses streamable-http path when proxy type is streamable-http", () => {
@@ -198,8 +198,8 @@ describe("piCodingAgentMaterializer", () => {
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const mcpJson = JSON.parse(result.get(".pi/mcp.json")!);
-        expect(mcpJson.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/mcp");
-        expect(mcpJson.mcpServers.chapter.type).toBe("streamable-http");
+        expect(mcpJson.mcpServers.mason.url).toBe("http://mcp-proxy:9090/mcp");
+        expect(mcpJson.mcpServers.mason.type).toBe("streamable-http");
       });
 
       it("defaults to SSE when no proxy type specified", () => {
@@ -208,8 +208,8 @@ describe("piCodingAgentMaterializer", () => {
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const mcpJson = JSON.parse(result.get(".pi/mcp.json")!);
-        expect(mcpJson.mcpServers.chapter.url).toBe("http://mcp-proxy:9090/sse");
-        expect(mcpJson.mcpServers.chapter.type).toBe("sse");
+        expect(mcpJson.mcpServers.mason.url).toBe("http://mcp-proxy:9090/sse");
+        expect(mcpJson.mcpServers.mason.type).toBe("sse");
       });
 
       it("includes placeholder auth header when no token provided", () => {
@@ -217,7 +217,7 @@ describe("piCodingAgentMaterializer", () => {
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const mcpJson = JSON.parse(result.get(".pi/mcp.json")!);
-        expect(mcpJson.mcpServers.chapter.headers.Authorization).toBe("Bearer ${MCP_PROXY_TOKEN}");
+        expect(mcpJson.mcpServers.mason.headers.Authorization).toBe("Bearer ${MCP_PROXY_TOKEN}");
       });
 
       it("bakes actual token into auth header when proxyToken provided", () => {
@@ -226,16 +226,16 @@ describe("piCodingAgentMaterializer", () => {
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", token);
 
         const mcpJson = JSON.parse(result.get(".pi/mcp.json")!);
-        expect(mcpJson.mcpServers.chapter.headers.Authorization).toBe("Bearer abc123def456");
+        expect(mcpJson.mcpServers.mason.headers.Authorization).toBe("Bearer abc123def456");
       });
     });
 
-    describe(".pi/extensions/chapter-mcp/index.ts", () => {
+    describe(".pi/extensions/mason-mcp/index.ts", () => {
       it("does not contain registerMcpServer (MCP config is in .pi/mcp.json)", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const indexTs = result.get(".pi/extensions/chapter-mcp/index.ts")!;
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
         expect(indexTs).not.toContain("pi.registerMcpServer(");
       });
 
@@ -243,7 +243,7 @@ describe("piCodingAgentMaterializer", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const indexTs = result.get(".pi/extensions/chapter-mcp/index.ts")!;
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
         // Two tasks: triage-issue and review-pr
         const registerCommandCount = (indexTs.match(/pi\.registerCommand\(/g) || []).length;
         expect(registerCommandCount).toBe(2);
@@ -253,7 +253,7 @@ describe("piCodingAgentMaterializer", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const indexTs = result.get(".pi/extensions/chapter-mcp/index.ts")!;
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
         expect(indexTs).toContain('name: "triage-issue"');
         expect(indexTs).toContain('name: "review-pr"');
       });
@@ -262,7 +262,7 @@ describe("piCodingAgentMaterializer", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const indexTs = result.get(".pi/extensions/chapter-mcp/index.ts")!;
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
         expect(indexTs).toContain("role: issue-manager");
         expect(indexTs).toContain("github: create_issue, list_repos, add_label");
       });
@@ -271,7 +271,7 @@ describe("piCodingAgentMaterializer", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const indexTs = result.get(".pi/extensions/chapter-mcp/index.ts")!;
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
         expect(indexTs).toContain("Required Skills");
         expect(indexTs).toContain("skills/labeling/");
       });
@@ -280,7 +280,7 @@ describe("piCodingAgentMaterializer", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const indexTs = result.get(".pi/extensions/chapter-mcp/index.ts")!;
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
         // Find the review-pr command block
         const reviewPrIndex = indexTs.indexOf('name: "review-pr"');
         const afterReviewPr = indexTs.slice(reviewPrIndex);
@@ -295,7 +295,7 @@ describe("piCodingAgentMaterializer", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const indexTs = result.get(".pi/extensions/chapter-mcp/index.ts")!;
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
         expect(indexTs).toContain("## Task");
         expect(indexTs).toContain("./prompts/triage.md");
       });
@@ -305,7 +305,7 @@ describe("piCodingAgentMaterializer", () => {
         agent.roles[1].tasks[0].prompt = undefined;
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const indexTs = result.get(".pi/extensions/chapter-mcp/index.ts")!;
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
         expect(indexTs).toContain("[no prompt defined]");
       });
 
@@ -313,7 +313,7 @@ describe("piCodingAgentMaterializer", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const indexTs = result.get(".pi/extensions/chapter-mcp/index.ts")!;
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
         expect(indexTs).toContain("export default (pi) => {");
         expect(indexTs.trim().endsWith("};")).toBe(true);
       });
@@ -389,8 +389,8 @@ describe("piCodingAgentMaterializer", () => {
 
         const keys = [...result.keys()].sort();
         expect(keys).toEqual([
-          ".pi/extensions/chapter-mcp/index.ts",
-          ".pi/extensions/chapter-mcp/package.json",
+          ".pi/extensions/mason-mcp/index.ts",
+          ".pi/extensions/mason-mcp/package.json",
           ".pi/mcp.json",
           ".pi/settings.json",
           "agent-launch.json",
@@ -400,11 +400,11 @@ describe("piCodingAgentMaterializer", () => {
     });
 
     describe("ACP mode", () => {
-      it("does not generate .chapter/acp.json even in ACP mode", () => {
+      it("does not generate .mason/acp.json even in ACP mode", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090", undefined, { acpMode: true });
 
-        expect(result.has(".chapter/acp.json")).toBe(false);
+        expect(result.has(".mason/acp.json")).toBe(false);
       });
 
       it("still generates all standard workspace files in ACP mode", () => {
@@ -413,7 +413,7 @@ describe("piCodingAgentMaterializer", () => {
 
         expect(result.has(".pi/settings.json")).toBe(true);
         expect(result.has(".pi/mcp.json")).toBe(true);
-        expect(result.has(".pi/extensions/chapter-mcp/index.ts")).toBe(true);
+        expect(result.has(".pi/extensions/mason-mcp/index.ts")).toBe(true);
       });
     });
   });

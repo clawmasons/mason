@@ -1,8 +1,8 @@
-export { appChapterFieldSchema, type AppChapterField } from "./app.js";
-export { skillChapterFieldSchema, type SkillChapterField } from "./skill.js";
-export { taskChapterFieldSchema, type TaskChapterField } from "./task.js";
-export { roleChapterFieldSchema, type RoleChapterField } from "./role.js";
-export { parseChapterField, type ChapterField } from "./chapter-field.js";
+export { appFieldSchema, type AppField } from "./app.js";
+export { skillFieldSchema, type SkillField } from "./skill.js";
+export { taskFieldSchema, type TaskField } from "./task.js";
+export { roleFieldSchema, type RoleField } from "./role.js";
+export { parseField, type Field } from "./field.js";
 
 // ROLE_TYPES schemas
 export {
