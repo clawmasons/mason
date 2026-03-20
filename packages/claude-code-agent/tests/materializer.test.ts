@@ -384,6 +384,41 @@ describe("claudeCodeMaterializer", () => {
         const config = JSON.parse(result.get("agent-launch.json")!);
         expect(config.command).toBe("claude-agent-acp");
       });
+
+      it("appends initialPrompt as final positional in args", () => {
+        const agent = makeRepoOpsAgent();
+        const result = claudeCodeMaterializer.materializeWorkspace(
+          agent, "http://mcp-proxy:9090", undefined, { initialPrompt: "do this task" },
+        );
+
+        const config = JSON.parse(result.get("agent-launch.json")!);
+        expect(config.args).toBeDefined();
+        expect(config.args[config.args.length - 1]).toBe("do this task");
+      });
+
+      it("places initialPrompt after --append-system-prompt when instructions present", () => {
+        const agent = makeRepoOpsAgent();
+        agent.roles[0].instructions = "You are a focused reviewer.";
+        const result = claudeCodeMaterializer.materializeWorkspace(
+          agent, "http://mcp-proxy:9090", undefined, { initialPrompt: "start now" },
+        );
+
+        const config = JSON.parse(result.get("agent-launch.json")!);
+        const appendIdx = config.args.indexOf("--append-system-prompt");
+        const promptIdx = config.args.indexOf("start now");
+        expect(appendIdx).toBeGreaterThanOrEqual(0);
+        expect(promptIdx).toBeGreaterThan(appendIdx + 1);
+        expect(config.args[config.args.length - 1]).toBe("start now");
+      });
+
+      it("omits initialPrompt from args when not provided", () => {
+        const agent = makeRepoOpsAgent();
+        const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const config = JSON.parse(result.get("agent-launch.json")!);
+        // Only --effort max by default, no extra positional
+        expect(config.args).toEqual(["--effort", "max"]);
+      });
     });
 
     describe("result completeness", () => {
@@ -464,6 +499,24 @@ describe("claudeCodeMaterializer", () => {
 
       expect(result.has("agent-launch.json")).toBe(true);
       expect(result.has("AGENTS.md")).toBe(false);
+    });
+
+    it("appends initialPrompt as final positional in supervisor agent-launch.json", () => {
+      const agent = makeRepoOpsAgent();
+      const result = claudeCodeMaterializer.materializeSupervisor!(
+        agent, "http://mcp-proxy:9090", undefined, { initialPrompt: "supervise this" },
+      );
+
+      const config = JSON.parse(result.get("agent-launch.json")!);
+      expect(config.args[config.args.length - 1]).toBe("supervise this");
+    });
+
+    it("omits initialPrompt from supervisor agent-launch.json when not provided", () => {
+      const agent = makeRepoOpsAgent();
+      const result = claudeCodeMaterializer.materializeSupervisor!(agent, "http://mcp-proxy:9090");
+
+      const config = JSON.parse(result.get("agent-launch.json")!);
+      expect(config.args).toEqual(["--effort", "max"]);
     });
 
     it("merges mcpServers into existing .claude.json when existingHomePath provided", () => {

@@ -340,7 +340,7 @@ async function ensureDockerBuild(
   roleType: Role,
   agentType: string,
   projectDir: string,
-  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations; agentConfigCredentials?: string[]; agentArgs?: string[] },
+  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations; agentConfigCredentials?: string[]; agentArgs?: string[]; initialPrompt?: string },
 ): Promise<{ dockerBuildDir: string; dockerDir: string }> {
   const existsSync = deps?.existsSyncFn ?? fs.existsSync;
   const roleName = getAppShortName(roleType.metadata.name);
@@ -540,9 +540,10 @@ function expandHome(p: string): string {
 /**
  * Create the action handler for the `run` command.
  */
-function createRunAction(overrideRole?: string) {
+function createRunAction(overrideRole?: string, overridePrompt?: string) {
   return async (
     positionalAgent: string | undefined,
+    positionalPrompt: string | undefined,
     options: {
       acp?: boolean;
       bash?: boolean;
@@ -557,7 +558,21 @@ function createRunAction(overrideRole?: string) {
       proxyPort: string;
     },
   ) => {
-    const agentInput = positionalAgent ?? options.agent;
+    // Disambiguate positional args:
+    // - When --agent is set AND positionalAgent is also set, treat positionalAgent as prompt
+    // - Otherwise positionalAgent is the agent name and positionalPrompt is the prompt
+    let agentPositional: string | undefined;
+    let promptPositional: string | undefined;
+    if (options.agent && positionalAgent) {
+      agentPositional = undefined;
+      promptPositional = positionalAgent;
+    } else {
+      agentPositional = positionalAgent;
+      promptPositional = positionalPrompt;
+    }
+
+    const agentInput = agentPositional ?? options.agent;
+    const initialPrompt = promptPositional ?? overridePrompt;
     const projectDir = process.cwd();
 
     // Auto-init .mason/config.json when an agent name is provided
@@ -640,6 +655,7 @@ function createRunAction(overrideRole?: string) {
         homeOverride,
         agentConfigCredentials: configEntry?.credentials,
         agentArgs,
+        // initialPrompt intentionally omitted for ACP mode
       });
     } else if (options.devContainer) {
       await runAgent(projectDir, resolvedAgentType, role, undefined, {
@@ -651,6 +667,7 @@ function createRunAction(overrideRole?: string) {
         devContainerCustomizations: (configEntry as { devContainerCustomizations?: DevContainerCustomizations } | undefined)?.devContainerCustomizations,
         agentConfigCredentials: configEntry?.credentials,
         agentArgs,
+        initialPrompt,
       });
     } else {
       await runAgent(projectDir, resolvedAgentType, role, undefined, {
@@ -661,6 +678,7 @@ function createRunAction(overrideRole?: string) {
         homeOverride,
         agentConfigCredentials: configEntry?.credentials,
         agentArgs,
+        initialPrompt,
       });
     }
   };
@@ -671,6 +689,7 @@ export function registerRunCommand(program: Command): void {
     .command("run")
     .description("Run a role on the specified agent runtime")
     .argument("[agent]", "Agent name from config or built-in type (e.g., claude, pi, mcp)")
+    .argument("[prompt]", "Initial prompt passed to the agent as the first message")
     .option("--acp", "Start in ACP mode for editor integration")
     .option("--bash", "Launch bash shell instead of the agent (for debugging)")
     .option("--terminal", "Force terminal (interactive) mode, overriding config mode")
@@ -687,12 +706,14 @@ export function registerRunCommand(program: Command): void {
 }
 
 const CONFIGURE_ROLE = "@clawmasons/role-configure-project";
+const CONFIGURE_PROMPT = "create and implement role plan";
 
 export function registerConfigureCommand(program: Command): void {
   program
     .command("configure")
     .description("Configure a project for mason (alias for run with the configure-project role)")
     .argument("[agent]", "Agent name from config or built-in type (e.g., claude, pi, mcp)")
+    .argument("[prompt]", "Initial prompt (defaults to \"create and implement role plan\")")
     .option("--acp", "Start in ACP mode for editor integration")
     .option("--bash", "Launch bash shell instead of the agent (for debugging)")
     .option("--terminal", "Force terminal (interactive) mode, overriding config mode")
@@ -703,7 +724,7 @@ export function registerConfigureCommand(program: Command): void {
     .option("--proxy-only", "Start proxy infrastructure only, output connection info as JSON")
     .option("--verbose", "Show Docker build and compose output")
     .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
-    .action(createRunAction(CONFIGURE_ROLE));
+    .action(createRunAction(CONFIGURE_ROLE, CONFIGURE_PROMPT));
 }
 
 // ── Main Orchestrator ─────────────────────────────────────────────────
@@ -724,6 +745,7 @@ export async function runAgent(
     devContainerCustomizations?: DevContainerCustomizations;
     agentConfigCredentials?: string[];
     agentArgs?: string[];
+    initialPrompt?: string;
   },
 ): Promise<void> {
   // Initialize agent registry with config-declared agents from .mason/config.json
@@ -737,6 +759,7 @@ export async function runAgent(
   const homeOverride = deps?.homeOverride ?? acpOptions?.homeOverride;
   const agentConfigCredentials = acpOptions?.agentConfigCredentials;
   const agentArgs = acpOptions?.agentArgs;
+  const initialPrompt = acpOptions?.initialPrompt;
 
   if (isAcpMode) {
     return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials, agentArgs);
@@ -747,10 +770,11 @@ export async function runAgent(
       acpOptions?.devContainerCustomizations,
       agentConfigCredentials,
       agentArgs,
+      initialPrompt,
     );
   } else {
     const verbose = acpOptions?.verbose === true;
-    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs);
+    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt);
   }
 }
 
@@ -791,6 +815,7 @@ async function runAgentInteractiveMode(
   homeOverride?: string,
   agentConfigCredentials?: string[],
   agentArgs?: string[],
+  initialPrompt?: string,
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const runAgent = deps?.runAgentFn ?? runAgentWithOciRestart;
@@ -816,7 +841,7 @@ async function runAgentInteractiveMode(
 
     // 4. Ensure docker build artifacts exist (auto-build if missing)
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
-      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs },
+      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs, initialPrompt },
     );
 
     // 5. Ensure .mason is in project's .gitignore
@@ -970,6 +995,7 @@ async function runAgentDevContainerMode(
   devContainerCustomizations?: DevContainerCustomizations,
   agentConfigCredentials?: string[],
   agentArgs?: string[],
+  initialPrompt?: string,
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
@@ -995,7 +1021,7 @@ async function runAgentDevContainerMode(
     // 3. Ensure docker build artifacts
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
       roleType, agentType, projectDir,
-      { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations, agentConfigCredentials, agentArgs },
+      { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations, agentConfigCredentials, agentArgs, initialPrompt },
     );
 
     // 4. Ensure .mason is in .gitignore
@@ -1259,6 +1285,7 @@ async function runAgentAcpMode(
   homeOverride?: string,
   agentConfigCredentials?: string[],
   agentArgs?: string[],
+  // initialPrompt is intentionally omitted: ACP mode does not forward initial prompts
 ): Promise<void> {
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
   const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;

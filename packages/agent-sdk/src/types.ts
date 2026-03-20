@@ -18,6 +18,8 @@ export interface MaterializeOptions {
   agentConfigCredentials?: string[];
   /** Extra args from alias config appended to the agent invocation after all mason-resolved args. */
   agentArgs?: string[];
+  /** Initial prompt passed to the agent as the first user message at launch. */
+  initialPrompt?: string;
 }
 
 /**

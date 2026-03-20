@@ -7,7 +7,7 @@ describe("CLI entry point", () => {
   });
 
   it("has a version matching package.json", () => {
-    expect(program.version()).toBe("0.1.2");
+    expect(program.version()).toBe("0.1.3");
   });
 
   it("has a description", () => {

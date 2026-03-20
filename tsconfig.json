@@ -38,7 +38,10 @@
     "packages/shared/tests/**/*",
     "packages/mcp-agent/tests/**/*",
     "packages/agent-sdk/src/**/*",
+    "packages/agent-sdk/tests/**/*",
     "packages/pi-coding-agent/src/**/*",
-    "packages/claude-code-agent/src/**/*"
+    "packages/pi-coding-agent/tests/**/*",
+    "packages/claude-code-agent/src/**/*",
+    "packages/claude-code-agent/tests/**/*"
   ]
 }

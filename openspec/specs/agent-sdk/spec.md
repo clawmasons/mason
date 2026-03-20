@@ -89,7 +89,7 @@ Each agent package SHALL export its `AgentPackage` object as the default export 
 The `@clawmasons/agent-sdk` package SHALL export the following helper functions for use by agent materializer implementations:
 - `generateAgentsMd(agent: ResolvedAgent): string`
 - `generateSkillReadme(skill: ResolvedSkill): string`
-- `generateAgentLaunchJson(runtime: string, roleCredentials: string[], acpMode?: boolean): string`
+- `generateAgentLaunchJson(agentPkg: AgentPackage, roleCredentials: string[], acpMode?: boolean, instructions?: string, agentArgs?: string[], initialPrompt?: string): string`
 - `formatPermittedTools(permissions): string`
 - `collectAllSkills(roles: ResolvedRole[]): Map<string, ResolvedSkill>`
 - `collectAllTasks(roles: ResolvedRole[]): Array<[ResolvedTask, ResolvedRole[]]>`
@@ -103,6 +103,38 @@ These functions SHALL be moved from `packages/cli/src/materializer/common.ts` in
 #### Scenario: generateAgentLaunchJson uses AgentPackage runtime config
 - **WHEN** `generateAgentLaunchJson()` is called
 - **THEN** it SHALL accept runtime config from the `AgentPackage.runtime` field instead of hardcoded `RUNTIME_COMMANDS` and `RUNTIME_CREDENTIALS` maps
+
+### Requirement: generateAgentLaunchJson accepts initialPrompt as final positional arg
+
+`generateAgentLaunchJson` SHALL accept an optional `initialPrompt?: string` parameter (after `agentArgs`). When `initialPrompt` is a non-empty string and `acpMode` is false, it SHALL be appended as the final positional argument in the generated `args` array, after all flags and `agentArgs`.
+
+The full args ordering SHALL be:
+1. Base `runtime.args` (e.g., `["--effort", "max"]`)
+2. `["--append-system-prompt", instructions]` when applicable
+3. `agentArgs` (alias-level overrides)
+4. `initialPrompt` as a bare positional string
+
+#### Scenario: initialPrompt appended as final positional
+
+- **WHEN** `generateAgentLaunchJson` is called with `initialPrompt = "do this task"` and `acpMode = false`
+- **THEN** the resulting `args` SHALL have `"do this task"` as the last element
+- **AND** all flag args SHALL precede it
+
+#### Scenario: Full arg ordering with all params
+
+- **WHEN** `generateAgentLaunchJson` is called with `instructions`, `agentArgs = ["--extra"]`, and `initialPrompt = "go"`
+- **AND** `supportsAppendSystemPrompt = true` and `acpMode = false`
+- **THEN** `args` SHALL be `[...baseArgs, "--append-system-prompt", instructions, "--extra", "go"]`
+
+#### Scenario: initialPrompt not injected when undefined or empty
+
+- **WHEN** `initialPrompt` is `undefined` or `""`
+- **THEN** no bare positional string SHALL be appended to `args`
+
+#### Scenario: initialPrompt not injected in ACP mode
+
+- **WHEN** `acpMode = true` and `initialPrompt = "do this"`
+- **THEN** `"do this"` SHALL NOT appear in `args`
 
 ### Requirement: SDK re-exports shared types for convenience
 
