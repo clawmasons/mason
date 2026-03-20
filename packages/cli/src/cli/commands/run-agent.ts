@@ -353,6 +353,24 @@ async function ensureDockerBuild(
     fs.rmSync(dockerBuildDir, { recursive: true, force: true });
   }
 
+  // Compute hash of container.packages to detect changes since last build
+  const packagesHash = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(roleType.container?.packages ?? {}))
+    .digest("hex");
+  const hashFilePath = path.join(dockerBuildDir, agentType, ".packages-hash");
+
+  // If the Dockerfile exists but packages have changed, invalidate the build dir
+  if (existsSync(path.join(dockerBuildDir, agentType, "Dockerfile"))) {
+    const storedHash = existsSync(hashFilePath)
+      ? fs.readFileSync(hashFilePath, "utf-8").trim()
+      : null;
+    if (storedHash !== packagesHash) {
+      console.log(`\n  Detected container.packages change. Rebuilding Docker artifacts...`);
+      fs.rmSync(dockerBuildDir, { recursive: true, force: true });
+    }
+  }
+
   if (!existsSync(path.join(dockerBuildDir, agentType, "Dockerfile"))) {
     console.log(`\n  Docker artifacts not found. Building...`);
 
@@ -383,6 +401,9 @@ async function ensureDockerBuild(
 
     // Create per-role cache directory for NODE_COMPILE_CACHE and NPM_CONFIG_CACHE
     fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy", ".cache"), { recursive: true });
+
+    // Write packages hash so future runs can detect changes
+    fs.writeFileSync(hashFilePath, packagesHash);
 
     console.log(`  Docker artifacts built at .mason/docker/${roleName}/`);
   }

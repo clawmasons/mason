@@ -1,6 +1,6 @@
 {
   "name": "@clawmasons/credential-service",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Credential resolution and distribution service for Clawmasons Chapter",
   "type": "module",
   "main": "./dist/index.js",
