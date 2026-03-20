@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { discoverPackages } from "../../resolver/discover.js";
 import { resolveRolePackage } from "../../resolver/resolve.js";
 import type { ResolvedAgent } from "@clawmasons/shared";
-import { computeToolFilters } from "@clawmasons/shared";
+import { computeToolFilters, CLI_NAME_UPPERCASE } from "@clawmasons/shared";
 import {
   loadEnvFile,
   resolveEnvVars,
@@ -12,7 +12,7 @@ import {
   ToolRouter,
   ResourceRouter,
   PromptRouter,
-  ChapterProxyServer,
+  ProxyServer,
 } from "@clawmasons/proxy";
 import type { UpstreamAppConfig } from "@clawmasons/proxy";
 import type Database from "better-sqlite3";
@@ -32,7 +32,7 @@ interface ProxyOptions {
 export function registerProxyCommand(program: Command): void {
   program
     .command("proxy")
-    .description("Start the chapter MCP proxy server for a role")
+    .description("Start the MCP proxy server for a role")
     .option("--port <number>", "Port to listen on (default: 9090)")
     .option("--startup-timeout <seconds>", "Upstream server startup timeout in seconds (default: 60)")
     .option("--agent <name>", "Agent package name (for backward compatibility)")
@@ -51,7 +51,7 @@ export async function startProxy(
 ): Promise<void> {
   let db: Database.Database | undefined;
   let upstream: UpstreamManager | undefined;
-  let server: ChapterProxyServer | undefined;
+  let server: ProxyServer | undefined;
 
   // Graceful shutdown handler
   const shutdown = async () => {
@@ -132,14 +132,14 @@ export async function startProxy(
       : 9090;
     const transport = (options.transport as "sse" | "streamable-http" | undefined)
       ?? "sse";
-    const authToken = process.env.CHAPTER_PROXY_TOKEN || undefined;
+    const authToken = process.env[`${CLI_NAME_UPPERCASE}_PROXY_TOKEN`] || undefined;
     const credentialProxyToken = process.env.CREDENTIAL_PROXY_TOKEN || undefined;
-    const sessionType = process.env.CHAPTER_SESSION_TYPE || undefined;
-    const acpClient = process.env.CHAPTER_ACP_CLIENT || undefined;
+    const sessionType = process.env[`${CLI_NAME_UPPERCASE}_SESSION_TYPE`] || undefined;
+    const acpClient = process.env[`${CLI_NAME_UPPERCASE}_ACP_CLIENT`] || undefined;
 
     // Parse declared credentials from env (set by ACP session compose)
     let declaredCredentials: string[] | undefined;
-    const declaredCredentialsEnv = process.env.CHAPTER_DECLARED_CREDENTIALS;
+    const declaredCredentialsEnv = process.env[`${CLI_NAME_UPPERCASE}_DECLARED_CREDENTIALS`];
     if (declaredCredentialsEnv) {
       try {
         declaredCredentials = JSON.parse(declaredCredentialsEnv) as string[];
@@ -155,7 +155,7 @@ export async function startProxy(
 
     console.log(`${elapsed()} Starting HTTP server on port ${port}...`);
     stepStart = performance.now();
-    server = new ChapterProxyServer({
+    server = new ProxyServer({
       port,
       transport,
       router: emptyRouter,
@@ -243,7 +243,7 @@ function resolveRoleName(
 
   const roles: string[] = [];
   for (const [name, pkg] of packages) {
-    if (pkg.chapterField.type === "role") {
+    if (pkg.field.type === "role") {
       roles.push(name);
     }
   }

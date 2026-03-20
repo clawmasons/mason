@@ -14,7 +14,7 @@ import { WebSocket } from "ws";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
-  ChapterProxyServer,
+  ProxyServer,
   ToolRouter,
   UpstreamManager,
 } from "@clawmasons/proxy";
@@ -39,7 +39,7 @@ describe("credential flow integration", () => {
 
   let port: number;
   let proxyUrl: string;
-  let proxy: ChapterProxyServer;
+  let proxy: ProxyServer;
   let credentialService: CredentialService;
   let credWs: WebSocket | null = null;
 
@@ -69,7 +69,7 @@ describe("credential flow integration", () => {
     const router = new ToolRouter(new Map(), new Map());
     const upstream = new UpstreamManager([]);
 
-    proxy = new ChapterProxyServer({
+    proxy = new ProxyServer({
       port,
       transport: "streamable-http",
       router,

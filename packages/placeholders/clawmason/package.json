@@ -1,12 +1,12 @@
 {
   "name": "clawmason",
   "version": "0.1.0",
-  "description": "Placeholder package for namespace protection. See https://github.com/clawmasons/chapter",
+  "description": "Placeholder package for namespace protection. See https://github.com/clawmasons/mason",
   "files": [],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/clawmasons/chapter.git"
+    "url": "https://github.com/clawmasons/mason.git"
   },
-  "homepage": "https://github.com/clawmasons/chapter"
+  "homepage": "https://github.com/clawmasons/mason"
 }

@@ -6,11 +6,9 @@ import { program } from "../../src/cli/index.js";
 import { runPermissions } from "../../src/cli/commands/permissions.js";
 
 describe("CLI permissions command", () => {
-  const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
+  const permsCmd = program.commands.find((cmd) => cmd.name() === "permissions");
 
-  it("has the permissions command registered under chapter", () => {
-    expect(chapterCmd).toBeDefined();
-    const permsCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "permissions");
+  it("has the permissions command registered", () => {
     expect(permsCmd).toBeDefined();
     if (permsCmd) {
       expect(permsCmd.description()).toContain("permission");
@@ -18,7 +16,6 @@ describe("CLI permissions command", () => {
   });
 
   it("permissions command accepts a role argument", () => {
-    const permsCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "permissions");
     expect(permsCmd).toBeDefined();
     if (permsCmd) {
       const args = permsCmd.registeredArguments;
@@ -29,7 +26,6 @@ describe("CLI permissions command", () => {
   });
 
   it("permissions command has --json option", () => {
-    const permsCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "permissions");
     expect(permsCmd).toBeDefined();
     if (permsCmd) {
       const jsonOption = permsCmd.options.find((opt) => opt.long === "--json");
@@ -45,7 +41,7 @@ describe("runPermissions", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-perms-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-perms-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});

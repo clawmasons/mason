@@ -13,14 +13,14 @@ export interface McpServerConfig {
 }
 
 /**
- * A matched MCP server linked to its chapter App.
+ * A matched MCP server linked to its App.
  */
 export interface MatchedServer {
   /** The mcpServers key (e.g., "github") */
   name: string;
   /** The original MCP server config from the ACP client */
   config: McpServerConfig;
-  /** The chapter App that matched */
+  /** The App that matched */
   app: ResolvedApp;
   /** The app's short name (e.g., "github") */
   appShortName: string;
@@ -39,7 +39,7 @@ export interface UnmatchedServer {
 }
 
 /**
- * The result of matching ACP client mcpServers against chapter Apps.
+ * The result of matching ACP client mcpServers against Apps.
  */
 export interface MatchResult {
   matched: MatchedServer[];
@@ -113,7 +113,7 @@ function disambiguate(
 }
 
 /**
- * Match ACP client mcpServers entries against chapter's resolved Apps.
+ * Match ACP client mcpServers entries against resolved Apps.
  *
  * Matching uses `getAppShortName()` as the primary key (case-insensitive).
  * When multiple apps share the same short name, command+args or URL
@@ -139,7 +139,7 @@ export function matchServers(
       unmatched.push({
         name,
         config,
-        reason: `No matching chapter App found for server "${name}"`,
+        reason: `No matching App found for server "${name}"`,
       });
       continue;
     }

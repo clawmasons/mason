@@ -58,7 +58,7 @@ describe("mcpAgentMaterializer", () => {
 
   describe("materializeWorkspace", () => {
     describe(".mcp.json", () => {
-      it("generates single chapter entry with SSE proxy", () => {
+      it("generates single mason entry with SSE proxy", () => {
         const agent = makeMcpTestAgent();
         const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000");
 
@@ -66,20 +66,20 @@ describe("mcpAgentMaterializer", () => {
         expect(mcpJson).toBeDefined();
 
         const mcp = JSON.parse(mcpJson!);
-        expect(mcp.mcpServers.chapter).toBeDefined();
-        expect(mcp.mcpServers.chapter.type).toBe("sse");
-        expect(mcp.mcpServers.chapter.url).toBe("http://mcp-proxy:3000/sse");
-        expect(Object.keys(mcp.mcpServers)).toEqual(["chapter"]);
+        expect(mcp.mcpServers.mason).toBeDefined();
+        expect(mcp.mcpServers.mason.type).toBe("sse");
+        expect(mcp.mcpServers.mason.url).toBe("http://mcp-proxy:3000/sse");
+        expect(Object.keys(mcp.mcpServers)).toEqual(["mason"]);
       });
 
-      it("generates chapter entry with streamable-http transport", () => {
+      it("generates mason entry with streamable-http transport", () => {
         const agent = makeMcpTestAgent();
         agent.proxy = { port: 3000, type: "streamable-http" };
         const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000");
 
         const mcp = JSON.parse(result.get(".mcp.json")!);
-        expect(mcp.mcpServers.chapter.type).toBe("streamable-http");
-        expect(mcp.mcpServers.chapter.url).toBe("http://mcp-proxy:3000/mcp");
+        expect(mcp.mcpServers.mason.type).toBe("streamable-http");
+        expect(mcp.mcpServers.mason.url).toBe("http://mcp-proxy:3000/mcp");
       });
 
       it("includes placeholder auth header when no token provided", () => {
@@ -87,7 +87,7 @@ describe("mcpAgentMaterializer", () => {
         const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000");
 
         const mcp = JSON.parse(result.get(".mcp.json")!);
-        expect(mcp.mcpServers.chapter.headers.Authorization).toBe("Bearer ${MCP_PROXY_TOKEN}");
+        expect(mcp.mcpServers.mason.headers.Authorization).toBe("Bearer ${MCP_PROXY_TOKEN}");
       });
 
       it("bakes actual token into auth header when proxyToken provided", () => {
@@ -96,7 +96,7 @@ describe("mcpAgentMaterializer", () => {
         const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000", token);
 
         const mcp = JSON.parse(result.get(".mcp.json")!);
-        expect(mcp.mcpServers.chapter.headers.Authorization).toBe("Bearer test-token-123");
+        expect(mcp.mcpServers.mason.headers.Authorization).toBe("Bearer test-token-123");
       });
     });
 
@@ -154,11 +154,11 @@ describe("mcpAgentMaterializer", () => {
         expect(keys.some((k) => k.includes("commands/"))).toBe(false);
       });
 
-      it("does not generate .chapter/acp.json even in ACP mode", () => {
+      it("does not generate .mason/acp.json even in ACP mode", () => {
         const agent = makeMcpTestAgent();
         const result = mcpAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:3000", undefined, { acpMode: true });
 
-        expect(result.has(".chapter/acp.json")).toBe(false);
+        expect(result.has(".mason/acp.json")).toBe(false);
       });
     });
   });

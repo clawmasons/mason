@@ -1,5 +1,5 @@
-export { ChapterProxyServer } from "./server.js";
-export type { ChapterProxyServerConfig } from "./server.js";
+export { ProxyServer } from "./server.js";
+export type { ProxyServerConfig } from "./server.js";
 export { ToolRouter, ResourceRouter, PromptRouter } from "./router.js";
 export type { RouteEntry, ResourceRouteEntry, PromptRouteEntry } from "./router.js";
 export { UpstreamManager, createTransport } from "./upstream.js";

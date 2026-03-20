@@ -333,13 +333,13 @@ describe("generateSessionComposeYml (run-agent scenarios)", () => {
     expect(agentSection).toContain("MCP_PROXY_TOKEN=test-token-abc");
     expect(agentSection).not.toContain("OPENROUTER_API_KEY");
     expect(agentSection).not.toContain("ANTHROPIC_API_KEY");
-    expect(agentSection).not.toContain("CHAPTER_PROXY_TOKEN");
+    expect(agentSection).not.toContain("MASON_PROXY_TOKEN");
   });
 
-  it("proxy has CHAPTER_PROXY_TOKEN", () => {
+  it("proxy has MASON_PROXY_TOKEN", () => {
     const yml = generateSessionComposeYml(defaultOpts);
     const proxySection = yml.split("agent-writer:")[0]!;
-    expect(proxySection).toContain("CHAPTER_PROXY_TOKEN=test-token-abc");
+    expect(proxySection).toContain("MASON_PROXY_TOKEN=test-token-abc");
   });
 
   it("includes PROJECT_DIR in proxy environment", () => {
@@ -659,7 +659,7 @@ describe("runAgent", () => {
   }
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-run-agent-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-run-agent-test-"));
     projectDir = path.join(tmpDir, "my-project");
     fs.mkdirSync(projectDir, { recursive: true });
 
@@ -986,8 +986,8 @@ describe("runAgent", () => {
     const content1 = fs.readFileSync(file1, "utf-8");
     const content2 = fs.readFileSync(file2, "utf-8");
 
-    const proxyToken1 = content1.match(/CHAPTER_PROXY_TOKEN=([a-f0-9]+)/)![1];
-    const proxyToken2 = content2.match(/CHAPTER_PROXY_TOKEN=([a-f0-9]+)/)![1];
+    const proxyToken1 = content1.match(/MASON_PROXY_TOKEN=([a-f0-9]+)/)![1];
+    const proxyToken2 = content2.match(/MASON_PROXY_TOKEN=([a-f0-9]+)/)![1];
     expect(proxyToken1).not.toBe(proxyToken2);
 
     const credToken1 = content1.match(/CREDENTIAL_PROXY_TOKEN=([a-f0-9]+)/)![1];
@@ -1100,7 +1100,7 @@ describe("runProxyOnly", () => {
   }
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-proxy-only-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-proxy-only-test-"));
     projectDir = path.join(tmpDir, "my-project");
     fs.mkdirSync(projectDir, { recursive: true });
 

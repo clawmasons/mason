@@ -14,7 +14,7 @@ A **task** is a unit of work that defines what an agent does. Tasks declare what
   "name": "@acme.platform/task-take-notes",
   "version": "1.0.0",
   "description": "Subagent task — create and organize markdown notes",
-  "chapter": {
+  "mason": {
     "type": "task",
     "taskType": "subagent",
     "prompt": "./prompts/take-notes.md",

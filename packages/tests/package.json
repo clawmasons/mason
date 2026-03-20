@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "setup": "tsx scripts/setup-chapter.ts",
-    "teardown": "tsx scripts/teardown-chapter.ts",
+    "setup": "tsx scripts/setup.ts",
+    "teardown": "tsx scripts/teardown.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

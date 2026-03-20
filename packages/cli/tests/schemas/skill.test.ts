@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { skillChapterFieldSchema } from "@clawmasons/shared";
+import { skillFieldSchema } from "@clawmasons/shared";
 
-describe("skillChapterFieldSchema", () => {
+describe("skillFieldSchema", () => {
   it("validates a valid skill", () => {
-    const result = skillChapterFieldSchema.safeParse({
+    const result = skillFieldSchema.safeParse({
       type: "skill",
       artifacts: ["./SKILL.md", "./examples/"],
       description: "Issue labeling taxonomy and heuristics",
@@ -18,7 +18,7 @@ describe("skillChapterFieldSchema", () => {
   });
 
   it("rejects skill missing artifacts", () => {
-    const result = skillChapterFieldSchema.safeParse({
+    const result = skillFieldSchema.safeParse({
       type: "skill",
       description: "Missing artifacts",
     });
@@ -26,7 +26,7 @@ describe("skillChapterFieldSchema", () => {
   });
 
   it("rejects skill with empty artifacts array", () => {
-    const result = skillChapterFieldSchema.safeParse({
+    const result = skillFieldSchema.safeParse({
       type: "skill",
       artifacts: [],
       description: "Empty artifacts",
@@ -35,7 +35,7 @@ describe("skillChapterFieldSchema", () => {
   });
 
   it("rejects skill missing description", () => {
-    const result = skillChapterFieldSchema.safeParse({
+    const result = skillFieldSchema.safeParse({
       type: "skill",
       artifacts: ["./SKILL.md"],
     });
@@ -43,7 +43,7 @@ describe("skillChapterFieldSchema", () => {
   });
 
   it("validates PRD example: @clawmasons/skill-labeling", () => {
-    const result = skillChapterFieldSchema.safeParse({
+    const result = skillFieldSchema.safeParse({
       type: "skill",
       artifacts: ["./SKILL.md", "./examples/", "./schemas/"],
       description: "Issue labeling taxonomy and heuristics",

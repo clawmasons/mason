@@ -153,7 +153,7 @@ describe("auditPostHook", () => {
     }).not.toThrow();
 
     expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[chapter] audit log write failed"),
+      expect.stringContaining("[mason] audit log write failed"),
     );
 
     stderrSpy.mockRestore();
@@ -216,8 +216,8 @@ describe("logDroppedServers", () => {
 
   it("logs each dropped server as an audit entry with status 'dropped'", () => {
     const unmatched = [
-      { name: "personal-notes", reason: "No chapter App matches server name" },
-      { name: "my-custom-tool", reason: "No chapter App matches server name" },
+      { name: "personal-notes", reason: "No matching App found for server name" },
+      { name: "my-custom-tool", reason: "No matching App found for server name" },
     ];
 
     logDroppedServers(db, unmatched, "note-taker", "writer", "zed");
@@ -242,14 +242,14 @@ describe("logDroppedServers", () => {
 
   it("includes the drop reason in the result field", () => {
     const unmatched = [
-      { name: "personal-notes", reason: "No chapter App matches server name" },
+      { name: "personal-notes", reason: "No matching App found for server name" },
     ];
 
     logDroppedServers(db, unmatched, "note-taker", "writer");
 
     const entries = queryAuditLog(db);
     expect(entries).toHaveLength(1);
-    expect(JSON.parse(entries[0].result!)).toBe("No chapter App matches server name");
+    expect(JSON.parse(entries[0].result!)).toBe("No matching App found for server name");
   });
 
   it("handles empty unmatched list (no-op)", () => {
@@ -304,7 +304,7 @@ describe("logDroppedServers", () => {
     }).not.toThrow();
 
     expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[chapter] audit log write failed"),
+      expect.stringContaining("[mason] audit log write failed"),
     );
 
     stderrSpy.mockRestore();

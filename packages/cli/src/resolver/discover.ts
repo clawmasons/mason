@@ -1,12 +1,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { parseChapterField, type DiscoveredPackage } from "@clawmasons/shared";
+import { parseField, CLI_NAME_LOWERCASE, type DiscoveredPackage } from "@clawmasons/shared";
 
 const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents"];
 
 /**
- * Try to read and parse a chapter package from a directory.
- * Returns null if the directory doesn't contain a valid chapter package.
+ * Try to read and parse a package from a directory.
+ * Returns null if the directory doesn't contain a valid package.
  */
 function tryReadPackage(dirPath: string): DiscoveredPackage | null {
   const pkgJsonPath = path.join(dirPath, "package.json");
@@ -14,18 +14,18 @@ function tryReadPackage(dirPath: string): DiscoveredPackage | null {
     return null;
   }
 
-  let pkgJson: { name?: string; version?: string; chapter?: unknown };
+  let pkgJson: { name?: string; version?: string; [key: string]: unknown };
   try {
     pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
   } catch {
     return null;
   }
 
-  if (!pkgJson.name || !pkgJson.chapter) {
+  if (!pkgJson.name || !pkgJson[CLI_NAME_LOWERCASE]) {
     return null;
   }
 
-  const result = parseChapterField(pkgJson.chapter);
+  const result = parseField(pkgJson[CLI_NAME_LOWERCASE]);
   if (!result.success) {
     return null;
   }
@@ -34,12 +34,12 @@ function tryReadPackage(dirPath: string): DiscoveredPackage | null {
     name: pkgJson.name,
     version: pkgJson.version ?? "0.0.0",
     packagePath: dirPath,
-    chapterField: result.data,
+    field: result.data,
   };
 }
 
 /**
- * Scan a workspace type directory (e.g., apps/, tasks/) for chapter packages.
+ * Scan a workspace type directory (e.g., apps/, tasks/) for packages.
  */
 function scanWorkspaceDir(
   rootDir: string,
@@ -64,7 +64,7 @@ function scanWorkspaceDir(
 }
 
 /**
- * Scan node_modules for chapter packages, including scoped packages.
+ * Scan node_modules for packages, including scoped packages.
  */
 function scanNodeModules(
   rootDir: string,
@@ -106,7 +106,7 @@ function scanNodeModules(
 }
 
 /**
- * Discover all chapter packages in the workspace and node_modules.
+ * Discover all packages in the workspace and node_modules.
  * Workspace packages take precedence over node_modules versions.
  */
 export function discoverPackages(rootDir: string): Map<string, DiscoveredPackage> {

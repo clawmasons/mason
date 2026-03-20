@@ -255,7 +255,7 @@ describe("runPackage — package.json generation", () => {
 
     expect(pkgJson.name).toBe("bare-role");
     expect(pkgJson.description).toBe("A bare role");
-    expect((pkgJson.chapter as Record<string, unknown>).type).toBe("role");
+    expect((pkgJson.mason as Record<string, unknown>).type).toBe("role");
   });
 
   it("uses `package` metadata field as npm package name when specified", async () => {
@@ -300,7 +300,7 @@ describe("runPackage — package.json generation", () => {
       ),
     ) as Record<string, unknown>;
 
-    expect((pkgJson.chapter as Record<string, unknown>).type).toBe("role");
+    expect((pkgJson.mason as Record<string, unknown>).type).toBe("role");
     expect(pkgJson.devDependencies).toEqual({ typescript: "^5.0.0" });
     expect((pkgJson.scripts as Record<string, string>).build).toBe("tsc");
   });

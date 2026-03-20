@@ -9,8 +9,7 @@ import { registerValidateCommand } from "./validate.js";
 import { readConfigAgentNames } from "@clawmasons/agent-sdk";
 
 /**
- * Register all chapter workspace subcommands under the `chapter` subcommand group,
- * and register top-level commands (`run`, `package`).
+ * Register all workspace subcommands and top-level commands.
  *
  * Also installs shorthand detection: if the first positional argument is a known
  * agent type or config-declared agent name (e.g., `mason claude --role x`), it is
@@ -22,16 +21,12 @@ export function registerCommands(program: Command): void {
   registerConfigureCommand(program);
   registerPackageCommand(program);
 
-  // `chapter` subcommand group
-  const chapter = program
-    .command("chapter")
-    .description("Chapter workspace management commands");
-
-  registerListCommand(chapter);
-  registerValidateCommand(chapter);
-  registerPermissionsCommand(chapter);
-  registerBuildCommand(chapter);
-  registerProxyCommand(chapter);
+  // Workspace management commands
+  registerListCommand(program);
+  registerValidateCommand(program);
+  registerPermissionsCommand(program);
+  registerBuildCommand(program);
+  registerProxyCommand(program);
 
   // Read config-declared agent names synchronously so shorthand detection
   // can recognise them before program.parse() fires.

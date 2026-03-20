@@ -15,10 +15,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const E2E_ROOT = path.resolve(__dirname, "..");
 export const PROJECT_ROOT = path.resolve(E2E_ROOT, "../..");
 export const FIXTURES_BASE = path.join(E2E_ROOT, "fixtures");
-export const FIXTURES_DIR = path.join(FIXTURES_BASE, "test-chapter");
+export const FIXTURES_DIR = path.join(FIXTURES_BASE, "test-mason");
 export const MASON_BIN = path.join(PROJECT_ROOT, "scripts", "mason.js");
-/** @deprecated Use MASON_BIN instead */
-export const CHAPTER_BIN = MASON_BIN;
 
 /** Workspace directories to copy from fixtures. */
 const WORKSPACE_DIRS = ["apps", "tasks", "skills", "roles", "agents", ".mason", ".claude"];
@@ -49,7 +47,7 @@ function copyDirRecursive(src: string, dest: string): void {
  * @param name - A short name used in the temp dir path (e.g., "build-pipeline")
  * @param opts.excludePaths - Relative paths within the workspace to remove after copying
  *                            (e.g., ["agents/mcp-test", "roles/mcp-test"])
- * @param opts.fixture - Fixture directory name under e2e/fixtures/ (default: "test-chapter")
+ * @param opts.fixture - Fixture directory name under e2e/fixtures/ (default: "test-mason")
  */
 export function copyFixtureWorkspace(
   name: string,
@@ -102,7 +100,7 @@ export function masonExec(
   cwd: string,
   opts?: { timeout?: number },
 ): string {
-  return execFileSync("node", [CHAPTER_BIN, ...args], {
+  return execFileSync("node", [MASON_BIN, ...args], {
     cwd,
     stdio: "pipe",
     timeout: opts?.timeout ?? 30_000,
@@ -143,7 +141,7 @@ export function masonExecExpectError(
   opts?: { timeout?: number },
 ): { stdout: string; stderr: string; exitCode: number } {
   try {
-    const stdout = execFileSync("node", [CHAPTER_BIN, ...args], {
+    const stdout = execFileSync("node", [MASON_BIN, ...args], {
       cwd,
       stdio: "pipe",
       timeout: opts?.timeout ?? 30_000,

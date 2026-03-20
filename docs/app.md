@@ -14,7 +14,7 @@ An **app** is an MCP (Model Context Protocol) server that provides tools to agen
   "name": "@acme.platform/app-filesystem",
   "version": "1.0.0",
   "description": "MCP filesystem server — read, write, and browse local files",
-  "chapter": {
+  "mason": {
     "type": "app",
     "transport": "stdio",
     "command": "npx",

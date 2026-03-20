@@ -55,7 +55,7 @@ async function createRolePackage(opts: {
   const pkgJson = {
     name: opts.packageName,
     version: "1.0.0",
-    chapter: { type: "role" },
+    mason: { type: "role" },
   };
   await writeFile(join(pkgDir, "package.json"), JSON.stringify(pkgJson));
 

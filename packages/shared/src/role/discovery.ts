@@ -4,7 +4,7 @@
  *
  * Discovery sources (in precedence order):
  * 1. Local roles: <projectDir>/.mason/roles/<name>/ROLE.md
- * 2. Packaged roles: node_modules packages with chapter.type === "role"
+ * 2. Packaged roles: node_modules packages with metadata type === "role"
  *
  * Local roles shadow packaged roles with the same name, enabling the
  * "eject and customize" workflow (PRD §6.3).
@@ -21,6 +21,7 @@ import { readMaterializedRole } from "./parser.js";
 import { readPackagedRole } from "./package-reader.js";
 import { getGlobalNpmRoot } from "./global-npm-root.js";
 import type { Role } from "../types/role.js";
+import { CLI_NAME_LOWERCASE } from "../constants.js";
 
 /**
  * Error thrown when role discovery or resolution fails.
@@ -199,7 +200,7 @@ async function findLocalRole(
 // ---------------------------------------------------------------------------
 
 /**
- * Scan node_modules for packages with chapter.type === "role".
+ * Scan node_modules for packages with metadata type === "role".
  * Checks both top-level and scoped package directories.
  */
 async function discoverPackagedRoles(projectDir: string): Promise<Role[]> {
@@ -266,16 +267,15 @@ async function findPackagedRole(
 }
 
 /**
- * Check if a directory is an NPM package with chapter.type === "role".
+ * Check if a directory is an NPM package with metadata type === "role".
  */
 async function isRolePackage(pkgDir: string): Promise<boolean> {
   const pkgJsonPath = join(pkgDir, "package.json");
   try {
     const raw = await readFile(pkgJsonPath, "utf-8");
-    const pkg = JSON.parse(raw) as {
-      chapter?: { type?: string };
-    };
-    return pkg.chapter?.type === "role";
+    const pkg = JSON.parse(raw) as Record<string, unknown>;
+    const metadata = pkg[CLI_NAME_LOWERCASE] as { type?: string } | undefined;
+    return metadata?.type === "role";
   } catch {
     return false;
   }

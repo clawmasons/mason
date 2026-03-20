@@ -11,7 +11,7 @@ const mountSchema = z.object({
   readonly: z.boolean().optional().default(false),
 });
 
-export const roleChapterFieldSchema = z.object({
+export const roleFieldSchema = z.object({
   type: z.literal("role"),
   description: z.string().optional(),
   risk: z.enum(["HIGH", "MEDIUM", "LOW"]).optional().default("LOW"),
@@ -30,4 +30,4 @@ export const roleChapterFieldSchema = z.object({
   aptPackages: z.array(z.string()).optional(),
 });
 
-export type RoleChapterField = z.infer<typeof roleChapterFieldSchema>;
+export type RoleField = z.infer<typeof roleFieldSchema>;

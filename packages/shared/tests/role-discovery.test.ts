@@ -64,7 +64,7 @@ async function createPackagedRole(opts: {
   const pkgJson = {
     name: opts.packageName,
     version: "1.0.0",
-    chapter: { type: "role" },
+    mason: { type: "role" },
   };
   await writeFile(
     join(pkgDir, "package.json"),
@@ -89,7 +89,7 @@ async function createNonRolePackage(packageName: string): Promise<void> {
   await mkdir(pkgDir, { recursive: true });
   await writeFile(
     join(pkgDir, "package.json"),
-    JSON.stringify({ name: packageName, version: "1.0.0", chapter: { type: "skill" } }),
+    JSON.stringify({ name: packageName, version: "1.0.0", mason: { type: "skill" } }),
   );
 }
 

@@ -1,4 +1,5 @@
 import type { ResolvedAgent } from "@clawmasons/shared";
+import { CLI_NAME_LOWERCASE } from "@clawmasons/shared";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage } from "@clawmasons/agent-sdk";
 import {
   generateAgentLaunchJson,
@@ -7,7 +8,7 @@ import {
 /**
  * Generate .mcp.json content for the mcp-agent.
  *
- * Creates a single "chapter" MCP server entry pointing at the proxy's
+ * Creates a single MCP server entry (keyed by CLI_NAME_LOWERCASE) pointing at the proxy's
  * unified endpoint:  /sse  (SSE)  or  /mcp  (streamable-http).
  */
 function generateMcpJson(
@@ -22,7 +23,7 @@ function generateMcpJson(
 
   const mcpConfig = {
     mcpServers: {
-      chapter: {
+      [CLI_NAME_LOWERCASE]: {
         type: proxyType,
         url: `${proxyEndpoint}${pathSuffix}`,
         headers: {
@@ -42,7 +43,7 @@ let _agentPkg: AgentPackage;
  * MCP Agent runtime materializer.
  *
  * Generates a minimal workspace directory for the mcp-agent package:
- * - .mcp.json — MCP server config pointing to chapter-proxy
+ * - .mcp.json — MCP server config pointing to the MCP proxy
  * - AGENTS.md — agent identity and role documentation
  *
  * The mcp-agent is a tool-calling REPL/ACP agent, not a full coding

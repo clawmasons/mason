@@ -45,7 +45,7 @@ vi.mock("@clawmasons/proxy", () => ({
     listPrompts: vi.fn(() => []),
     resolve: vi.fn(() => null),
   })),
-  ChapterProxyServer: vi.fn().mockImplementation(() => ({
+  ProxyServer: vi.fn().mockImplementation(() => ({
     start: vi.fn(),
     stop: vi.fn(),
     setRouting: vi.fn(),
@@ -54,34 +54,28 @@ vi.mock("@clawmasons/proxy", () => ({
 
 // ── Command Registration Tests ──────────────────────────────────────
 
-describe("chapter proxy command", () => {
-  const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
+describe("proxy command", () => {
+  const proxyCmd = program.commands.find((cmd) => cmd.name() === "proxy");
 
-  it("is registered under chapter", () => {
-    expect(chapterCmd).toBeDefined();
-    const proxyCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "proxy");
+  it("is registered", () => {
     expect(proxyCmd).toBeDefined();
   });
 
   it("has a description", () => {
-    const proxyCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "proxy");
     expect(proxyCmd?.description()).toContain("proxy");
   });
 
   it("has --port option", () => {
-    const proxyCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "proxy");
     const opt = proxyCmd?.options.find((o) => o.long === "--port");
     expect(opt).toBeDefined();
   });
 
   it("has --startup-timeout option", () => {
-    const proxyCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "proxy");
     const opt = proxyCmd?.options.find((o) => o.long === "--startup-timeout");
     expect(opt).toBeDefined();
   });
 
   it("has --agent option", () => {
-    const proxyCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "proxy");
     const opt = proxyCmd?.options.find((o) => o.long === "--agent");
     expect(opt).toBeDefined();
   });
@@ -93,7 +87,7 @@ import { startProxy } from "../../src/cli/commands/proxy.js";
 import { discoverPackages } from "../../src/resolver/discover.js";
 import { resolveRolePackage } from "../../src/resolver/resolve.js";
 import { computeToolFilters } from "@clawmasons/shared";
-import { UpstreamManager, ChapterProxyServer } from "@clawmasons/proxy";
+import { UpstreamManager, ProxyServer } from "@clawmasons/proxy";
 import type { DiscoveredPackage, ResolvedRole } from "@clawmasons/shared";
 
 function makeResolvedRole(name: string): ResolvedRole {
@@ -128,7 +122,7 @@ function makeRolePackages(roleName: string): Map<string, DiscoveredPackage> {
     name: roleName,
     version: "1.0.0",
     packagePath: "/fake/path",
-    chapterField: {
+    field: {
       type: "role",
       risk: "LOW",
       permissions: {
@@ -166,13 +160,13 @@ describe("startProxy", () => {
       name: "@test/role-a",
       version: "1.0.0",
       packagePath: "/fake/a",
-      chapterField: { type: "role", risk: "LOW", permissions: {} },
+      field: { type: "role", risk: "LOW", permissions: {} },
     });
     packages.set("@test/role-b", {
       name: "@test/role-b",
       version: "1.0.0",
       packagePath: "/fake/b",
-      chapterField: { type: "role", risk: "LOW", permissions: {} },
+      field: { type: "role", risk: "LOW", permissions: {} },
     });
     vi.mocked(discoverPackages).mockReturnValue(packages);
 
@@ -190,7 +184,7 @@ describe("startProxy", () => {
     await startProxy("/fake/root", {});
 
     expect(resolveRolePackage).toHaveBeenCalledWith(roleName, expect.any(Map));
-    expect(ChapterProxyServer).toHaveBeenCalled();
+    expect(ProxyServer).toHaveBeenCalled();
   });
 
   it("uses --role flag to select role", async () => {
@@ -212,7 +206,7 @@ describe("startProxy", () => {
 
     await startProxy("/fake/root", { role: roleName, port: "8080" });
 
-    expect(ChapterProxyServer).toHaveBeenCalledWith(
+    expect(ProxyServer).toHaveBeenCalledWith(
       expect.objectContaining({ port: 8080 }),
     );
   });
@@ -258,7 +252,7 @@ describe("startProxy", () => {
 
     await startProxy("/fake/root", { role: roleName });
 
-    expect(ChapterProxyServer).toHaveBeenCalledWith(
+    expect(ProxyServer).toHaveBeenCalledWith(
       expect.objectContaining({
         approvalPatterns: ["github_delete_*"],
       }),

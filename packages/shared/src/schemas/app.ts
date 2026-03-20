@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const appChapterFieldSchema = z
+export const appFieldSchema = z
   .object({
     type: z.literal("app"),
     description: z.string().optional(),
@@ -40,4 +40,4 @@ export const appChapterFieldSchema = z
     }
   });
 
-export type AppChapterField = z.infer<typeof appChapterFieldSchema>;
+export type AppField = z.infer<typeof appFieldSchema>;

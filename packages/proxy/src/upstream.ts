@@ -54,7 +54,7 @@ export class UpstreamManager {
     const connectPromises = this.configs.map(async (config) => {
       const transport = createTransport(config);
       const client = new Client(
-        { name: "chapter-upstream", version: "0.1.0" },
+        { name: "mason-upstream", version: "0.1.0" },
       );
       await client.connect(transport);
       this.clients.set(config.name, client);

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { CLI_NAME_LOWERCASE, CLI_NAME_UPPERCASE } from "@clawmasons/shared";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -77,8 +78,8 @@ CREATE TABLE IF NOT EXISTS approval_requests (
 
 // ── Database ───────────────────────────────────────────────────────────
 
-const DEFAULT_DB_PATH = process.env.CHAPTER_DB_PATH
-  ?? join(homedir(), ".chapter", "data", "chapter.db");
+const DEFAULT_DB_PATH = process.env[`${CLI_NAME_UPPERCASE}_DB_PATH`]
+  ?? join(homedir(), `.${CLI_NAME_LOWERCASE}`, "data", `${CLI_NAME_LOWERCASE}.db`);
 
 export function openDatabase(dbPath: string = DEFAULT_DB_PATH): Database.Database {
   if (dbPath !== ":memory:") {

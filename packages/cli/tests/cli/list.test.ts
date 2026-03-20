@@ -6,11 +6,9 @@ import { program } from "../../src/cli/index.js";
 import { runList } from "../../src/cli/commands/list.js";
 
 describe("CLI list command", () => {
-  const chapterCmd = program.commands.find((cmd) => cmd.name() === "chapter");
+  const listCmd = program.commands.find((cmd) => cmd.name() === "list");
 
-  it("has the list command registered under chapter", () => {
-    expect(chapterCmd).toBeDefined();
-    const listCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "list");
+  it("has the list command registered", () => {
     expect(listCmd).toBeDefined();
     if (listCmd) {
       expect(listCmd.description()).toContain("roles");
@@ -18,7 +16,6 @@ describe("CLI list command", () => {
   });
 
   it("list command has --json option", () => {
-    const listCmd = chapterCmd!.commands.find((cmd) => cmd.name() === "list");
     expect(listCmd).toBeDefined();
     if (listCmd) {
       const jsonOption = listCmd.options.find((opt) => opt.long === "--json");
@@ -34,7 +31,7 @@ describe("runList", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-list-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-list-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});

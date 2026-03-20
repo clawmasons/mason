@@ -78,7 +78,7 @@ Agents run in Docker containers with:
 
 ## Audit Logging
 
-All operations are logged to a SQLite database (`chapter.db`):
+All operations are logged to a SQLite database (`mason.db`):
 
 ### Tool Call Audit
 - Tool name, arguments, and result

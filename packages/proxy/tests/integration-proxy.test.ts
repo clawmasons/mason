@@ -1,8 +1,8 @@
 /**
- * End-to-End Integration Test — Native Chapter Proxy
+ * End-to-End Integration Test — Native Mason Proxy
  *
  * Exercises the full proxy pipeline with a real upstream MCP server:
- *   UpstreamManager → ToolRouter → ChapterProxyServer → MCP Client
+ *   UpstreamManager → ToolRouter → ProxyServer → MCP Client
  *
  * Uses @modelcontextprotocol/server-filesystem as the upstream via stdio.
  */
@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import { ChapterProxyServer } from "../src/server.js";
+import { ProxyServer } from "../src/server.js";
 import { UpstreamManager } from "../src/upstream.js";
 import { ToolRouter } from "../src/router.js";
 import { openDatabase, queryAuditLog } from "../src/db.js";
@@ -34,7 +34,7 @@ let dbPath: string;
 let db: Database.Database;
 let upstream: UpstreamManager;
 let router: ToolRouter;
-let server: ChapterProxyServer;
+let server: ProxyServer;
 let client: Client;
 
 // ── Setup / Teardown ───────────────────────────────────────────────────
@@ -43,13 +43,13 @@ beforeAll(async () => {
   // 1. Create temp workspace for the filesystem server
   // Use realpathSync to resolve macOS /tmp → /private/var/folders symlinks
   // so paths match what the filesystem server considers "allowed"
-  tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "chapter-integration-")));
+  tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "mason-integration-")));
 
   // Seed a test file so we can verify reads
-  writeFileSync(join(tmpDir, "hello.txt"), "Hello from chapter integration test");
+  writeFileSync(join(tmpDir, "hello.txt"), "Hello from mason integration test");
 
   // 2. Open temp SQLite database
-  dbPath = join(tmpDir, "chapter-test.db");
+  dbPath = join(tmpDir, "mason-test.db");
   db = openDatabase(dbPath);
 
   // 3. Configure UpstreamManager with real filesystem server
@@ -77,8 +77,8 @@ beforeAll(async () => {
   ]);
   router = new ToolRouter(upstreamTools, toolFilters);
 
-  // 5. Start ChapterProxyServer
-  server = new ChapterProxyServer({
+  // 5. Start ProxyServer
+  server = new ProxyServer({
     port: TEST_PORT,
     transport: "streamable-http",
     router,
@@ -110,7 +110,7 @@ afterAll(async () => {
 
 // ── Tests ──────────────────────────────────────────────────────────────
 
-describe("Chapter Proxy Integration", () => {
+describe("Mason Proxy Integration", () => {
 
   // Scenario 1: Proxy starts and accepts connections
   it("proxy accepts MCP connections and lists tools", async () => {
@@ -146,7 +146,7 @@ describe("Chapter Proxy Integration", () => {
       .filter((c) => c.type === "text")
       .map((c) => c.text)
       .join("");
-    expect(text).toContain("Hello from chapter integration test");
+    expect(text).toContain("Hello from mason integration test");
   });
 
   // Scenario 3b: Write + read round-trip
@@ -210,18 +210,18 @@ describe("Chapter Proxy Integration", () => {
 
 // ── Approval Workflow Tests (separate server instance) ─────────────────
 
-describe("Chapter Proxy Integration — Approval Workflow", () => {
-  let approvalServer: ChapterProxyServer;
+describe("Mason Proxy Integration — Approval Workflow", () => {
+  let approvalServer: ProxyServer;
   let approvalClient: Client;
   let approvalDb: Database.Database;
   const APPROVAL_PORT = TEST_PORT + 1;
 
   beforeAll(async () => {
     // Use a separate DB for approval tests to avoid interference
-    const approvalDbPath = join(tmpDir, "chapter-approval-test.db");
+    const approvalDbPath = join(tmpDir, "mason-approval-test.db");
     approvalDb = openDatabase(approvalDbPath);
 
-    approvalServer = new ChapterProxyServer({
+    approvalServer = new ProxyServer({
       port: APPROVAL_PORT,
       transport: "streamable-http",
       router,
@@ -279,14 +279,14 @@ describe("Chapter Proxy Integration — Approval Workflow", () => {
       .filter((c) => c.type === "text")
       .map((c) => c.text)
       .join("");
-    expect(text).toContain("Hello from chapter integration test");
+    expect(text).toContain("Hello from mason integration test");
   });
 
   // Scenario 7 (partial): Clean shutdown
   it("proxy server shuts down cleanly", async () => {
     // Create a second server to test shutdown without affecting other tests
     const shutdownPort = APPROVAL_PORT + 1;
-    const shutdownServer = new ChapterProxyServer({
+    const shutdownServer = new ProxyServer({
       port: shutdownPort,
       transport: "streamable-http",
       router,

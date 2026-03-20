@@ -68,7 +68,7 @@ See [Credential Service](component-credential-service.md) for resolution details
 
 ## Audit Logging
 
-All operations are logged to a SQLite database (`chapter.db`):
+All operations are logged to a SQLite database (`mason.db`):
 
 - **Tool calls** — Tool name, arguments, result, duration, status, timestamp
 - **Credential requests** — Key, outcome (granted/denied/error), source, timestamp

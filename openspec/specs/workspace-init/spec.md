@@ -93,7 +93,7 @@ The `mason init` command SHALL print a summary of created files and directories 
 - **THEN** the CLI prints the template name and next-step commands using the project scope (e.g., `mason validate @test-project/member-note-taker`)
 
 ### Requirement: Template directory structure
-The `@clawmasons/mason` package SHALL contain a `templates/` directory with at least one template (`note-taker/`). Each template directory SHALL contain the files needed to bootstrap a working project.
+The `@clawmasons/mason` package SHALL contain a `templates/` directory with at least one template (`note-taker/`). Each template directory SHALL contain the files needed to bootstrap a working project. Template package.json files SHALL use the `mason` key (CLI_NAME_LOWERCASE) for their metadata field instead of `chapter`.
 
 #### Scenario: note-taker template exists
 - **WHEN** the `templates/` directory is inspected
@@ -105,18 +105,18 @@ The `@clawmasons/mason` package SHALL contain a `templates/` directory with at l
 
 #### Scenario: Template member references local role
 - **WHEN** `templates/note-taker/members/note-taker/package.json` is read
-- **THEN** the chapter field has `type: "member"`, `memberType: "agent"`, and `roles` contains `@{{projectScope}}/role-writer`
+- **THEN** the `mason` field has `type: "member"`, `memberType: "agent"`, and `roles` contains `@{{projectScope}}/role-writer`
 
 #### Scenario: Template role references local components
 - **WHEN** `templates/note-taker/roles/writer/package.json` is read
-- **THEN** the chapter field has `type: "role"`, tasks include `@{{projectScope}}/task-take-notes`, skills include `@{{projectScope}}/skill-markdown-conventions`, and permissions reference `@{{projectScope}}/app-filesystem`
+- **THEN** the `mason` field has `type: "role"`, tasks include `@{{projectScope}}/task-take-notes`, skills include `@{{projectScope}}/skill-markdown-conventions`, and permissions reference `@{{projectScope}}/app-filesystem`
 
 #### Scenario: Template member includes identity fields
 - **WHEN** `templates/note-taker/members/note-taker/package.json` is read
-- **THEN** the chapter field includes `name`, `slug`, `email`, and `authProviders` fields as required by the member schema
+- **THEN** the `mason` field includes `name`, `slug`, `email`, and `authProviders` fields as required by the member schema
 
 #### Scenario: Template member validates against member schema after init
-- **WHEN** `mason init --template note-taker --name @acme/my-project` is run and the generated `members/note-taker/package.json` chapter field is parsed with `parseChapterField()`
+- **WHEN** `mason init --template note-taker --name @acme/my-project` is run and the generated `members/note-taker/package.json` field (under the `mason` key) is parsed with `parseField()`
 - **THEN** the parse succeeds, `type` is `"member"`, and `memberType` is `"agent"`
 
 ### Requirement: mason init --template copies template files

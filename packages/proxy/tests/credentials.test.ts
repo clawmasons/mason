@@ -16,7 +16,7 @@ describe("loadEnvFile", () => {
   });
 
   function writeEnv(content: string): string {
-    tempDir = mkdtempSync(join(tmpdir(), "chapter-cred-"));
+    tempDir = mkdtempSync(join(tmpdir(), "mason-cred-"));
     const filePath = join(tempDir, ".env");
     writeFileSync(filePath, content);
     return filePath;

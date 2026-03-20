@@ -6,13 +6,19 @@ The ACP session manages the two-container Docker Compose session (proxy + agent)
 
 ### Requirement: AcpSession generates a docker-compose.yml with two services
 
-The `generateAcpComposeYml()` function SHALL produce a compose file with proxy and agent services. The compose file SHALL reference build contexts from `{projectDir}/.clawmasons/docker/{role-name}/` instead of any external docker build path. The credential-service SHALL NOT be included as a Docker container — it runs in-process on the host.
+The `generateAcpComposeYml()` function SHALL produce a compose file with proxy and agent services. The compose file SHALL reference build contexts from `{projectDir}/.clawmasons/docker/{role-name}/` instead of any external docker build path. The credential-service SHALL NOT be included as a Docker container — it runs in-process on the host. Environment variables in the compose file SHALL use `${CLI_NAME_UPPERCASE}_` prefix (currently `MASON_`) instead of `CHAPTER_`.
 
 #### Scenario: Two services are present
 - **GIVEN** valid compose options with agent "claude" and role "writer"
 - **WHEN** `generateAcpComposeYml()` is called
 - **THEN** the output contains services `proxy-writer` and `agent-claude-writer`
 - **AND** the output does NOT contain a `credential-service` service
+
+#### Scenario: Proxy environment uses CLI name prefix
+- **GIVEN** valid compose options with agent "claude" and role "writer"
+- **WHEN** `generateAcpComposeYml()` is called
+- **THEN** the proxy service environment SHALL include `MASON_PROXY_TOKEN`, `MASON_SESSION_TYPE`, and optionally `MASON_ACP_CLIENT`
+- **AND** the environment SHALL NOT contain any `CHAPTER_` prefixed variables
 
 #### Scenario: Agent depends on proxy
 - **GIVEN** valid compose options
@@ -132,7 +138,7 @@ The initiate template's mcp agent SHALL declare `TEST_LLM_TOKEN` in its credenti
 
 #### Scenario: Agent package.json includes TEST_LLM_TOKEN
 - **GIVEN** the initiate template's mcp agent package.json
-- **WHEN** the `chapter.credentials` array is inspected
+- **WHEN** the `mason.credentials` array is inspected (using the CLI_NAME_LOWERCASE key)
 - **THEN** it contains `"TEST_LLM_TOKEN"`
 
 ### Requirement: ACP session resolves project directory from session/new cwd

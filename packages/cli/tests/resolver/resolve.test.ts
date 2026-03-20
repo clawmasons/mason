@@ -4,14 +4,14 @@ import {
   PackageNotFoundError,
   TypeMismatchError,
 } from "../../src/resolver/errors.js";
-import type { DiscoveredPackage, ChapterField } from "@clawmasons/shared";
-import { parseChapterField } from "@clawmasons/shared";
+import type { DiscoveredPackage, Field } from "@clawmasons/shared";
+import { parseField } from "@clawmasons/shared";
 
 /**
  * Helper to build a DiscoveredPackage from minimal inputs.
  */
-function makePkg(name: string, version: string, chapterField: ChapterField): DiscoveredPackage {
-  return { name, version, packagePath: `/fake/${name}`, chapterField };
+function makePkg(name: string, version: string, field: Field): DiscoveredPackage {
+  return { name, version, packagePath: `/fake/${name}`, field };
 }
 
 /**
@@ -106,8 +106,8 @@ describe("resolveRolePackage", () => {
 });
 
 describe("agent type rejection", () => {
-  it("rejects chapter.type = 'agent' in schema validation", () => {
-    const result = parseChapterField({
+  it("rejects mason.type = 'agent' in schema validation", () => {
+    const result = parseField({
       type: "agent",
       name: "Test Agent",
       slug: "test-agent",
@@ -117,8 +117,8 @@ describe("agent type rejection", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts chapter.type = 'role' in schema validation", () => {
-    const result = parseChapterField({
+  it("accepts mason.type = 'role' in schema validation", () => {
+    const result = parseField({
       type: "role",
       risk: "LOW",
       permissions: {

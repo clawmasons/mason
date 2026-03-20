@@ -15,7 +15,7 @@ import * as path from "node:path";
 import * as crypto from "node:crypto";
 import * as os from "node:os";
 import type { Role } from "@clawmasons/shared";
-import { getAppShortName } from "@clawmasons/shared";
+import { getAppShortName, CLI_NAME_UPPERCASE } from "@clawmasons/shared";
 import { materializeForAgent, getMaterializer, getAgentFromRegistry } from "./role-materializer.js";
 import { generateAgentDockerfile } from "../generator/agent-dockerfile.js";
 import { generateProxyDockerfile } from "../generator/proxy-dockerfile.js";
@@ -352,7 +352,7 @@ services:
       context: ../../../docker
       dockerfile: ../docker/${roleName}/mcp-proxy/Dockerfile
     environment:
-      - CHAPTER_PROXY_TOKEN=\${CHAPTER_PROXY_TOKEN}
+      - ${CLI_NAME_UPPERCASE}_PROXY_TOKEN=\${${CLI_NAME_UPPERCASE}_PROXY_TOKEN}
       - CREDENTIAL_PROXY_TOKEN=\${CREDENTIAL_PROXY_TOKEN}
     ports:
       - "9090:9090"
@@ -364,7 +364,7 @@ services:
     depends_on:
       - proxy-${roleName}
     environment:
-      - MCP_PROXY_TOKEN=\${CHAPTER_PROXY_TOKEN}
+      - MCP_PROXY_TOKEN=\${${CLI_NAME_UPPERCASE}_PROXY_TOKEN}
 `;
 }
 
@@ -491,15 +491,15 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
 
   // --- Proxy service ---
   const proxyEnvLines = [
-    `      - CHAPTER_PROXY_TOKEN=${proxyToken}`,
+    `      - ${CLI_NAME_UPPERCASE}_PROXY_TOKEN=${proxyToken}`,
     `      - CREDENTIAL_PROXY_TOKEN=${credentialProxyToken}`,
     `      - PROJECT_DIR=${PROJECT_MOUNT_PATH}`,
   ];
   if (sessionType) {
-    proxyEnvLines.push(`      - CHAPTER_SESSION_TYPE=${sessionType}`);
+    proxyEnvLines.push(`      - ${CLI_NAME_UPPERCASE}_SESSION_TYPE=${sessionType}`);
   }
   if (credentialKeys && credentialKeys.length > 0) {
-    proxyEnvLines.push(`      - CHAPTER_DECLARED_CREDENTIALS=${JSON.stringify(credentialKeys)}`);
+    proxyEnvLines.push(`      - ${CLI_NAME_UPPERCASE}_DECLARED_CREDENTIALS=${JSON.stringify(credentialKeys)}`);
   }
 
   // --- Agent volumes ---

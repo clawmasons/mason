@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { createServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { CLI_NAME_LOWERCASE } from "@clawmasons/shared";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
@@ -24,7 +25,7 @@ import { CredentialRelay } from "./handlers/credential-relay.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-export interface ChapterProxyServerConfig {
+export interface ProxyServerConfig {
   port?: number;
   transport: "sse" | "streamable-http";
   router: ToolRouter;
@@ -77,17 +78,17 @@ const CREDENTIAL_REQUEST_TOOL: Tool = {
   },
 };
 
-// ── ChapterProxyServer ──────────────────────────────────────────────────
+// ── ProxyServer ──────────────────────────────────────────────────
 
 const DEFAULT_PORT = 9090;
 
-export class ChapterProxyServer {
-  private config: Required<Pick<ChapterProxyServerConfig, "port" | "transport">> & ChapterProxyServerConfig;
+export class ProxyServer {
+  private config: Required<Pick<ProxyServerConfig, "port" | "transport">> & ProxyServerConfig;
   private httpServer: HttpServer | null = null;
   private activeTransports: Set<SSEServerTransport | StreamableHTTPServerTransport> = new Set();
   private sessionStore: SessionStore;
   private credentialRelay: CredentialRelay | null = null;
-  constructor(config: ChapterProxyServerConfig) {
+  constructor(config: ProxyServerConfig) {
     this.config = { ...config, port: config.port ?? DEFAULT_PORT };
     this.sessionStore = new SessionStore(config.riskLevel);
 
@@ -327,7 +328,7 @@ export class ChapterProxyServer {
     };
 
     const server = new Server(
-      { name: "chapter", version: "0.1.0" },
+      { name: CLI_NAME_LOWERCASE, version: "0.1.0" },
       { capabilities },
     );
 

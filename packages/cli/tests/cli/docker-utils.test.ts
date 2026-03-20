@@ -10,7 +10,7 @@ describe("validateEnvFile", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-env-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-env-test-"));
   });
 
   afterEach(() => {
@@ -20,7 +20,7 @@ describe("validateEnvFile", () => {
   it("returns empty array when all values are filled", () => {
     fs.writeFileSync(
       path.join(tmpDir, ".env"),
-      "# Comment\nGITHUB_TOKEN=abc123\nCHAPTER_PROXY_TOKEN=xyz\n",
+      "# Comment\nGITHUB_TOKEN=abc123\nMASON_PROXY_TOKEN=xyz\n",
     );
     const missing = validateEnvFile(tmpDir);
     expect(missing).toEqual([]);
@@ -29,7 +29,7 @@ describe("validateEnvFile", () => {
   it("returns missing variables with empty values", () => {
     fs.writeFileSync(
       path.join(tmpDir, ".env"),
-      "GITHUB_TOKEN=\nCHAPTER_PROXY_TOKEN=abc\nSLACK_TOKEN=\n",
+      "GITHUB_TOKEN=\nMASON_PROXY_TOKEN=abc\nSLACK_TOKEN=\n",
     );
     const missing = validateEnvFile(tmpDir);
     expect(missing).toEqual(["GITHUB_TOKEN", "SLACK_TOKEN"]);

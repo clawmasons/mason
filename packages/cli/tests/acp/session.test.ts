@@ -162,15 +162,15 @@ describe("generateAcpComposeYml", () => {
     const yml = generateAcpComposeYml(defaultOpts);
     const proxySection = yml.split("agent-writer:")[0]!;
 
-    expect(proxySection).toContain("CHAPTER_PROXY_TOKEN=test-proxy-token");
+    expect(proxySection).toContain("MASON_PROXY_TOKEN=test-proxy-token");
     expect(proxySection).toContain("CREDENTIAL_PROXY_TOKEN=test-cred-token");
   });
 
-  it("proxy has CHAPTER_SESSION_TYPE=acp", () => {
+  it("proxy has MASON_SESSION_TYPE=acp", () => {
     const yml = generateAcpComposeYml(defaultOpts);
     const proxySection = yml.split("agent-writer:")[0]!;
 
-    expect(proxySection).toContain("CHAPTER_SESSION_TYPE=acp");
+    expect(proxySection).toContain("MASON_SESSION_TYPE=acp");
   });
 
   it("proxy has PROJECT_DIR env set to project mount path", () => {
@@ -236,7 +236,7 @@ describe("generateAcpComposeYml", () => {
     const yml = generateAcpComposeYml({ ...defaultOpts, acpClient: "zed" });
     const proxySection = yml.split("agent-writer:")[0]!;
 
-    expect(proxySection).toContain("CHAPTER_ACP_CLIENT=zed");
+    expect(proxySection).toContain("MASON_ACP_CLIENT=zed");
   });
 
   it("includes acpCommand as command when provided", () => {
@@ -303,7 +303,7 @@ describe("AcpSession", () => {
   let dockerDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "chapter-acp-session-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-acp-session-test-"));
     const setup = setupProjectDir(tmpDir);
     projectDir = setup.projectDir;
     dockerBuildDir = setup.dockerBuildDir;

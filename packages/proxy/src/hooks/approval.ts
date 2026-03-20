@@ -70,7 +70,7 @@ export async function requestApproval(
     createApprovalRequest(db, req);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[chapter] approval request creation failed: ${message}`);
+    console.error(`[mason] approval request creation failed: ${message}`);
     return "denied";
   }
 
@@ -82,7 +82,7 @@ export async function requestApproval(
     try {
       const current = getApprovalRequest(db, id);
       if (!current) {
-        console.error(`[chapter] approval request ${id} disappeared from database`);
+        console.error(`[mason] approval request ${id} disappeared from database`);
         return "denied";
       }
       if (current.status === "approved") {
@@ -93,7 +93,7 @@ export async function requestApproval(
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[chapter] approval request poll failed: ${message}`);
+      console.error(`[mason] approval request poll failed: ${message}`);
       return "denied";
     }
   }
@@ -108,7 +108,7 @@ export async function requestApproval(
     updateApprovalStatus(db, id, "denied", "auto-timeout");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[chapter] approval auto-timeout update failed: ${message}`);
+    console.error(`[mason] approval auto-timeout update failed: ${message}`);
   }
 
   return "timeout";

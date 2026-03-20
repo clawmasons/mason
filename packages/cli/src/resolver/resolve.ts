@@ -1,8 +1,8 @@
 import type {
-  AppChapterField,
-  RoleChapterField,
-  SkillChapterField,
-  TaskChapterField,
+  AppField,
+  RoleField,
+  SkillField,
+  TaskField,
   DiscoveredPackage,
   ResolvedApp,
   ResolvedRole,
@@ -31,18 +31,18 @@ function getPackage(
 }
 
 /**
- * Assert that a discovered package has the expected chapter type.
+ * Assert that a discovered package has the expected type.
  */
 function assertType(
   pkg: DiscoveredPackage,
   expectedType: string,
   context?: string,
 ): void {
-  if (pkg.chapterField.type !== expectedType) {
+  if (pkg.field.type !== expectedType) {
     throw new TypeMismatchError(
       pkg.name,
       expectedType,
-      pkg.chapterField.type,
+      pkg.field.type,
       context,
     );
   }
@@ -58,20 +58,20 @@ function resolveApp(
 ): ResolvedApp {
   const pkg = getPackage(name, packages, context);
   assertType(pkg, "app", context);
-  const chapter = pkg.chapterField as AppChapterField;
+  const field = pkg.field as AppField;
 
   return {
     name: pkg.name,
     version: pkg.version,
-    transport: chapter.transport,
-    command: chapter.command,
-    args: chapter.args,
-    url: chapter.url,
-    env: chapter.env,
-    tools: chapter.tools,
-    capabilities: chapter.capabilities,
-    credentials: chapter.credentials,
-    description: chapter.description,
+    transport: field.transport,
+    command: field.command,
+    args: field.args,
+    url: field.url,
+    env: field.env,
+    tools: field.tools,
+    capabilities: field.capabilities,
+    credentials: field.credentials,
+    description: field.description,
   };
 }
 
@@ -85,13 +85,13 @@ function resolveSkill(
 ): ResolvedSkill {
   const pkg = getPackage(name, packages, context);
   assertType(pkg, "skill", context);
-  const chapter = pkg.chapterField as SkillChapterField;
+  const field = pkg.field as SkillField;
 
   return {
     name: pkg.name,
     version: pkg.version,
-    artifacts: chapter.artifacts,
-    description: chapter.description,
+    artifacts: field.artifacts,
+    description: field.description,
   };
 }
 
@@ -112,30 +112,30 @@ function resolveTask(
 
   const pkg = getPackage(name, packages, context);
   assertType(pkg, "task", context);
-  const chapter = pkg.chapterField as TaskChapterField;
+  const field = pkg.field as TaskField;
   const taskContext = `task "${name}"`;
 
   // Resolve required apps
   const apps: ResolvedApp[] = [];
-  if (chapter.requires?.apps) {
-    for (const appName of chapter.requires.apps) {
+  if (field.requires?.apps) {
+    for (const appName of field.requires.apps) {
       apps.push(resolveApp(appName, packages, taskContext));
     }
   }
 
   // Resolve required skills
   const skills: ResolvedSkill[] = [];
-  if (chapter.requires?.skills) {
-    for (const skillName of chapter.requires.skills) {
+  if (field.requires?.skills) {
+    for (const skillName of field.requires.skills) {
       skills.push(resolveSkill(skillName, packages, taskContext));
     }
   }
 
   // Resolve sub-tasks for composite tasks
   const subTasks: ResolvedTask[] = [];
-  if (chapter.tasks) {
+  if (field.tasks) {
     const newPath = [...traversalPath, name];
-    for (const subTaskName of chapter.tasks) {
+    for (const subTaskName of field.tasks) {
       subTasks.push(resolveTask(subTaskName, packages, newPath, taskContext));
     }
   }
@@ -143,12 +143,12 @@ function resolveTask(
   return {
     name: pkg.name,
     version: pkg.version,
-    taskType: chapter.taskType,
-    prompt: chapter.prompt,
-    timeout: chapter.timeout,
-    approval: chapter.approval,
-    requiredApps: chapter.requires?.apps,
-    requiredSkills: chapter.requires?.skills,
+    taskType: field.taskType,
+    prompt: field.prompt,
+    timeout: field.timeout,
+    approval: field.approval,
+    requiredApps: field.requires?.apps,
+    requiredSkills: field.requires?.skills,
     apps,
     skills,
     subTasks,
@@ -165,34 +165,34 @@ function resolveRole(
 ): ResolvedRole {
   const pkg = getPackage(name, packages, context);
   assertType(pkg, "role", context);
-  const chapter = pkg.chapterField as RoleChapterField;
+  const field = pkg.field as RoleField;
   const roleContext = `role "${name}"`;
 
   // Resolve tasks
   const tasks: ResolvedTask[] = [];
-  if (chapter.tasks) {
-    for (const taskName of chapter.tasks) {
+  if (field.tasks) {
+    for (const taskName of field.tasks) {
       tasks.push(resolveTask(taskName, packages, [], roleContext));
     }
   }
 
   // Resolve role-level skills
   const skills: ResolvedSkill[] = [];
-  if (chapter.skills) {
-    for (const skillName of chapter.skills) {
+  if (field.skills) {
+    for (const skillName of field.skills) {
       skills.push(resolveSkill(skillName, packages, roleContext));
     }
   }
 
   // Collect all apps referenced by permissions (these are the apps this role touches)
   const apps: ResolvedApp[] = [];
-  const permissionKeys = Object.keys(chapter.permissions);
+  const permissionKeys = Object.keys(field.permissions);
   const hasWildcard = permissionKeys.includes("*");
 
   if (hasWildcard) {
     // Wildcard "*" means all apps in the workspace
     for (const [, pkg] of packages) {
-      if (pkg.chapterField.type === "app") {
+      if (pkg.field.type === "app") {
         apps.push(resolveApp(pkg.name, packages, roleContext));
       }
     }
@@ -218,13 +218,13 @@ function resolveRole(
   return {
     name: pkg.name,
     version: pkg.version,
-    description: chapter.description,
-    risk: chapter.risk,
-    permissions: chapter.permissions,
-    constraints: chapter.constraints,
-    mounts: chapter.mounts,
-    baseImage: chapter.baseImage,
-    aptPackages: chapter.aptPackages,
+    description: field.description,
+    risk: field.risk,
+    permissions: field.permissions,
+    constraints: field.constraints,
+    mounts: field.mounts,
+    baseImage: field.baseImage,
+    aptPackages: field.aptPackages,
     tasks,
     apps,
     skills,

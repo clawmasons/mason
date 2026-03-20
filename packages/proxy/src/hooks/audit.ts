@@ -60,7 +60,7 @@ export function auditPostHook(
     insertAuditLog(db, entry);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[chapter] audit log write failed: ${message}`);
+    console.error(`[mason] audit log write failed: ${message}`);
   }
 }
 
@@ -75,7 +75,7 @@ export interface DroppedServer {
  * Log each dropped (unmatched) MCP server as an audit entry with status "dropped".
  *
  * Called during ACP session setup when MCP servers from the ACP client
- * don't match any chapter App.
+ * don't match any App.
  */
 export function logDroppedServers(
   db: Database.Database,
@@ -104,7 +104,7 @@ export function logDroppedServers(
       insertAuditLog(db, entry);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[chapter] audit log write failed (dropped server "${server.name}"): ${message}`);
+      console.error(`[mason] audit log write failed (dropped server "${server.name}"): ${message}`);
     }
   }
 }

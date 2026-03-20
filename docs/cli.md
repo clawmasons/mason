@@ -101,29 +101,29 @@ Output: `.mason/roles/<name>/build/*.tgz`
 
 ---
 
-## Chapter Subcommands
+## Workspace Subcommands
 
-All workspace management commands are under the `chapter` subgroup.
+Commands for managing workspaces and packages.
 
-### `mason chapter init`
+### `mason init`
 
-Initialize a new chapter workspace.
+Initialize a new workspace.
 
 ```bash
-mason chapter init --name <lodge>.<chapter> [options]
+mason init --name <lodge>.<workspace> [options]
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--name <name>` | **(required)** Workspace name in `<lodge>.<chapter>` format |
+| `--name <name>` | **(required)** Workspace name in `<lodge>.<workspace>` format |
 | `--template <template>` | Use a project template (e.g., `note-taker`) |
 
-### `mason chapter build`
+### `mason build`
 
-Build chapter workspace: resolve roles, pack packages, and generate Docker artifacts.
+Build workspace: resolve roles, pack packages, and generate Docker artifacts.
 
 ```bash
-mason chapter build [role] [options]
+mason build [role] [options]
 ```
 
 | Argument | Description |
@@ -135,24 +135,24 @@ mason chapter build [role] [options]
 | `--output <path>` | Output path for lock file |
 | `--json` | Print lock file to stdout as JSON |
 
-### `mason chapter list`
+### `mason list`
 
 List roles and their dependency trees.
 
 ```bash
-mason chapter list [options]
+mason list [options]
 ```
 
 | Option | Description |
 |--------|-------------|
 | `--json` | Output as JSON |
 
-### `mason chapter validate`
+### `mason validate`
 
 Validate a role's dependency graph and permissions.
 
 ```bash
-mason chapter validate <role> [options]
+mason validate <role> [options]
 ```
 
 | Argument | Description |
@@ -163,12 +163,12 @@ mason chapter validate <role> [options]
 |--------|-------------|
 | `--json` | Output validation result as JSON |
 
-### `mason chapter permissions`
+### `mason permissions`
 
 Display the resolved permission matrix and tool filters for a role.
 
 ```bash
-mason chapter permissions <role> [options]
+mason permissions <role> [options]
 ```
 
 | Argument | Description |
@@ -179,12 +179,12 @@ mason chapter permissions <role> [options]
 |--------|-------------|
 | `--json` | Output as JSON |
 
-### `mason chapter add`
+### `mason add`
 
-Add a chapter package dependency (wraps npm install with chapter validation).
+Add a package dependency (wraps npm install with validation).
 
 ```bash
-mason chapter add <pkg> [npmArgs...]
+mason add <pkg> [npmArgs...]
 ```
 
 | Argument | Description |
@@ -192,12 +192,12 @@ mason chapter add <pkg> [npmArgs...]
 | `<pkg>` | Package name to add |
 | `[npmArgs...]` | Additional arguments forwarded to npm install |
 
-### `mason chapter remove`
+### `mason remove`
 
-Remove a chapter package dependency (wraps npm uninstall with dependent checking).
+Remove a package dependency (wraps npm uninstall with dependent checking).
 
 ```bash
-mason chapter remove <pkg> [npmArgs...] [options]
+mason remove <pkg> [npmArgs...] [options]
 ```
 
 | Argument | Description |
@@ -209,12 +209,12 @@ mason chapter remove <pkg> [npmArgs...] [options]
 |--------|-------------|
 | `--force` | Remove even if other packages depend on it |
 
-### `mason chapter init-role`
+### `mason init-role`
 
-Initialize a host-wide runtime directory for a chapter role.
+Initialize a host-wide runtime directory for a role.
 
 ```bash
-mason chapter init-role --role <name> [options]
+mason init-role --role <name> [options]
 ```
 
 | Option | Description |
@@ -222,20 +222,20 @@ mason chapter init-role --role <name> [options]
 | `--role <name>` | **(required)** Role to initialize |
 | `--target-dir <path>` | Override the default role directory location |
 
-### `mason chapter pack`
+### `mason pack`
 
 Build and pack all workspace packages into `dist/`.
 
 ```bash
-mason chapter pack
+mason pack
 ```
 
-### `mason chapter proxy`
+### `mason proxy`
 
-Start the chapter MCP proxy server for a role.
+Start the MCP proxy server for a role.
 
 ```bash
-mason chapter proxy [options]
+mason proxy [options]
 ```
 
 | Option | Description |

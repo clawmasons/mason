@@ -2,10 +2,10 @@
  * Package Reader — reads an NPM role package and produces a Role object.
  *
  * Steps:
- * 1. Read package.json and verify chapter.type === "role"
+ * 1. Read package.json and verify the metadata field has type === "role"
  * 2. Read the bundled ROLE.md from the package directory
  * 3. Parse frontmatter and body (reuses parseFrontmatter from parser.ts)
- * 4. Normalize fields using dialect mapping if chapter.dialect is specified,
+ * 4. Normalize fields using dialect mapping if metadata.dialect is specified,
  *    otherwise use generic ROLE_TYPES field names directly
  * 5. Resolve all paths relative to the package directory
  * 6. Set source.type = 'package' and source.packageName
@@ -19,6 +19,7 @@ import type { Role } from "../types/role.js";
 import { parseFrontmatter } from "./parser.js";
 import { scanBundledResources } from "./resource-scanner.js";
 import { getDialect, type DialectEntry } from "./dialect-registry.js";
+import { CLI_NAME_LOWERCASE } from "../constants.js";
 
 /**
  * Error thrown when a role NPM package cannot be read.
@@ -55,10 +56,7 @@ export class PackageDependencyError extends Error {
 interface PackageJson {
   name: string;
   version?: string;
-  chapter?: {
-    type?: string;
-    dialect?: string;
-  };
+  [key: string]: unknown;
 }
 
 /**
@@ -79,15 +77,16 @@ const GENERIC_FIELD_MAPPING: DialectEntry = {
  *
  * @param packagePath - Absolute path to the package directory (e.g., node_modules/@acme/role-create-prd)
  * @returns Validated Role with source.type = 'package'
- * @throws PackageReadError if the package is missing required files or has wrong chapter.type
+ * @throws PackageReadError if the package is missing required files or has wrong metadata type
  */
 export async function readPackagedRole(packagePath: string): Promise<Role> {
   // 1. Read and validate package.json
   const pkgJson = await readPackageJson(packagePath);
+  const metadataField = pkgJson[CLI_NAME_LOWERCASE] as { type?: string; dialect?: string } | undefined;
 
-  if (!pkgJson.chapter || pkgJson.chapter.type !== "role") {
+  if (!metadataField || metadataField.type !== "role") {
     throw new PackageReadError(
-      `Package "${pkgJson.name}" does not have chapter.type = "role" (got: ${pkgJson.chapter?.type ?? "undefined"})`,
+      `Package "${pkgJson.name}" does not have ${CLI_NAME_LOWERCASE}.type = "role" (got: ${metadataField?.type ?? "undefined"})`,
       packagePath,
     );
   }
@@ -214,20 +213,21 @@ async function readPackageJson(packagePath: string): Promise<PackageJson> {
 
 /**
  * Resolve the dialect to use for field normalization.
- * If chapter.dialect is specified, use that dialect's mapping.
+ * If metadata.dialect is specified, use that dialect's mapping.
  * Otherwise, use generic ROLE_TYPES field names.
  */
 function resolveDialect(
   pkgJson: PackageJson,
   packagePath: string,
 ): DialectEntry {
-  const dialectName = pkgJson.chapter?.dialect;
+  const metadataField = pkgJson[CLI_NAME_LOWERCASE] as { dialect?: string } | undefined;
+  const dialectName = metadataField?.dialect;
   if (!dialectName) return GENERIC_FIELD_MAPPING;
 
   const dialect = getDialect(dialectName);
   if (!dialect) {
     throw new PackageReadError(
-      `Unknown dialect "${dialectName}" specified in chapter.dialect`,
+      `Unknown dialect "${dialectName}" specified in ${CLI_NAME_LOWERCASE}.dialect`,
       packagePath,
     );
   }
