@@ -21,7 +21,7 @@ import { matchesApprovalPattern, requestApproval } from "./hooks/approval.js";
 import type { ApprovalOptions } from "./hooks/approval.js";
 import { SessionStore, handleConnectAgent, type RiskLevel } from "./handlers/connect-agent.js";
 import { RelayServer } from "./relay/server.js";
-import { createRelayMessage, type CredentialResponseMessage, type McpToolsRegisterMessage, type McpToolsRegisteredMessage } from "./relay/messages.js";
+import { createRelayMessage, type CredentialResponseMessage, type McpToolResultMessage, type McpToolsRegisterMessage, type McpToolsRegisteredMessage } from "./relay/messages.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -40,6 +40,8 @@ export interface ProxyServerConfig {
   relayToken?: string;
   /** Timeout for credential requests in milliseconds. Default: 30000. */
   credentialRequestTimeoutMs?: number;
+  /** Timeout for host MCP tool calls in milliseconds. Default: 60000. */
+  hostToolCallTimeoutMs?: number;
   /** Agent's declared credential keys (for credential_request tool). */
   declaredCredentials?: string[];
   /** Role name for the agent session. */
@@ -481,6 +483,48 @@ export class ProxyServer {
           };
         }
         // approval === "approved" — fall through to upstream call
+      }
+
+      // Host route — forward tool call over relay to host proxy
+      if (route.isHostRoute) {
+        if (!relay || !relay.isConnected()) {
+          const msg = `Host tool call failed: Relay not connected`;
+          auditPostHook(ctx, pre, msg, "error", relay);
+          return {
+            content: [{ type: "text" as const, text: msg }],
+            isError: true,
+          };
+        }
+
+        try {
+          const mcpToolCallMsg = createRelayMessage("mcp_tool_call", {
+            app_name: route.appName,
+            tool_name: route.originalToolName,
+            arguments: args as Record<string, unknown> | undefined,
+          });
+
+          const timeoutMs = this.config.hostToolCallTimeoutMs ?? 60_000;
+          const response = await relay.request(mcpToolCallMsg, timeoutMs) as McpToolResultMessage;
+
+          if (response.error) {
+            auditPostHook(ctx, pre, response.error, "error", relay);
+            return {
+              content: [{ type: "text" as const, text: response.error }],
+              isError: true,
+            };
+          }
+
+          const result = response.result ?? { content: [] };
+          auditPostHook(ctx, pre, result, "success", relay);
+          return result;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          auditPostHook(ctx, pre, message, "error", relay);
+          return {
+            content: [{ type: "text" as const, text: message }],
+            isError: true,
+          };
+        }
       }
 
       try {

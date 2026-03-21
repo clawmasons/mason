@@ -7,7 +7,7 @@ import { Readable, Writable } from "node:stream";
 import { spawn } from "node:child_process";
 import { checkDockerCompose } from "./docker-utils.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
-import type { ResolvedAgent, Role } from "@clawmasons/shared";
+import type { ResolvedAgent, ResolvedApp, Role } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName } from "@clawmasons/shared";
 import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry, loadConfigAliasEntry } from "@clawmasons/agent-sdk";
@@ -513,6 +513,7 @@ export interface RunAgentDeps {
     proxyPort: number;
     relayToken: string;
     envCredentials: Record<string, string>;
+    hostApps?: ResolvedApp[];
   }) => Promise<{ stop: () => Promise<void> }>;
   /** Override proxy health check (for testing). */
   waitForProxyHealthFn?: (url: string, timeoutMs: number) => Promise<void>;
@@ -906,10 +907,11 @@ async function runAgentInteractiveMode(
     await waitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
     console.log(`  Proxy ready.`);
 
-    // 9. Collect env credentials and start host proxy in-process
+    // 9. Collect env credentials, partition apps, and start host proxy in-process
     const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
     const resolvedAgent = adaptRoleFn(roleType, agentType);
     const envCredentials = collectEnvCredentials(resolvedAgent);
+    const hostApps = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
 
     console.log(`  Starting host proxy (in-process)...`);
 
@@ -919,6 +921,7 @@ async function runAgentInteractiveMode(
         proxyPort,
         relayToken,
         envCredentials,
+        hostApps: hostApps.length > 0 ? hostApps : undefined,
       });
       console.log(`  Host proxy connected to Docker proxy.`);
     } catch (err) {
@@ -1099,7 +1102,13 @@ async function runAgentDevContainerMode(
     // 9. Start host proxy
     const resolvedAgent = adaptRoleFn(roleType, agentType);
     const envCredentials = collectEnvCredentials(resolvedAgent);
-    const hostProxyHandle = await startHostProxy({ proxyPort, relayToken, envCredentials });
+    const hostAppsDevContainer = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
+    const hostProxyHandle = await startHostProxy({
+      proxyPort,
+      relayToken,
+      envCredentials,
+      hostApps: hostAppsDevContainer.length > 0 ? hostAppsDevContainer : undefined,
+    });
     console.log(`  Host proxy connected.`);
 
     // 10. Build and start agent container in background (detached)
@@ -1424,11 +1433,13 @@ async function runAgentAcpMode(
     // ── Step 6b: Start host proxy in-process ──────────────────────────
     logger.log("[mason agent --acp] Starting host proxy (in-process)...");
     const startHostProxy = deps?.startHostProxyFn ?? defaultStartHostProxy;
+    const hostAppsAcp = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
 
     hostProxyHandle = await startHostProxy({
       proxyPort,
       relayToken: infraInfo.relayToken,
       envCredentials,
+      hostApps: hostAppsAcp.length > 0 ? hostAppsAcp : undefined,
     });
     logger.log("[mason agent --acp] Host proxy connected to Docker proxy.");
 
@@ -1506,12 +1517,14 @@ async function defaultStartHostProxy(opts: {
   proxyPort: number;
   relayToken: string;
   envCredentials: Record<string, string>;
+  hostApps?: ResolvedApp[];
 }): Promise<{ stop: () => Promise<void> }> {
   const hostProxy = new HostProxy({
     relayUrl: `ws://localhost:${opts.proxyPort}/ws/relay`,
     token: opts.relayToken,
     keychainService: "mason",
     envCredentials: opts.envCredentials,
+    hostApps: opts.hostApps,
   });
   await hostProxy.start();
   return { stop: () => hostProxy.stop() };
