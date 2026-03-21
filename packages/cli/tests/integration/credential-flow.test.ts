@@ -226,15 +226,6 @@ describe("credential flow integration", () => {
     expect(textContent.text).toContain("Invalid session token");
   });
 
-  it("audit log records credential requests", async () => {
-    const db = credentialService.getDatabase();
-    const entries = db
-      .prepare("SELECT * FROM credential_audit WHERE credential_key = 'TEST_TOKEN'")
-      .all() as Array<{ outcome: string; agent_id: string }>;
-
-    // Should have at least one granted entry from the full flow test
-    const granted = entries.filter((e) => e.outcome === "granted");
-    expect(granted.length).toBeGreaterThan(0);
-    expect(granted[0].agent_id).toBe("mcp-test");
-  });
+  // Note: Audit logging is now emitter-based (no SQLite).
+  // Audit emission is tested in credential service unit tests.
 });

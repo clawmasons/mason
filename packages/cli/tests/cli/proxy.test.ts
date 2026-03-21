@@ -23,9 +23,6 @@ vi.mock("@clawmasons/shared", async () => {
 vi.mock("@clawmasons/proxy", () => ({
   loadEnvFile: vi.fn(() => ({})),
   resolveEnvVars: vi.fn((env: Record<string, string>) => env),
-  openDatabase: vi.fn(() => ({
-    close: vi.fn(),
-  })),
   UpstreamManager: vi.fn().mockImplementation(() => ({
     initialize: vi.fn(),
     getTools: vi.fn(async () => []),

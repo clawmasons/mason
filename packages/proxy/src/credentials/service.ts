@@ -1,12 +1,6 @@
-import type BetterSqlite3 from "better-sqlite3";
 import type { CredentialRequest, CredentialResponse, CredentialServiceConfig } from "./schemas.js";
 import { CredentialResolver } from "./resolver.js";
-import {
-  openCredentialDatabase,
-  createSqliteAuditEmitter,
-  type AuditEmitter,
-  type CredentialAuditEntry,
-} from "./audit.js";
+import type { AuditEmitter, CredentialAuditEntry } from "./audit.js";
 
 /**
  * The credential service handles credential requests: validates access,
@@ -17,7 +11,6 @@ import {
  */
 export class CredentialService {
   private readonly resolver: CredentialResolver;
-  private readonly db: BetterSqlite3.Database;
   private readonly auditEmitter: AuditEmitter;
 
   constructor(
@@ -29,8 +22,7 @@ export class CredentialService {
       envFilePath: config.envFilePath,
       keychainService: config.keychainService,
     });
-    this.db = openCredentialDatabase(config.dbPath);
-    this.auditEmitter = auditEmitter ?? createSqliteAuditEmitter(this.db);
+    this.auditEmitter = auditEmitter ?? (() => {});
   }
 
   /**
@@ -94,17 +86,11 @@ export class CredentialService {
   }
 
   /**
-   * Close the database connection.
+   * Close the credential service.
+   * No-op since SQLite has been removed — retained for API compatibility.
    */
   close(): void {
-    this.db.close();
-  }
-
-  /**
-   * Get the underlying database (for testing/querying audit entries).
-   */
-  getDatabase(): BetterSqlite3.Database {
-    return this.db;
+    // No-op — no database to close
   }
 
   private audit(

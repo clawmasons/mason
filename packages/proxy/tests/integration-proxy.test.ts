@@ -5,6 +5,10 @@
  *   UpstreamManager → ToolRouter → ProxyServer → MCP Client
  *
  * Uses @modelcontextprotocol/server-filesystem as the upstream via stdio.
+ *
+ * Note: Audit logging is now relay-based (audit_event messages). Since
+ * no relay is connected in this integration test, audit events are
+ * silently dropped. Audit behavior is tested in hooks/audit.test.ts.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -17,8 +21,6 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { ProxyServer } from "../src/server.js";
 import { UpstreamManager } from "../src/upstream.js";
 import { ToolRouter } from "../src/router.js";
-import { openDatabase, queryAuditLog } from "../src/db.js";
-import type Database from "better-sqlite3";
 import type { ResolvedApp, ToolFilter } from "@clawmasons/shared";
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -30,8 +32,6 @@ const AGENT_NAME = "integration-test";
 // ── Shared State ───────────────────────────────────────────────────────
 
 let tmpDir: string;
-let dbPath: string;
-let db: Database.Database;
 let upstream: UpstreamManager;
 let router: ToolRouter;
 let server: ProxyServer;
@@ -48,11 +48,7 @@ beforeAll(async () => {
   // Seed a test file so we can verify reads
   writeFileSync(join(tmpDir, "hello.txt"), "Hello from mason integration test");
 
-  // 2. Open temp SQLite database
-  dbPath = join(tmpDir, "mason-test.db");
-  db = openDatabase(dbPath);
-
-  // 3. Configure UpstreamManager with real filesystem server
+  // 2. Configure UpstreamManager with real filesystem server
   const filesystemApp: ResolvedApp = {
     name: APP_NAME,
     version: "0.0.0",
@@ -67,7 +63,7 @@ beforeAll(async () => {
   upstream = new UpstreamManager([{ name: APP_NAME, app: filesystemApp }]);
   await upstream.initialize(30_000);
 
-  // 4. Discover tools from upstream and build router
+  // 3. Discover tools from upstream and build router
   const upstreamTools = new Map<string, Tool[]>();
   const tools = await upstream.getTools(APP_NAME);
   upstreamTools.set(APP_NAME, tools);
@@ -77,18 +73,17 @@ beforeAll(async () => {
   ]);
   router = new ToolRouter(upstreamTools, toolFilters);
 
-  // 5. Start ProxyServer
+  // 4. Start ProxyServer (no relay/db — audit events silently dropped)
   server = new ProxyServer({
     port: TEST_PORT,
     transport: "streamable-http",
     router,
     upstream,
-    db,
     agentName: AGENT_NAME,
   });
   await server.start();
 
-  // 6. Connect MCP client
+  // 5. Connect MCP client
   client = new Client({ name: "integration-test-client", version: "0.1.0" });
   const transport = new StreamableHTTPClientTransport(
     new URL(`http://localhost:${TEST_PORT}/mcp`),
@@ -100,7 +95,6 @@ afterAll(async () => {
   try { await client?.close(); } catch { /* ignore */ }
   try { await server?.stop(); } catch { /* ignore */ }
   try { await upstream?.shutdown(); } catch { /* ignore */ }
-  try { db?.close(); } catch { /* ignore */ }
   try {
     if (tmpDir && existsSync(tmpDir)) {
       rmSync(tmpDir, { recursive: true, force: true });
@@ -174,8 +168,8 @@ describe("Mason Proxy Integration", () => {
     expect(text).toContain(testContent);
   });
 
-  // Scenario 4: Unknown tool returns error + audit log "denied"
-  it("tools/call with unknown tool returns isError and logs denied", async () => {
+  // Scenario 4: Unknown tool returns error
+  it("tools/call with unknown tool returns isError", async () => {
     const result = await client.callTool({
       name: "nonexistent_tool",
     });
@@ -184,108 +178,12 @@ describe("Mason Proxy Integration", () => {
     expect(result.content).toEqual([
       { type: "text", text: "Unknown tool: nonexistent_tool" },
     ]);
-
-    // Verify audit log
-    const entries = queryAuditLog(db);
-    const denied = entries.find(
-      (e) => e.tool_name === "nonexistent_tool" && e.status === "denied",
-    );
-    expect(denied).toBeDefined();
-    expect(denied!.agent_name).toBe(AGENT_NAME);
   });
 
-  // Scenario 5: Audit log populated after successful tool call
-  it("audit log contains entries for successful tool calls", async () => {
-    const entries = queryAuditLog(db);
-    const successEntries = entries.filter((e) => e.status === "success");
-    expect(successEntries.length).toBeGreaterThan(0);
-
-    const entry = successEntries[0]!;
-    expect(entry.agent_name).toBe(AGENT_NAME);
-    expect(entry.app_name).toBe(APP_NAME);
-    expect(entry.duration_ms).toBeGreaterThanOrEqual(0);
-    expect(entry.tool_name).toBeTruthy();
-  });
-});
-
-// ── Approval Workflow Tests (separate server instance) ─────────────────
-
-describe("Mason Proxy Integration — Approval Workflow", () => {
-  let approvalServer: ProxyServer;
-  let approvalClient: Client;
-  let approvalDb: Database.Database;
-  const APPROVAL_PORT = TEST_PORT + 1;
-
-  beforeAll(async () => {
-    // Use a separate DB for approval tests to avoid interference
-    const approvalDbPath = join(tmpDir, "mason-approval-test.db");
-    approvalDb = openDatabase(approvalDbPath);
-
-    approvalServer = new ProxyServer({
-      port: APPROVAL_PORT,
-      transport: "streamable-http",
-      router,
-      upstream,
-      db: approvalDb,
-      agentName: AGENT_NAME,
-      approvalPatterns: ["filesystem_write_*"],
-      approvalOptions: { ttlSeconds: 1, pollIntervalMs: 50 },
-    });
-    await approvalServer.start();
-
-    approvalClient = new Client({ name: "approval-test-client", version: "0.1.0" });
-    const transport = new StreamableHTTPClientTransport(
-      new URL(`http://localhost:${APPROVAL_PORT}/mcp`),
-    );
-    await approvalClient.connect(transport);
-  }, 30_000);
-
-  afterAll(async () => {
-    try { await approvalClient?.close(); } catch { /* ignore */ }
-    try { await approvalServer?.stop(); } catch { /* ignore */ }
-    try { approvalDb?.close(); } catch { /* ignore */ }
-  });
-
-  // Scenario 6: Approval-required tool auto-denies after TTL
-  it("approval-required tool times out and auto-denies", async () => {
-    const result = await approvalClient.callTool({
-      name: "filesystem_write_file",
-      arguments: { path: join(tmpDir, "blocked.txt"), content: "should not write" },
-    });
-
-    expect(result.isError).toBe(true);
-    const text = (result.content as Array<{ type: string; text: string }>)[0]!.text;
-    expect(text).toContain("timed out");
-
-    // Verify audit log shows timeout
-    const entries = queryAuditLog(approvalDb);
-    const timeoutEntry = entries.find((e) => e.status === "timeout");
-    expect(timeoutEntry).toBeDefined();
-    expect(timeoutEntry!.tool_name).toBe("write_file");
-
-    // Verify the file was NOT written
-    expect(existsSync(join(tmpDir, "blocked.txt"))).toBe(false);
-  }, 15_000);
-
-  // Non-matching tool proceeds without approval
-  it("non-matching tool proceeds without approval", async () => {
-    const result = await approvalClient.callTool({
-      name: "filesystem_read_file",
-      arguments: { path: join(tmpDir, "hello.txt") },
-    });
-
-    expect(result.isError).toBeFalsy();
-    const text = (result.content as Array<{ type: string; text: string }>)
-      .filter((c) => c.type === "text")
-      .map((c) => c.text)
-      .join("");
-    expect(text).toContain("Hello from mason integration test");
-  });
-
-  // Scenario 7 (partial): Clean shutdown
+  // Scenario 5: Clean shutdown
   it("proxy server shuts down cleanly", async () => {
     // Create a second server to test shutdown without affecting other tests
-    const shutdownPort = APPROVAL_PORT + 1;
+    const shutdownPort = TEST_PORT + 1;
     const shutdownServer = new ProxyServer({
       port: shutdownPort,
       transport: "streamable-http",

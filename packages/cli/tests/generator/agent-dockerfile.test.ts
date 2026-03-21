@@ -499,11 +499,12 @@ describe("generateProxyDockerfile", () => {
     expect(result).toContain("getent group $HOST_GID");
   });
 
-  it("installs build tools for native addons", () => {
+  it("does not install native build tools (no native addons needed)", () => {
     const agent = makeNoteTakerAgent();
     const result = generateProxyDockerfile(agent.roles[0], agent.name);
 
-    expect(result).toContain("python3 make g++");
+    expect(result).not.toContain("python3 make g++");
+    expect(result).not.toContain("better-sqlite3");
   });
 
   it("uses bundled proxy entry point with agent name", () => {

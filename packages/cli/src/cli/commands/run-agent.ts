@@ -1436,7 +1436,7 @@ async function runAgentAcpMode(
       envCredentials,
     });
     credentialWsClient = { disconnect: credServiceHandle.disconnect } as CredentialWSClient;
-    credentialService = { close: credServiceHandle.close } as CredentialService;
+    credentialService = { close: credServiceHandle.close } as unknown as CredentialService;
     logger.log("[mason agent --acp] Credential service connected to proxy.");
 
     // ── Step 7: Create and start ACP SDK bridge ──────────────────────

@@ -1,8 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { auditPreHook, auditPostHook, logDroppedServers } from "../../src/hooks/audit.js";
 import type { HookContext } from "../../src/hooks/audit.js";
-import { openDatabase, queryAuditLog } from "../../src/db.js";
-import type Database from "better-sqlite3";
+import type { RelayServer } from "../../src/relay/server.js";
 
 // ── Fixtures ────────────────────────────────────────────────────────────
 
@@ -16,6 +15,17 @@ function makeContext(overrides?: Partial<HookContext>): HookContext {
     arguments: { title: "Fix bug" },
     ...overrides,
   };
+}
+
+function createMockRelay(connected = true): RelayServer {
+  return {
+    send: vi.fn(),
+    request: vi.fn(),
+    isConnected: vi.fn(() => connected),
+    handleUpgrade: vi.fn(),
+    registerHandler: vi.fn(),
+    shutdown: vi.fn(),
+  } as unknown as RelayServer;
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────
@@ -41,52 +51,47 @@ describe("auditPreHook", () => {
 });
 
 describe("auditPostHook", () => {
-  let db: Database.Database;
-
-  beforeEach(() => {
-    db = openDatabase(":memory:");
-  });
-
-  afterEach(() => {
-    db.close();
-  });
-
-  it("writes a success audit entry with all fields", () => {
+  it("sends an audit_event message via relay", () => {
+    const relay = createMockRelay();
     const ctx = makeContext();
     const pre = { id: "test-id-1", startTime: Date.now() - 50 };
     const result = { content: [{ type: "text", text: "PR #42 created" }] };
 
-    auditPostHook(ctx, pre, result, "success", db);
+    auditPostHook(ctx, pre, result, "success", relay);
 
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-
-    const entry = entries[0];
-    expect(entry.id).toBe("test-id-1");
-    expect(entry.agent_name).toBe("note-taker");
-    expect(entry.role_name).toBe("writer");
-    expect(entry.app_name).toBe("@clawmasons/app-github");
-    expect(entry.tool_name).toBe("create_pr");
-    expect(entry.arguments).toBe(JSON.stringify({ title: "Fix bug" }));
-    expect(entry.result).toBe(JSON.stringify(result));
-    expect(entry.status).toBe("success");
-    expect(entry.duration_ms).toBeGreaterThanOrEqual(0);
-    expect(entry.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(relay.send).toHaveBeenCalledTimes(1);
+    const msg = vi.mocked(relay.send).mock.calls[0][0];
+    expect(msg.type).toBe("audit_event");
+    if (msg.type === "audit_event") {
+      expect(msg.agent_name).toBe("note-taker");
+      expect(msg.role_name).toBe("writer");
+      expect(msg.app_name).toBe("@clawmasons/app-github");
+      expect(msg.tool_name).toBe("create_pr");
+      expect(msg.arguments).toBe(JSON.stringify({ title: "Fix bug" }));
+      expect(msg.result).toBe(JSON.stringify(result));
+      expect(msg.status).toBe("success");
+      expect(msg.duration_ms).toBeGreaterThanOrEqual(0);
+      expect(msg.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    }
   });
 
-  it("writes an error audit entry", () => {
+  it("sends an error audit event", () => {
+    const relay = createMockRelay();
     const ctx = makeContext();
     const pre = { id: "test-id-2", startTime: Date.now() - 10 };
 
-    auditPostHook(ctx, pre, "Connection refused", "error", db);
+    auditPostHook(ctx, pre, "Connection refused", "error", relay);
 
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].status).toBe("error");
-    expect(entries[0].result).toBe(JSON.stringify("Connection refused"));
+    const msg = vi.mocked(relay.send).mock.calls[0][0];
+    expect(msg.type).toBe("audit_event");
+    if (msg.type === "audit_event") {
+      expect(msg.status).toBe("error");
+      expect(msg.result).toBe(JSON.stringify("Connection refused"));
+    }
   });
 
-  it("writes a denied audit entry", () => {
+  it("sends a denied audit event", () => {
+    const relay = createMockRelay();
     const ctx = makeContext({
       appName: "unknown",
       toolName: "github_delete_repo",
@@ -94,62 +99,55 @@ describe("auditPostHook", () => {
     });
     const pre = { id: "test-id-3", startTime: Date.now() };
 
-    auditPostHook(ctx, pre, "Unknown tool: github_delete_repo", "denied", db);
+    auditPostHook(ctx, pre, "Unknown tool: github_delete_repo", "denied", relay);
 
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].status).toBe("denied");
-    expect(entries[0].duration_ms).toBeGreaterThanOrEqual(0);
+    const msg = vi.mocked(relay.send).mock.calls[0][0];
+    expect(msg.type).toBe("audit_event");
+    if (msg.type === "audit_event") {
+      expect(msg.status).toBe("denied");
+    }
   });
 
   it("computes duration_ms from startTime", () => {
+    const relay = createMockRelay();
     const ctx = makeContext();
     const pre = { id: "test-id-4", startTime: Date.now() - 100 };
 
-    auditPostHook(ctx, pre, null, "success", db);
+    auditPostHook(ctx, pre, null, "success", relay);
 
-    const entries = queryAuditLog(db);
-    expect(entries[0].duration_ms).toBeGreaterThanOrEqual(100);
-  });
-
-  it("JSON-stringifies arguments and result", () => {
-    const ctx = makeContext({ arguments: { path: "/tmp", recursive: true } });
-    const pre = { id: "test-id-5", startTime: Date.now() };
-    const result = { content: [{ type: "text", text: "done" }] };
-
-    auditPostHook(ctx, pre, result, "success", db);
-
-    const entries = queryAuditLog(db);
-    expect(JSON.parse(entries[0].arguments!)).toEqual({
-      path: "/tmp",
-      recursive: true,
-    });
-    expect(JSON.parse(entries[0].result!)).toEqual(result);
+    const msg = vi.mocked(relay.send).mock.calls[0][0];
+    if (msg.type === "audit_event") {
+      expect(msg.duration_ms).toBeGreaterThanOrEqual(100);
+    }
   });
 
   it("handles undefined arguments gracefully", () => {
+    const relay = createMockRelay();
     const ctx = makeContext({ arguments: undefined });
     const pre = { id: "test-id-6", startTime: Date.now() };
 
-    auditPostHook(ctx, pre, null, "success", db);
+    auditPostHook(ctx, pre, null, "success", relay);
 
-    const entries = queryAuditLog(db);
-    expect(entries[0].arguments).toBeNull();
-    expect(entries[0].result).toBeNull();
+    const msg = vi.mocked(relay.send).mock.calls[0][0];
+    if (msg.type === "audit_event") {
+      expect(msg.arguments).toBeUndefined();
+      expect(msg.result).toBeUndefined();
+    }
   });
 
-  it("swallows database write errors without throwing", () => {
+  it("swallows relay send errors without throwing", () => {
+    const relay = createMockRelay();
+    vi.mocked(relay.send).mockImplementation(() => {
+      throw new Error("Relay not connected");
+    });
+
     const ctx = makeContext();
     const pre = { id: "test-id-7", startTime: Date.now() };
 
-    // Close db to force an error
-    db.close();
-
     const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    // Should not throw
     expect(() => {
-      auditPostHook(ctx, pre, null, "success", db);
+      auditPostHook(ctx, pre, null, "success", relay);
     }).not.toThrow();
 
     expect(stderrSpy).toHaveBeenCalledWith(
@@ -157,146 +155,87 @@ describe("auditPostHook", () => {
     );
 
     stderrSpy.mockRestore();
-
-    // Reopen db for afterEach cleanup
-    db = openDatabase(":memory:");
   });
 
-  // ── ACP Session Metadata ────────────────────────────────────────────
-
-  it("writes session_type and acp_client when provided in context", () => {
-    const ctx = makeContext({ sessionType: "acp", acpClient: "zed" });
-    const pre = { id: "test-acp-1", startTime: Date.now() - 10 };
-
-    auditPostHook(ctx, pre, null, "success", db);
-
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].session_type).toBe("acp");
-    expect(entries[0].acp_client).toBe("zed");
-  });
-
-  it("writes null session_type and acp_client when not provided (backward compat)", () => {
+  it("does nothing when relay is null", () => {
     const ctx = makeContext();
-    const pre = { id: "test-acp-2", startTime: Date.now() };
+    const pre = { id: "test-id-8", startTime: Date.now() };
 
-    auditPostHook(ctx, pre, null, "success", db);
-
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].session_type).toBeNull();
-    expect(entries[0].acp_client).toBeNull();
-  });
-
-  it("writes session_type without acp_client", () => {
-    const ctx = makeContext({ sessionType: "acp" });
-    const pre = { id: "test-acp-3", startTime: Date.now() };
-
-    auditPostHook(ctx, pre, null, "success", db);
-
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].session_type).toBe("acp");
-    expect(entries[0].acp_client).toBeNull();
+    // Should not throw
+    expect(() => {
+      auditPostHook(ctx, pre, null, "success", null);
+    }).not.toThrow();
   });
 });
 
 // ── logDroppedServers ──────────────────────────────────────────────────
 
 describe("logDroppedServers", () => {
-  let db: Database.Database;
-
-  beforeEach(() => {
-    db = openDatabase(":memory:");
-  });
-
-  afterEach(() => {
-    db.close();
-  });
-
-  it("logs each dropped server as an audit entry with status 'dropped'", () => {
+  it("logs each dropped server as an audit_event with status 'dropped'", () => {
+    const relay = createMockRelay();
     const unmatched = [
       { name: "personal-notes", reason: "No matching App found for server name" },
       { name: "my-custom-tool", reason: "No matching App found for server name" },
     ];
 
-    logDroppedServers(db, unmatched, "note-taker", "writer", "zed");
+    logDroppedServers(relay, unmatched, "note-taker", "writer", "zed");
 
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(2);
+    expect(relay.send).toHaveBeenCalledTimes(2);
 
-    // Entries are in DESC order by timestamp; both have same timestamp so order may vary
-    const names = entries.map((e) => e.app_name).sort();
-    expect(names).toEqual(["my-custom-tool", "personal-notes"]);
-
-    for (const entry of entries) {
-      expect(entry.status).toBe("dropped");
-      expect(entry.session_type).toBe("acp");
-      expect(entry.acp_client).toBe("zed");
-      expect(entry.agent_name).toBe("note-taker");
-      expect(entry.role_name).toBe("writer");
-      expect(entry.duration_ms).toBe(0);
-      expect(entry.tool_name).toBe(entry.app_name);
+    const messages = vi.mocked(relay.send).mock.calls.map((c) => c[0]);
+    for (const msg of messages) {
+      expect(msg.type).toBe("audit_event");
+      if (msg.type === "audit_event") {
+        expect(msg.status).toBe("dropped");
+        expect(msg.agent_name).toBe("note-taker");
+        expect(msg.role_name).toBe("writer");
+        expect(msg.duration_ms).toBe(0);
+      }
     }
+
+    const names = messages.map((m) => m.type === "audit_event" ? m.app_name : "").sort();
+    expect(names).toEqual(["my-custom-tool", "personal-notes"]);
   });
 
   it("includes the drop reason in the result field", () => {
+    const relay = createMockRelay();
     const unmatched = [
       { name: "personal-notes", reason: "No matching App found for server name" },
     ];
 
-    logDroppedServers(db, unmatched, "note-taker", "writer");
+    logDroppedServers(relay, unmatched, "note-taker", "writer");
 
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(JSON.parse(entries[0].result!)).toBe("No matching App found for server name");
+    const msg = vi.mocked(relay.send).mock.calls[0][0];
+    if (msg.type === "audit_event") {
+      expect(JSON.parse(msg.result!)).toBe("No matching App found for server name");
+    }
   });
 
   it("handles empty unmatched list (no-op)", () => {
-    logDroppedServers(db, [], "note-taker", "writer");
+    const relay = createMockRelay();
+    logDroppedServers(relay, [], "note-taker", "writer");
 
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(0);
+    expect(relay.send).not.toHaveBeenCalled();
   });
 
-  it("writes acp_client as null when not provided", () => {
-    const unmatched = [
-      { name: "personal-notes", reason: "No match" },
-    ];
-
-    logDroppedServers(db, unmatched, "note-taker", "writer");
-
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].acp_client).toBeNull();
-    expect(entries[0].session_type).toBe("acp");
+  it("does nothing when relay is null", () => {
+    // Should not throw
+    expect(() => {
+      logDroppedServers(null, [{ name: "notes", reason: "no match" }], "agent", "role");
+    }).not.toThrow();
   });
 
-  it("can be filtered by session_type", () => {
-    // Log a dropped server (acp session)
-    logDroppedServers(db, [{ name: "notes", reason: "no match" }], "agent", "role");
-
-    // Log a regular tool call (no session type)
-    const ctx = makeContext();
-    const pre = { id: "regular-1", startTime: Date.now() };
-    auditPostHook(ctx, pre, null, "success", db);
-
-    const acpEntries = queryAuditLog(db, { session_type: "acp" });
-    expect(acpEntries).toHaveLength(1);
-    expect(acpEntries[0].status).toBe("dropped");
-
-    const allEntries = queryAuditLog(db);
-    expect(allEntries).toHaveLength(2);
-  });
-
-  it("swallows database errors without throwing", () => {
-    db.close();
+  it("swallows relay errors without throwing", () => {
+    const relay = createMockRelay();
+    vi.mocked(relay.send).mockImplementation(() => {
+      throw new Error("Relay not connected");
+    });
 
     const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     expect(() => {
       logDroppedServers(
-        db,
+        relay,
         [{ name: "notes", reason: "no match" }],
         "agent",
         "role",
@@ -308,8 +247,5 @@ describe("logDroppedServers", () => {
     );
 
     stderrSpy.mockRestore();
-
-    // Reopen for afterEach cleanup
-    db = openDatabase(":memory:");
   });
 });
