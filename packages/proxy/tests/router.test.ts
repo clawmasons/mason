@@ -253,6 +253,102 @@ describe("ToolRouter.resolve", () => {
   });
 });
 
+// ── ToolRouter.addRoutes ─────────────────────────────────────────────────
+
+describe("ToolRouter.addRoutes", () => {
+  it("adds tools dynamically to listTools()", () => {
+    const router = new ToolRouter(new Map(), new Map());
+    expect(router.listTools()).toHaveLength(0);
+
+    router.addRoutes("@acme/app-xcode", [
+      makeTool("run_simulator"),
+      makeTool("list_devices"),
+    ]);
+
+    const tools = router.listTools();
+    expect(tools).toHaveLength(2);
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      "xcode_list_devices",
+      "xcode_run_simulator",
+    ]);
+  });
+
+  it("marks entries with isHostRoute: true", () => {
+    const router = new ToolRouter(new Map(), new Map());
+
+    router.addRoutes("@acme/app-xcode", [makeTool("run_simulator")]);
+
+    const entry = router.resolve("xcode_run_simulator");
+    expect(entry).not.toBeNull();
+    expect(entry!.isHostRoute).toBe(true);
+    expect(entry!.appName).toBe("@acme/app-xcode");
+    expect(entry!.appShortName).toBe("xcode");
+    expect(entry!.originalToolName).toBe("run_simulator");
+  });
+
+  it("throws on duplicate prefixed tool names", () => {
+    const upstreamTools = new Map<string, Tool[]>([
+      ["@clawmasons/app-github", [makeTool("create_pr")]],
+    ]);
+    const filters = new Map<string, ToolFilter>([
+      ["@clawmasons/app-github", makeFilter(["create_pr"])],
+    ]);
+    const router = new ToolRouter(upstreamTools, filters);
+
+    expect(() =>
+      router.addRoutes("@other/app-github", [makeTool("create_pr")]),
+    ).toThrow(/Duplicate prefixed tool name "github_create_pr"/);
+  });
+
+  it("handles empty tools array as a no-op", () => {
+    const router = new ToolRouter(new Map(), new Map());
+
+    router.addRoutes("@acme/app-xcode", []);
+
+    expect(router.listTools()).toHaveLength(0);
+  });
+
+  it("resolve() returns dynamically added routes", () => {
+    const router = new ToolRouter(new Map(), new Map());
+
+    router.addRoutes("@acme/app-xcode", [makeTool("run_simulator")]);
+
+    const entry = router.resolve("xcode_run_simulator");
+    expect(entry).not.toBeNull();
+    expect(entry!.appName).toBe("@acme/app-xcode");
+    expect(entry!.originalToolName).toBe("run_simulator");
+    expect(entry!.prefixedToolName).toBe("xcode_run_simulator");
+    expect(entry!.tool.name).toBe("xcode_run_simulator");
+  });
+
+  it("coexists with constructor-built routes", () => {
+    const upstreamTools = new Map<string, Tool[]>([
+      ["@clawmasons/app-github", [makeTool("create_pr")]],
+    ]);
+    const filters = new Map<string, ToolFilter>([
+      ["@clawmasons/app-github", makeFilter(["create_pr"])],
+    ]);
+    const router = new ToolRouter(upstreamTools, filters);
+
+    router.addRoutes("@acme/app-xcode", [makeTool("run_simulator")]);
+
+    const tools = router.listTools();
+    expect(tools).toHaveLength(2);
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      "github_create_pr",
+      "xcode_run_simulator",
+    ]);
+
+    // Constructor route should not have isHostRoute
+    const githubEntry = router.resolve("github_create_pr");
+    expect(githubEntry!.isHostRoute).toBeUndefined();
+
+    // Dynamic route should have isHostRoute
+    const xcodeEntry = router.resolve("xcode_run_simulator");
+    expect(xcodeEntry!.isHostRoute).toBe(true);
+  });
+});
+
 // ── ResourceRouter ──────────────────────────────────────────────────────
 
 function makeResource(name: string, uri: string, description?: string): Resource {

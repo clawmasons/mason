@@ -325,7 +325,10 @@ The host proxy starts MCP servers declared with `location: "host"`, discovers th
 
 **Testable output:** Host proxy starts mock MCP server → discovers tools → sends `mcp_tools_register` → Docker proxy creates stub routes → `tools/list` includes host tools with correct prefixing. `mcp_tools_registered` confirmation sent back. `npx tsc --noEmit` compiles. `npx vitest run packages/proxy/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — [Archived spec](../../changes/archive/2026-03-21-host-mcp-lifecycle/)
+- [Proposal](../../changes/archive/2026-03-21-host-mcp-lifecycle/proposal.md)
+- [Design](../../changes/archive/2026-03-21-host-mcp-lifecycle/design.md)
+- [Tasks](../../changes/archive/2026-03-21-host-mcp-lifecycle/tasks.md)
 
 ---
 
