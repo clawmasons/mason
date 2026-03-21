@@ -114,8 +114,8 @@ function resolveSourceDialect(source: string): AgentPackage | undefined {
 /** Canonical mason task config for roles stored in .mason/tasks/. */
 const MASON_TASK_CONFIG: AgentTaskConfig = {
   projectFolder: ".mason/tasks",
-  nameFormat: "{scopeKebab}-{taskName}.md",
-  scopeFormat: "kebab-case-prefix",
+  nameFormat: "{scopePath}/{taskName}.md",
+  scopeFormat: "path",
   supportedFields: "all",
   prompt: "markdown-body",
 };

@@ -158,13 +158,14 @@ function aggregatePermissions(
 }
 
 function adaptTask(task: TaskRef): ResolvedTask {
-  const colonIdx = task.name.lastIndexOf(":");
+  const normalized = task.name.replace(/\//g, ":");
+  const colonIdx = normalized.lastIndexOf(":");
   if (colonIdx === -1) {
-    return { name: task.name, version: "0.0.0" };
+    return { name: normalized, version: "0.0.0" };
   }
   return {
-    name: task.name.slice(colonIdx + 1),
-    scope: task.name.slice(0, colonIdx),
+    name: normalized.slice(colonIdx + 1),
+    scope: normalized.slice(0, colonIdx),
     version: "0.0.0",
   };
 }

@@ -44,8 +44,8 @@ const piConfig: AgentTaskConfig = {
 
 const allFieldsConfig: AgentTaskConfig = {
   projectFolder: ".mason/tasks",
-  nameFormat: "{scopeKebab}-{taskName}.md",
-  scopeFormat: "kebab-case-prefix",
+  nameFormat: "{scopePath}/{taskName}.md",
+  scopeFormat: "path",
   supportedFields: "all",
   prompt: "markdown-body",
 };
