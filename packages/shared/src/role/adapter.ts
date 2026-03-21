@@ -182,6 +182,7 @@ function adaptApp(app: AppConfig): ResolvedApp {
     tools: [...(app.tools?.allow ?? [])],
     capabilities: [],
     credentials: [...(app.credentials ?? [])],
+    location: app.location ?? "proxy",
   };
 }
 

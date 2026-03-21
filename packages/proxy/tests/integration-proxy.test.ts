@@ -58,6 +58,7 @@ beforeAll(async () => {
     tools: ["read_file", "write_file", "list_directory", "create_directory"],
     capabilities: [],
     credentials: [],
+    location: "proxy",
   };
 
   upstream = new UpstreamManager([{ name: APP_NAME, app: filesystemApp }]);

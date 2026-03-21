@@ -40,6 +40,7 @@ function makeTestRole(): Role {
           deny: ["delete_repo"],
         },
         credentials: ["GITHUB_TOKEN"],
+        location: "proxy",
       },
     ],
     skills: [

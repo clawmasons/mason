@@ -297,7 +297,11 @@ Add the `location` field to the app config schema and `ResolvedApp` type to dist
 
 **Testable output:** Schema validates `{ location: "host" }` and `{ location: "proxy" }`. Omitting `location` defaults to `"proxy"`. Schema rejects `{ location: "invalid" }`. `ResolvedApp` type includes `location`. `npx tsc --noEmit` compiles. `npx vitest run packages/shared/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — [Archived spec](../../changes/archive/2026-03-21-host-mcp-location-field/)
+- [Proposal](../../changes/archive/2026-03-21-host-mcp-location-field/proposal.md)
+- [Design](../../changes/archive/2026-03-21-host-mcp-location-field/design.md)
+- [Tasks](../../changes/archive/2026-03-21-host-mcp-location-field/tasks.md)
+- [Spec: host-mcp-location-field](../../changes/archive/2026-03-21-host-mcp-location-field/specs/host-mcp-location-field/spec.md)
 
 ---
 
