@@ -167,6 +167,7 @@ export async function readPackagedRole(packagePath: string): Promise<Role> {
     source: {
       type: "package" as const,
       packageName: pkgJson.name,
+      path: packagePath,
     },
   };
 

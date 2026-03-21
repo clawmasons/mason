@@ -1,6 +1,7 @@
 // Types
 export type {
   AgentPackage,
+  AgentTaskConfig,
   DockerfileConfig,
   AcpConfig,
   RuntimeConfig,
@@ -18,6 +19,8 @@ export {
   collectAllTasks,
   generateAgentLaunchJson,
   generateSkillReadme,
+  readTasks,
+  materializeTasks,
 } from "./helpers.js";
 export type { LaunchCredentialConfig } from "./helpers.js";
 

@@ -76,6 +76,25 @@ export interface RuntimeMaterializer {
   ): MaterializationResult;
 }
 
+// ── Agent Task Config ──
+
+/**
+ * Declarative configuration for how an agent stores task files.
+ * Drives both readTasks() and materializeTasks() in the SDK.
+ */
+export interface AgentTaskConfig {
+  /** Folder where task files live, relative to workspace root (e.g., ".claude/commands"). */
+  projectFolder: string;
+  /** File name template. Tokens: {scopePath}, {scopeKebab}, {taskName} */
+  nameFormat: string;
+  /** How scope is encoded in the file system. */
+  scopeFormat: "path" | "kebab-case-prefix";
+  /** Which ResolvedTask fields map to YAML frontmatter. "all" or array of field names/mappings (e.g., "name->displayName"). */
+  supportedFields: "all" | Array<string>;
+  /** Where the prompt content is stored in the file. */
+  prompt: "markdown-body";
+}
+
 // ── Agent Package Types ──
 
 /**
@@ -143,4 +162,7 @@ export interface AgentPackage {
 
   /** Runtime command configuration for agent-launch.json. */
   runtime?: RuntimeConfig;
+
+  /** Declarative task file layout config. Drives readTasks() and materializeTasks(). */
+  tasks?: AgentTaskConfig;
 }

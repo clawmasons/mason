@@ -42,14 +42,8 @@ function buildRoleFixture(): Map<string, DiscoveredPackage> {
   // Tasks
   packages.set("@clawmasons/task-triage-issue", makePkg("@clawmasons/task-triage-issue", "0.3.1", {
     type: "task",
-    taskType: "subagent",
     prompt: "./prompts/triage.md",
-    requires: {
-      apps: ["@clawmasons/app-github"],
-      skills: ["@clawmasons/skill-labeling"],
-    },
-    timeout: "5m",
-    approval: "auto",
+    description: "Triage incoming issues",
   }));
 
   // Roles

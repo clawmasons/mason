@@ -44,15 +44,7 @@ function makeTriageTask(): ResolvedTask {
   return {
     name: "@clawmasons/task-triage-issue",
     version: "0.3.1",
-    taskType: "subagent",
     prompt: "./prompts/triage.md",
-    timeout: "5m",
-    approval: "auto",
-    requiredApps: ["@clawmasons/app-github"],
-    requiredSkills: ["@clawmasons/skill-labeling"],
-    apps: [makeGithubApp()],
-    skills: [makeLabelingSkill()],
-    subTasks: [],
   };
 }
 
@@ -60,12 +52,7 @@ function makeReviewTask(): ResolvedTask {
   return {
     name: "@clawmasons/task-review-pr",
     version: "1.0.0",
-    taskType: "subagent",
     prompt: "./prompts/review.md",
-    requiredApps: ["@clawmasons/app-github"],
-    apps: [makeGithubApp()],
-    skills: [],
-    subTasks: [],
   };
 }
 
@@ -258,45 +245,19 @@ describe("piCodingAgentMaterializer", () => {
         expect(indexTs).toContain('name: "review-pr"');
       });
 
-      it("includes role context in command prompt", () => {
+      it("includes task name and version in command description", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
-        expect(indexTs).toContain("role: issue-manager");
-        expect(indexTs).toContain("github: create_issue, list_repos, add_label");
+        expect(indexTs).toContain("@clawmasons/task-triage-issue@0.3.1");
       });
 
-      it("includes skill references in command prompt when task has skills", () => {
+      it("includes prompt in command prompt field", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
-        expect(indexTs).toContain("Required Skills");
-        expect(indexTs).toContain("skills/labeling/");
-      });
-
-      it("omits skills section in command prompt when task has no skills", () => {
-        const agent = makePiAgent();
-        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
-        // Find the review-pr command block
-        const reviewPrIndex = indexTs.indexOf('name: "review-pr"');
-        const afterReviewPr = indexTs.slice(reviewPrIndex);
-        // The review-pr task has no skills, so its prompt should not contain "Required Skills"
-        // Extract just the prompt for review-pr (up to the closing });)
-        const closingBrace = afterReviewPr.indexOf("});");
-        const reviewPrBlock = afterReviewPr.slice(0, closingBrace);
-        expect(reviewPrBlock).not.toContain("Required Skills");
-      });
-
-      it("includes task prompt reference in command prompt", () => {
-        const agent = makePiAgent();
-        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
-        expect(indexTs).toContain("## Task");
         expect(indexTs).toContain("./prompts/triage.md");
       });
 
@@ -392,6 +353,8 @@ describe("piCodingAgentMaterializer", () => {
           ".pi/extensions/mason-mcp/index.ts",
           ".pi/extensions/mason-mcp/package.json",
           ".pi/mcp.json",
+          ".pi/prompts/@clawmasons/task-review-pr.md",
+          ".pi/prompts/@clawmasons/task-triage-issue.md",
           ".pi/settings.json",
           "agent-launch.json",
           "skills/labeling/README.md",

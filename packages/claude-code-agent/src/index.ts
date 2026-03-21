@@ -24,6 +24,13 @@ RUN npm install -g @anthropic-ai/claude-code
     ],
     supportsAppendSystemPrompt: true,
   },
+  tasks: {
+    projectFolder: ".claude/commands",
+    nameFormat: "{scopePath}/{taskName}.md",
+    scopeFormat: "path",
+    supportedFields: ["name->displayName", "description", "category", "tags"],
+    prompt: "markdown-body",
+  },
 };
 
 // Wire the materializer to its parent AgentPackage

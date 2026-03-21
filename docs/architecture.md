@@ -164,6 +164,30 @@ The same role definition is translated into runtime-specific configurations via 
 
 The materializer reads the resolved role graph and produces everything the runtime needs, including Dockerfiles, configuration files, and mounted skill/prompt content. Custom agents can be registered in `.mason/config.json` by pointing to any npm package that implements the Agent Package SDK.
 
+### Task Read/Write Flow
+
+Tasks are read from a source agent's project folder and written to a target agent's format. The Agent Package SDK provides generic `readTasks()` and `materializeTasks()` functions that use each agent's `AgentTaskConfig` to handle format differences automatically.
+
+```
+Source Agent Files          ResolvedTask[]           Target Agent Files
+─────────────────          ──────────────           ──────────────────
+.claude/commands/           readTasks()              .pi/prompts/
+  ops/                    ─────────────►              ops-triage-fix-bug.md
+    triage/                 name: fix-bug             ops-triage-review.md
+      fix-bug.md            scope: ops:triage
+      review.md             prompt: "..."           materializeTasks()
+                            ...                   ◄─────────────────
+```
+
+Each `AgentPackage` declares an `AgentTaskConfig` that specifies:
+- **projectFolder**: Where task files live (e.g., `.claude/commands`)
+- **nameFormat**: How filenames are constructed (e.g., `{scopePath}/{taskName}.md`)
+- **scopeFormat**: Whether scope uses directories (`path`) or kebab prefixes (`kebab-case-prefix`)
+- **supportedFields**: Which metadata fields appear in YAML frontmatter
+- **prompt**: Where the prompt content lives (currently `markdown-body`)
+
+See [Task](task.md) for the full task model documentation.
+
 ## Related
 
 - [Initialization](initialization.md) — How lodges and runtime directories are set up

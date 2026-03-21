@@ -1,105 +1,112 @@
 ---
 title: Task
-description: Unit of work that agents execute
+description: Named prompt that agents execute as slash commands
 ---
 
 # Task
 
-A **task** is a unit of work that defines what an agent does. Tasks declare what [apps](app.md) and [skills](skill.md) they need, and can be composed into workflows.
+A **task** is a named prompt that an agent can execute — typically surfaced as a slash command (e.g., `/triage` in Claude Code or a registered command in pi-coding-agent). Tasks are defined in a [role](role.md) and materialized as markdown files in the agent's project folder.
 
-## Package Definition
+## How Tasks Work
 
-```json
-{
-  "name": "@acme.platform/task-take-notes",
-  "version": "1.0.0",
-  "description": "Subagent task — create and organize markdown notes",
-  "mason": {
-    "type": "task",
-    "taskType": "subagent",
-    "prompt": "./prompts/take-notes.md",
-    "requires": {
-      "apps": ["@acme.platform/app-filesystem"],
-      "skills": ["@acme.platform/skill-markdown-conventions"]
-    }
-  }
-}
-```
+1. A role declares tasks by name in its `tasks:` section
+2. Each task is a markdown file with optional YAML frontmatter for metadata
+3. The Agent Package SDK provides generic `readTasks()` and `materializeTasks()` functions
+4. Each agent declares how it stores tasks via `AgentTaskConfig` in its `AgentPackage`
+5. Tasks can be read from one agent format and written to another — enabling cross-agent portability
 
-## Schema Fields
+## ResolvedTask
+
+After resolution, every task becomes a `ResolvedTask`:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `type` | `"task"` | Yes | Package type identifier |
-| `taskType` | enum | Yes | Execution type (see below) |
-| `prompt` | string | No | Path to prompt file |
-| `requires` | object | No | Required apps and skills |
-| `tasks` | string[] | No | Sub-tasks (for composite type) |
-| `timeout` | string | No | Execution timeout |
-| `approval` | enum | No | Approval mode |
+| `name` | string | Yes | Derived from the filename (without extension or scope prefix) |
+| `version` | string | Yes | Semantic version |
+| `displayName` | string | No | Human-friendly name (from frontmatter `name` field) |
+| `description` | string | No | Brief description of the task |
+| `category` | string | No | Grouping category |
+| `tags` | string[] | No | Searchable tags |
+| `scope` | string | No | Colon-delimited scope (e.g., `ops:triage`) |
+| `prompt` | string | No | The actual prompt content (markdown body) |
 
-### Task Types
+**Key rule**: `name` is always derived from the filename, never from frontmatter. If a frontmatter `name` field exists, it maps to `displayName`.
 
-| Type | Description |
-|------|-------------|
-| `subagent` | Delegates work to an AI sub-agent with a prompt |
-| `script` | Executes a shell script or command |
-| `composite` | Orchestrates multiple sub-tasks |
-| `human` | Requires human input or approval |
+## AgentTaskConfig
 
-### Requirements
+Each agent package declares how it stores task files via `AgentTaskConfig`:
 
-Declare which apps and skills the task needs:
-
-```json
-{
-  "requires": {
-    "apps": ["@acme/app-filesystem", "@acme/app-github"],
-    "skills": ["@acme/skill-markdown-conventions"]
-  }
+```typescript
+interface AgentTaskConfig {
+  projectFolder: string;       // e.g., ".claude/commands"
+  nameFormat: string;          // e.g., "{scopePath}/{taskName}.md"
+  scopeFormat: "path" | "kebab-case-prefix";
+  supportedFields: "all" | string[];  // frontmatter fields
+  prompt: "markdown-body";
 }
 ```
 
-These dependencies are resolved at build time and ensured to be available at runtime.
+### Scope Formats
 
-### Prompt Files
+| Format | Layout | Example |
+|--------|--------|---------|
+| `path` | Nested directories | `.claude/commands/ops/triage/fix-bug.md` |
+| `kebab-case-prefix` | Flat with prefix | `.pi/prompts/ops-triage-fix-bug.md` |
 
-For `subagent` tasks, the `prompt` field points to a markdown file containing the agent's instructions:
+No-scope tasks go directly in the `projectFolder` root (no prefix, no subdirectory).
 
-```json
-{
-  "taskType": "subagent",
-  "prompt": "./prompts/take-notes.md"
+### Field Mapping
+
+The `supportedFields` array controls which `ResolvedTask` properties appear in YAML frontmatter. Use `->` syntax to map a frontmatter key to a different property:
+
+- `"description"` — frontmatter key `description` maps to property `description`
+- `"name->displayName"` — frontmatter key `name` maps to property `displayName`
+- `"all"` — includes all metadata fields with their default keys
+
+### Agent Examples
+
+**Claude Code** (`path` scope, rich frontmatter):
+```typescript
+tasks: {
+  projectFolder: ".claude/commands",
+  nameFormat: "{scopePath}/{taskName}.md",
+  scopeFormat: "path",
+  supportedFields: ["name->displayName", "description", "category", "tags"],
+  prompt: "markdown-body",
 }
 ```
 
-The prompt file is injected into the agent's context during execution (e.g., as a slash command in Claude Code or a task prompt in other runtimes).
-
-### Approval Modes
-
-| Mode | Description |
-|------|-------------|
-| `auto` | Execute without approval |
-| `confirm` | Require confirmation before execution |
-| `review` | Require review of results after execution |
-
-### Composite Tasks
-
-Composite tasks orchestrate sub-tasks:
-
-```json
-{
-  "taskType": "composite",
-  "tasks": [
-    "@acme/task-gather-requirements",
-    "@acme/task-write-implementation",
-    "@acme/task-run-tests"
-  ]
+**pi-coding-agent** (`kebab-case-prefix`, minimal frontmatter):
+```typescript
+tasks: {
+  projectFolder: ".pi/prompts",
+  nameFormat: "{scopeKebab}-{taskName}.md",
+  scopeFormat: "kebab-case-prefix",
+  supportedFields: ["description"],
+  prompt: "markdown-body",
 }
 ```
+
+## Task File Format
+
+A task file is a markdown file with optional YAML frontmatter:
+
+```markdown
+---
+name: Triage Issues
+description: Triage and label incoming GitHub issues
+category: ops
+tags:
+  - ops
+  - triage
+---
+You are a triage agent. Review the incoming issue and...
+```
+
+The markdown body after the frontmatter is the task prompt.
 
 ## Related
 
 - [Role](role.md) — Roles reference tasks to make them available
-- [App](app.md) — Tools that tasks require
-- [Skill](skill.md) — Knowledge that tasks use
+- [App](app.md) — Tools available to the agent
+- [Skill](skill.md) — Knowledge the agent uses

@@ -19,6 +19,13 @@ RUN npm install -g @mariozechner/pi-coding-agent
   runtime: {
     command: "pi",
   },
+  tasks: {
+    projectFolder: ".pi/prompts",
+    nameFormat: "{scopeKebab}-{taskName}.md",
+    scopeFormat: "kebab-case-prefix",
+    supportedFields: ["description"],
+    prompt: "markdown-body",
+  },
 };
 
 // Wire the materializer to its parent AgentPackage

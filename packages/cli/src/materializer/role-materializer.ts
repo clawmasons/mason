@@ -6,10 +6,11 @@
  * registry to look up AgentPackage instances dynamically.
  */
 
-import type { Role } from "@clawmasons/shared";
+import * as path from "node:path";
+import type { Role, ResolvedAgent } from "@clawmasons/shared";
 import { adaptRoleToResolvedAgent } from "@clawmasons/shared";
-import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage, AgentRegistry } from "@clawmasons/agent-sdk";
-import { createAgentRegistry, getAgent, getRegisteredAgentNames } from "@clawmasons/agent-sdk";
+import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage, AgentRegistry, AgentTaskConfig } from "@clawmasons/agent-sdk";
+import { createAgentRegistry, getAgent, getRegisteredAgentNames, readTasks } from "@clawmasons/agent-sdk";
 
 // Built-in agent packages
 import claudeCodeAgent from "@clawmasons/claude-code-agent";
@@ -92,6 +93,82 @@ export function getRegisteredAgentTypes(): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// Task Content Resolution
+// ---------------------------------------------------------------------------
+
+/** Canonical mason task config for roles stored in .mason/tasks/. */
+const MASON_TASK_CONFIG: AgentTaskConfig = {
+  projectFolder: ".mason/tasks",
+  nameFormat: "{scopeKebab}-{taskName}.md",
+  scopeFormat: "kebab-case-prefix",
+  supportedFields: "all",
+  prompt: "markdown-body",
+};
+
+/**
+ * Determine the AgentTaskConfig for reading tasks from the role's source location.
+ */
+function getSourceTaskConfig(role: Role): AgentTaskConfig | undefined {
+  const dialect = role.source.agentDialect;
+  if (!dialect || dialect === "mason") return MASON_TASK_CONFIG;
+
+  const agentPkg = getAgentFromRegistry(dialect);
+  return agentPkg?.tasks ?? MASON_TASK_CONFIG;
+}
+
+/**
+ * Determine the project directory for reading source task files.
+ *
+ * For local roles: role.source.path is the role dir (e.g., <project>/.mason/roles/<name>),
+ * so the project root is 3 levels up.
+ * For packaged roles: source.path is the package directory itself.
+ */
+function getSourceProjectDir(role: Role): string | undefined {
+  if (role.source.type === "package" && role.source.path) {
+    return role.source.path;
+  }
+
+  if (role.source.type === "local" && role.source.path) {
+    return path.resolve(role.source.path, "..", "..", "..");
+  }
+
+  return undefined;
+}
+
+/**
+ * Read actual task file contents from the role's source location and
+ * populate prompt + metadata fields on the ResolvedAgent's tasks.
+ *
+ * This bridges the gap between TaskRef (name-only references in the Role)
+ * and the full ResolvedTask with prompt content that materializers need.
+ */
+export function resolveTaskContent(agent: ResolvedAgent, role: Role): void {
+  const sourceConfig = getSourceTaskConfig(role);
+  const sourceProjectDir = getSourceProjectDir(role);
+
+  if (!sourceConfig || !sourceProjectDir) return;
+
+  const sourceTasks = readTasks(sourceConfig, sourceProjectDir);
+
+  // Build lookup by task name
+  const sourceByName = new Map(sourceTasks.map((t) => [t.name, t]));
+
+  for (const resolvedRole of agent.roles) {
+    for (const task of resolvedRole.tasks) {
+      const source = sourceByName.get(task.name);
+      if (source) {
+        task.prompt = source.prompt;
+        if (source.displayName) task.displayName = source.displayName;
+        if (source.description) task.description = source.description;
+        if (source.category) task.category = source.category;
+        if (source.tags) task.tags = source.tags;
+        if (source.scope) task.scope = source.scope;
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Orchestration
 // ---------------------------------------------------------------------------
 
@@ -131,6 +208,9 @@ export function materializeForAgent(
 
   // Convert Role to ResolvedAgent via the adapter.
   const resolvedAgent = adaptRoleToResolvedAgent(role, agentType);
+
+  // Resolve actual task prompt content from source files.
+  resolveTaskContent(resolvedAgent, role);
 
   // Merge agent-config credentials (from .mason/config.json) into the resolved agent.
   if (options?.agentConfigCredentials?.length) {

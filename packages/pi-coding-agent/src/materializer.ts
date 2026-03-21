@@ -1,56 +1,13 @@
-import type { ResolvedAgent, ResolvedRole, ResolvedTask } from "@clawmasons/shared";
+import type { ResolvedAgent } from "@clawmasons/shared";
 import { getAppShortName, CLI_NAME_LOWERCASE } from "@clawmasons/shared";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage } from "@clawmasons/agent-sdk";
 import {
-  formatPermittedTools,
   collectAllSkills,
   collectAllTasks,
+  materializeTasks,
   generateSkillReadme,
   generateAgentLaunchJson,
 } from "@clawmasons/agent-sdk";
-
-/**
- * Generate the command prompt for a pi `registerCommand()` call.
- *
- * Same structure as claude-code-agent's slash commands:
- * - Role context with permitted tools
- * - Skill references
- * - Task prompt
- */
-function generateCommandPrompt(
-  task: ResolvedTask,
-  owningRoles: ResolvedRole[],
-): string {
-  const lines: string[] = [];
-
-  for (const role of owningRoles) {
-    const roleShortName = getAppShortName(role.name);
-    lines.push("## Role Context");
-    lines.push(`You are operating as role: ${roleShortName}`);
-    lines.push("Permitted tools for this role:");
-    lines.push(formatPermittedTools(role.permissions));
-    lines.push("Do NOT use tools outside this list even if they appear available.");
-    lines.push("");
-  }
-
-  if (task.skills.length > 0) {
-    lines.push("## Required Skills");
-    for (const skill of task.skills) {
-      const skillShortName = getAppShortName(skill.name);
-      lines.push(`See skills/${skillShortName}/ for ${skill.description}.`);
-    }
-    lines.push("");
-  }
-
-  lines.push("## Task");
-  if (task.prompt) {
-    lines.push(`[contents of ${task.prompt}]`);
-  } else {
-    lines.push("[no prompt defined]");
-  }
-
-  return lines.join("\n");
-}
 
 /**
  * Escape a string for use inside a JavaScript template literal.
@@ -140,10 +97,10 @@ function generateExtensionIndexTs(
 
   // Register each task as a pi command
   const allTasks = collectAllTasks(agent.roles);
-  for (const [task, owningRoles] of allTasks) {
+  for (const [task] of allTasks) {
     const taskShortName = getAppShortName(task.name);
     const description = `${task.name}@${task.version}`;
-    const prompt = generateCommandPrompt(task, owningRoles);
+    const prompt = task.prompt ?? "[no prompt defined]";
 
     lines.push("");
     lines.push("  pi.registerCommand({");
@@ -208,6 +165,13 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
     const instructions = agent.roles[0]?.instructions;
     if (instructions) {
       result.set(".pi/APPEND_SYSTEM.md", instructions);
+    }
+
+    // .pi/prompts/ — task markdown files
+    if (_agentPkg.tasks) {
+      const allTasks = collectAllTasks(agent.roles);
+      const taskFiles = materializeTasks(allTasks.map(([t]) => t), _agentPkg.tasks);
+      for (const [p, c] of taskFiles) result.set(p, c);
     }
 
     // agent-launch.json — tells agent-entry how to bootstrap this agent
