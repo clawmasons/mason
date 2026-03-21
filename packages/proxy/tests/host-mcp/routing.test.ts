@@ -7,7 +7,7 @@ import { RelayServer } from "../../src/relay/server.js";
 import { HostProxy } from "../../src/host-proxy.js";
 import { ToolRouter } from "../../src/router.js";
 import { createRelayMessage } from "../../src/relay/messages.js";
-import type { RelayMessage, McpToolsRegisterMessage, McpToolsRegisteredMessage, McpToolResultMessage } from "../../src/relay/messages.js";
+import type { RelayMessage, McpToolsRegisterMessage, McpToolsRegisteredMessage, McpToolCallMessage, McpToolResultMessage } from "../../src/relay/messages.js";
 import type { ResolvedApp } from "@clawmasons/shared";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 
@@ -17,8 +17,6 @@ vi.mock("../../src/approvals/dialog.js", () => ({
 }));
 
 // ── Mock the MCP Client and transport ───────────────────────────────
-// vi.mock is hoisted, so we cannot reference top-level variables inside
-// the factory. Use vi.hoisted() to declare mocks that are available.
 const { mockClose, mockConnect, mockListTools, mockCallTool } = vi.hoisted(() => ({
   mockClose: vi.fn().mockResolvedValue(undefined),
   mockConnect: vi.fn().mockResolvedValue(undefined),
@@ -44,7 +42,7 @@ vi.mock("../../src/upstream.js", async (importOriginal) => {
 });
 
 // ── Test port management ────────────────────────────────────────────
-let nextPort = 19900;
+let nextPort = 19800;
 function getPort(): number {
   return nextPort++;
 }
@@ -76,9 +74,9 @@ function makeTool(name: string, description?: string): Tool {
   };
 }
 
-// ── Host MCP Lifecycle Tests ────────────────────────────────────────
+// ── Host MCP Tool Call Routing Tests ────────────────────────────────
 
-describe("Host MCP Server Lifecycle", () => {
+describe("Host MCP Tool Call Routing", () => {
   let relay: RelayServer;
   let httpServer: HttpServer;
   let port: number;
@@ -134,7 +132,7 @@ describe("Host MCP Server Lifecycle", () => {
       httpServer.listen(port, resolve);
     });
 
-    tmpDir = mkdtempSync(join(tmpdir(), "host-mcp-test-"));
+    tmpDir = mkdtempSync(join(tmpdir(), "host-mcp-routing-test-"));
     auditFilePath = join(tmpDir, "audit.jsonl");
   });
 
@@ -153,9 +151,13 @@ describe("Host MCP Server Lifecycle", () => {
     }
   });
 
-  it("starts host MCP servers, discovers tools, and registers via relay", async () => {
+  it("forwards tool call to host MCP server and returns result", async () => {
+    // Set up mock: discover tools, then handle tool call
     mockListTools.mockResolvedValue({
-      tools: [makeTool("run_simulator"), makeTool("list_devices")],
+      tools: [makeTool("run_simulator")],
+    });
+    mockCallTool.mockResolvedValue({
+      content: [{ type: "text", text: "Simulator started on device-123" }],
     });
 
     proxy = new HostProxy({
@@ -167,61 +169,36 @@ describe("Host MCP Server Lifecycle", () => {
 
     await proxy.start();
 
-    // Verify host MCP server tools were registered in the tool router
-    const tools = toolRouter.listTools();
-    expect(tools).toHaveLength(2);
-    expect(tools.map((t) => t.name).sort()).toEqual([
-      "xcode_list_devices",
-      "xcode_run_simulator",
-    ]);
+    // Verify tools are registered
+    expect(toolRouter.listTools()).toHaveLength(1);
+    const route = toolRouter.resolve("xcode_run_simulator");
+    expect(route).not.toBeNull();
+    expect(route!.isHostRoute).toBe(true);
 
-    // Verify routes are marked as host routes
-    const entry = toolRouter.resolve("xcode_run_simulator");
-    expect(entry).not.toBeNull();
-    expect(entry!.isHostRoute).toBe(true);
-    expect(entry!.appName).toBe("@acme/app-xcode");
-    expect(entry!.originalToolName).toBe("run_simulator");
-  });
-
-  it("handles multiple host apps", async () => {
-    mockListTools
-      .mockResolvedValueOnce({
-        tools: [makeTool("run_simulator")],
-      })
-      .mockResolvedValueOnce({
-        tools: [makeTool("send_message")],
-      });
-
-    proxy = new HostProxy({
-      relayUrl: `ws://localhost:${port}/ws/relay`,
-      token: "test-token",
-      auditFilePath,
-      hostApps: [makeHostApp("@acme/app-xcode"), makeHostApp("@acme/app-slack")],
+    // Send mcp_tool_call from Docker side via relay
+    const toolCallMsg = createRelayMessage("mcp_tool_call", {
+      app_name: "@acme/app-xcode",
+      tool_name: "run_simulator",
+      arguments: { deviceId: "device-123" },
     });
 
-    await proxy.start();
+    const response = await relay.request(toolCallMsg, 5000) as McpToolResultMessage;
 
-    const tools = toolRouter.listTools();
-    expect(tools).toHaveLength(2);
-    expect(tools.map((t) => t.name).sort()).toEqual([
-      "slack_send_message",
-      "xcode_run_simulator",
-    ]);
-  });
-
-  it("works normally with no host apps", async () => {
-    proxy = new HostProxy({
-      relayUrl: `ws://localhost:${port}/ws/relay`,
-      token: "test-token",
-      auditFilePath,
+    expect(response.type).toBe("mcp_tool_result");
+    expect(response.id).toBe(toolCallMsg.id);
+    expect(response.error).toBeUndefined();
+    expect(response.result).toEqual({
+      content: [{ type: "text", text: "Simulator started on device-123" }],
     });
 
-    await proxy.start();
-    expect(proxy.isConnected()).toBe(true);
-    expect(toolRouter.listTools()).toHaveLength(0);
+    // Verify callTool was called correctly
+    expect(mockCallTool).toHaveBeenCalledWith({
+      name: "run_simulator",
+      arguments: { deviceId: "device-123" },
+    });
   });
 
-  it("closes host MCP clients on stop()", async () => {
+  it("returns error for unknown app_name", async () => {
     mockListTools.mockResolvedValue({
       tools: [makeTool("run_simulator")],
     });
@@ -234,22 +211,95 @@ describe("Host MCP Server Lifecycle", () => {
     });
 
     await proxy.start();
-    expect(mockClose).not.toHaveBeenCalled();
 
-    await proxy.stop();
-    expect(mockClose).toHaveBeenCalledTimes(1);
-  });
-
-  it("skips apps that fail to start and continues with others", async () => {
-    mockConnect
-      .mockRejectedValueOnce(new Error("spawn failed"))
-      .mockResolvedValueOnce(undefined);
-
-    mockListTools.mockResolvedValue({
-      tools: [makeTool("send_message")],
+    // Send tool call for unknown app
+    const toolCallMsg = createRelayMessage("mcp_tool_call", {
+      app_name: "@acme/app-unknown",
+      tool_name: "some_tool",
     });
 
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await relay.request(toolCallMsg, 5000) as McpToolResultMessage;
+
+    expect(response.type).toBe("mcp_tool_result");
+    expect(response.id).toBe(toolCallMsg.id);
+    expect(response.error).toContain("Unknown host app");
+    expect(response.result).toBeUndefined();
+  });
+
+  it("returns error when host MCP server throws", async () => {
+    mockListTools.mockResolvedValue({
+      tools: [makeTool("run_simulator")],
+    });
+    mockCallTool.mockRejectedValue(new Error("Simulator crashed"));
+
+    proxy = new HostProxy({
+      relayUrl: `ws://localhost:${port}/ws/relay`,
+      token: "test-token",
+      auditFilePath,
+      hostApps: [makeHostApp("@acme/app-xcode")],
+    });
+
+    await proxy.start();
+
+    const toolCallMsg = createRelayMessage("mcp_tool_call", {
+      app_name: "@acme/app-xcode",
+      tool_name: "run_simulator",
+      arguments: { deviceId: "device-123" },
+    });
+
+    const response = await relay.request(toolCallMsg, 5000) as McpToolResultMessage;
+
+    expect(response.type).toBe("mcp_tool_result");
+    expect(response.id).toBe(toolCallMsg.id);
+    expect(response.error).toBe("Simulator crashed");
+    expect(response.result).toBeUndefined();
+  });
+
+  it("handles tool call with no arguments", async () => {
+    mockListTools.mockResolvedValue({
+      tools: [makeTool("list_devices")],
+    });
+    mockCallTool.mockResolvedValue({
+      content: [{ type: "text", text: '["device-1", "device-2"]' }],
+    });
+
+    proxy = new HostProxy({
+      relayUrl: `ws://localhost:${port}/ws/relay`,
+      token: "test-token",
+      auditFilePath,
+      hostApps: [makeHostApp("@acme/app-xcode")],
+    });
+
+    await proxy.start();
+
+    const toolCallMsg = createRelayMessage("mcp_tool_call", {
+      app_name: "@acme/app-xcode",
+      tool_name: "list_devices",
+    });
+
+    const response = await relay.request(toolCallMsg, 5000) as McpToolResultMessage;
+
+    expect(response.type).toBe("mcp_tool_result");
+    expect(response.error).toBeUndefined();
+    expect(response.result).toEqual({
+      content: [{ type: "text", text: '["device-1", "device-2"]' }],
+    });
+
+    expect(mockCallTool).toHaveBeenCalledWith({
+      name: "list_devices",
+      arguments: undefined,
+    });
+  });
+
+  it("routes to correct app when multiple host apps are running", async () => {
+    mockListTools
+      .mockResolvedValueOnce({ tools: [makeTool("run_simulator")] })
+      .mockResolvedValueOnce({ tools: [makeTool("send_message")] });
+
+    mockCallTool
+      .mockResolvedValueOnce({
+        content: [{ type: "text", text: "Message sent" }],
+      });
 
     proxy = new HostProxy({
       relayUrl: `ws://localhost:${port}/ws/relay`,
@@ -260,113 +310,19 @@ describe("Host MCP Server Lifecycle", () => {
 
     await proxy.start();
 
-    // Only the second app should be registered
-    const tools = toolRouter.listTools();
-    expect(tools).toHaveLength(1);
-    expect(tools[0]!.name).toBe("slack_send_message");
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to start host MCP server "@acme/app-xcode"'),
-    );
-
-    consoleSpy.mockRestore();
-  });
-
-  it("skips apps with no tools discovered", async () => {
-    mockListTools.mockResolvedValue({ tools: [] });
-
-    proxy = new HostProxy({
-      relayUrl: `ws://localhost:${port}/ws/relay`,
-      token: "test-token",
-      auditFilePath,
-      hostApps: [makeHostApp("@acme/app-xcode")],
-    });
-
-    await proxy.start();
-    expect(toolRouter.listTools()).toHaveLength(0);
-  });
-
-  it("end-to-end: register tools then forward tool call and return result", async () => {
-    mockListTools.mockResolvedValue({
-      tools: [makeTool("run_simulator", "Run the iOS simulator")],
-    });
-    mockCallTool.mockResolvedValue({
-      content: [{ type: "text", text: "Simulator running on device-abc" }],
-    });
-
-    proxy = new HostProxy({
-      relayUrl: `ws://localhost:${port}/ws/relay`,
-      token: "test-token",
-      auditFilePath,
-      hostApps: [makeHostApp("@acme/app-xcode")],
-    });
-
-    await proxy.start();
-
-    // Verify registration happened
-    const tools = toolRouter.listTools();
-    expect(tools).toHaveLength(1);
-    expect(tools[0]!.name).toBe("xcode_run_simulator");
-
-    // Now send a tool call from the Docker side
+    // Call the slack tool (second app)
     const toolCallMsg = createRelayMessage("mcp_tool_call", {
-      app_name: "@acme/app-xcode",
-      tool_name: "run_simulator",
-      arguments: { deviceId: "device-abc" },
+      app_name: "@acme/app-slack",
+      tool_name: "send_message",
+      arguments: { channel: "#general", text: "Hello" },
     });
 
     const response = await relay.request(toolCallMsg, 5000) as McpToolResultMessage;
 
     expect(response.type).toBe("mcp_tool_result");
-    expect(response.id).toBe(toolCallMsg.id);
     expect(response.error).toBeUndefined();
     expect(response.result).toEqual({
-      content: [{ type: "text", text: "Simulator running on device-abc" }],
-    });
-
-    expect(mockCallTool).toHaveBeenCalledWith({
-      name: "run_simulator",
-      arguments: { deviceId: "device-abc" },
-    });
-  });
-
-  it("preserves tool descriptions and input schemas during registration", async () => {
-    const toolWithSchema: Tool = {
-      name: "run_simulator",
-      description: "Run the iOS simulator",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          deviceId: { type: "string", description: "Device ID" },
-          appBundle: { type: "string", description: "App bundle ID" },
-        },
-        required: ["deviceId"],
-      },
-    };
-
-    mockListTools.mockResolvedValue({
-      tools: [toolWithSchema],
-    });
-
-    proxy = new HostProxy({
-      relayUrl: `ws://localhost:${port}/ws/relay`,
-      token: "test-token",
-      auditFilePath,
-      hostApps: [makeHostApp("@acme/app-xcode")],
-    });
-
-    await proxy.start();
-
-    const entry = toolRouter.resolve("xcode_run_simulator");
-    expect(entry).not.toBeNull();
-    expect(entry!.tool.description).toBe("Run the iOS simulator");
-    expect(entry!.tool.inputSchema).toEqual({
-      type: "object",
-      properties: {
-        deviceId: { type: "string", description: "Device ID" },
-        appBundle: { type: "string", description: "App bundle ID" },
-      },
-      required: ["deviceId"],
+      content: [{ type: "text", text: "Message sent" }],
     });
   });
 });

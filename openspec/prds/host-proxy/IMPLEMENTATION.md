@@ -351,4 +351,7 @@ Forward agent tool calls for host MCP server tools from the Docker proxy to the 
 
 **Testable output:** Agent calls host tool → Docker proxy sends `mcp_tool_call` over relay → host proxy forwards to local MCP server → result returns as `mcp_tool_result` → agent receives result. Timeout → agent receives error. Non-host tools unaffected (routed to upstream as before). `npx tsc --noEmit` compiles. `npx vitest run packages/proxy/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — [Archived spec](../../changes/archive/2026-03-21-host-mcp-tool-routing/)
+- [Proposal](../../changes/archive/2026-03-21-host-mcp-tool-routing/proposal.md)
+- [Design](../../changes/archive/2026-03-21-host-mcp-tool-routing/design.md)
+- [Tasks](../../changes/archive/2026-03-21-host-mcp-tool-routing/tasks.md)

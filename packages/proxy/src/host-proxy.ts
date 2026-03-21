@@ -8,7 +8,7 @@ import { CredentialRelayHandler } from "./credentials/relay-handler.js";
 import { ApprovalHandler } from "./approvals/handler.js";
 import { AuditWriter } from "./audit/writer.js";
 import { createRelayMessage } from "./relay/messages.js";
-import type { AuditEventMessage, RelayMessage } from "./relay/messages.js";
+import type { AuditEventMessage, McpToolCallMessage, McpToolResultMessage, RelayMessage } from "./relay/messages.js";
 import { createTransport } from "./upstream.js";
 
 // ── Config ──────────────────────────────────────────────────────────────
@@ -122,6 +122,46 @@ export class HostProxy {
     const auditWriter = this.auditWriter;
     this.relayClient.registerHandler("audit_event", (msg: RelayMessage) => {
       auditWriter.write(msg as AuditEventMessage);
+    });
+
+    // 5d. Host MCP tool calls — forward to local MCP client and return result
+    const hostClients = this.hostClients;
+    const relayClientRef = this.relayClient;
+    this.relayClient.registerHandler("mcp_tool_call", (msg: RelayMessage) => {
+      const toolCall = msg as McpToolCallMessage;
+      void (async () => {
+        const client = hostClients.get(toolCall.app_name);
+        if (!client) {
+          const errorResult: McpToolResultMessage = {
+            id: toolCall.id,
+            type: "mcp_tool_result",
+            error: `Unknown host app: ${toolCall.app_name}`,
+          };
+          relayClientRef.send(errorResult);
+          return;
+        }
+
+        try {
+          const result = await client.callTool({
+            name: toolCall.tool_name,
+            arguments: toolCall.arguments,
+          });
+          const successResult: McpToolResultMessage = {
+            id: toolCall.id,
+            type: "mcp_tool_result",
+            result: result as Record<string, unknown>,
+          };
+          relayClientRef.send(successResult);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          const errorResult: McpToolResultMessage = {
+            id: toolCall.id,
+            type: "mcp_tool_result",
+            error: message,
+          };
+          relayClientRef.send(errorResult);
+        }
+      })();
     });
 
     // 6. Connect
