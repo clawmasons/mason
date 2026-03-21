@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { CredentialService } from "../src/service.js";
-import { queryCredentialAudit } from "../src/audit.js";
-import type { CredentialRequest } from "../src/schemas.js";
+import { CredentialService } from "../../src/credentials/service.js";
+import { queryCredentialAudit } from "../../src/credentials/audit.js";
+import type { CredentialRequest } from "../../src/credentials/schemas.js";
 
 // Mock the keychain module to prevent actual keychain calls
-vi.mock("../src/keychain.js", () => ({
+vi.mock("../../src/credentials/keychain.js", () => ({
   queryKeychain: vi.fn().mockResolvedValue(undefined),
 }));
 

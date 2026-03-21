@@ -10,7 +10,6 @@ mason/
     cli/                  # @clawmasons/mason — CLI and library
     shared/               # @clawmasons/shared — schemas, types, utilities
     proxy/                # @clawmasons/proxy — MCP proxy server
-    credential-service/   # @clawmasons/credential-service — credential resolver
     agent-entry/          # @clawmasons/agent-entry — agent bootstrap binary
     mcp-agent/            # MCP agent runtime (REPL + ACP modes)
     placeholders/         # Stub packages for testing

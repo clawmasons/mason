@@ -15,7 +15,7 @@
     "paths": {
       "@clawmasons/shared": ["./packages/shared/src/index.ts"],
       "@clawmasons/proxy": ["./packages/proxy/src/index.ts"],
-      "@clawmasons/credential-service": ["./packages/credential-service/src/index.ts"],
+
       "@clawmasons/agent-entry": ["./packages/agent-entry/src/index.ts"],
       "@clawmasons/agent-sdk": ["./packages/agent-sdk/src/index.ts"],
       "@clawmasons/mcp-agent": ["./packages/mcp-agent/src/index.ts"],
@@ -28,12 +28,10 @@
     "packages/shared/src/**/*",
     "packages/proxy/src/**/*",
     "packages/cli/src/**/*",
-    "packages/credential-service/src/**/*",
     "packages/agent-entry/src/**/*",
     "packages/mcp-agent/src/**/*",
     "packages/proxy/tests/**/*",
     "packages/cli/tests/**/*",
-    "packages/credential-service/tests/**/*",
     "packages/agent-entry/tests/**/*",
     "packages/shared/tests/**/*",
     "packages/mcp-agent/tests/**/*",

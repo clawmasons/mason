@@ -11,12 +11,12 @@ const mockQueryKeychainByService = vi.fn<
   (service: string) => Promise<string | undefined>
 >();
 
-vi.mock("../src/keychain.js", () => ({
+vi.mock("../../src/credentials/keychain.js", () => ({
   queryKeychain: (...args: [string, string]) => mockQueryKeychain(...args),
   queryKeychainByService: (...args: [string]) => mockQueryKeychainByService(...args),
 }));
 
-import { CredentialResolver } from "../src/resolver.js";
+import { CredentialResolver } from "../../src/credentials/resolver.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 

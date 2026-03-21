@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { loadEnvFile, resolveEnvVars } from "../src/credentials.js";
+import { loadEnvFile, resolveEnvVars } from "../src/env-utils.js";
 
 // ── loadEnvFile ──────────────────────────────────────────────────────────
 

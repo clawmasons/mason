@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { WebSocketServer, type WebSocket as WSType } from "ws";
-import { CredentialWSClient } from "../src/ws-client.js";
-import { CredentialService } from "../src/service.js";
-import type { CredentialRequest } from "../src/schemas.js";
+import { CredentialWSClient } from "../../src/credentials/ws-client.js";
+import { CredentialService } from "../../src/credentials/service.js";
+import type { CredentialRequest } from "../../src/credentials/schemas.js";
 
 // Mock the keychain module
-vi.mock("../src/keychain.js", () => ({
+vi.mock("../../src/credentials/keychain.js", () => ({
   queryKeychain: vi.fn().mockResolvedValue(undefined),
 }));
 

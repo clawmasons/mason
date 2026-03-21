@@ -5,7 +5,7 @@ import {
   queryCredentialAudit,
   generateAuditId,
   type CredentialAuditEntry,
-} from "../src/audit.js";
+} from "../../src/credentials/audit.js";
 import type Database from "better-sqlite3";
 
 describe("Credential Audit", () => {

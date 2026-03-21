@@ -27,6 +27,14 @@ export interface CredentialAuditFilters {
   limit?: number;
 }
 
+/**
+ * Callback interface for emitting audit entries.
+ *
+ * The default implementation writes to SQLite (backward compat).
+ * CHANGE 6 will replace this with a relay-based emitter.
+ */
+export type AuditEmitter = (entry: CredentialAuditEntry) => void;
+
 // ── Schema ─────────────────────────────────────────────────────────────
 
 const CREATE_CREDENTIAL_AUDIT = `
@@ -49,6 +57,8 @@ const DEFAULT_DB_PATH = process.env.CREDENTIAL_DB_PATH
 
 /**
  * Open the credential audit database and ensure the table exists.
+ *
+ * @deprecated Will be removed in CHANGE 6 when SQLite is replaced by relay audit events.
  */
 export function openCredentialDatabase(
   dbPath: string = DEFAULT_DB_PATH,
@@ -67,6 +77,8 @@ export function openCredentialDatabase(
 
 /**
  * Insert a credential audit entry.
+ *
+ * @deprecated Will be removed in CHANGE 6 when SQLite is replaced by relay audit events.
  */
 export function insertCredentialAudit(
   db: Database.Database,
@@ -85,6 +97,8 @@ export function insertCredentialAudit(
 
 /**
  * Query credential audit entries with optional filters.
+ *
+ * @deprecated Will be removed in CHANGE 6 when SQLite is replaced by relay audit events.
  */
 export function queryCredentialAudit(
   db: Database.Database,
@@ -129,4 +143,15 @@ export function queryCredentialAudit(
  */
 export function generateAuditId(): string {
   return randomUUID();
+}
+
+/**
+ * Create an AuditEmitter that writes to a SQLite database.
+ *
+ * @deprecated Will be removed in CHANGE 6 when SQLite is replaced by relay audit events.
+ */
+export function createSqliteAuditEmitter(db: Database.Database): AuditEmitter {
+  return (entry: CredentialAuditEntry) => {
+    insertCredentialAudit(db, entry);
+  };
 }
