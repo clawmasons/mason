@@ -70,6 +70,7 @@ function resolveApp(
     tools: field.tools,
     capabilities: field.capabilities,
     credentials: field.credentials,
+    location: "proxy",
     description: field.description,
   };
 }

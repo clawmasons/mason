@@ -24,6 +24,7 @@ export interface ResolvedApp {
   tools: string[];
   capabilities: string[];
   credentials: string[];
+  location: "proxy" | "host";
   description?: string;
 }
 

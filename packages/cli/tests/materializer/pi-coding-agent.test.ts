@@ -14,6 +14,7 @@ function makeGithubApp(): ResolvedApp {
     tools: ["create_issue", "list_repos", "create_pr", "get_pr", "create_review", "add_label", "delete_repo", "transfer_repo"],
     capabilities: ["resources", "tools"],
     credentials: [],
+    location: "proxy",
   };
 }
 
@@ -28,6 +29,7 @@ function makeSlackApp(): ResolvedApp {
     tools: ["send_message", "list_channels"],
     capabilities: ["tools"],
     credentials: [],
+    location: "proxy",
   };
 }
 

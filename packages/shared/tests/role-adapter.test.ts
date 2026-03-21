@@ -263,6 +263,22 @@ describe("adaptRoleToResolvedAgent", () => {
       const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.roles[0].apps[0].transport).toBe("stdio");
     });
+
+    it("defaults location to proxy when omitted", () => {
+      const role = minimalRole({
+        apps: [{ name: "github" }],
+      });
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      expect(agent.roles[0].apps[0].location).toBe("proxy");
+    });
+
+    it("preserves location: host when specified", () => {
+      const role = minimalRole({
+        apps: [{ name: "xcode-sim", location: "host" }],
+      });
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      expect(agent.roles[0].apps[0].location).toBe("host");
+    });
   });
 
   // ---- Permissions aggregation ----

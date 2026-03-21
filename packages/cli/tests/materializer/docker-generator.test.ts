@@ -36,6 +36,7 @@ function makeTestRole(overrides?: Partial<Role>): Role {
           deny: ["delete_repo"],
         },
         credentials: ["GITHUB_TOKEN"],
+        location: "proxy",
       },
     ],
     skills: [{ name: "prd-writing" }],

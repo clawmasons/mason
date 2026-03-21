@@ -14,6 +14,7 @@ function makeApp(overrides: Partial<ResolvedApp> = {}): ResolvedApp {
     tools: ["create_issue", "list_repos", "add_label", "get_pr", "create_review", "delete_repo", "transfer_repo"],
     capabilities: ["tools"],
     credentials: [],
+    location: "proxy",
     ...overrides,
   };
 }

@@ -16,6 +16,7 @@ function makeGithubApp(): ResolvedApp {
     tools: ["create_issue", "list_repos", "create_pr"],
     capabilities: ["tools"],
     credentials: [],
+    location: "proxy",
   };
 }
 
@@ -29,6 +30,7 @@ function makeFilesystemApp(): ResolvedApp {
     tools: ["read_file", "write_file", "list_directory"],
     capabilities: ["tools"],
     credentials: [],
+    location: "proxy",
   };
 }
 

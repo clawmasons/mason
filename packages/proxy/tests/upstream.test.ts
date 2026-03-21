@@ -82,6 +82,7 @@ function makeStdioApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
     tools: ["create_pr", "list_repos"],
     capabilities: ["tools"],
     credentials: [],
+    location: "proxy",
     ...overrides,
   };
 }
@@ -95,6 +96,7 @@ function makeSseApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
     tools: ["send_message"],
     capabilities: ["tools"],
     credentials: [],
+    location: "proxy",
     ...overrides,
   };
 }
@@ -108,6 +110,7 @@ function makeStreamableApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
     tools: ["create_issue"],
     capabilities: ["tools"],
     credentials: [],
+    location: "proxy",
     ...overrides,
   };
 }

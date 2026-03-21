@@ -107,6 +107,7 @@ function makeResolvedRole(name: string): ResolvedRole {
         tools: ["create_pr"],
         capabilities: ["github"],
         credentials: [],
+        location: "proxy",
       },
     ],
     skills: [],
