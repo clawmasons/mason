@@ -1014,7 +1014,7 @@ describe("ProxyServer (readyGate)", () => {
 
     server = new ProxyServer({
       port, transport: "streamable-http", router, upstream, readyGate,
-      credentialProxyToken: "test-cred-token",
+      relayToken: "test-relay-token",
     });
     await server.start();
 
@@ -1041,7 +1041,7 @@ describe("ProxyServer (readyGate)", () => {
 
     server = new ProxyServer({
       port, transport: "streamable-http", router, upstream, readyGate,
-      credentialProxyToken: "test-cred-token",
+      relayToken: "test-relay-token",
     });
     await server.start();
 

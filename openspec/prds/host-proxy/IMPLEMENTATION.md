@@ -150,7 +150,10 @@ Wire the Docker proxy's `credential_request` MCP tool to use the relay protocol 
 
 **Testable output:** Agent calls `credential_request` tool → Docker proxy sends `credential_request` over relay → host handler resolves credential → `credential_response` returns to Docker proxy → agent receives value. Timeout on no response returns error to agent. `/ws/credentials` endpoint returns 404. `CredentialRelay` class no longer exists. `npx tsc --noEmit` compiles. `npx vitest run packages/proxy/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — [Archived spec](../../changes/archive/2026-03-21-credential-requests-via-relay/)
+- [Proposal](../../changes/archive/2026-03-21-credential-requests-via-relay/proposal.md)
+- [Design](../../changes/archive/2026-03-21-credential-requests-via-relay/design.md)
+- [Tasks](../../changes/archive/2026-03-21-credential-requests-via-relay/tasks.md)
 
 ---
 
