@@ -215,7 +215,10 @@ Replace SQLite-based approval polling with relay `approval_request`/`approval_re
 
 **Testable output:** Tool matching approval pattern → `approval_request` sent over relay → host handler invokes dialog → `approval_response` returns "approved" or "denied" → Docker proxy proceeds or blocks. TTL expiry → auto-deny. Non-macOS → auto-approve with warning. No SQLite references in approval code. `npx tsc --noEmit` compiles. `npx vitest run packages/proxy/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — [Archived spec](../../changes/archive/2026-03-21-approvals-via-relay/)
+- [Proposal](../../changes/archive/2026-03-21-approvals-via-relay/proposal.md)
+- [Design](../../changes/archive/2026-03-21-approvals-via-relay/design.md)
+- [Tasks](../../changes/archive/2026-03-21-approvals-via-relay/tasks.md)
 
 ---
 

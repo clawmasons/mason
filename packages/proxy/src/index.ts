@@ -17,6 +17,8 @@ export type { RelayServerConfig } from "./relay/server.js";
 export { RelayClient } from "./relay/client.js";
 export type { RelayClientConfig } from "./relay/client.js";
 export { AuditWriter } from "./audit/writer.js";
+export { ApprovalHandler } from "./approvals/handler.js";
+export { showApprovalDialog } from "./approvals/dialog.js";
 // Credential service (absorbed from @clawmasons/credential-service)
 export {
   CredentialResolver,
