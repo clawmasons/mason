@@ -86,7 +86,11 @@ Create the host-side WebSocket client that connects to the Docker proxy's `/ws/r
 
 **Testable output:** Client connects to mock WS server with valid token → connected. Invalid token → rejected. Incoming messages dispatched to correct handler by type. `send()` delivers message to server. `request()` resolves on correlated response, rejects on timeout. `disconnect()` closes cleanly. `npx tsc --noEmit` compiles. `npx vitest run packages/proxy/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — [Archived spec](../../changes/archive/2026-03-21-relay-client/)
+- [Proposal](../../changes/archive/2026-03-21-relay-client/proposal.md)
+- [Design](../../changes/archive/2026-03-21-relay-client/design.md)
+- [Tasks](../../changes/archive/2026-03-21-relay-client/tasks.md)
+- [Spec: relay-client](../../changes/archive/2026-03-21-relay-client/specs/relay-client/spec.md)
 
 ---
 

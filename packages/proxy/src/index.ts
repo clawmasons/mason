@@ -25,3 +25,5 @@ export { CredentialRelay } from "./handlers/credential-relay.js";
 export type { CredentialRelayConfig, CredentialToolResult } from "./handlers/credential-relay.js";
 export { RelayServer } from "./relay/server.js";
 export type { RelayServerConfig } from "./relay/server.js";
+export { RelayClient } from "./relay/client.js";
+export type { RelayClientConfig } from "./relay/client.js";
