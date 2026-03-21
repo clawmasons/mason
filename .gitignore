@@ -1,4 +1,4 @@
-# Logs
+# Log
 logs
 *.log
 npm-debug.log*
@@ -157,3 +157,4 @@ packages/mason-roles/roles/**/build
 .mason
 .codex
 .pi
+.claude
