@@ -182,7 +182,10 @@ Replace SQLite audit logging with relay `audit_event` messages. Create a host-si
 
 **Testable output:** Tool call triggers audit pre/post hooks → `audit_event` message sent over relay. Host-side `AuditWriter` appends JSON line to file. `better-sqlite3` not in `package.json`. `db.ts` does not exist. `ProxyServerConfig` has no `db` field. `npx tsc --noEmit` compiles. `npx vitest run packages/proxy/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — [Archived spec](../../changes/archive/audit-events-relay-remove-sqlite/)
+- [Proposal](../../changes/archive/audit-events-relay-remove-sqlite/proposal.md)
+- [Design](../../changes/archive/audit-events-relay-remove-sqlite/design.md)
+- [Tasks](../../changes/archive/audit-events-relay-remove-sqlite/tasks.md)
 
 ---
 

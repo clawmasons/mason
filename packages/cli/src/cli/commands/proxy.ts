@@ -7,7 +7,6 @@ import { computeToolFilters, CLI_NAME_UPPERCASE } from "@clawmasons/shared";
 import {
   loadEnvFile,
   resolveEnvVars,
-  openDatabase,
   UpstreamManager,
   ToolRouter,
   ResourceRouter,
@@ -15,7 +14,6 @@ import {
   ProxyServer,
 } from "@clawmasons/proxy";
 import type { UpstreamAppConfig } from "@clawmasons/proxy";
-import type Database from "better-sqlite3";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -49,7 +47,6 @@ export async function startProxy(
   rootDir: string,
   options: ProxyOptions,
 ): Promise<void> {
-  let db: Database.Database | undefined;
   let upstream: UpstreamManager | undefined;
   let server: ProxyServer | undefined;
 
@@ -61,9 +58,6 @@ export async function startProxy(
     } catch { /* best-effort */ }
     try {
       if (upstream) await upstream.shutdown();
-    } catch { /* best-effort */ }
-    try {
-      if (db) db.close();
     } catch { /* best-effort */ }
     process.exit(0);
   };
@@ -106,13 +100,7 @@ export async function startProxy(
     const envPath = join(rootDir, ".env");
     const loadedEnv = loadEnvFile(envPath);
 
-    // ── Step 5: Open SQLite ────────────────────────────────────────────
-    console.log(`${elapsed()} Opening database...`);
-    stepStart = performance.now();
-    db = openDatabase();
-    console.log(`${elapsed()} Database opened (${stepMs()}ms)`);
-
-    // ── Step 6: Create upstream manager ──────────────────────────────────
+    // ── Step 5: Create upstream manager ──────────────────────────────────
     const projectDir = process.env.PROJECT_DIR;
     const appConfigs = collectApps(agent, loadedEnv, projectDir);
     upstream = new UpstreamManager(appConfigs);
@@ -121,10 +109,10 @@ export async function startProxy(
       ? parseInt(options.startupTimeout, 10) * 1000
       : 60_000;
 
-    // ── Step 7: Collect approval patterns ──────────────────────────────
+    // ── Step 6: Collect approval patterns ──────────────────────────────
     const approvalPatterns = collectApprovalPatterns(agent);
 
-    // ── Step 8: Start HTTP server EARLY ────────────────────────────────
+    // ── Step 7: Start HTTP server EARLY ────────────────────────────────
     // Health, connect-agent, and credential_request work immediately.
     // Tool/resource/prompt calls block on readyGate until upstreams connect.
     const port = options.port
@@ -160,7 +148,6 @@ export async function startProxy(
       transport,
       router: emptyRouter,
       upstream,
-      db,
       agentName: agent.name,
       authToken,
       relayToken,
@@ -174,13 +161,13 @@ export async function startProxy(
     await server.start();
     console.log(`${elapsed()} Server listening (${stepMs()}ms)`);
 
-    // ── Step 9: Connect upstream MCP servers ─────────────────────────────
+    // ── Step 8: Connect upstream MCP servers ─────────────────────────────
     console.log(`${elapsed()} Connecting to ${appConfigs.length} upstream server(s)...`);
     stepStart = performance.now();
     await upstream.initialize(timeoutMs);
     console.log(`${elapsed()} Upstream connected (${stepMs()}ms)`);
 
-    // ── Step 10: Build routing tables and open the ready gate ───────────
+    // ── Step 9: Build routing tables and open the ready gate ───────────
     console.log(`${elapsed()} Fetching tools/resources/prompts...`);
     stepStart = performance.now();
     const upstreamTools = new Map<string, import("@modelcontextprotocol/sdk/types.js").Tool[]>();
@@ -205,7 +192,7 @@ export async function startProxy(
     resolveReady();
     console.log(`${elapsed()} Routing tables built (${stepMs()}ms)`);
 
-    // ── Step 11: Ready ─────────────────────────────────────────────────
+    // ── Step 10: Ready ─────────────────────────────────────────────────
     const totalMs = Math.round(performance.now() - t0);
     const toolCount = router.listTools().length;
     const resourceCount = resourceRouter.listResources().length;
@@ -225,7 +212,6 @@ export async function startProxy(
     console.error(`\n  Proxy startup failed: ${message}\n`);
     // Clean up on startup failure
     try { if (upstream) await upstream.shutdown(); } catch { /* best-effort */ }
-    try { if (db) db.close(); } catch { /* best-effort */ }
     process.exit(1);
   }
 }

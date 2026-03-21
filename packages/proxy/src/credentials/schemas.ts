@@ -47,7 +47,7 @@ export type CredentialResponse = z.infer<typeof credentialResponseSchema>;
 // ── Service Config ──────────────────────────────────────────────────────
 
 export const credentialServiceConfigSchema = z.object({
-  /** Path to the SQLite database. Defaults to ~/.mason/data/mason.db. */
+  /** @deprecated No longer used — SQLite has been removed. Retained for config compatibility. */
   dbPath: z.string().optional(),
   /** Path to the .env file for dotenv credential resolution. */
   envFilePath: z.string().optional(),

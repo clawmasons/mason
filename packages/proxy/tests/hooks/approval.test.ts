@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { matchesApprovalPattern, requestApproval } from "../../src/hooks/approval.js";
 import type { HookContext } from "../../src/hooks/audit.js";
-import { openDatabase, updateApprovalStatus } from "../../src/db.js";
-import type Database from "better-sqlite3";
+import type { RelayServer } from "../../src/relay/server.js";
+import type { RelayMessage } from "../../src/relay/messages.js";
 
 // ── Fixtures ────────────────────────────────────────────────────────────
 
@@ -16,6 +16,28 @@ function makeContext(overrides?: Partial<HookContext>): HookContext {
     arguments: { repo: "test" },
     ...overrides,
   };
+}
+
+function createMockRelay(
+  requestResponse?: Partial<RelayMessage>,
+  requestError?: Error,
+): RelayServer {
+  return {
+    send: vi.fn(),
+    request: vi.fn().mockImplementation(async () => {
+      if (requestError) throw requestError;
+      return {
+        id: "test-id",
+        type: "approval_response",
+        status: "approved",
+        ...requestResponse,
+      };
+    }),
+    isConnected: vi.fn(() => true),
+    handleUpgrade: vi.fn(),
+    registerHandler: vi.fn(),
+    shutdown: vi.fn(),
+  } as unknown as RelayServer;
 }
 
 // ── matchesApprovalPattern Tests ────────────────────────────────────────
@@ -70,150 +92,81 @@ describe("matchesApprovalPattern", () => {
 // ── requestApproval Tests ───────────────────────────────────────────────
 
 describe("requestApproval", () => {
-  let db: Database.Database;
-
-  beforeEach(() => {
-    db = openDatabase(":memory:");
-  });
-
-  afterEach(() => {
-    db.close();
-  });
-
-  it("creates a pending approval request in the database", async () => {
+  it("sends an approval_request message via relay", async () => {
+    const relay = createMockRelay({ status: "approved" });
     const ctx = makeContext();
 
-    // Use very short TTL and poll interval so the test doesn't hang
-    const promise = requestApproval(ctx, db, { ttlSeconds: 1, pollIntervalMs: 50 });
+    await requestApproval(ctx, relay, { ttlSeconds: 5 });
 
-    // Check the request was created
-    const rows = db.prepare("SELECT * FROM approval_requests WHERE status = 'pending'").all() as Array<{ id: string }>;
-    expect(rows).toHaveLength(1);
-
-    // Let it time out
-    await promise;
+    expect(relay.request).toHaveBeenCalledTimes(1);
+    const [msg, timeout] = vi.mocked(relay.request).mock.calls[0];
+    expect(msg.type).toBe("approval_request");
+    expect(timeout).toBe(5000); // 5 seconds in ms
+    if (msg.type === "approval_request") {
+      expect(msg.agent_name).toBe("note-taker");
+      expect(msg.role_name).toBe("writer");
+      expect(msg.app_name).toBe("@clawmasons/app-github");
+      expect(msg.tool_name).toBe("github_delete_repo");
+      expect(msg.ttl_seconds).toBe(5);
+    }
   });
 
-  it("stores correct context fields in the approval request", async () => {
+  it("returns 'approved' when relay response has status approved", async () => {
+    const relay = createMockRelay({ status: "approved" });
     const ctx = makeContext();
-    const promise = requestApproval(ctx, db, { ttlSeconds: 1, pollIntervalMs: 50 });
 
-    const rows = db.prepare("SELECT * FROM approval_requests").all() as Array<{
-      agent_name: string;
-      role_name: string;
-      app_name: string;
-      tool_name: string;
-      arguments: string;
-      status: string;
-      ttl_seconds: number;
-    }>;
-    expect(rows).toHaveLength(1);
-    expect(rows[0].agent_name).toBe("note-taker");
-    expect(rows[0].role_name).toBe("writer");
-    expect(rows[0].app_name).toBe("@clawmasons/app-github");
-    expect(rows[0].tool_name).toBe("github_delete_repo");
-    expect(JSON.parse(rows[0].arguments)).toEqual({ repo: "test" });
-    expect(rows[0].status).toBe("pending");
-    expect(rows[0].ttl_seconds).toBe(1);
-
-    await promise;
-  });
-
-  it("returns 'approved' when status is updated externally", async () => {
-    const ctx = makeContext();
-    const promise = requestApproval(ctx, db, { ttlSeconds: 5, pollIntervalMs: 50 });
-
-    // Approve after a short delay
-    const rows = db.prepare("SELECT id FROM approval_requests").all() as Array<{ id: string }>;
-    setTimeout(() => {
-      updateApprovalStatus(db, rows[0].id, "approved", "operator@example.com");
-    }, 100);
-
-    const result = await promise;
+    const result = await requestApproval(ctx, relay, { ttlSeconds: 5 });
     expect(result).toBe("approved");
   });
 
-  it("returns 'denied' when status is updated to denied externally", async () => {
+  it("returns 'denied' when relay response has status denied", async () => {
+    const relay = createMockRelay({ status: "denied" });
     const ctx = makeContext();
-    const promise = requestApproval(ctx, db, { ttlSeconds: 5, pollIntervalMs: 50 });
 
-    const rows = db.prepare("SELECT id FROM approval_requests").all() as Array<{ id: string }>;
-    setTimeout(() => {
-      updateApprovalStatus(db, rows[0].id, "denied", "operator@example.com");
-    }, 100);
-
-    const result = await promise;
+    const result = await requestApproval(ctx, relay, { ttlSeconds: 5 });
     expect(result).toBe("denied");
   });
 
-  it("returns 'timeout' and auto-denies when TTL expires", async () => {
+  it("returns 'timeout' when relay request times out", async () => {
+    const relay = createMockRelay(
+      undefined,
+      new Error("Relay request timed out after 5000ms"),
+    );
     const ctx = makeContext();
-    const result = await requestApproval(ctx, db, { ttlSeconds: 0.1, pollIntervalMs: 30 });
 
+    const result = await requestApproval(ctx, relay, { ttlSeconds: 5 });
     expect(result).toBe("timeout");
-
-    // Verify auto-deny was written
-    const rows = db.prepare("SELECT * FROM approval_requests").all() as Array<{
-      status: string;
-      resolved_by: string;
-    }>;
-    expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe("denied");
-    expect(rows[0].resolved_by).toBe("auto-timeout");
   });
 
-  it("returns 'denied' on database creation failure", async () => {
+  it("returns 'denied' on relay error (non-timeout)", async () => {
+    const relay = createMockRelay(
+      undefined,
+      new Error("Relay not connected"),
+    );
     const ctx = makeContext();
-    const closedDb = openDatabase(":memory:");
-    closedDb.close();
 
     const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const result = await requestApproval(ctx, closedDb, { ttlSeconds: 1, pollIntervalMs: 50 });
-
+    const result = await requestApproval(ctx, relay, { ttlSeconds: 5 });
     expect(result).toBe("denied");
+
     expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[mason] approval request creation failed"),
+      expect.stringContaining("[mason] approval request failed"),
     );
 
     stderrSpy.mockRestore();
   });
 
-  it("returns 'denied' when database fails during polling", async () => {
-    const ctx = makeContext();
-    const pollDb = openDatabase(":memory:");
-    const promise = requestApproval(ctx, pollDb, { ttlSeconds: 5, pollIntervalMs: 50 });
-
-    // Close the DB after the request is created but before polling reads it
-    setTimeout(() => {
-      pollDb.close();
-    }, 80);
-
-    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const result = await promise;
-
-    expect(result).toBe("denied");
-    expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[mason] approval request poll failed"),
-    );
-
-    stderrSpy.mockRestore();
-  });
-
-  it("handles race between TTL expiry and external approval", async () => {
+  it("uses default TTL of 300 seconds when not specified", async () => {
+    const relay = createMockRelay({ status: "approved" });
     const ctx = makeContext();
 
-    // Create the request with very short TTL
-    const promise = requestApproval(ctx, db, { ttlSeconds: 0.15, pollIntervalMs: 30 });
+    await requestApproval(ctx, relay);
 
-    // Approve just before TTL expires — the final check should catch it
-    const rows = db.prepare("SELECT id FROM approval_requests").all() as Array<{ id: string }>;
-    setTimeout(() => {
-      updateApprovalStatus(db, rows[0].id, "approved", "operator@example.com");
-    }, 120);
-
-    const result = await promise;
-    // Either approved (caught in final check) or timeout (race) — both are valid
-    expect(["approved", "timeout"]).toContain(result);
+    const [msg, timeout] = vi.mocked(relay.request).mock.calls[0];
+    expect(timeout).toBe(300_000);
+    if (msg.type === "approval_request") {
+      expect(msg.ttl_seconds).toBe(300);
+    }
   });
 });

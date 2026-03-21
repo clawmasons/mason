@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CredentialService } from "../../src/credentials/service.js";
-import { queryCredentialAudit } from "../../src/credentials/audit.js";
+import type { AuditEmitter, CredentialAuditEntry } from "../../src/credentials/audit.js";
 import type { CredentialRequest } from "../../src/credentials/schemas.js";
 
 // Mock the keychain module to prevent actual keychain calls
@@ -10,6 +10,8 @@ vi.mock("../../src/credentials/keychain.js", () => ({
 
 describe("CredentialService", () => {
   let service: CredentialService;
+  let auditEntries: CredentialAuditEntry[];
+  let auditEmitter: AuditEmitter;
   const envKeysToClean: string[] = [];
 
   function setEnv(key: string, value: string): void {
@@ -18,11 +20,16 @@ describe("CredentialService", () => {
   }
 
   beforeEach(() => {
-    service = new CredentialService({
-      dbPath: ":memory:",
-      envFilePath: "/nonexistent/.env",
-      keychainService: "test",
-    });
+    auditEntries = [];
+    auditEmitter = (entry) => auditEntries.push(entry);
+    service = new CredentialService(
+      {
+        envFilePath: "/nonexistent/.env",
+        keychainService: "test",
+      },
+      undefined,
+      auditEmitter,
+    );
   });
 
   afterEach(() => {
@@ -126,39 +133,36 @@ describe("CredentialService", () => {
   // ── Audit Logging ─────────────────────────────────────────────────
 
   describe("audit logging", () => {
-    it("logs granted access", async () => {
+    it("logs granted access via audit emitter", async () => {
       setEnv("API_KEY", "value");
       await service.handleRequest(makeRequest());
 
-      const entries = queryCredentialAudit(service.getDatabase());
-      expect(entries).toHaveLength(1);
-      expect(entries[0].outcome).toBe("granted");
-      expect(entries[0].agent_id).toBe("test-agent");
-      expect(entries[0].credential_key).toBe("API_KEY");
-      expect(entries[0].source).toBe("env");
-      expect(entries[0].deny_reason).toBeNull();
+      expect(auditEntries).toHaveLength(1);
+      expect(auditEntries[0].outcome).toBe("granted");
+      expect(auditEntries[0].agent_id).toBe("test-agent");
+      expect(auditEntries[0].credential_key).toBe("API_KEY");
+      expect(auditEntries[0].source).toBe("env");
+      expect(auditEntries[0].deny_reason).toBeNull();
     });
 
-    it("logs denied access", async () => {
+    it("logs denied access via audit emitter", async () => {
       await service.handleRequest(
         makeRequest({ key: "FORBIDDEN", declaredCredentials: ["API_KEY"] }),
       );
 
-      const entries = queryCredentialAudit(service.getDatabase());
-      expect(entries).toHaveLength(1);
-      expect(entries[0].outcome).toBe("denied");
-      expect(entries[0].deny_reason).toContain("has not declared");
+      expect(auditEntries).toHaveLength(1);
+      expect(auditEntries[0].outcome).toBe("denied");
+      expect(auditEntries[0].deny_reason).toContain("has not declared");
     });
 
-    it("logs resolution errors", async () => {
+    it("logs resolution errors via audit emitter", async () => {
       await service.handleRequest(
         makeRequest({ key: "MISSING", declaredCredentials: ["MISSING"] }),
       );
 
-      const entries = queryCredentialAudit(service.getDatabase());
-      expect(entries).toHaveLength(1);
-      expect(entries[0].outcome).toBe("error");
-      expect(entries[0].deny_reason).toContain("not found");
+      expect(auditEntries).toHaveLength(1);
+      expect(auditEntries[0].outcome).toBe("error");
+      expect(auditEntries[0].deny_reason).toContain("not found");
     });
 
     it("records session and role metadata", async () => {
@@ -167,9 +171,8 @@ describe("CredentialService", () => {
         makeRequest({ sessionId: "sess-42", role: "admin-role" }),
       );
 
-      const entries = queryCredentialAudit(service.getDatabase());
-      expect(entries[0].session_id).toBe("sess-42");
-      expect(entries[0].role).toBe("admin-role");
+      expect(auditEntries[0].session_id).toBe("sess-42");
+      expect(auditEntries[0].role).toBe("admin-role");
     });
   });
 });

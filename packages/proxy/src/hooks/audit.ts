@@ -1,6 +1,6 @@
-import type Database from "better-sqlite3";
-import { generateId, insertAuditLog } from "../db.js";
-import type { AuditLogEntry } from "../db.js";
+import { randomUUID } from "node:crypto";
+import { createRelayMessage } from "../relay/messages.js";
+import type { RelayServer } from "../relay/server.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -25,24 +25,27 @@ export interface AuditPreHookResult {
 export function auditPreHook(context: HookContext): AuditPreHookResult {
   void context;
   return {
-    id: generateId(),
+    id: randomUUID(),
     startTime: Date.now(),
   };
 }
 
 // ── Post-Hook ──────────────────────────────────────────────────────────
 
+export type AuditStatus = "success" | "error" | "denied" | "timeout" | "dropped";
+
 export function auditPostHook(
   context: HookContext,
   preResult: AuditPreHookResult,
   callResult: unknown,
-  status: AuditLogEntry["status"],
-  db: Database.Database,
+  status: AuditStatus,
+  relay: RelayServer | null,
 ): void {
+  if (!relay) return;
+
   const durationMs = Date.now() - preResult.startTime;
 
-  const entry: AuditLogEntry = {
-    id: preResult.id,
+  const msg = createRelayMessage("audit_event", {
     agent_name: context.agentName,
     role_name: context.roleName,
     app_name: context.appName,
@@ -52,12 +55,10 @@ export function auditPostHook(
     status,
     duration_ms: durationMs,
     timestamp: new Date().toISOString(),
-    session_type: context.sessionType,
-    acp_client: context.acpClient,
-  };
+  });
 
   try {
-    insertAuditLog(db, entry);
+    relay.send(msg);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[mason] audit log write failed: ${message}`);
@@ -78,15 +79,16 @@ export interface DroppedServer {
  * don't match any App.
  */
 export function logDroppedServers(
-  db: Database.Database,
+  relay: RelayServer | null,
   unmatched: DroppedServer[],
   agentName: string,
   roleName: string,
-  acpClient?: string,
+  _acpClient?: string,
 ): void {
+  if (!relay) return;
+
   for (const server of unmatched) {
-    const entry: AuditLogEntry = {
-      id: generateId(),
+    const msg = createRelayMessage("audit_event", {
       agent_name: agentName,
       role_name: roleName,
       app_name: server.name,
@@ -96,12 +98,10 @@ export function logDroppedServers(
       status: "dropped",
       duration_ms: 0,
       timestamp: new Date().toISOString(),
-      session_type: "acp",
-      acp_client: acpClient,
-    };
+    });
 
     try {
-      insertAuditLog(db, entry);
+      relay.send(msg);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[mason] audit log write failed (dropped server "${server.name}"): ${message}`);

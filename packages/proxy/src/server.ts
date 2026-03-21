@@ -13,7 +13,6 @@ import {
   GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import type Database from "better-sqlite3";
 import type { ToolRouter, ResourceRouter, PromptRouter } from "./router.js";
 import type { UpstreamManager } from "./upstream.js";
 import { auditPreHook, auditPostHook } from "./hooks/audit.js";
@@ -31,7 +30,6 @@ export interface ProxyServerConfig {
   transport: "sse" | "streamable-http";
   router: ToolRouter;
   upstream: UpstreamManager;
-  db?: Database.Database;
   agentName?: string;
   authToken?: string;
   approvalPatterns?: string[];
@@ -316,10 +314,8 @@ export class ProxyServer {
   // ── MCP Server Factory ────────────────────────────────────────────
 
   private createMcpServer(): Server {
-    // Destructure only stable (non-late-bound) fields.
-    // router, upstream, resourceRouter, promptRouter are accessed via
-    // this.config.* so they pick up values set by setRouting().
-    const { db, agentName, approvalPatterns, approvalOptions } = this.config;
+    const { agentName, approvalPatterns, approvalOptions } = this.config;
+    const relay = this.relayServer;
 
     const capabilities: Record<string, Record<string, never>> = {
       tools: {},
@@ -415,48 +411,42 @@ export class ProxyServer {
       const { router, upstream } = this.config;
       const route = router.resolve(name);
       if (!route) {
-        if (db) {
-          const ctx: HookContext = {
-            agentName: agentName ?? "unknown",
-            roleName: "unknown",
-            appName: "unknown",
-            toolName: name,
-            prefixedToolName: name,
-            arguments: args,
-            sessionType: this.config.sessionType,
-            acpClient: this.config.acpClient,
-          };
-          const pre = auditPreHook(ctx);
-          auditPostHook(ctx, pre, `Unknown tool: ${name}`, "denied", db);
-        }
+        const ctx: HookContext = {
+          agentName: agentName ?? "unknown",
+          roleName: "unknown",
+          appName: "unknown",
+          toolName: name,
+          prefixedToolName: name,
+          arguments: args,
+          sessionType: this.config.sessionType,
+          acpClient: this.config.acpClient,
+        };
+        const pre = auditPreHook(ctx);
+        auditPostHook(ctx, pre, `Unknown tool: ${name}`, "denied", relay);
         return {
           content: [{ type: "text" as const, text: `Unknown tool: ${name}` }],
           isError: true,
         };
       }
 
-      const ctx: HookContext | undefined = db
-        ? {
-            agentName: agentName ?? "unknown",
-            roleName: "unknown",
-            appName: route.appName,
-            toolName: route.originalToolName,
-            prefixedToolName: route.prefixedToolName,
-            arguments: args,
-            sessionType: this.config.sessionType,
-            acpClient: this.config.acpClient,
-          }
-        : undefined;
-      const pre = ctx ? auditPreHook(ctx) : undefined;
+      const ctx: HookContext = {
+        agentName: agentName ?? "unknown",
+        roleName: "unknown",
+        appName: route.appName,
+        toolName: route.originalToolName,
+        prefixedToolName: route.prefixedToolName,
+        arguments: args,
+        sessionType: this.config.sessionType,
+        acpClient: this.config.acpClient,
+      };
+      const pre = auditPreHook(ctx);
 
       // Approval check — between audit pre-hook and upstream call
-      if (db && ctx && approvalPatterns?.length && matchesApprovalPattern(route.prefixedToolName, approvalPatterns)) {
-        const approval = await requestApproval(ctx, db, approvalOptions);
+      if (relay && approvalPatterns?.length && matchesApprovalPattern(route.prefixedToolName, approvalPatterns)) {
+        const approval = await requestApproval(ctx, relay, approvalOptions);
         if (approval === "denied") {
           const msg = `Tool call denied: ${route.prefixedToolName} requires approval`;
-          if (pre) {
-            auditPostHook(ctx, pre, msg, "denied", db);
-          }
+          auditPostHook(ctx, pre, msg, "denied", relay);
           return {
             content: [{ type: "text" as const, text: msg }],
             isError: true,
@@ -465,9 +455,7 @@ export class ProxyServer {
         if (approval === "timeout") {
           const ttl = approvalOptions?.ttlSeconds ?? 300;
           const msg = `Tool call timed out: ${route.prefixedToolName} approval expired after ${ttl} seconds`;
-          if (pre) {
-            auditPostHook(ctx, pre, msg, "timeout", db);
-          }
+          auditPostHook(ctx, pre, msg, "timeout", relay);
           return {
             content: [{ type: "text" as const, text: msg }],
             isError: true,
@@ -482,15 +470,11 @@ export class ProxyServer {
           route.originalToolName,
           args as Record<string, unknown> | undefined,
         );
-        if (db && ctx && pre) {
-          auditPostHook(ctx, pre, result, "success", db);
-        }
+        auditPostHook(ctx, pre, result, "success", relay);
         return result;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        if (db && ctx && pre) {
-          auditPostHook(ctx, pre, message, "error", db);
-        }
+        auditPostHook(ctx, pre, message, "error", relay);
         return {
           content: [{ type: "text" as const, text: message }],
           isError: true,

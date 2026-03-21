@@ -34,18 +34,12 @@ ENV NODE_COMPILE_CACHE=/app/.cache/v8
 # Direct npm/npx package cache into the persistent .cache volume
 ENV NPM_CONFIG_CACHE=/app/.cache/npm
 
-# Install build tools for native addons (e.g., better-sqlite3)
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
-
 # Copy esbuild-bundled proxy entry point (single file, fast boot)
 COPY proxy-bundle.cjs ./
 
-# Copy pre-populated node_modules (native addons + package.json for discovery)
+# Copy pre-populated node_modules (package.json for discovery)
 COPY package.json ./
 COPY node_modules/ ./node_modules/
-
-# Rebuild native addons for the container platform
-RUN npm rebuild better-sqlite3
 
 # Create mason user with host-matching UID/GID
 ARG HOST_UID=1000

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CredentialResolver } from "../../src/credentials/resolver.js";
 import { CredentialService } from "../../src/credentials/service.js";
-import { queryCredentialAudit } from "../../src/credentials/audit.js";
+import type { AuditEmitter, CredentialAuditEntry } from "../../src/credentials/audit.js";
 import type { CredentialRequest } from "../../src/credentials/schemas.js";
 
 // Mock the keychain module to prevent actual keychain calls
@@ -108,6 +108,8 @@ describe("CredentialResolver session overrides", () => {
 
 describe("CredentialService session overrides", () => {
   let service: CredentialService;
+  let auditEntries: CredentialAuditEntry[];
+  let auditEmitter: AuditEmitter;
   const envKeysToClean: string[] = [];
 
   function setEnv(key: string, value: string): void {
@@ -128,11 +130,16 @@ describe("CredentialService session overrides", () => {
   }
 
   beforeEach(() => {
-    service = new CredentialService({
-      dbPath: ":memory:",
-      envFilePath: "/nonexistent/.env",
-      keychainService: "test",
-    });
+    auditEntries = [];
+    auditEmitter = (entry) => auditEntries.push(entry);
+    service = new CredentialService(
+      {
+        envFilePath: "/nonexistent/.env",
+        keychainService: "test",
+      },
+      undefined,
+      auditEmitter,
+    );
   });
 
   afterEach(() => {
@@ -162,10 +169,9 @@ describe("CredentialService session overrides", () => {
 
     await service.handleRequest(makeRequest());
 
-    const entries = queryCredentialAudit(service.getDatabase());
-    expect(entries).toHaveLength(1);
-    expect(entries[0].outcome).toBe("granted");
-    expect(entries[0].source).toBe("session");
+    expect(auditEntries).toHaveLength(1);
+    expect(auditEntries[0].outcome).toBe("granted");
+    expect(auditEntries[0].source).toBe("session");
   });
 
   it("clearSessionOverrides falls back to normal resolution", async () => {

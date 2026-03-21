@@ -28,12 +28,7 @@ export { CredentialWSClient, type CredentialWSClientOptions } from "./ws-client.
 
 // Audit
 export {
-  openCredentialDatabase,
-  insertCredentialAudit,
-  queryCredentialAudit,
   generateAuditId,
-  createSqliteAuditEmitter,
   type AuditEmitter,
   type CredentialAuditEntry,
-  type CredentialAuditFilters,
 } from "./audit.js";
