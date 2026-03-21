@@ -21,7 +21,7 @@ import { matchesApprovalPattern, requestApproval } from "./hooks/approval.js";
 import type { ApprovalOptions } from "./hooks/approval.js";
 import { SessionStore, handleConnectAgent, type RiskLevel } from "./handlers/connect-agent.js";
 import { RelayServer } from "./relay/server.js";
-import { createRelayMessage, type CredentialResponseMessage } from "./relay/messages.js";
+import { createRelayMessage, type CredentialResponseMessage, type McpToolsRegisterMessage, type McpToolsRegisteredMessage } from "./relay/messages.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -94,6 +94,25 @@ export class ProxyServer {
     if (config.relayToken) {
       this.relayServer = new RelayServer({
         token: config.relayToken,
+      });
+
+      // Handle host MCP server tool registration
+      this.relayServer.registerHandler("mcp_tools_register", (msg) => {
+        const regMsg = msg as McpToolsRegisterMessage;
+        const tools: Tool[] = regMsg.tools.map((t) => ({
+          name: t.name,
+          description: t.description,
+          inputSchema: t.inputSchema as Tool["inputSchema"],
+        }));
+        this.config.router.addRoutes(regMsg.app_name, tools);
+
+        // Send confirmation with same id for request/response correlation
+        const confirmation: McpToolsRegisteredMessage = {
+          id: regMsg.id,
+          type: "mcp_tools_registered",
+          app_name: regMsg.app_name,
+        };
+        this.relayServer!.send(confirmation);
       });
     }
   }
