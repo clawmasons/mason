@@ -5,7 +5,8 @@ export {
   findRolesForTask,
   collectAllSkills,
   collectAllTasks,
-  generateSkillReadme,
+  readSkills,
+  materializeSkills,
 } from "@clawmasons/agent-sdk";
 export type { LaunchCredentialConfig } from "@clawmasons/agent-sdk";
 

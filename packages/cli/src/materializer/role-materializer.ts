@@ -8,9 +8,9 @@
 
 import * as path from "node:path";
 import type { Role, ResolvedAgent } from "@clawmasons/shared";
-import { adaptRoleToResolvedAgent } from "@clawmasons/shared";
-import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage, AgentRegistry, AgentTaskConfig } from "@clawmasons/agent-sdk";
-import { createAgentRegistry, getAgent, getRegisteredAgentNames, readTasks } from "@clawmasons/agent-sdk";
+import { adaptRoleToResolvedAgent, getDialectByDirectory } from "@clawmasons/shared";
+import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage, AgentRegistry, AgentTaskConfig, AgentSkillConfig } from "@clawmasons/agent-sdk";
+import { createAgentRegistry, getAgent, getRegisteredAgentNames, readTasks, readSkills } from "@clawmasons/agent-sdk";
 
 // Built-in agent packages
 import claudeCodeAgent from "@clawmasons/claude-code-agent";
@@ -93,6 +93,21 @@ export function getRegisteredAgentTypes(): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// Source Dialect Resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve a sources entry (e.g. ".claude", "claude") to an AgentPackage.
+ * Strips leading dot, looks up dialect by directory, then gets the agent package.
+ */
+function resolveSourceDialect(source: string): AgentPackage | undefined {
+  const dir = source.startsWith(".") ? source.slice(1) : source;
+  const dialect = getDialectByDirectory(dir);
+  if (!dialect) return undefined;
+  return getAgentFromRegistry(dialect.name);
+}
+
+// ---------------------------------------------------------------------------
 // Task Content Resolution
 // ---------------------------------------------------------------------------
 
@@ -109,6 +124,14 @@ const MASON_TASK_CONFIG: AgentTaskConfig = {
  * Determine the AgentTaskConfig for reading tasks from the role's source location.
  */
 function getSourceTaskConfig(role: Role): AgentTaskConfig | undefined {
+  // Check explicit sources first
+  if (role.sources?.length) {
+    for (const src of role.sources) {
+      const pkg = resolveSourceDialect(src);
+      if (pkg?.tasks) return pkg.tasks;
+    }
+  }
+  // Fall back to auto-detected dialect
   const dialect = role.source.agentDialect;
   if (!dialect || dialect === "mason") return MASON_TASK_CONFIG;
 
@@ -163,6 +186,68 @@ export function resolveTaskContent(agent: ResolvedAgent, role: Role): void {
         if (source.category) task.category = source.category;
         if (source.tags) task.tags = source.tags;
         if (source.scope) task.scope = source.scope;
+      } else {
+        console.warn(`  Warning: task "${task.name}" not found in source (searched ${sourceConfig.projectFolder})`);
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Skill Content Resolution
+// ---------------------------------------------------------------------------
+
+/** Canonical mason skill config for roles stored in .mason/skills/. */
+const MASON_SKILL_CONFIG: AgentSkillConfig = {
+  projectFolder: ".mason/skills",
+};
+
+/**
+ * Determine the AgentSkillConfig for reading skills from the role's source location.
+ */
+function getSourceSkillConfig(role: Role): AgentSkillConfig | undefined {
+  // Check explicit sources first
+  if (role.sources?.length) {
+    for (const src of role.sources) {
+      const pkg = resolveSourceDialect(src);
+      if (pkg?.skills) return pkg.skills;
+    }
+  }
+  // Fall back to auto-detected dialect
+  const dialect = role.source.agentDialect;
+  if (!dialect || dialect === "mason") return MASON_SKILL_CONFIG;
+
+  const agentPkg = getAgentFromRegistry(dialect);
+  return agentPkg?.skills ?? MASON_SKILL_CONFIG;
+}
+
+/**
+ * Read actual skill file contents from the role's source location and
+ * populate contentMap on the ResolvedAgent's skills.
+ *
+ * This bridges the gap between SkillRef (name-only references in the Role)
+ * and the full ResolvedSkill with file content that materializers need.
+ */
+export function resolveSkillContent(agent: ResolvedAgent, role: Role): void {
+  const sourceConfig = getSourceSkillConfig(role);
+  const sourceProjectDir = getSourceProjectDir(role);
+
+  if (!sourceConfig || !sourceProjectDir) return;
+
+  const sourceSkills = readSkills(sourceConfig, sourceProjectDir);
+
+  // Build lookup by skill name
+  const sourceByName = new Map(sourceSkills.map((s) => [s.name, s]));
+
+  for (const resolvedRole of agent.roles) {
+    for (const skill of resolvedRole.skills) {
+      const source = sourceByName.get(skill.name);
+      if (source) {
+        skill.contentMap = source.contentMap;
+        if (source.description) skill.description = source.description;
+        if (source.artifacts.length > 0) skill.artifacts = source.artifacts;
+      } else {
+        console.warn(`  Warning: skill "${skill.name}" not found in source (searched ${sourceConfig.projectFolder})`);
       }
     }
   }
@@ -211,6 +296,9 @@ export function materializeForAgent(
 
   // Resolve actual task prompt content from source files.
   resolveTaskContent(resolvedAgent, role);
+
+  // Resolve actual skill file content from source files.
+  resolveSkillContent(resolvedAgent, role);
 
   // Merge agent-config credentials (from .mason/config.json) into the resolved agent.
   if (options?.agentConfigCredentials?.length) {

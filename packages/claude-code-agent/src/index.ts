@@ -31,6 +31,9 @@ RUN npm install -g @anthropic-ai/claude-code
     supportedFields: ["name->displayName", "description", "category", "tags"],
     prompt: "markdown-body",
   },
+  skills: {
+    projectFolder: ".claude/skills",
+  },
 };
 
 // Wire the materializer to its parent AgentPackage

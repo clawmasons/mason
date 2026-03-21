@@ -26,6 +26,9 @@ RUN npm install -g @mariozechner/pi-coding-agent
     supportedFields: ["description"],
     prompt: "markdown-body",
   },
+  skills: {
+    projectFolder: "skills",
+  },
 };
 
 // Wire the materializer to its parent AgentPackage

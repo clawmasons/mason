@@ -57,6 +57,7 @@ export type {
   ResolvedRole,
   ResolvedSkill,
   ResolvedTask,
+  AgentSkillConfig,
 } from "./types.js";
 
 // Tool filtering

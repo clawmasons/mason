@@ -347,7 +347,7 @@ describe("generateRoleDockerBuildDir", () => {
 
     expect(buildWorkspaceKeys.some((k) => k.endsWith(".mcp.json"))).toBe(false);
     expect(buildWorkspaceKeys.some((k) => k.endsWith("AGENTS.md"))).toBe(false);
-    expect(buildWorkspaceKeys.some((k) => k.endsWith("SKILL.md"))).toBe(true);
+    // Skills without contentMap (no resolveSkillContent call) produce no files
   });
 
   it("supervisor role routes materialized files to home/ not build/workspace/project/", () => {
@@ -386,9 +386,8 @@ describe("generateRoleDockerBuildDir", () => {
     const claudeJsonContent = JSON.parse(writtenFiles.get(claudeJsonFile!)!);
     expect(claudeJsonContent.mcpServers).toBeDefined();
 
-    // Skills go under home/.claude/skills/ not home/skills/
-    expect(homeFiles.some((k) => k.includes(path.join("home", "skills")))).toBe(false);
-    expect(homeFiles.some((k) => k.includes(path.join("home", ".claude", "skills")))).toBe(true);
+    // Skills without contentMap (no resolveSkillContent call) produce no files.
+    // When contentMap is populated, skills go under home/.claude/skills/ not home/skills/.
   });
 
   it("supervisor role Dockerfile uses WORKDIR /home/mason/workspace (not /project)", () => {

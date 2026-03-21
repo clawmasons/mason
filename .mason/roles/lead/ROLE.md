@@ -4,6 +4,9 @@ description: Drives spec creation, planning, code review, and release for the ch
 version: 1.0.0
 type: project
 
+sources:
+  - .claude
+
 skills:
   - openspec-new-change
   - openspec-explore

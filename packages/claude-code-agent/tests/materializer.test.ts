@@ -37,8 +37,13 @@ function makeLabelingSkill(): ResolvedSkill {
   return {
     name: "@clawmasons/skill-labeling",
     version: "1.0.0",
-    artifacts: ["./SKILL.md", "./examples/", "./schemas/"],
+    artifacts: ["SKILL.md", "examples/example1.md", "schemas/labels.json"],
     description: "Issue labeling taxonomy and heuristics",
+    contentMap: new Map([
+      ["SKILL.md", "# Labeling\n\nIssue labeling taxonomy and heuristics"],
+      ["examples/example1.md", "Example content"],
+      ["schemas/labels.json", '{"labels": []}'],
+    ]),
   };
 }
 
@@ -252,14 +257,16 @@ describe("claudeCodeMaterializer", () => {
 
 
     describe("skills directory", () => {
-      it("generates SKILL.md for each unique skill under .claude/skills/", () => {
+      it("materializes SKILL.md and companion files under .claude/skills/", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         expect(result.has(".claude/skills/labeling/SKILL.md")).toBe(true);
+        expect(result.has(".claude/skills/labeling/examples/example1.md")).toBe(true);
+        expect(result.has(".claude/skills/labeling/schemas/labels.json")).toBe(true);
       });
 
-      it("includes skill description in SKILL.md", () => {
+      it("includes actual skill content in materialized files", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
@@ -267,14 +274,12 @@ describe("claudeCodeMaterializer", () => {
         expect(skillMd).toContain("Issue labeling taxonomy and heuristics");
       });
 
-      it("lists skill artifacts in SKILL.md", () => {
+      it("copies companion file content verbatim", () => {
         const agent = makeRepoOpsAgent();
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const skillMd = result.get(".claude/skills/labeling/SKILL.md")!;
-        expect(skillMd).toContain("./SKILL.md");
-        expect(skillMd).toContain("./examples/");
-        expect(skillMd).toContain("./schemas/");
+        expect(result.get(".claude/skills/labeling/examples/example1.md")).toBe("Example content");
+        expect(result.get(".claude/skills/labeling/schemas/labels.json")).toBe('{"labels": []}');
       });
 
       it("deduplicates skills across roles", () => {
@@ -284,9 +289,9 @@ describe("claudeCodeMaterializer", () => {
 
         const result = claudeCodeMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        // Should only have one .claude/skills/labeling/ entry
-        const skillEntries = [...result.keys()].filter((k) => k.startsWith(".claude/skills/"));
-        expect(skillEntries).toEqual([".claude/skills/labeling/SKILL.md"]);
+        // Should only have one set of .claude/skills/labeling/ entries
+        const skillEntries = [...result.keys()].filter((k) => k.startsWith(".claude/skills/labeling/"));
+        expect(skillEntries).toHaveLength(3); // SKILL.md + 2 companions
       });
     });
 
@@ -386,6 +391,8 @@ describe("claudeCodeMaterializer", () => {
           ".claude/commands/@clawmasons/task-triage-issue.md",
           ".claude/settings.json",
           ".claude/skills/labeling/SKILL.md",
+          ".claude/skills/labeling/examples/example1.md",
+          ".claude/skills/labeling/schemas/labels.json",
           "agent-launch.json",
         ]);
       });
@@ -429,11 +436,12 @@ describe("claudeCodeMaterializer", () => {
       expect(result.has(".mcp.json")).toBe(false);
     });
 
-    it("emits skills under .claude/skills/{name}/SKILL.md", () => {
+    it("emits skills under .claude/skills/{name}/ with actual content", () => {
       const agent = makeRepoOpsAgent();
       const result = claudeCodeMaterializer.materializeSupervisor!(agent, "http://mcp-proxy:9090");
 
       expect(result.has(".claude/skills/labeling/SKILL.md")).toBe(true);
+      expect(result.has(".claude/skills/labeling/examples/example1.md")).toBe(true);
       expect(result.has("skills/labeling/SKILL.md")).toBe(false);
     });
 
@@ -508,6 +516,8 @@ describe("claudeCodeMaterializer", () => {
         ".claude/commands/@clawmasons/task-triage-issue.md",
         ".claude/settings.json",
         ".claude/skills/labeling/SKILL.md",
+        ".claude/skills/labeling/examples/example1.md",
+        ".claude/skills/labeling/schemas/labels.json",
         "agent-launch.json",
       ]);
     });

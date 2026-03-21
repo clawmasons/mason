@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import yaml from "js-yaml";
-import type { ResolvedRole, ResolvedTask, ResolvedSkill } from "@clawmasons/shared";
+import type { ResolvedRole, ResolvedTask, ResolvedSkill, AgentSkillConfig } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
 import type { AgentPackage, AgentTaskConfig, MaterializationResult } from "./types.js";
 
@@ -166,23 +166,104 @@ export function generateAgentLaunchJson(
   return JSON.stringify(config, null, 2);
 }
 
-/**
- * Generate a skill README.md.
- */
-export function generateSkillReadme(skill: ResolvedSkill): string {
-  const lines: string[] = [];
-  const skillShortName = getAppShortName(skill.name);
+// ── Skill Read/Write ─────────────────────────────────────────────────
 
-  lines.push(`# ${skillShortName}`);
-  lines.push("");
-  lines.push(skill.description);
-  lines.push("");
-  lines.push("## Artifacts");
-  for (const artifact of skill.artifacts) {
-    lines.push(`- ${artifact}`);
+/**
+ * Recursively discover all files in a directory, returning paths relative to baseDir.
+ */
+function walkAllFiles(dir: string, baseDir: string): string[] {
+  const results: string[] = [];
+  if (!fs.existsSync(dir)) return results;
+
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...walkAllFiles(full, baseDir));
+    } else if (entry.isFile()) {
+      results.push(path.relative(baseDir, full));
+    }
+  }
+  return results;
+}
+
+/**
+ * Read skill directories from an agent's folder based on its AgentSkillConfig.
+ *
+ * Walks {projectDir}/{config.projectFolder}/, treating each subdirectory as a skill.
+ * Reads SKILL.md frontmatter for name/description, enumerates all files into contentMap.
+ * Directories without a SKILL.md are skipped.
+ */
+export function readSkills(
+  config: AgentSkillConfig,
+  projectDir: string,
+): ResolvedSkill[] {
+  const skillsDir = path.join(projectDir, config.projectFolder);
+  if (!fs.existsSync(skillsDir)) return [];
+
+  const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+  const skills: ResolvedSkill[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+
+    const skillDir = path.join(skillsDir, entry.name);
+    const skillMdPath = path.join(skillDir, "SKILL.md");
+    if (!fs.existsSync(skillMdPath)) continue;
+
+    // Parse SKILL.md frontmatter for name and description
+    const skillMdContent = fs.readFileSync(skillMdPath, "utf-8");
+    const { frontmatter } = parseFrontmatter(skillMdContent);
+    const name = (frontmatter.name as string) ?? entry.name;
+    const description = (frontmatter.description as string) ?? "";
+
+    // Enumerate all files and read content
+    const relativePaths = walkAllFiles(skillDir, skillDir);
+    const contentMap = new Map<string, string>();
+    const artifacts: string[] = [];
+
+    for (const relPath of relativePaths) {
+      const fullPath = path.join(skillDir, relPath);
+      contentMap.set(relPath, fs.readFileSync(fullPath, "utf-8"));
+      artifacts.push(relPath);
+    }
+
+    skills.push({
+      name,
+      version: "0.0.0",
+      artifacts,
+      description,
+      contentMap,
+    });
   }
 
-  return lines.join("\n");
+  return skills;
+}
+
+/**
+ * Write ResolvedSkill[] to an agent's file layout based on its AgentSkillConfig.
+ *
+ * For each skill with a contentMap, writes every entry to
+ * {config.projectFolder}/{skill-short-name}/{relative-path}.
+ * Skills without a contentMap are skipped.
+ */
+export function materializeSkills(
+  skills: ResolvedSkill[],
+  config: AgentSkillConfig,
+): MaterializationResult {
+  const result: MaterializationResult = new Map();
+
+  for (const skill of skills) {
+    if (!skill.contentMap || skill.contentMap.size === 0) continue;
+
+    const shortName = getAppShortName(skill.name);
+    for (const [relPath, content] of skill.contentMap) {
+      const fullPath = path.posix.join(config.projectFolder, shortName, relPath);
+      result.set(fullPath, content);
+    }
+  }
+
+  return result;
 }
 
 // ── Task Read/Write ──────────────────────────────────────────────────

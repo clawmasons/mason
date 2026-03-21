@@ -18,9 +18,10 @@ export {
   collectAllSkills,
   collectAllTasks,
   generateAgentLaunchJson,
-  generateSkillReadme,
   readTasks,
   materializeTasks,
+  readSkills,
+  materializeSkills,
 } from "./helpers.js";
 export type { LaunchCredentialConfig } from "./helpers.js";
 
@@ -44,5 +45,6 @@ export type {
   ResolvedRole,
   ResolvedTask,
   ResolvedSkill,
+  AgentSkillConfig,
 } from "@clawmasons/shared";
 export { getAppShortName } from "@clawmasons/shared";

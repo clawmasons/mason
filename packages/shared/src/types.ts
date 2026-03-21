@@ -35,6 +35,16 @@ export interface ResolvedSkill {
   version: string;
   artifacts: string[];
   description: string;
+  contentMap?: Map<string, string>;
+}
+
+/**
+ * Declarative configuration for how an agent stores skill files.
+ * Drives both readSkills() and materializeSkills() in the SDK.
+ */
+export interface AgentSkillConfig {
+  /** Folder where skill directories live, relative to workspace root (e.g., ".claude/skills"). */
+  projectFolder: string;
 }
 
 /**
