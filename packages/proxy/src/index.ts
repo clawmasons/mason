@@ -23,3 +23,5 @@ export { SessionStore, handleConnectAgent } from "./handlers/connect-agent.js";
 export type { SessionEntry, RiskLevel } from "./handlers/connect-agent.js";
 export { CredentialRelay } from "./handlers/credential-relay.js";
 export type { CredentialRelayConfig, CredentialToolResult } from "./handlers/credential-relay.js";
+export { RelayServer } from "./relay/server.js";
+export type { RelayServerConfig } from "./relay/server.js";

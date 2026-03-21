@@ -55,7 +55,11 @@ Replace the single-purpose `/ws/credentials` endpoint with a generic `/ws/relay`
 
 **Testable output:** WebSocket connects to `/ws/relay` with valid bearer token → accepted. Invalid token → rejected 401. `send()` delivers message to connected client. `request()` resolves when correlated response arrives. `request()` rejects after timeout. Reconnection replaces old connection. `npx tsc --noEmit` compiles. `npx vitest run packages/proxy/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — [Archived spec](../../changes/archive/2026-03-21-relay-server/)
+- [Proposal](../../changes/archive/2026-03-21-relay-server/proposal.md)
+- [Design](../../changes/archive/2026-03-21-relay-server/design.md)
+- [Tasks](../../changes/archive/2026-03-21-relay-server/tasks.md)
+- [Spec: relay-server](../../changes/archive/2026-03-21-relay-server/specs/relay-server/spec.md)
 
 ---
 
