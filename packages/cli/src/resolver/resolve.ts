@@ -10,7 +10,6 @@ import type {
   ResolvedTask,
 } from "@clawmasons/shared";
 import {
-  CircularDependencyError,
   PackageNotFoundError,
   TypeMismatchError,
 } from "./errors.js";
@@ -97,61 +96,21 @@ function resolveSkill(
 
 /**
  * Resolve a task package to a ResolvedTask.
- * Tracks the traversal path for circular dependency detection.
  */
 function resolveTask(
   name: string,
   packages: Map<string, DiscoveredPackage>,
-  traversalPath: string[],
   context?: string,
 ): ResolvedTask {
-  // Circular dependency detection
-  if (traversalPath.includes(name)) {
-    throw new CircularDependencyError([...traversalPath, name]);
-  }
-
   const pkg = getPackage(name, packages, context);
   assertType(pkg, "task", context);
   const field = pkg.field as TaskField;
-  const taskContext = `task "${name}"`;
-
-  // Resolve required apps
-  const apps: ResolvedApp[] = [];
-  if (field.requires?.apps) {
-    for (const appName of field.requires.apps) {
-      apps.push(resolveApp(appName, packages, taskContext));
-    }
-  }
-
-  // Resolve required skills
-  const skills: ResolvedSkill[] = [];
-  if (field.requires?.skills) {
-    for (const skillName of field.requires.skills) {
-      skills.push(resolveSkill(skillName, packages, taskContext));
-    }
-  }
-
-  // Resolve sub-tasks for composite tasks
-  const subTasks: ResolvedTask[] = [];
-  if (field.tasks) {
-    const newPath = [...traversalPath, name];
-    for (const subTaskName of field.tasks) {
-      subTasks.push(resolveTask(subTaskName, packages, newPath, taskContext));
-    }
-  }
 
   return {
     name: pkg.name,
     version: pkg.version,
-    taskType: field.taskType,
     prompt: field.prompt,
-    timeout: field.timeout,
-    approval: field.approval,
-    requiredApps: field.requires?.apps,
-    requiredSkills: field.requires?.skills,
-    apps,
-    skills,
-    subTasks,
+    description: field.description,
   };
 }
 
@@ -172,7 +131,7 @@ function resolveRole(
   const tasks: ResolvedTask[] = [];
   if (field.tasks) {
     for (const taskName of field.tasks) {
-      tasks.push(resolveTask(taskName, packages, [], roleContext));
+      tasks.push(resolveTask(taskName, packages, roleContext));
     }
   }
 

@@ -2,79 +2,57 @@ import { describe, it, expect } from "vitest";
 import { taskFieldSchema } from "@clawmasons/shared";
 
 describe("taskFieldSchema", () => {
-  it("validates a valid subagent task", () => {
+  it("validates a minimal task with just type", () => {
     const result = taskFieldSchema.safeParse({
       type: "task",
-      taskType: "subagent",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("validates a task with prompt", () => {
+    const result = taskFieldSchema.safeParse({
+      type: "task",
       prompt: "./prompts/triage.md",
-      requires: {
-        apps: ["@clawmasons/app-github"],
-        skills: ["@clawmasons/skill-labeling"],
-      },
-      timeout: "5m",
-      approval: "auto",
     });
     expect(result.success).toBe(true);
   });
 
-  it("validates a composite task", () => {
+  it("validates a task with description", () => {
     const result = taskFieldSchema.safeParse({
       type: "task",
-      taskType: "composite",
+      description: "Triage incoming issues",
     });
     expect(result.success).toBe(true);
   });
 
-  it("validates a script task", () => {
+  it("validates a task with all fields", () => {
     const result = taskFieldSchema.safeParse({
       type: "task",
-      taskType: "script",
+      prompt: "./prompts/triage.md",
+      description: "Triage incoming issues",
     });
     expect(result.success).toBe(true);
   });
 
-  it("validates a human task", () => {
+  it("rejects task with wrong type literal", () => {
     const result = taskFieldSchema.safeParse({
-      type: "task",
-      taskType: "human",
-      prompt: "./prompts/approval.md",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("rejects task with invalid taskType", () => {
-    const result = taskFieldSchema.safeParse({
-      type: "task",
-      taskType: "unknown",
+      type: "skill",
     });
     expect(result.success).toBe(false);
-    if (!result.success) {
-      const message = result.error.issues[0].message;
-      expect(message).toContain("Invalid enum value");
-    }
   });
 
-  it("accepts task with partial requires", () => {
+  it("rejects task with missing type", () => {
     const result = taskFieldSchema.safeParse({
-      type: "task",
-      taskType: "subagent",
-      requires: { apps: ["@clawmasons/app-github"] },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("validates PRD example: @clawmasons/task-triage-issue", () => {
-    const result = taskFieldSchema.safeParse({
-      type: "task",
-      taskType: "subagent",
       prompt: "./prompts/triage.md",
-      requires: {
-        apps: ["@clawmasons/app-github"],
-        skills: ["@clawmasons/skill-labeling"],
-      },
-      timeout: "5m",
-      approval: "auto",
     });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects non-string prompt", () => {
+    const result = taskFieldSchema.safeParse({
+      type: "task",
+      prompt: 123,
+    });
+    expect(result.success).toBe(false);
   });
 });

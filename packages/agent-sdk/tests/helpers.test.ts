@@ -22,16 +22,11 @@ function makeSkill(name: string): ResolvedSkill {
   };
 }
 
-function makeTask(name: string, skills: ResolvedSkill[] = []): ResolvedTask {
+function makeTask(name: string): ResolvedTask {
   return {
     name,
     version: "1.0.0",
-    taskType: "subagent",
     prompt: "./prompts/task.md",
-    requiredApps: [],
-    apps: [],
-    skills,
-    subTasks: [],
   };
 }
 
@@ -186,30 +181,12 @@ describe("collectAllSkills", () => {
     expect(result.get("@clawmasons/skill-labeling")).toBe(skill);
   });
 
-  it("collects skills from task.skills", () => {
-    const skill = makeSkill("@clawmasons/skill-from-task");
-    const task = makeTask("@clawmasons/task-x", [skill]);
-    const role = makeRole("@clawmasons/role-a", [task]);
-
-    const result = collectAllSkills([role]);
-    expect(result.has("@clawmasons/skill-from-task")).toBe(true);
-  });
-
   it("deduplicates skills appearing in multiple roles", () => {
     const skill = makeSkill("@clawmasons/skill-shared");
     const roleA = makeRole("@clawmasons/role-a", [], [skill]);
     const roleB = makeRole("@clawmasons/role-b", [], [skill]);
 
     const result = collectAllSkills([roleA, roleB]);
-    expect(result.size).toBe(1);
-  });
-
-  it("deduplicates skill from both role.skills and task.skills", () => {
-    const skill = makeSkill("@clawmasons/skill-dup");
-    const task = makeTask("@clawmasons/task-x", [skill]);
-    const role = makeRole("@clawmasons/role-a", [task], [skill]);
-
-    const result = collectAllSkills([role]);
     expect(result.size).toBe(1);
   });
 

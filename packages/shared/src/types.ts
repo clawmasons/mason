@@ -38,20 +38,17 @@ export interface ResolvedSkill {
 }
 
 /**
- * A fully-resolved task in the dependency graph.
+ * A fully-resolved task — a named prompt with metadata.
  */
 export interface ResolvedTask {
   name: string;
   version: string;
-  taskType: "subagent" | "script" | "composite" | "human";
+  displayName?: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  scope?: string;
   prompt?: string;
-  timeout?: string;
-  approval?: "auto" | "confirm" | "review";
-  requiredApps?: string[];
-  requiredSkills?: string[];
-  apps: ResolvedApp[];
-  skills: ResolvedSkill[];
-  subTasks: ResolvedTask[];
 }
 
 /**

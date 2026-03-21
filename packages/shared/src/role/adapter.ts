@@ -86,7 +86,7 @@ export function adaptRoleToResolvedAgent(
 
 function buildResolvedRole(role: Role, version: string): ResolvedRole {
   const permissions = aggregatePermissions(role.apps);
-  const tasks = role.tasks.map((t) => adaptTask(t, role.instructions));
+  const tasks = role.tasks.map((t) => adaptTask(t));
   const apps = role.apps.map(adaptApp);
   const skills = role.skills.map(adaptSkill);
 
@@ -157,15 +157,12 @@ function aggregatePermissions(
   return permissions;
 }
 
-function adaptTask(task: TaskRef, instructions: string): ResolvedTask {
+function adaptTask(task: TaskRef): ResolvedTask {
   return {
     name: task.name,
     version: "0.0.0",
-    taskType: "subagent",
-    prompt: instructions,
-    apps: [],
-    skills: [],
-    subTasks: [],
+    // prompt is intentionally undefined — it will be resolved
+    // from source task files by the materializer layer
   };
 }
 

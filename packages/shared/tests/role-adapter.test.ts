@@ -155,12 +155,8 @@ describe("adaptRoleToResolvedAgent", () => {
 
       expect(tasks).toHaveLength(2);
       expect(tasks[0].name).toBe("define-change");
-      expect(tasks[0].taskType).toBe("subagent");
       expect(tasks[0].version).toBe("0.0.0");
-      expect(tasks[0].prompt).toBe("You are a test agent.");
-      expect(tasks[0].apps).toEqual([]);
-      expect(tasks[0].skills).toEqual([]);
-      expect(tasks[0].subTasks).toEqual([]);
+      expect(tasks[0].prompt).toBeUndefined();
       expect(tasks[1].name).toBe("review-change");
     });
   });

@@ -1,6 +1,9 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
+import yaml from "js-yaml";
 import type { ResolvedRole, ResolvedTask, ResolvedSkill } from "@clawmasons/shared";
 import { getAppShortName } from "@clawmasons/shared";
-import type { AgentPackage } from "./types.js";
+import type { AgentPackage, AgentTaskConfig, MaterializationResult } from "./types.js";
 
 /**
  * Mapping from LLM provider identifiers to their environment variable names.
@@ -57,13 +60,6 @@ export function collectAllSkills(roles: ResolvedRole[]): Map<string, ResolvedSki
     for (const skill of role.skills) {
       if (!skills.has(skill.name)) {
         skills.set(skill.name, skill);
-      }
-    }
-    for (const task of role.tasks) {
-      for (const skill of task.skills) {
-        if (!skills.has(skill.name)) {
-          skills.set(skill.name, skill);
-        }
       }
     }
   }
@@ -187,4 +183,241 @@ export function generateSkillReadme(skill: ResolvedSkill): string {
   }
 
   return lines.join("\n");
+}
+
+// ── Task Read/Write ──────────────────────────────────────────────────
+
+/**
+ * Parse a supportedFields entry into its ResolvedTask property name and frontmatter key.
+ * "name->displayName" means frontmatter key "name" maps to property "displayName".
+ * "description" means both are "description".
+ */
+function parseFieldMapping(entry: string): { property: string; frontmatterKey: string } {
+  const arrowIdx = entry.indexOf("->");
+  if (arrowIdx !== -1) {
+    return {
+      frontmatterKey: entry.slice(0, arrowIdx),
+      property: entry.slice(arrowIdx + 2),
+    };
+  }
+  return { property: entry, frontmatterKey: entry };
+}
+
+/**
+ * Get the list of field mappings from an AgentTaskConfig.
+ * When "all", returns all ResolvedTask metadata fields (excluding name, prompt, scope).
+ */
+function getFieldMappings(config: AgentTaskConfig): Array<{ property: string; frontmatterKey: string }> {
+  if (config.supportedFields === "all") {
+    return [
+      { property: "displayName", frontmatterKey: "displayName" },
+      { property: "description", frontmatterKey: "description" },
+      { property: "category", frontmatterKey: "category" },
+      { property: "tags", frontmatterKey: "tags" },
+      { property: "version", frontmatterKey: "version" },
+    ];
+  }
+  return config.supportedFields.map(parseFieldMapping);
+}
+
+/** Convert scope "ops:triage" to path "ops/triage". */
+function scopeToPath(scope: string): string {
+  if (!scope) return "";
+  return scope.replace(/:/g, "/");
+}
+
+/** Convert scope "ops:triage" to kebab prefix "ops-triage". */
+function scopeToKebab(scope: string): string {
+  if (!scope) return "";
+  return scope.replace(/:/g, "-");
+}
+
+/**
+ * Resolve a nameFormat template to a file path relative to projectFolder.
+ */
+function resolveNameFormat(
+  nameFormat: string,
+  taskName: string,
+  scope: string,
+): string {
+  let result = nameFormat
+    .replace("{taskName}", taskName)
+    .replace("{scopePath}", scopeToPath(scope))
+    .replace("{scopeKebab}", scopeToKebab(scope));
+
+  // Clean up: remove leading slash or dash when scope is empty
+  result = result.replace(/^\//, "").replace(/^-/, "");
+  // Clean up double slashes from empty scope
+  result = result.replace(/\/\//g, "/");
+
+  return result;
+}
+
+/**
+ * Parse YAML frontmatter and markdown body from file content.
+ * Returns { frontmatter, body }.
+ */
+function parseFrontmatter(content: string): { frontmatter: Record<string, unknown>; body: string } {
+  const trimmed = content.trimStart();
+  if (!trimmed.startsWith("---")) {
+    return { frontmatter: {}, body: content };
+  }
+
+  const endIdx = trimmed.indexOf("---", 3);
+  if (endIdx === -1) {
+    return { frontmatter: {}, body: content };
+  }
+
+  const yamlStr = trimmed.slice(3, endIdx).trim();
+  const body = trimmed.slice(endIdx + 3).replace(/^\r?\n/, "");
+  const parsed = yaml.load(yamlStr);
+  const frontmatter = (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+    ? parsed as Record<string, unknown>
+    : {};
+
+  return { frontmatter, body };
+}
+
+/**
+ * Build YAML frontmatter string from a ResolvedTask and field mappings.
+ */
+function buildFrontmatter(
+  task: ResolvedTask,
+  mappings: Array<{ property: string; frontmatterKey: string }>,
+): string {
+  const obj: Record<string, unknown> = {};
+
+  for (const { property, frontmatterKey } of mappings) {
+    const value = (task as unknown as Record<string, unknown>)[property];
+    if (value !== undefined && value !== null && value !== "") {
+      obj[frontmatterKey] = value;
+    }
+  }
+
+  if (Object.keys(obj).length === 0) return "";
+
+  return `---\n${yaml.dump(obj, { lineWidth: -1 }).trimEnd()}\n---\n`;
+}
+
+/**
+ * Recursively discover .md files in a directory.
+ */
+function walkMdFiles(dir: string): string[] {
+  const results: string[] = [];
+  if (!fs.existsSync(dir)) return results;
+
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...walkMdFiles(full));
+    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      results.push(full);
+    }
+  }
+  return results;
+}
+
+/**
+ * List .md files in a flat directory (no recursion).
+ */
+function listMdFiles(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith(".md"))
+    .map((e) => path.join(dir, e.name));
+}
+
+/**
+ * Read task files from an agent's folder based on its AgentTaskConfig.
+ *
+ * Discovers .md files, parses frontmatter and body, derives name from filename
+ * and scope from path/prefix. Returns ResolvedTask[].
+ */
+export function readTasks(
+  config: AgentTaskConfig,
+  projectDir: string,
+): ResolvedTask[] {
+  const tasksDir = path.join(projectDir, config.projectFolder);
+  const files = config.scopeFormat === "path"
+    ? walkMdFiles(tasksDir)
+    : listMdFiles(tasksDir);
+
+  const mappings = getFieldMappings(config);
+  const tasks: ResolvedTask[] = [];
+
+  for (const filePath of files) {
+    const relativePath = path.relative(tasksDir, filePath);
+    const content = fs.readFileSync(filePath, "utf-8");
+    const { frontmatter, body } = parseFrontmatter(content);
+
+    // Derive name from filename (always authoritative)
+    const basename = path.basename(relativePath, ".md");
+
+    let taskName: string;
+    let scope: string;
+
+    if (config.scopeFormat === "path") {
+      // Name is the filename, scope is the directory path
+      taskName = basename;
+      const dirPart = path.dirname(relativePath);
+      scope = dirPart === "." ? "" : dirPart.replace(/\//g, ":").replace(/\\/g, ":");
+    } else {
+      // kebab-case-prefix: entire filename is {scopeKebab}-{taskName}
+      // Without a known task name to search for, treat the full basename as the name
+      // and scope as empty. When a known name is provided via the task list,
+      // callers can match and extract scope.
+      taskName = basename;
+      scope = "";
+    }
+
+    // Build the ResolvedTask
+    const task: ResolvedTask = {
+      name: taskName,
+      version: "0.0.0",
+      scope,
+      prompt: body || undefined,
+    };
+
+    // Map frontmatter fields to task properties
+    for (const { property, frontmatterKey } of mappings) {
+      const value = frontmatter[frontmatterKey];
+      if (value !== undefined) {
+        (task as unknown as Record<string, unknown>)[property] = value;
+      }
+    }
+
+    tasks.push(task);
+  }
+
+  return tasks;
+}
+
+/**
+ * Write ResolvedTask[] to an agent's file layout based on its AgentTaskConfig.
+ *
+ * Generates file paths from nameFormat + scopeFormat, builds YAML frontmatter
+ * from supportedFields, places prompt as markdown body.
+ * Returns MaterializationResult (Map<string, string>).
+ */
+export function materializeTasks(
+  tasks: ResolvedTask[],
+  config: AgentTaskConfig,
+): MaterializationResult {
+  const result: MaterializationResult = new Map();
+  const mappings = getFieldMappings(config);
+
+  for (const task of tasks) {
+    const relativePath = resolveNameFormat(config.nameFormat, task.name, task.scope ?? "");
+    const fullPath = path.posix.join(config.projectFolder, relativePath);
+
+    const frontmatter = buildFrontmatter(task, mappings);
+    const body = task.prompt ?? "";
+    const content = frontmatter ? `${frontmatter}${body}` : body;
+
+    result.set(fullPath, content);
+  }
+
+  return result;
 }

@@ -32,13 +32,7 @@ function makeTask(overrides: Partial<ResolvedTask> = {}): ResolvedTask {
   return {
     name: "@clawmasons/task-triage-issue",
     version: "1.0.0",
-    taskType: "subagent",
     prompt: "./prompts/triage.md",
-    requiredApps: ["@clawmasons/app-github"],
-    requiredSkills: ["@clawmasons/skill-labeling"],
-    apps: [makeApp()],
-    skills: [makeSkill()],
-    subTasks: [],
     ...overrides,
   };
 }
@@ -119,10 +113,6 @@ describe("validateAgent", () => {
         tasks: [
           makeTask({
             name: "@clawmasons/task-triage-issue",
-            requiredApps: ["@clawmasons/app-github"],
-            requiredSkills: ["@clawmasons/skill-labeling"],
-            apps: [githubApp],
-            skills: [skill],
           }),
         ],
         apps: [githubApp, slackApp],
@@ -157,75 +147,6 @@ describe("validateAgent", () => {
         roles: [makeRole({ tasks: [], skills: [] })],
       }));
       expect(result.valid).toBe(true);
-    });
-  });
-
-  describe("requirement coverage", () => {
-    it("fails when task requires app not in role permissions", () => {
-      const slackApp = makeApp({
-        name: "@clawmasons/app-slack",
-        tools: ["send_message"],
-      });
-
-      const task = makeTask({
-        apps: [makeApp(), slackApp], // task requires both github and slack
-      });
-
-      // Role only has permissions for github, not slack
-      const role = makeRole({
-        tasks: [task],
-      });
-
-      const result = validateAgent(makeMember({ roles: [role] }));
-      expect(result.valid).toBe(false);
-      expect(result.errors).toHaveLength(1);
-      expect(result.errors[0].category).toBe("requirement-coverage");
-      expect(result.errors[0].context.app).toBe("@clawmasons/app-slack");
-      expect(result.errors[0].context.task).toBe("@clawmasons/task-triage-issue");
-      expect(result.errors[0].context.role).toBe("@clawmasons/role-issue-manager");
-    });
-
-    it("checks sub-task requirement coverage recursively", () => {
-      const slackApp = makeApp({
-        name: "@clawmasons/app-slack",
-        tools: ["send_message"],
-      });
-
-      const subTask = makeTask({
-        name: "@clawmasons/task-notify",
-        apps: [slackApp],
-        skills: [],
-        requiredSkills: [],
-        subTasks: [],
-      });
-
-      const compositeTask = makeTask({
-        name: "@clawmasons/task-triage-and-notify",
-        taskType: "composite",
-        apps: [],
-        skills: [],
-        requiredApps: [],
-        requiredSkills: [],
-        subTasks: [subTask],
-      });
-
-      const role = makeRole({
-        tasks: [compositeTask],
-        // No slack permissions
-      });
-
-      const result = validateAgent(makeMember({ roles: [role] }));
-      expect(result.valid).toBe(false);
-      const coverageErrors = result.errors.filter((e) => e.category === "requirement-coverage");
-      expect(coverageErrors).toHaveLength(1);
-      expect(coverageErrors[0].context.app).toBe("@clawmasons/app-slack");
-      expect(coverageErrors[0].context.task).toBe("@clawmasons/task-notify");
-    });
-
-    it("passes when task requires app covered by role permissions", () => {
-      const result = validateAgent(makeMember());
-      const coverageErrors = result.errors.filter((e) => e.category === "requirement-coverage");
-      expect(coverageErrors).toHaveLength(0);
     });
   });
 
@@ -272,64 +193,6 @@ describe("validateAgent", () => {
     });
   });
 
-  describe("skill availability", () => {
-    it("passes when task skill is available in task resolution", () => {
-      const result = validateAgent(makeMember());
-      const skillErrors = result.errors.filter((e) => e.category === "skill-availability");
-      expect(skillErrors).toHaveLength(0);
-    });
-
-    it("passes when task skill is available via parent role", () => {
-      const skill = makeSkill();
-      const task = makeTask({
-        requiredSkills: ["@clawmasons/skill-labeling"],
-        skills: [], // NOT in task's resolved skills
-      });
-      const role = makeRole({
-        tasks: [task],
-        skills: [skill], // but IS in the role's skills
-      });
-
-      const result = validateAgent(makeMember({ roles: [role] }));
-      const skillErrors = result.errors.filter((e) => e.category === "skill-availability");
-      expect(skillErrors).toHaveLength(0);
-    });
-
-    it("fails when required skill is not available in task or role", () => {
-      const task = makeTask({
-        requiredSkills: ["@clawmasons/skill-missing"],
-        skills: [], // not resolved in task
-      });
-      const role = makeRole({
-        tasks: [task],
-        skills: [], // not in role either
-      });
-
-      const result = validateAgent(makeMember({ roles: [role] }));
-      expect(result.valid).toBe(false);
-      const skillErrors = result.errors.filter((e) => e.category === "skill-availability");
-      expect(skillErrors).toHaveLength(1);
-      expect(skillErrors[0].context.skill).toBe("@clawmasons/skill-missing");
-      expect(skillErrors[0].context.task).toBe("@clawmasons/task-triage-issue");
-      expect(skillErrors[0].context.role).toBe("@clawmasons/role-issue-manager");
-    });
-
-    it("passes when task has no required skills", () => {
-      const task = makeTask({
-        requiredSkills: undefined,
-        skills: [],
-      });
-      const role = makeRole({
-        tasks: [task],
-        skills: [],
-      });
-
-      const result = validateAgent(makeMember({ roles: [role] }));
-      const skillErrors = result.errors.filter((e) => e.category === "skill-availability");
-      expect(skillErrors).toHaveLength(0);
-    });
-  });
-
   describe("app launch config", () => {
     it("fails when stdio app is missing command", () => {
       const badApp = makeApp({
@@ -344,7 +207,7 @@ describe("validateAgent", () => {
           "@clawmasons/app-broken": { allow: ["create_issue"], deny: [] },
         },
         apps: [badApp],
-        tasks: [makeTask({ apps: [badApp] })],
+        tasks: [makeTask()],
       });
 
       const result = validateAgent(makeMember({ roles: [role] }));
@@ -366,7 +229,7 @@ describe("validateAgent", () => {
           "@clawmasons/app-broken": { allow: ["create_issue"], deny: [] },
         },
         apps: [badApp],
-        tasks: [makeTask({ apps: [badApp] })],
+        tasks: [makeTask()],
       });
 
       const result = validateAgent(makeMember({ roles: [role] }));
@@ -389,7 +252,7 @@ describe("validateAgent", () => {
           "@clawmasons/app-remote": { allow: ["search"], deny: [] },
         },
         apps: [badApp],
-        tasks: [makeTask({ apps: [badApp] })],
+        tasks: [makeTask()],
       });
 
       const result = validateAgent(makeMember({ roles: [role] }));
@@ -690,11 +553,6 @@ describe("validateAgent", () => {
         tools: ["real_tool"],
       });
 
-      const slackApp = makeApp({
-        name: "@clawmasons/app-slack",
-        tools: ["send_message"],
-      });
-
       const role = makeRole({
         permissions: {
           "@clawmasons/app-github": {
@@ -706,9 +564,7 @@ describe("validateAgent", () => {
             deny: [],
           },
         },
-        tasks: [makeTask({
-          apps: [makeApp(), slackApp], // requirement coverage error: slack not in permissions
-        })],
+        tasks: [makeTask()],
         apps: [makeApp(), badApp],
       });
 
@@ -716,7 +572,6 @@ describe("validateAgent", () => {
       expect(result.valid).toBe(false);
 
       const categories = new Set(result.errors.map((e) => e.category));
-      expect(categories.has("requirement-coverage")).toBe(true);
       expect(categories.has("tool-existence")).toBe(true);
       expect(categories.has("app-launch-config")).toBe(true);
     });

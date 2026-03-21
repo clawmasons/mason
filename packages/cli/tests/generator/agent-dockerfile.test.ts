@@ -45,12 +45,7 @@ function makeTriageTask(): ResolvedTask {
   return {
     name: "@acme.platform/task-triage-issue",
     version: "1.0.0",
-    taskType: "subagent",
     prompt: "./prompts/triage.md",
-    requiredApps: ["@acme.platform/app-github"],
-    apps: [makeGithubApp()],
-    skills: [makeLabelingSkill()],
-    subTasks: [],
   };
 }
 
@@ -58,12 +53,7 @@ function makeWriteTask(): ResolvedTask {
   return {
     name: "@acme.platform/task-write-notes",
     version: "1.0.0",
-    taskType: "subagent",
     prompt: "./prompts/write.md",
-    requiredApps: ["@acme.platform/app-filesystem"],
-    apps: [makeFilesystemApp()],
-    skills: [],
-    subTasks: [],
   };
 }
 

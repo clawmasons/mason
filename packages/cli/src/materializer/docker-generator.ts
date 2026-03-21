@@ -16,7 +16,7 @@ import * as crypto from "node:crypto";
 import * as os from "node:os";
 import type { Role } from "@clawmasons/shared";
 import { getAppShortName, CLI_NAME_UPPERCASE } from "@clawmasons/shared";
-import { materializeForAgent, getMaterializer, getAgentFromRegistry } from "./role-materializer.js";
+import { materializeForAgent, getMaterializer, getAgentFromRegistry, resolveTaskContent } from "./role-materializer.js";
 import { generateAgentDockerfile } from "../generator/agent-dockerfile.js";
 import { generateProxyDockerfile } from "../generator/proxy-dockerfile.js";
 import { adaptRoleToResolvedAgent } from "@clawmasons/shared";
@@ -268,6 +268,7 @@ export function generateRoleDockerBuildDir(
 
   // Agent Dockerfile
   const resolvedAgent = adaptRoleToResolvedAgent(role, agentType);
+  resolveTaskContent(resolvedAgent, role);
   const agentRole = resolvedAgent.roles[0];
   if (!agentRole) {
     throw new Error(`adaptRoleToResolvedAgent produced no roles for "${role.metadata.name}"`);

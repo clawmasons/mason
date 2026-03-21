@@ -187,7 +187,7 @@ describe("readPackagedRole — valid packages", () => {
     expect(role.source.type).toBe("package");
     expect(role.source.packageName).toBe("@acme/role-create-prd");
     expect(role.source.agentDialect).toBeUndefined();
-    expect(role.source.path).toBeUndefined();
+    expect(role.source.path).toBeDefined();
   });
 
   it("reads a package with dialect-specific field names via mason.dialect", async () => {
