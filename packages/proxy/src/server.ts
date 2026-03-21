@@ -22,6 +22,7 @@ import { matchesApprovalPattern, requestApproval } from "./hooks/approval.js";
 import type { ApprovalOptions } from "./hooks/approval.js";
 import { SessionStore, handleConnectAgent, type RiskLevel } from "./handlers/connect-agent.js";
 import { CredentialRelay } from "./handlers/credential-relay.js";
+import { RelayServer } from "./relay/server.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -39,6 +40,8 @@ export interface ProxyServerConfig {
   promptRouter?: PromptRouter;
   /** Token for authenticating credential service WebSocket connections. */
   credentialProxyToken?: string;
+  /** Token for authenticating relay WebSocket connections (/ws/relay). */
+  relayToken?: string;
   /** Timeout for credential requests in milliseconds. Default: 30000. */
   credentialRequestTimeoutMs?: number;
   /** Agent's declared credential keys (for credential_request tool). */
@@ -88,6 +91,7 @@ export class ProxyServer {
   private activeTransports: Set<SSEServerTransport | StreamableHTTPServerTransport> = new Set();
   private sessionStore: SessionStore;
   private credentialRelay: CredentialRelay | null = null;
+  private relayServer: RelayServer | null = null;
   constructor(config: ProxyServerConfig) {
     this.config = { ...config, port: config.port ?? DEFAULT_PORT };
     this.sessionStore = new SessionStore(config.riskLevel);
@@ -96,6 +100,12 @@ export class ProxyServer {
       this.credentialRelay = new CredentialRelay({
         credentialProxyToken: config.credentialProxyToken,
         requestTimeoutMs: config.credentialRequestTimeoutMs,
+      });
+    }
+
+    if (config.relayToken) {
+      this.relayServer = new RelayServer({
+        token: config.relayToken,
       });
     }
   }
@@ -113,6 +123,11 @@ export class ProxyServer {
   /** Expose the credential relay for external access. */
   getCredentialRelay(): CredentialRelay | null {
     return this.credentialRelay;
+  }
+
+  /** Expose the relay server for external access (e.g., registering handlers). */
+  getRelayServer(): RelayServer | null {
+    return this.relayServer;
   }
 
   async start(): Promise<void> {
@@ -168,13 +183,16 @@ export class ProxyServer {
       }
     });
 
-    // WebSocket upgrade handler for credential service
-    if (this.credentialRelay) {
-      const relay = this.credentialRelay;
+    // WebSocket upgrade handler for credential service and relay
+    if (this.credentialRelay || this.relayServer) {
+      const credRelay = this.credentialRelay;
+      const relayServer = this.relayServer;
       this.httpServer.on("upgrade", (req, socket, head) => {
         const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-        if (url.pathname === "/ws/credentials") {
-          relay.handleUpgrade(req, socket, head as Buffer);
+        if (url.pathname === "/ws/credentials" && credRelay) {
+          credRelay.handleUpgrade(req, socket, head as Buffer);
+        } else if (url.pathname === "/ws/relay" && relayServer) {
+          relayServer.handleUpgrade(req, socket, head as Buffer);
         } else {
           socket.destroy();
         }
@@ -195,6 +213,11 @@ export class ProxyServer {
     // Close credential relay first
     if (this.credentialRelay) {
       this.credentialRelay.close();
+    }
+
+    // Shut down relay server
+    if (this.relayServer) {
+      this.relayServer.shutdown();
     }
 
     const closePromises = Array.from(this.activeTransports).map(async (t) => {
