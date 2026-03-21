@@ -7,7 +7,7 @@ import { RelayServer } from "../../src/relay/server.js";
 import { HostProxy } from "../../src/host-proxy.js";
 import { ToolRouter } from "../../src/router.js";
 import { createRelayMessage } from "../../src/relay/messages.js";
-import type { RelayMessage, McpToolsRegisterMessage, McpToolsRegisteredMessage, McpToolCallMessage, McpToolResultMessage } from "../../src/relay/messages.js";
+import type { RelayMessage, McpToolsRegisterMessage, McpToolsRegisteredMessage, McpToolResultMessage } from "../../src/relay/messages.js";
 import type { ResolvedApp } from "@clawmasons/shared";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 
