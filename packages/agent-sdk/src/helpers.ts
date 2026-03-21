@@ -476,6 +476,45 @@ export function readTasks(
 }
 
 /**
+ * Read a single task file by constructing the expected path from scope and name.
+ *
+ * Instead of scanning directories, this builds the file path deterministically
+ * using the AgentTaskConfig.nameFormat template and reads that file directly.
+ * Returns undefined if the file does not exist.
+ */
+export function readTask(
+  config: AgentTaskConfig,
+  projectDir: string,
+  name: string,
+  scope: string,
+): ResolvedTask | undefined {
+  const relativePath = resolveNameFormat(config.nameFormat, name, scope);
+  const fullPath = path.join(projectDir, config.projectFolder, relativePath);
+
+  if (!fs.existsSync(fullPath)) return undefined;
+
+  const content = fs.readFileSync(fullPath, "utf-8");
+  const { frontmatter, body } = parseFrontmatter(content);
+  const mappings = getFieldMappings(config);
+
+  const task: ResolvedTask = {
+    name,
+    version: "0.0.0",
+    scope: scope || undefined,
+    prompt: body || undefined,
+  };
+
+  for (const { property, frontmatterKey } of mappings) {
+    const value = frontmatter[frontmatterKey];
+    if (value !== undefined) {
+      (task as unknown as Record<string, unknown>)[property] = value;
+    }
+  }
+
+  return task;
+}
+
+/**
  * Write ResolvedTask[] to an agent's file layout based on its AgentTaskConfig.
  *
  * Generates file paths from nameFormat + scopeFormat, builds YAML frontmatter

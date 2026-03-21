@@ -12,8 +12,8 @@ skills:
   - openspec-verify-change
 
 commands:
-  - opsx/apply
-  - opsx/verify
+  - opsx:apply
+  - opsx:verify
 
 container:
   ignore:

@@ -18,6 +18,7 @@ export {
   collectAllSkills,
   collectAllTasks,
   generateAgentLaunchJson,
+  readTask,
   readTasks,
   materializeTasks,
   readSkills,

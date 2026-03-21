@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { ResolvedTask } from "@clawmasons/shared";
-import { readTasks, materializeTasks } from "../src/helpers.js";
+import { readTask, readTasks, materializeTasks } from "../src/helpers.js";
 import type { AgentTaskConfig } from "../src/types.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -454,5 +454,64 @@ describe("round-trip: materializeTasks → readTasks", () => {
     expect(task.tags).toEqual(["test", "round-trip"]);
     expect(task.version).toBe("1.0.0");
     expect(task.prompt).toBe("Do everything");
+  });
+});
+
+// ── readTask (singular) ──────────────────────────────────────────────────
+
+describe("readTask", () => {
+  it("reads a scoped task with path format", () => {
+    writeFile(".claude/commands/opsx/apply.md", `---
+name: "OPSX: Apply"
+description: Apply changes
+---
+Apply the change`);
+    const task = readTask(claudeConfig, tmpDir, "apply", "opsx");
+
+    expect(task).toBeDefined();
+    expect(task!.name).toBe("apply");
+    expect(task!.scope).toBe("opsx");
+    expect(task!.displayName).toBe("OPSX: Apply");
+    expect(task!.description).toBe("Apply changes");
+    expect(task!.prompt).toBe("Apply the change");
+  });
+
+  it("reads a scoped task with kebab format", () => {
+    writeFile(".pi/prompts/opsx-apply.md", `---
+description: Apply changes
+---
+Apply the change`);
+    const task = readTask(piConfig, tmpDir, "apply", "opsx");
+
+    expect(task).toBeDefined();
+    expect(task!.name).toBe("apply");
+    expect(task!.scope).toBe("opsx");
+    expect(task!.description).toBe("Apply changes");
+    expect(task!.prompt).toBe("Apply the change");
+  });
+
+  it("reads an unscoped task", () => {
+    writeFile(".claude/commands/doc-cleanup.md", "Clean up docs");
+    const task = readTask(claudeConfig, tmpDir, "doc-cleanup", "");
+
+    expect(task).toBeDefined();
+    expect(task!.name).toBe("doc-cleanup");
+    expect(task!.scope).toBeUndefined();
+    expect(task!.prompt).toBe("Clean up docs");
+  });
+
+  it("reads a deeply nested scope with path format", () => {
+    writeFile(".claude/commands/ops/triage/label-issue.md", "Label it");
+    const task = readTask(claudeConfig, tmpDir, "label-issue", "ops:triage");
+
+    expect(task).toBeDefined();
+    expect(task!.name).toBe("label-issue");
+    expect(task!.scope).toBe("ops:triage");
+    expect(task!.prompt).toBe("Label it");
+  });
+
+  it("returns undefined for nonexistent file", () => {
+    const task = readTask(claudeConfig, tmpDir, "nonexistent", "opsx");
+    expect(task).toBeUndefined();
   });
 });

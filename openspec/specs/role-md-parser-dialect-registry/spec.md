@@ -62,19 +62,27 @@ The system SHALL detect the agent dialect from the ROLE.md file's directory path
 - **THEN** a `RoleParseError` is thrown
 
 ### Requirement: Field Normalization
-The system SHALL normalize agent-specific field names to generic ROLE_TYPES names using the dialect registry.
 
-#### Scenario: Claude Code — commands to tasks
-- **WHEN** a Claude Code ROLE.md has `commands: ['define-change', 'review-change']`
-- **THEN** the result has `tasks: [{name: 'define-change'}, {name: 'review-change'}]`
+The system SHALL normalize agent-specific field names to generic ROLE_TYPES names using the dialect registry. Task references in dialect-specific fields SHALL use `:` as the scope delimiter (e.g., `opsx:apply`). The `adaptTask()` function SHALL split task names on the last `:` to extract scope and name:
+- `"opsx:apply"` → `{ name: "apply", scope: "opsx", version: "0.0.0" }`
+- `"ops:triage:label"` → `{ name: "label", scope: "ops:triage", version: "0.0.0" }`
+- `"doc-cleanup"` → `{ name: "doc-cleanup", scope: "", version: "0.0.0" }` (no scope, bare name preserved)
 
-#### Scenario: Codex — instructions to tasks
-- **WHEN** a Codex ROLE.md has `instructions: ['review-diff']`
-- **THEN** the result has `tasks: [{name: 'review-diff'}]`
+#### Scenario: Claude Code — commands to tasks with scope extraction
+- **WHEN** a Claude Code ROLE.md has `commands: ['opsx:apply', 'opsx:verify', 'doc-cleanup']`
+- **THEN** the result has `tasks: [{name: 'apply', scope: 'opsx'}, {name: 'verify', scope: 'opsx'}, {name: 'doc-cleanup', scope: ''}]`
 
-#### Scenario: Aider — conventions to tasks
-- **WHEN** an Aider ROLE.md has `conventions: ['rename-symbol']`
-- **THEN** the result has `tasks: [{name: 'rename-symbol'}]`
+#### Scenario: Codex — instructions to tasks with scope extraction
+- **WHEN** a Codex ROLE.md has `instructions: ['opsx:apply']`
+- **THEN** the result has `tasks: [{name: 'apply', scope: 'opsx'}]`
+
+#### Scenario: Aider — conventions to tasks with scope extraction
+- **WHEN** an Aider ROLE.md has `conventions: ['opsx:apply']`
+- **THEN** the result has `tasks: [{name: 'apply', scope: 'opsx'}]`
+
+#### Scenario: Deeply nested scope extraction
+- **WHEN** a ROLE.md has `commands: ['ops:triage:label-issue']`
+- **THEN** the result has `tasks: [{name: 'label-issue', scope: 'ops:triage'}]`
 
 #### Scenario: mcp_servers to apps
 - **WHEN** a ROLE.md has `mcp_servers: [{name: 'github', tools: {allow: ['create_issue']}}]`

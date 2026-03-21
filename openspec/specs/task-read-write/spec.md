@@ -15,6 +15,8 @@ The system SHALL provide a `readTasks(config: AgentTaskConfig, projectDir: strin
 6. Reads the prompt from the markdown body (when `config.prompt` is `"markdown-body"`)
 7. Returns `ResolvedTask[]`
 
+This function remains available for bulk operations (cross-agent portability, round-trip tests) but is no longer the primary mechanism for resolving task content from ROLE.md references. The primary resolution path is `readTask()` (singular) from the `scoped-command-resolution` capability.
+
 #### Scenario: Read tasks with path scope format
 - **WHEN** `readTasks` is called with `scopeFormat: "path"` and `projectFolder: ".claude/commands"`
 - **AND** the folder contains `fix-bug.md` and `ops/triage/label-issue.md`

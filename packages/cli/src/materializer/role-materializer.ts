@@ -10,7 +10,7 @@ import * as path from "node:path";
 import type { Role, ResolvedAgent } from "@clawmasons/shared";
 import { adaptRoleToResolvedAgent, getDialectByDirectory } from "@clawmasons/shared";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage, AgentRegistry, AgentTaskConfig, AgentSkillConfig } from "@clawmasons/agent-sdk";
-import { createAgentRegistry, getAgent, getRegisteredAgentNames, readTasks, readSkills } from "@clawmasons/agent-sdk";
+import { createAgentRegistry, getAgent, getRegisteredAgentNames, readTask, readSkills } from "@clawmasons/agent-sdk";
 
 // Built-in agent packages
 import claudeCodeAgent from "@clawmasons/claude-code-agent";
@@ -171,14 +171,9 @@ export function resolveTaskContent(agent: ResolvedAgent, role: Role): void {
 
   if (!sourceConfig || !sourceProjectDir) return;
 
-  const sourceTasks = readTasks(sourceConfig, sourceProjectDir);
-
-  // Build lookup by task name
-  const sourceByName = new Map(sourceTasks.map((t) => [t.name, t]));
-
   for (const resolvedRole of agent.roles) {
     for (const task of resolvedRole.tasks) {
-      const source = sourceByName.get(task.name);
+      const source = readTask(sourceConfig, sourceProjectDir, task.name, task.scope ?? "");
       if (source) {
         task.prompt = source.prompt;
         if (source.displayName) task.displayName = source.displayName;
