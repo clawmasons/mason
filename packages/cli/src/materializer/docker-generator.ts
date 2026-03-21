@@ -355,7 +355,7 @@ services:
       dockerfile: ../docker/${roleName}/mcp-proxy/Dockerfile
     environment:
       - ${CLI_NAME_UPPERCASE}_PROXY_TOKEN=\${${CLI_NAME_UPPERCASE}_PROXY_TOKEN}
-      - CREDENTIAL_PROXY_TOKEN=\${CREDENTIAL_PROXY_TOKEN}
+      - RELAY_TOKEN=\${RELAY_TOKEN}
     ports:
       - "9090:9090"
 
@@ -390,7 +390,7 @@ export interface SessionComposeOptions {
   /** Proxy authentication token. */
   proxyToken: string;
   /** Credential proxy token. */
-  credentialProxyToken: string;
+  relayToken: string;
   /** Proxy port on host. */
   proxyPort?: number;
   /** Volume mask entries from generateVolumeMasks(). */
@@ -451,7 +451,7 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
     roleName,
     agentType,
     proxyToken,
-    credentialProxyToken,
+    relayToken,
     proxyPort = 9090,
     volumeMasks = [],
     roleMounts,
@@ -494,7 +494,7 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
   // --- Proxy service ---
   const proxyEnvLines = [
     `      - ${CLI_NAME_UPPERCASE}_PROXY_TOKEN=${proxyToken}`,
-    `      - CREDENTIAL_PROXY_TOKEN=${credentialProxyToken}`,
+    `      - RELAY_TOKEN=${relayToken}`,
     `      - PROJECT_DIR=${PROJECT_MOUNT_PATH}`,
   ];
   if (sessionType) {
@@ -716,7 +716,7 @@ export interface SessionResult {
   /** Generated proxy token. */
   proxyToken: string;
   /** Generated credential proxy token. */
-  credentialProxyToken: string;
+  relayToken: string;
   /** Proxy service name. */
   proxyServiceName: string;
   /** Agent service name. */
@@ -766,7 +766,7 @@ export function createSessionDirectory(
 
   // Generate tokens
   const proxyToken = deps.randomBytes(32).toString("hex");
-  const credentialProxyToken = deps.randomBytes(32).toString("hex");
+  const relayToken = deps.randomBytes(32).toString("hex");
 
   // Compute volume masks from role's container.ignore.paths
   const ignorePaths = role.container?.ignore?.paths ?? [];
@@ -800,7 +800,7 @@ export function createSessionDirectory(
     ...opts,
     roleName,
     proxyToken,
-    credentialProxyToken,
+    relayToken,
     volumeMasks,
     sessionDir,
     logsDir,
@@ -823,7 +823,7 @@ export function createSessionDirectory(
     composeFile,
     logsDir,
     proxyToken,
-    credentialProxyToken,
+    relayToken,
     proxyServiceName,
     agentServiceName,
   };

@@ -289,7 +289,7 @@ describe("generateSessionComposeYml (run-agent scenarios)", () => {
     agentName: "@acme/agent",
     roleName: "writer",
     proxyToken: "test-token-abc",
-    credentialProxyToken: "cred-token-xyz",
+    relayToken: "cred-token-xyz",
     proxyPort: 3000,
     sessionDir: "/projects/my-project/.mason/sessions/abc123",
     logsDir: "/projects/my-project/.mason/sessions/abc123/logs",
@@ -313,10 +313,10 @@ describe("generateSessionComposeYml (run-agent scenarios)", () => {
     expect(yml).toContain("init: true");
   });
 
-  it("includes CREDENTIAL_PROXY_TOKEN in proxy environment", () => {
+  it("includes RELAY_TOKEN in proxy environment", () => {
     const yml = generateSessionComposeYml(defaultOpts);
     const proxySection = yml.split("agent-writer:")[0]!;
-    expect(proxySection).toContain("CREDENTIAL_PROXY_TOKEN=cred-token-xyz");
+    expect(proxySection).toContain("RELAY_TOKEN=cred-token-xyz");
   });
 
   it("agent depends on proxy directly", () => {
@@ -579,7 +579,7 @@ describe("packages-hash invalidation", () => {
       existsSyncFn: (p: string) => fs.existsSync(p),
       execComposeFn: async () => 0,
       runAgentFn: async () => 0,
-      startCredentialServiceFn: async () => ({ disconnect: () => {}, close: () => {} }),
+      startHostProxyFn: async () => ({ stop: async () => {} }),
     };
   }
 
@@ -675,7 +675,7 @@ describe("runAgent", () => {
 
   function makeMockDeps(overrides?: {
     proxyExitCode?: number;
-    credServiceExitCode?: number;
+    hostProxyExitCode?: number;
     agentExitCode?: number;
     downExitCode?: number;
     sessionId?: string;
@@ -756,15 +756,15 @@ describe("runAgent", () => {
           return overrides?.agentExitCode ?? 0;
         },
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        startCredentialServiceFn: async (_opts: {
+        startHostProxyFn: async (_opts: {
           proxyPort: number;
-          credentialProxyToken: string;
+          relayToken: string;
           envCredentials: Record<string, string>;
         }) => {
-          if (overrides?.credServiceExitCode && overrides.credServiceExitCode !== 0) {
-            throw new Error("Mock credential service startup failure");
+          if (overrides?.hostProxyExitCode && overrides.hostProxyExitCode !== 0) {
+            throw new Error("Mock host proxy startup failure");
           }
-          return { disconnect: () => {}, close: () => {} };
+          return { stop: async () => {} };
         },
       },
     };
@@ -851,7 +851,7 @@ describe("runAgent", () => {
       ensureGitignoreEntryFn: () => false,
       existsSyncFn: (p: string) => fs.existsSync(p),
       waitForProxyHealthFn: async () => {},
-      startCredentialServiceFn: async () => ({ disconnect: () => {}, close: () => {} }),
+      startHostProxyFn: async () => ({ stop: async () => {} }),
     };
 
     // Pre-create docker build dirs for both runs
@@ -880,7 +880,7 @@ describe("runAgent", () => {
     expect(sessions).toContain("bbbb2222");
   });
 
-  it("starts proxy detached, then credential service in-process, then agent interactively", async () => {
+  it("starts proxy detached, then host proxy in-process, then agent interactively", async () => {
     const { calls, deps } = makeMockDeps();
 
     await runAgent(projectDir, "claude-code-agent", "writer", deps);
@@ -935,7 +935,7 @@ describe("runAgent", () => {
     expect(content).toContain("claude-code-agent/Dockerfile");
   });
 
-  it("compose file has CREDENTIAL_PROXY_TOKEN in proxy", async () => {
+  it("compose file has RELAY_TOKEN in proxy", async () => {
     const { deps } = makeMockDeps({ sessionId: "tok00001" });
 
     await runAgent(projectDir, "claude-code-agent", "writer", deps);
@@ -945,9 +945,9 @@ describe("runAgent", () => {
     );
     const content = fs.readFileSync(composeFile, "utf-8");
 
-    expect(content).toContain("CREDENTIAL_PROXY_TOKEN=");
+    expect(content).toContain("RELAY_TOKEN=");
 
-    const tokenMatch = content.match(/CREDENTIAL_PROXY_TOKEN=([a-f0-9]+)/);
+    const tokenMatch = content.match(/RELAY_TOKEN=([a-f0-9]+)/);
     expect(tokenMatch).toBeTruthy();
     expect(tokenMatch![1]).toMatch(/^[a-f0-9]{64}$/);
   });
@@ -990,8 +990,8 @@ describe("runAgent", () => {
     const proxyToken2 = content2.match(/MASON_PROXY_TOKEN=([a-f0-9]+)/)![1];
     expect(proxyToken1).not.toBe(proxyToken2);
 
-    const credToken1 = content1.match(/CREDENTIAL_PROXY_TOKEN=([a-f0-9]+)/)![1];
-    const credToken2 = content2.match(/CREDENTIAL_PROXY_TOKEN=([a-f0-9]+)/)![1];
+    const credToken1 = content1.match(/RELAY_TOKEN=([a-f0-9]+)/)![1];
+    const credToken2 = content2.match(/RELAY_TOKEN=([a-f0-9]+)/)![1];
     expect(credToken1).not.toBe(credToken2);
   });
 
@@ -1055,14 +1055,14 @@ describe("runAgent", () => {
     expect(errorOutput).toContain("Failed to start proxy");
   });
 
-  it("exits 1 when credential service fails to start", async () => {
-    const { deps } = makeMockDeps({ credServiceExitCode: 1 });
+  it("exits 1 when host proxy fails to start", async () => {
+    const { deps } = makeMockDeps({ hostProxyExitCode: 1 });
 
     await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("Failed to start credential service");
+    expect(errorOutput).toContain("Failed to start host proxy");
   });
 
   it("creates logs directory in session directory", async () => {
@@ -1140,7 +1140,7 @@ describe("runProxyOnly", () => {
           if (args.includes("-d")) return overrides?.upExitCode ?? 0;
           return 0;
         },
-        startCredentialServiceFn: async () => ({ disconnect: () => {}, close: () => {} }),
+        startHostProxyFn: async () => ({ stop: async () => {} }),
       },
     };
   }
@@ -1158,7 +1158,7 @@ describe("runProxyOnly", () => {
     expect(calls[1]!.args).toContain("proxy-writer");
   });
 
-  it("does NOT start agent or credential service", async () => {
+  it("does NOT start agent or host proxy", async () => {
     const { calls, deps } = makeDeps();
 
     await runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps);

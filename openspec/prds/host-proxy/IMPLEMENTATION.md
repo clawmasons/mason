@@ -261,15 +261,20 @@ Update the CLI's `run-agent` command to start a `HostProxy` instance instead of 
 **User Story:** As an operator, when I run `mason run-agent researcher dev`, the CLI starts a host proxy on my machine that connects to the Docker proxy via WebSocket. Credentials, approvals, and audit events all flow through this single connection. No separate credential-service container is needed.
 
 **Scope:**
-- Modify: `packages/cli/src/cli/commands/run-agent.ts` — replace `defaultStartCredentialService` with `defaultStartHostProxy`, update token naming, remove credential-service container from compose
-- Modify: `packages/cli/src/acp/session.ts` — update credential service references to host proxy
-- Modify: `packages/cli/src/cli/commands/proxy.ts` — use `RelayServer` instead of `CredentialRelay`, remove `openDatabase()` call
-- Modify: `packages/cli/src/cli/proxy-entry.ts` — update for relay-based proxy startup
+- Modify: `packages/cli/src/cli/commands/run-agent.ts` — replace `defaultStartCredentialService` with `defaultStartHostProxy`, update token naming
+- Modify: `packages/cli/src/acp/session.ts` — rename `credentialProxyToken` to `relayToken`, update compose env var
+- Modify: `packages/cli/src/materializer/docker-generator.ts` — rename `credentialProxyToken` to `relayToken` in types and compose output
+- Modify: `packages/proxy/src/host-proxy.ts` — add `envCredentials` support to `HostProxyConfig`
+- No change: `packages/cli/src/cli/commands/proxy.ts` — already reads `RELAY_TOKEN` with fallback
+- No change: `packages/cli/src/cli/proxy-entry.ts` — delegates to `startProxy()`, no changes needed
 - Modify: relevant CLI tests
 
 **Testable output:** `run-agent` starts a `HostProxy` instead of `CredentialService`. Docker Compose has `RELAY_TOKEN` (not `CREDENTIAL_PROXY_TOKEN`). No credential-service container in compose. Credential flow works end-to-end: agent → Docker proxy → relay → host proxy → credential resolved. `npx tsc --noEmit` compiles. `npx vitest run packages/cli/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — [Archived spec](../../changes/archive/2026-03-21-cli-host-proxy-integration/)
+- [Proposal](../../changes/archive/2026-03-21-cli-host-proxy-integration/proposal.md)
+- [Design](../../changes/archive/2026-03-21-cli-host-proxy-integration/design.md)
+- [Tasks](../../changes/archive/2026-03-21-cli-host-proxy-integration/tasks.md)
 
 ---
 

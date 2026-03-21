@@ -19,6 +19,8 @@ export interface HostProxyConfig {
   keychainService?: string;
   /** Path for JSONL audit log. Optional, defaults to ~/.mason/data/audit.jsonl. */
   auditFilePath?: string;
+  /** Environment credential overrides (e.g. from ACP client mcpServers config). */
+  envCredentials?: Record<string, string>;
 }
 
 // ── HostProxy ───────────────────────────────────────────────────────────
@@ -64,6 +66,11 @@ export class HostProxy {
       },
       resolver,
     );
+
+    // 1b. Apply session overrides (e.g. env credentials from ACP client)
+    if (this.config.envCredentials && Object.keys(this.config.envCredentials).length > 0) {
+      this.credentialService.setSessionOverrides(this.config.envCredentials);
+    }
 
     // 2. Audit writer
     this.auditWriter = new AuditWriter(

@@ -3,7 +3,7 @@
  *
  * Manages Docker Compose sessions for ACP mode. All services (proxy,
  * agent) live in a single compose file so they share a Docker network.
- * The credential service runs in-process on the host. The lifecycle is:
+ * The host proxy runs in-process on the host. The lifecycle is:
  *
  *   1. `startInfrastructure()` — `docker compose up -d` proxy
  *   2. `startAgentProcess(cwd)` — `docker compose run` (foreground, piped stdio)
@@ -108,7 +108,7 @@ export interface InfrastructureInfo {
   /** Generated proxy token (shared with agent sessions) */
   proxyToken: string;
   /** Generated credential proxy token (shared with agent sessions) */
-  credentialProxyToken: string;
+  relayToken: string;
   /** Role-specific Docker build directory */
   dockerBuildDir: string;
 }
@@ -154,7 +154,7 @@ export interface AcpSessionDeps {
 
 /**
  * Generate a docker-compose.yml with proxy and agent services.
- * The credential service runs in-process on the host, not in Docker.
+ * The host proxy runs in-process on the host, not in Docker.
  *
  * The agent service is defined with `profiles: ["agent"]` so that
  * `docker compose up -d` only starts the proxy.
@@ -174,7 +174,7 @@ export function generateAcpComposeYml(opts: {
   role: string;
   logsDir: string;
   proxyToken: string;
-  credentialProxyToken: string;
+  relayToken: string;
   proxyPort?: number;
   acpClient?: string;
   acpCommand?: string[];
@@ -189,7 +189,7 @@ export function generateAcpComposeYml(opts: {
     role,
     logsDir,
     proxyToken,
-    credentialProxyToken,
+    relayToken,
     proxyPort,
     acpClient,
     acpCommand,
@@ -211,7 +211,7 @@ export function generateAcpComposeYml(opts: {
   // Build proxy environment lines (include ACP metadata)
   const proxyEnvLines = [
     `      - ${CLI_NAME_UPPERCASE}_PROXY_TOKEN=${proxyToken}`,
-    `      - CREDENTIAL_PROXY_TOKEN=${credentialProxyToken}`,
+    `      - RELAY_TOKEN=${relayToken}`,
     `      - ${CLI_NAME_UPPERCASE}_SESSION_TYPE=acp`,
     `      - PROJECT_DIR=${PROJECT_MOUNT_PATH}`,
   ];
@@ -222,7 +222,7 @@ export function generateAcpComposeYml(opts: {
     proxyEnvLines.push(`      - ${CLI_NAME_UPPERCASE}_DECLARED_CREDENTIALS=${JSON.stringify(credentialKeys)}`);
   }
 
-  // Build proxy ports (expose to host for in-process credential service WSClient)
+  // Build proxy ports (expose to host for in-process host proxy relay connection)
   const proxyPortsSection = proxyPort
     ? `\n    ports:\n      - "${proxyPort}:9090"`
     : "";
@@ -355,7 +355,7 @@ export class AcpSession {
 
     // Generate tokens
     const proxyToken = crypto.randomBytes(32).toString("hex");
-    const credentialProxyToken = crypto.randomBytes(32).toString("hex");
+    const relayToken = crypto.randomBytes(32).toString("hex");
 
     // Generate compose file
     const composeContent = generateAcpComposeYml({
@@ -366,7 +366,7 @@ export class AcpSession {
       role,
       logsDir,
       proxyToken,
-      credentialProxyToken,
+      relayToken,
       proxyPort: this.config.proxyPort,
       acpClient: this.config.acpClient,
       acpCommand: this.config.acpCommand,
@@ -423,7 +423,7 @@ export class AcpSession {
 
     // Generate tokens
     const proxyToken = crypto.randomBytes(32).toString("hex");
-    const credentialProxyToken = crypto.randomBytes(32).toString("hex");
+    const relayToken = crypto.randomBytes(32).toString("hex");
 
     // Generate single compose file with all services
     const composeContent = generateAcpComposeYml({
@@ -434,7 +434,7 @@ export class AcpSession {
       role,
       logsDir,
       proxyToken,
-      credentialProxyToken,
+      relayToken,
       proxyPort: this.config.proxyPort,
       acpClient: this.config.acpClient,
       acpCommand: this.config.acpCommand,
@@ -462,7 +462,7 @@ export class AcpSession {
       proxyServiceName,
       agentServiceName,
       proxyToken,
-      credentialProxyToken,
+      relayToken,
       dockerBuildDir,
     };
 
