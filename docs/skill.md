@@ -44,10 +44,28 @@ The `artifacts` array lists files that are injected into the agent's context at 
 }
 ```
 
-How artifacts are delivered depends on the runtime materializer:
-- **Claude Code** — Placed in the `skills/` directory of the agent workspace
-- **pi-coding-agent** — Included in the agent's context configuration
+How artifacts are delivered depends on the runtime materializer. The SDK provides `readSkills()` and `materializeSkills()` helpers that handle discovery and file copying based on `AgentSkillConfig`:
+- **Claude Code** — Copied to `.claude/skills/{skill-name}/` (SKILL.md + companions)
+- **pi-coding-agent** — Copied to `skills/{skill-name}/` (SKILL.md + companions)
 - **MCP Agent** — Available as reference material
+
+### Project-Folder Skill Discovery
+
+Skills stored in an agent's project folder are discovered by `readSkills(config, projectDir)`. It walks `{projectDir}/{config.projectFolder}/`, treating each subdirectory containing a `SKILL.md` as a skill. All files in the directory (SKILL.md + templates, examples, schemas) are read into a `contentMap` and materialized verbatim by `materializeSkills()`.
+
+```typescript
+import type { AgentSkillConfig } from "@clawmasons/agent-sdk";
+
+const skillConfig: AgentSkillConfig = {
+  projectFolder: ".claude/skills",
+};
+
+// Read skills from project folder
+const skills = readSkills(skillConfig, "/path/to/project");
+
+// Materialize to output
+const files = materializeSkills(skills, skillConfig);
+```
 
 ## Use Cases
 

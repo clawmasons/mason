@@ -158,7 +158,7 @@ The same role definition is translated into runtime-specific configurations via 
 
 | Runtime | Aliases | Generated Artifacts |
 |---------|---------|-------------------|
-| **claude-code-agent** | `claude` | `.claude/` directory, `AGENTS.md`, `settings.json`, slash commands, skill files, Dockerfile |
+| **claude-code-agent** | `claude` | `.claude/` directory, `settings.json`, slash commands, skill files (SKILL.md + companions), Dockerfile |
 | **pi-coding-agent** | `pi` | pi-coding-agent configuration, instruction files, Dockerfile |
 | **mcp-agent** | `mcp` | Minimal config for testing (no LLM required) |
 
@@ -187,6 +187,29 @@ Each `AgentPackage` declares an `AgentTaskConfig` that specifies:
 - **prompt**: Where the prompt content lives (currently `markdown-body`)
 
 See [Task](task.md) for the full task model documentation.
+
+### Skill Read/Write Flow
+
+Skills are static file trees (SKILL.md + optional companions like templates, examples, schemas) that are copied verbatim between agent formats. The SDK provides `readSkills()` and `materializeSkills()` functions driven by each agent's `AgentSkillConfig`.
+
+```
+Source Agent Files          ResolvedSkill[]          Target Agent Files
+─────────────────          ───────────────          ──────────────────
+.mason/skills/              readSkills()             .claude/skills/
+  labeling/               ─────────────►              labeling/
+    SKILL.md                name: labeling              SKILL.md
+    examples/               contentMap: {...}           examples/
+      example1.md           artifacts: [...]              example1.md
+                                                    materializeSkills()
+                                                  ◄─────────────────
+```
+
+Each `AgentPackage` declares an `AgentSkillConfig` with:
+- **projectFolder**: Where skill directories live (e.g., `.claude/skills`)
+
+Unlike tasks, skills require no per-agent transformation — files are copied verbatim. Content is populated by `resolveSkillContent()` in the CLI orchestrator before materialization.
+
+See [Skill](skill.md) for the full skill model documentation.
 
 ## Related
 

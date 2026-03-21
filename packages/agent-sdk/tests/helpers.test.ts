@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
+import type { ResolvedRole, ResolvedSkill, ResolvedTask, AgentSkillConfig } from "@clawmasons/shared";
 import {
   PROVIDER_ENV_VARS,
   collectAllSkills,
@@ -7,7 +10,8 @@ import {
   findRolesForTask,
   formatPermittedTools,
   generateAgentLaunchJson,
-  generateSkillReadme,
+  readSkills,
+  materializeSkills,
 } from "../src/helpers.js";
 import type { AgentPackage } from "../src/types.js";
 
@@ -420,36 +424,163 @@ describe("generateAgentLaunchJson", () => {
   });
 });
 
-// ── generateSkillReadme ───────────────────────────────────────────────────────
+// ── readSkills ────────────────────────────────────────────────────────────────
 
-describe("generateSkillReadme", () => {
-  it("includes skill short name in header", () => {
-    const skill = makeSkill("@clawmasons/skill-labeling");
-    const result = generateSkillReadme(skill);
-    expect(result).toContain("# labeling");
+describe("readSkills", () => {
+  const config: AgentSkillConfig = { projectFolder: "skills" };
+
+  function makeTmpDir(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), "readskills-"));
+  }
+
+  it("discovers skill with SKILL.md and reads content into contentMap", () => {
+    const tmp = makeTmpDir();
+    const skillDir = path.join(tmp, "skills", "labeling");
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(path.join(skillDir, "SKILL.md"), "---\nname: Issue Labeling\ndescription: Label taxonomy\n---\nSkill content here");
+    fs.mkdirSync(path.join(skillDir, "examples"), { recursive: true });
+    fs.writeFileSync(path.join(skillDir, "examples", "example1.md"), "Example content");
+
+    const skills = readSkills(config, tmp);
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe("Issue Labeling");
+    expect(skills[0].description).toBe("Label taxonomy");
+    expect(skills[0].artifacts).toContain("SKILL.md");
+    expect(skills[0].artifacts).toContain(path.join("examples", "example1.md"));
+    expect(skills[0].contentMap?.get("SKILL.md")).toContain("Skill content here");
+    expect(skills[0].contentMap?.get(path.join("examples", "example1.md"))).toBe("Example content");
+
+    fs.rmSync(tmp, { recursive: true, force: true });
   });
 
-  it("includes skill description", () => {
-    const skill = makeSkill("@clawmasons/skill-labeling");
-    skill.description = "Issue labeling taxonomy and heuristics";
-    const result = generateSkillReadme(skill);
-    expect(result).toContain("Issue labeling taxonomy and heuristics");
+  it("skips directories without SKILL.md", () => {
+    const tmp = makeTmpDir();
+    const noSkillDir = path.join(tmp, "skills", "not-a-skill");
+    fs.mkdirSync(noSkillDir, { recursive: true });
+    fs.writeFileSync(path.join(noSkillDir, "README.md"), "not a skill");
+
+    const skills = readSkills(config, tmp);
+    expect(skills).toHaveLength(0);
+
+    fs.rmSync(tmp, { recursive: true, force: true });
   });
 
-  it("includes artifacts section with each artifact listed", () => {
-    const skill = makeSkill("@clawmasons/skill-x");
-    skill.artifacts = ["./SKILL.md", "./examples/", "./schemas/"];
-    const result = generateSkillReadme(skill);
-    expect(result).toContain("## Artifacts");
-    expect(result).toContain("./SKILL.md");
-    expect(result).toContain("./examples/");
-    expect(result).toContain("./schemas/");
+  it("returns empty array for missing projectFolder", () => {
+    const tmp = makeTmpDir();
+    const skills = readSkills(config, tmp);
+    expect(skills).toEqual([]);
+    fs.rmSync(tmp, { recursive: true, force: true });
   });
 
-  it("handles skills with no artifacts", () => {
-    const skill = makeSkill("@clawmasons/skill-empty");
-    skill.artifacts = [];
-    const result = generateSkillReadme(skill);
-    expect(result).toContain("## Artifacts");
+  it("uses directory name when SKILL.md has no name frontmatter", () => {
+    const tmp = makeTmpDir();
+    const skillDir = path.join(tmp, "skills", "my-skill");
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(path.join(skillDir, "SKILL.md"), "No frontmatter content");
+
+    const skills = readSkills(config, tmp);
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe("my-skill");
+
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+});
+
+// ── materializeSkills ─────────────────────────────────────────────────────────
+
+describe("materializeSkills", () => {
+  const config: AgentSkillConfig = { projectFolder: ".claude/skills" };
+
+  it("writes contentMap entries to correct paths", () => {
+    const skill: ResolvedSkill = {
+      name: "@clawmasons/skill-labeling",
+      version: "1.0.0",
+      description: "Labeling",
+      artifacts: ["SKILL.md", "examples/example1.md"],
+      contentMap: new Map([
+        ["SKILL.md", "# Labeling skill"],
+        ["examples/example1.md", "Example"],
+      ]),
+    };
+
+    const result = materializeSkills([skill], config);
+    expect(result.get(".claude/skills/labeling/SKILL.md")).toBe("# Labeling skill");
+    expect(result.get(".claude/skills/labeling/examples/example1.md")).toBe("Example");
+  });
+
+  it("derives short name by stripping scope and skill- prefix", () => {
+    const skill: ResolvedSkill = {
+      name: "@clawmasons/skill-labeling",
+      version: "1.0.0",
+      description: "test",
+      artifacts: ["SKILL.md"],
+      contentMap: new Map([["SKILL.md", "content"]]),
+    };
+
+    const result = materializeSkills([skill], config);
+    expect([...result.keys()]).toEqual([".claude/skills/labeling/SKILL.md"]);
+  });
+
+  it("handles unscoped skill name", () => {
+    const skill: ResolvedSkill = {
+      name: "labeling",
+      version: "1.0.0",
+      description: "test",
+      artifacts: ["SKILL.md"],
+      contentMap: new Map([["SKILL.md", "content"]]),
+    };
+
+    const result = materializeSkills([skill], config);
+    expect(result.has(".claude/skills/labeling/SKILL.md")).toBe(true);
+  });
+
+  it("skips skills without contentMap", () => {
+    const skill: ResolvedSkill = {
+      name: "@clawmasons/skill-empty",
+      version: "1.0.0",
+      description: "empty",
+      artifacts: [],
+    };
+
+    const result = materializeSkills([skill], config);
+    expect(result.size).toBe(0);
+  });
+});
+
+// ── readSkills/materializeSkills round-trip ───────────────────────────────────
+
+describe("readSkills + materializeSkills round-trip", () => {
+  const config: AgentSkillConfig = { projectFolder: "skills" };
+
+  it("preserves content through write then read", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "roundtrip-"));
+    const skill: ResolvedSkill = {
+      name: "labeling",
+      version: "1.0.0",
+      description: "Label taxonomy",
+      artifacts: ["SKILL.md", "templates/default.md"],
+      contentMap: new Map([
+        ["SKILL.md", "---\nname: labeling\ndescription: Label taxonomy\n---\nSkill body"],
+        ["templates/default.md", "Template content"],
+      ]),
+    };
+
+    // Write
+    const files = materializeSkills([skill], config);
+    for (const [relPath, content] of files) {
+      const fullPath = path.join(tmp, relPath);
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.writeFileSync(fullPath, content);
+    }
+
+    // Read back
+    const readBack = readSkills(config, tmp);
+    expect(readBack).toHaveLength(1);
+    expect(readBack[0].name).toBe("labeling");
+    expect(readBack[0].description).toBe("Label taxonomy");
+    expect(readBack[0].contentMap?.get("SKILL.md")).toContain("Skill body");
+    expect(readBack[0].contentMap?.get("templates/default.md")).toBe("Template content");
+
+    fs.rmSync(tmp, { recursive: true, force: true });
   });
 });

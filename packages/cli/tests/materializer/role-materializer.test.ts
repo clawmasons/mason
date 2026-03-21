@@ -139,11 +139,14 @@ describe("materializeForAgent", () => {
       expect(result.has(".claude/commands/review-change.md")).toBe(true);
     });
 
-    it("produces .claude/skills/ directory for skills", () => {
+    it("skips skills without source content (no contentMap)", () => {
       const role = makeTestRole();
+      // Source path doesn't exist on disk, so resolveSkillContent can't populate contentMap
       const result = materializeForAgent(role, "claude-code-agent");
 
-      expect(result.has(".claude/skills/prd-writing/SKILL.md")).toBe(true);
+      // No skill files when source directory is missing
+      const skillKeys = [...result.keys()].filter((k) => k.includes("skills/"));
+      expect(skillKeys).toHaveLength(0);
     });
 
     it("uses default proxy endpoint when none provided", () => {

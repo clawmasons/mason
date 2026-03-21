@@ -159,6 +159,72 @@ describe("adaptRoleToResolvedAgent", () => {
       expect(tasks[0].prompt).toBeUndefined();
       expect(tasks[1].name).toBe("review-change");
     });
+
+    it("extracts scope from colon-delimited task names", () => {
+      const role = minimalRole({
+        tasks: [{ name: "opsx:apply" }],
+      });
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      const task = agent.roles[0].tasks[0];
+
+      expect(task.name).toBe("apply");
+      expect(task.scope).toBe("opsx");
+    });
+
+    it("extracts deeply nested scope from colon-delimited names", () => {
+      const role = minimalRole({
+        tasks: [{ name: "ops:triage:label" }],
+      });
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      const task = agent.roles[0].tasks[0];
+
+      expect(task.name).toBe("label");
+      expect(task.scope).toBe("ops:triage");
+    });
+
+    it("leaves unscoped task names unchanged", () => {
+      const role = minimalRole({
+        tasks: [{ name: "doc-cleanup" }],
+      });
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      const task = agent.roles[0].tasks[0];
+
+      expect(task.name).toBe("doc-cleanup");
+      expect(task.scope).toBeUndefined();
+    });
+
+    it("extracts scope from slash-delimited task names", () => {
+      const role = minimalRole({
+        tasks: [{ name: "opsx/apply" }],
+      });
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      const task = agent.roles[0].tasks[0];
+
+      expect(task.name).toBe("apply");
+      expect(task.scope).toBe("opsx");
+    });
+
+    it("extracts deeply nested scope from slash-delimited names", () => {
+      const role = minimalRole({
+        tasks: [{ name: "ops/triage/label-issue" }],
+      });
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      const task = agent.roles[0].tasks[0];
+
+      expect(task.name).toBe("label-issue");
+      expect(task.scope).toBe("ops:triage");
+    });
+
+    it("handles mixed colon and slash delimiters", () => {
+      const role = minimalRole({
+        tasks: [{ name: "ops/triage:label" }],
+      });
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      const task = agent.roles[0].tasks[0];
+
+      expect(task.name).toBe("label");
+      expect(task.scope).toBe("ops:triage");
+    });
   });
 
   // ---- App mapping ----

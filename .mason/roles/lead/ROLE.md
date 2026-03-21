@@ -4,6 +4,9 @@ description: Drives spec creation, planning, code review, and release for the ch
 version: 1.0.0
 type: project
 
+sources:
+  - .mason
+
 skills:
   - openspec-new-change
   - openspec-explore
@@ -16,24 +19,24 @@ skills:
   - openspec-onboard
 
 tasks:
-  - opsx/apply
-  - opsx/verify
-  - opsx/new
-  - opsx/explore
-  - opsx/continue
-  - opsx/ff
-  - opsx/archive
-  - opsx/bulk-archive
-  - opsx/sync
-  - opsx/onboard
-  - opsx/prd-create
-  - opsx/prd-modify
-  - opsx/prd-refine
-  - opsx/prd-plan-implementation
-  - opsx/prd-implement-change
-  - opsx/prd-implement-all
-  - opsx/prd-review-pr
-  - opsx/flow-auto
+  - opsx:apply
+  - opsx:verify
+  - opsx:new
+  - opsx:explore
+  - opsx:continue
+  - opsx:ff
+  - opsx:archive
+  - opsx:bulk-archive
+  - opsx:sync
+  - opsx:onboard
+  - opsx:prd-create
+  - opsx:prd-modify
+  - opsx:prd-refine
+  - opsx:prd-plan-implementation
+  - opsx:prd-implement-change
+  - opsx:prd-implement-all
+  - opsx:prd-review-pr
+  - opsx:flow-auto
   - doc-cleanup
   - prd-todos
 
@@ -70,7 +73,7 @@ Use the openspec workflow for all non-trivial changes:
 7. **Archive** — `/opsx:archive` (or `/opsx:bulk-archive`) when a change is complete
 8. **Sync** — `/opsx:sync` to push delta specs into main specs
 
-For PRD-driven work: use `opsx/prd-*` commands to create, refine, plan, and implement from PRDs.
+For PRD-driven work: use `opsx:prd-*` commands to create, refine, plan, and implement from PRDs.
 
 ## Standards
 

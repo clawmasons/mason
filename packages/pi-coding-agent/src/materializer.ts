@@ -5,7 +5,7 @@ import {
   collectAllSkills,
   collectAllTasks,
   materializeTasks,
-  generateSkillReadme,
+  materializeSkills,
   generateAgentLaunchJson,
 } from "@clawmasons/agent-sdk";
 
@@ -151,14 +151,11 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
       generateExtensionIndexTs(agent),
     );
 
-    // skills/{skill-short-name}/README.md
-    const allSkills = collectAllSkills(agent.roles);
-    for (const [, skill] of allSkills) {
-      const skillShortName = getAppShortName(skill.name);
-      result.set(
-        `skills/${skillShortName}/README.md`,
-        generateSkillReadme(skill),
-      );
+    // Skills — copy actual SKILL.md + companions via materializeSkills
+    if (_agentPkg.skills) {
+      const allSkills = collectAllSkills(agent.roles);
+      const skillFiles = materializeSkills([...allSkills.values()], _agentPkg.skills);
+      for (const [p, c] of skillFiles) result.set(p, c);
     }
 
     // .pi/APPEND_SYSTEM.md — role instructions into system prompt

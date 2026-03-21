@@ -1,4 +1,4 @@
-import type { ResolvedAgent } from "@clawmasons/shared";
+import type { ResolvedAgent, AgentSkillConfig } from "@clawmasons/shared";
 
 // ── Core Materializer Types (moved from packages/cli/src/materializer/types.ts) ──
 
@@ -165,4 +165,7 @@ export interface AgentPackage {
 
   /** Declarative task file layout config. Drives readTasks() and materializeTasks(). */
   tasks?: AgentTaskConfig;
+
+  /** Declarative skill file layout config. Drives readSkills() and materializeSkills(). */
+  skills?: AgentSkillConfig;
 }

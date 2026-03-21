@@ -158,11 +158,15 @@ function aggregatePermissions(
 }
 
 function adaptTask(task: TaskRef): ResolvedTask {
+  const normalized = task.name.replace(/\//g, ":");
+  const colonIdx = normalized.lastIndexOf(":");
+  if (colonIdx === -1) {
+    return { name: normalized, version: "0.0.0" };
+  }
   return {
-    name: task.name,
+    name: normalized.slice(colonIdx + 1),
+    scope: normalized.slice(0, colonIdx),
     version: "0.0.0",
-    // prompt is intentionally undefined — it will be resolved
-    // from source task files by the materializer layer
   };
 }
 

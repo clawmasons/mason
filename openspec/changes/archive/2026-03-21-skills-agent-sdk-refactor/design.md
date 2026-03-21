@@ -144,7 +144,49 @@ const MASON_SKILL_CONFIG: AgentSkillConfig = {
 };
 ```
 
-Used when `role.source.agentDialect` is `"mason"` or absent.
+Used when `role.source.agentDialect` is `"mason"` or absent, and no explicit `sources` override is provided.
+
+### Decision 9: `role.sources` overrides auto-detected dialect for skill/task resolution
+
+Mason-dialect roles (stored in `.mason/roles/`) auto-detect `agentDialect: "mason"`, causing `getSourceSkillConfig` and `getSourceTaskConfig` to look in `.mason/skills/` and `.mason/tasks/` respectively. However, mason roles often reference skills and tasks that live in agent-specific directories (e.g., `.claude/skills/`, `.claude/commands/`).
+
+The existing `sources` field in the role schema (`z.array(z.string()).optional().default([])`) is now used to explicitly declare where skills/tasks come from. Resolution works as follows:
+
+```typescript
+function resolveSourceDialect(source: string): AgentPackage | undefined {
+  const dir = source.startsWith(".") ? source.slice(1) : source;
+  const dialect = getDialectByDirectory(dir);
+  if (!dialect) return undefined;
+  return getAgentFromRegistry(dialect.name);
+}
+```
+
+Both `getSourceTaskConfig` and `getSourceSkillConfig` check `role.sources` first — iterating entries, resolving each to a dialect via `getDialectByDirectory`, and returning the first matching agent package's task/skill config. Only if no `sources` match does it fall back to the auto-detected `role.source.agentDialect`.
+
+**Why not just fix `detectDialect`?** The dialect detection is correct — `.mason/roles/` IS the mason dialect. The issue is that mason roles can reference artifacts from other agent ecosystems. `sources` makes this cross-reference explicit and declarative.
+
+**Example:** A mason role at `.mason/roles/lead/ROLE.md` with `sources: [".claude"]` resolves `.claude` → `claude-code-agent` package → `skills: { projectFolder: ".claude/skills" }`, so skills are read from `.claude/skills/` instead of `.mason/skills/`.
+
+### Decision 10: Validation warnings for unresolved skills and tasks
+
+`resolveSkillContent` and `resolveTaskContent` now emit `console.warn` when a skill or task referenced in a role cannot be found in the resolved source directory:
+
+```typescript
+console.warn(`  Warning: skill "${skill.name}" not found in source (searched ${sourceConfig.projectFolder})`);
+```
+
+**Why warnings, not errors?** During development and testing, hollow skills (without content) are valid — tests create minimal ResolvedSkill fixtures that intentionally lack source files. Hard errors would break existing test suites. Warnings make misconfigured roles visible without breaking backwards compatibility.
+
+### Decision 11: Supervisor path calls resolveSkillContent
+
+The `docker-generator.ts` supervisor path (`generateRoleDockerBuildDir`) previously called `resolveTaskContent` but not `resolveSkillContent`. This meant skills in the supervisor Dockerfile path were always hollow. Both functions are now called together:
+
+```typescript
+resolveTaskContent(resolvedAgent, role);
+resolveSkillContent(resolvedAgent, role);
+```
+
+This ensures all materialization paths (both `materializeForAgent` and the supervisor Dockerfile generation) produce skills with real content.
 
 ## Risks / Trade-offs
 
@@ -155,6 +197,8 @@ Used when `role.source.agentDialect` is `"mason"` or absent.
 **[Behaviour change] Real SKILL.md replaces synthetic README.md** → Agents that previously found `README.md` in the skills directory will now find `SKILL.md` (and companions). Claude Code already uses `SKILL.md` path. Pi-coding-agent currently uses `README.md` — its `projectFolder` changes to match. The content is strictly better (real skill content vs. a synthetic list of artifact paths).
 
 **[Adapter hollowness preserved] `adaptSkill` still returns minimal objects** → Content resolution is deferred to the orchestrator. If someone calls `adaptRoleToResolvedAgent` without `resolveSkillContent`, skills will still be hollow. This matches the task pattern — the adapter is pure data, I/O is explicit.
+
+**[Config dependency] `sources` resolution depends on agent registry** → `resolveSourceDialect` looks up agent packages by dialect directory name. If the registry isn't initialized (e.g., `initRegistry` not called), only built-in agents are available. Mitigation: built-in agents cover all current use cases (`.claude` → `claude-code-agent`, `.pi` → `pi-coding-agent`).
 
 ## Open Questions
 

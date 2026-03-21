@@ -4,13 +4,16 @@ description: Implements features and fixes from openspec specs in the chapter mo
 version: 1.0.0
 type: project
 
+sources:
+  - .claude
+
 skills:
   - openspec-apply-change
   - openspec-verify-change
 
 commands:
-  - opsx/apply
-  - opsx/verify
+  - opsx:apply
+  - opsx:verify
 
 container:
   ignore:

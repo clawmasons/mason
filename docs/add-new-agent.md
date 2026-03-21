@@ -66,6 +66,10 @@ RUN npm install -g my-agent-cli
     supportedFields: ["description", "tags"],
     prompt: "markdown-body",
   },
+
+  skills: {
+    projectFolder: ".my-agent/skills",
+  },
 };
 
 export default myAgent;
@@ -145,6 +149,31 @@ const myAgentMaterializer: RuntimeMaterializer = {
 ```
 
 The `materializeTasks()` SDK function handles all the filename resolution, frontmatter generation, and scope formatting based on your `AgentTaskConfig`.
+
+## Skill Configuration
+
+The `skills` field is an `AgentSkillConfig` that declares where your agent stores skill files:
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `projectFolder` | Directory for skill subdirectories relative to workspace root | `.my-agent/skills` |
+
+Each skill is a directory containing `SKILL.md` and optional companion files (templates, examples, schemas). The SDK provides `readSkills()` and `materializeSkills()` helpers that discover skill directories and copy all files verbatim:
+
+```typescript
+import { collectAllSkills, materializeSkills } from "@clawmasons/agent-sdk";
+
+// In your materializer:
+if (agentPkg.skills) {
+  const allSkills = collectAllSkills(agent.roles);
+  const skillFiles = materializeSkills([...allSkills.values()], agentPkg.skills);
+  for (const [filePath, content] of skillFiles) {
+    result.set(filePath, content);
+  }
+}
+```
+
+Unlike tasks, skills require no per-agent transformation — `SKILL.md` and companions are copied as-is.
 
 ## Registration
 

@@ -35,8 +35,13 @@ function makeLabelingSkill(): ResolvedSkill {
   return {
     name: "@clawmasons/skill-labeling",
     version: "1.0.0",
-    artifacts: ["./SKILL.md", "./examples/", "./schemas/"],
+    artifacts: ["SKILL.md", "examples/example1.md", "schemas/labels.json"],
     description: "Issue labeling taxonomy and heuristics",
+    contentMap: new Map([
+      ["SKILL.md", "# Labeling\n\nIssue labeling taxonomy and heuristics"],
+      ["examples/example1.md", "Example content"],
+      ["schemas/labels.json", '{"labels": []}'],
+    ]),
   };
 }
 
@@ -284,29 +289,29 @@ describe("piCodingAgentMaterializer", () => {
     });
 
     describe("skills directory", () => {
-      it("generates README.md for each unique skill", () => {
+      it("materializes SKILL.md and companion files under skills/", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        expect(result.has("skills/labeling/README.md")).toBe(true);
+        expect(result.has("skills/labeling/SKILL.md")).toBe(true);
+        expect(result.has("skills/labeling/examples/example1.md")).toBe(true);
+        expect(result.has("skills/labeling/schemas/labels.json")).toBe(true);
       });
 
-      it("includes skill description in README", () => {
+      it("includes actual skill content in materialized files", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const readme = result.get("skills/labeling/README.md")!;
-        expect(readme).toContain("Issue labeling taxonomy and heuristics");
+        const skillMd = result.get("skills/labeling/SKILL.md")!;
+        expect(skillMd).toContain("Issue labeling taxonomy and heuristics");
       });
 
-      it("lists skill artifacts in README", () => {
+      it("copies companion file content verbatim", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const readme = result.get("skills/labeling/README.md")!;
-        expect(readme).toContain("./SKILL.md");
-        expect(readme).toContain("./examples/");
-        expect(readme).toContain("./schemas/");
+        expect(result.get("skills/labeling/examples/example1.md")).toBe("Example content");
+        expect(result.get("skills/labeling/schemas/labels.json")).toBe('{"labels": []}');
       });
 
       it("deduplicates skills across roles", () => {
@@ -315,8 +320,8 @@ describe("piCodingAgentMaterializer", () => {
 
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
-        const skillEntries = [...result.keys()].filter((k) => k.startsWith("skills/"));
-        expect(skillEntries).toEqual(["skills/labeling/README.md"]);
+        const skillEntries = [...result.keys()].filter((k) => k.startsWith("skills/labeling/"));
+        expect(skillEntries).toHaveLength(3); // SKILL.md + 2 companions
       });
     });
 
@@ -398,7 +403,9 @@ describe("piCodingAgentMaterializer", () => {
           ".pi/prompts/@clawmasons/task-triage-issue.md",
           ".pi/settings.json",
           "agent-launch.json",
-          "skills/labeling/README.md",
+          "skills/labeling/SKILL.md",
+          "skills/labeling/examples/example1.md",
+          "skills/labeling/schemas/labels.json",
         ]);
       });
     });
