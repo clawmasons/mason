@@ -133,7 +133,7 @@ export async function startProxy(
     const transport = (options.transport as "sse" | "streamable-http" | undefined)
       ?? "sse";
     const authToken = process.env[`${CLI_NAME_UPPERCASE}_PROXY_TOKEN`] || undefined;
-    const credentialProxyToken = process.env.CREDENTIAL_PROXY_TOKEN || undefined;
+    const relayToken = process.env.RELAY_TOKEN || process.env.CREDENTIAL_PROXY_TOKEN || undefined;
     const sessionType = process.env[`${CLI_NAME_UPPERCASE}_SESSION_TYPE`] || undefined;
     const acpClient = process.env[`${CLI_NAME_UPPERCASE}_ACP_CLIENT`] || undefined;
 
@@ -163,7 +163,7 @@ export async function startProxy(
       db,
       agentName: agent.name,
       authToken,
-      credentialProxyToken,
+      relayToken,
       approvalPatterns: approvalPatterns.length > 0 ? approvalPatterns : undefined,
       declaredCredentials,
       sessionType,

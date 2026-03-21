@@ -1,26 +1,24 @@
 /**
  * Integration test for the credential flow pipeline.
  *
- * Tests the full flow: proxy + credential service (SDK mode, in-process)
- * -> connect-agent -> credential_request -> credential resolved.
+ * Tests the full flow: proxy + relay client + credential service (SDK mode, in-process)
+ * -> connect-agent -> credential_request -> credential resolved via relay.
  *
  * This exercises the same code paths as a Docker deployment but without
- * containers, using the proxy's Streamable HTTP transport and the
- * credential service's CredentialService class directly.
+ * containers, using the proxy's Streamable HTTP transport, the RelayClient,
+ * and the CredentialRelayHandler.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { WebSocket } from "ws";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   ProxyServer,
   ToolRouter,
   UpstreamManager,
-} from "@clawmasons/proxy";
-import {
+  RelayClient,
   CredentialService,
-  credentialRequestSchema,
+  CredentialRelayHandler,
 } from "@clawmasons/proxy";
 
 // ── Test port management ────────────────────────────────────────────
@@ -34,14 +32,14 @@ function getPort(): number {
 
 describe("credential flow integration", () => {
   const PROXY_TOKEN = "test-proxy-token-abc";
-  const CREDENTIAL_TOKEN = "test-cred-token-xyz";
+  const RELAY_TOKEN = "test-relay-token-xyz";
   const envKeysToClean: string[] = [];
 
   let port: number;
   let proxyUrl: string;
   let proxy: ProxyServer;
   let credentialService: CredentialService;
-  let credWs: WebSocket | null = null;
+  let relayClient: RelayClient;
 
   // MCP SDK client (initialized once in beforeAll)
   let mcpClient: Client;
@@ -65,7 +63,7 @@ describe("credential flow integration", () => {
       keychainService: "test-integration",
     });
 
-    // Create a minimal proxy with credential relay enabled
+    // Create a minimal proxy with relay enabled
     const router = new ToolRouter(new Map(), new Map());
     const upstream = new UpstreamManager([]);
 
@@ -75,7 +73,7 @@ describe("credential flow integration", () => {
       router,
       upstream,
       authToken: PROXY_TOKEN,
-      credentialProxyToken: CREDENTIAL_TOKEN,
+      relayToken: RELAY_TOKEN,
       credentialRequestTimeoutMs: 5000,
       declaredCredentials: ["TEST_TOKEN"],
       agentName: "mcp-test",
@@ -85,27 +83,17 @@ describe("credential flow integration", () => {
 
     await proxy.start();
 
-    // Connect credential service via WebSocket (simulating the WS client)
-    credWs = await new Promise<WebSocket>((resolve, reject) => {
-      const ws = new WebSocket(`ws://localhost:${port}/ws/credentials`, {
-        headers: { Authorization: `Bearer ${CREDENTIAL_TOKEN}` },
-      });
-      ws.on("open", () => resolve(ws));
-      ws.on("error", reject);
+    // Connect relay client (simulating the host proxy)
+    relayClient = new RelayClient({
+      url: `ws://localhost:${port}/ws/relay`,
+      token: RELAY_TOKEN,
     });
 
-    // Wire up credential service to handle requests from the relay
-    credWs.on("message", async (data) => {
-      try {
-        const parsed = JSON.parse(data.toString());
-        const request = credentialRequestSchema.parse(parsed);
-        const response = await credentialService.handleRequest(request);
-        credWs!.send(JSON.stringify(response));
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error("[integration test] credential handler error:", msg);
-      }
-    });
+    // Register credential handler on relay client
+    const credHandler = new CredentialRelayHandler(relayClient, credentialService);
+    credHandler.register();
+
+    await relayClient.connect();
 
     // Initialize MCP SDK client
     mcpClient = new Client({ name: "test-client", version: "1.0.0" });
@@ -126,10 +114,7 @@ describe("credential flow integration", () => {
     } catch {
       // best-effort
     }
-    if (credWs) {
-      credWs.close();
-      credWs = null;
-    }
+    relayClient.disconnect();
     await proxy.stop();
     credentialService.close();
 

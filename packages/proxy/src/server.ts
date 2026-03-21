@@ -21,8 +21,8 @@ import type { HookContext } from "./hooks/audit.js";
 import { matchesApprovalPattern, requestApproval } from "./hooks/approval.js";
 import type { ApprovalOptions } from "./hooks/approval.js";
 import { SessionStore, handleConnectAgent, type RiskLevel } from "./handlers/connect-agent.js";
-import { CredentialRelay } from "./handlers/credential-relay.js";
 import { RelayServer } from "./relay/server.js";
+import { createRelayMessage, type CredentialResponseMessage } from "./relay/messages.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -38,8 +38,6 @@ export interface ProxyServerConfig {
   approvalOptions?: ApprovalOptions;
   resourceRouter?: ResourceRouter;
   promptRouter?: PromptRouter;
-  /** Token for authenticating credential service WebSocket connections. */
-  credentialProxyToken?: string;
   /** Token for authenticating relay WebSocket connections (/ws/relay). */
   relayToken?: string;
   /** Timeout for credential requests in milliseconds. Default: 30000. */
@@ -90,18 +88,10 @@ export class ProxyServer {
   private httpServer: HttpServer | null = null;
   private activeTransports: Set<SSEServerTransport | StreamableHTTPServerTransport> = new Set();
   private sessionStore: SessionStore;
-  private credentialRelay: CredentialRelay | null = null;
   private relayServer: RelayServer | null = null;
   constructor(config: ProxyServerConfig) {
     this.config = { ...config, port: config.port ?? DEFAULT_PORT };
     this.sessionStore = new SessionStore(config.riskLevel);
-
-    if (config.credentialProxyToken) {
-      this.credentialRelay = new CredentialRelay({
-        credentialProxyToken: config.credentialProxyToken,
-        requestTimeoutMs: config.credentialRequestTimeoutMs,
-      });
-    }
 
     if (config.relayToken) {
       this.relayServer = new RelayServer({
@@ -118,11 +108,6 @@ export class ProxyServer {
   /** Expose the session store for external access (e.g., risk-based limits in CHANGE 5). */
   getSessionStore(): SessionStore {
     return this.sessionStore;
-  }
-
-  /** Expose the credential relay for external access. */
-  getCredentialRelay(): CredentialRelay | null {
-    return this.credentialRelay;
   }
 
   /** Expose the relay server for external access (e.g., registering handlers). */
@@ -183,15 +168,12 @@ export class ProxyServer {
       }
     });
 
-    // WebSocket upgrade handler for credential service and relay
-    if (this.credentialRelay || this.relayServer) {
-      const credRelay = this.credentialRelay;
+    // WebSocket upgrade handler for relay
+    if (this.relayServer) {
       const relayServer = this.relayServer;
       this.httpServer.on("upgrade", (req, socket, head) => {
         const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-        if (url.pathname === "/ws/credentials" && credRelay) {
-          credRelay.handleUpgrade(req, socket, head as Buffer);
-        } else if (url.pathname === "/ws/relay" && relayServer) {
+        if (url.pathname === "/ws/relay") {
           relayServer.handleUpgrade(req, socket, head as Buffer);
         } else {
           socket.destroy();
@@ -210,11 +192,6 @@ export class ProxyServer {
   }
 
   async stop(): Promise<void> {
-    // Close credential relay first
-    if (this.credentialRelay) {
-      this.credentialRelay.close();
-    }
-
     // Shut down relay server
     if (this.relayServer) {
       this.relayServer.shutdown();
@@ -362,7 +339,7 @@ export class ProxyServer {
       if (this.config.readyGate) await this.config.readyGate;
 
       const tools = this.config.router.listTools();
-      if (this.credentialRelay) {
+      if (this.relayServer) {
         tools.push(CREDENTIAL_REQUEST_TOOL);
       }
       return { tools };
@@ -372,7 +349,7 @@ export class ProxyServer {
       const { name, arguments: args } = request.params;
 
       // Handle internal credential_request tool — no readyGate needed
-      if (name === "credential_request" && this.credentialRelay) {
+      if (name === "credential_request" && this.relayServer) {
         const key = (args as Record<string, unknown> | undefined)?.key as string | undefined;
         const sessionToken = (args as Record<string, unknown> | undefined)?.session_token as string | undefined;
 
@@ -383,23 +360,53 @@ export class ProxyServer {
           };
         }
 
-        const result = await this.credentialRelay.handleCredentialRequest(
-          this.sessionStore,
-          key,
-          sessionToken,
-          this.config.declaredCredentials,
-        );
-
-        if (result.error) {
+        // Validate session token
+        const session = this.sessionStore.getByToken(sessionToken);
+        if (!session) {
           return {
-            content: [{ type: "text" as const, text: `Credential error: ${result.error}` }],
+            content: [{ type: "text" as const, text: "Credential error: Invalid session token" }],
             isError: true,
           };
         }
 
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ key: result.key, value: result.value }) }],
-        };
+        if (!this.relayServer.isConnected()) {
+          return {
+            content: [{ type: "text" as const, text: "Credential error: Relay not connected" }],
+            isError: true,
+          };
+        }
+
+        try {
+          const relayMsg = createRelayMessage("credential_request", {
+            key,
+            agentId: session.agentId,
+            role: session.role,
+            sessionId: session.sessionId,
+            declaredCredentials: this.config.declaredCredentials ?? [],
+          });
+
+          const response = await this.relayServer.request(
+            relayMsg,
+            this.config.credentialRequestTimeoutMs,
+          ) as CredentialResponseMessage;
+
+          if (response.error) {
+            return {
+              content: [{ type: "text" as const, text: `Credential error: ${response.error}` }],
+              isError: true,
+            };
+          }
+
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify({ key: response.key, value: response.value }) }],
+          };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return {
+            content: [{ type: "text" as const, text: `Credential error: ${message}` }],
+            isError: true,
+          };
+        }
       }
 
       // All other tools require upstreams to be ready
