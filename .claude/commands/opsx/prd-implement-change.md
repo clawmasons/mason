@@ -31,19 +31,21 @@ Execute each step in order, completing each fully before moving to the next:
 
 1. **New** — Execute the instructions from `/opsx:new`. Create the new spec document and continue without stopping.  
 
-2. **Fast-Forward** — Execute the instructions from `/opsx:ff`. Flesh out and refine the spec. Confirm completion before proceeding but do not ask user.  check yourself.
+2. **Continue to the design** — Execute the instructions from `/opsx:continue`. To create the design document.  Once the design is complete.  take some time to re-review both the design.md and the proposal.md looking for any gaps for only this one change in the PRD.  make sure the design details the test coverage that will be added for the change.
 
-3. **Apply** — Execute the instructions from `/opsx:apply`. Synchronize the spec with the codebase. Confirm completion before proceeding but do not ask user.  check yourself.
+3. **Fast-Forward** — Execute the instructions from `/opsx:ff`. Flesh out and refine the spec. Confirm completion before proceeding but do not ask user.  check yourself.
 
-4. **Test** - Run all tests (run-tests.sh) for the project to make sure there were no unexpected regressions with the change. Include unit and UI tests. Fix the tests.  Confirm completion before proceeding but do not ask user.  check yourself.
+4. **Apply** — Execute the instructions from `/opsx:apply`. Synchronize the spec with the codebase. Confirm completion before proceeding but do not ask user.  check yourself.
 
-5. **Verify** — Execute the instructions from `/opsx:verify`. To verify new requirements were implemented and check that implementation will work with future changes planned for the PRD. Check for coding best practices.  Confirm completion before proceeding but do not ask user.  check yourself.
+5. **Test** - Run all tests (run-tests.sh) for the project to make sure there were no unexpected regressions with the change. Include unit and UI tests. Fix the tests.  Confirm completion before proceeding but do not ask user.  check yourself.
 
-6. **Sync** — Execute the instructions from `/opsx:sync`. Synchronize the spec with the codebase. Confirm completion before proceeding but do not ask user.  check yourself.
+6. **Verify** — Execute the instructions from `/opsx:verify`. To verify new requirements were implemented and check that implementation will work with future changes planned for the PRD. Check for coding best practices.  Confirm completion before proceeding but do not ask user.  check yourself.
 
-7. **Archive** — Execute the instructions from `/opsx:archive`. Archive the completed spec.
+7. **Sync** — Execute the instructions from `/opsx:sync`. Synchronize the spec with the codebase. Confirm completion before proceeding but do not ask user.  check yourself.
 
-8. **Update Change** - Update the change in IMPLEMENTATION.md with relative links to the archived proposal, design, tasks, and specs implemented with the change.  Also make any changes to the PRD.md and IMPLEMENTATION to match was was done in the change.
+8. **Archive** — Execute the instructions from `/opsx:archive`. Archive the completed spec.
+
+9. **Update Change** - Update the change in IMPLEMENTATION.md with relative links to the archived proposal, design, tasks, and specs implemented with the change.  Also make any changes to the PRD.md and IMPLEMENTATION to match was was done in the change.
 
 After each step, briefly summarize what was done before moving to the next. If any step fails or the user wants to stop, halt the flow and report status.
 
