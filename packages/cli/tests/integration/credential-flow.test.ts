@@ -21,7 +21,7 @@ import {
 import {
   CredentialService,
   credentialRequestSchema,
-} from "@clawmasons/credential-service";
+} from "@clawmasons/proxy";
 
 // ── Test port management ────────────────────────────────────────────
 

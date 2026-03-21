@@ -3,7 +3,9 @@ import type { CredentialRequest, CredentialResponse, CredentialServiceConfig } f
 import { CredentialResolver } from "./resolver.js";
 import {
   openCredentialDatabase,
-  insertCredentialAudit,
+  createSqliteAuditEmitter,
+  type AuditEmitter,
+  type CredentialAuditEntry,
 } from "./audit.js";
 
 /**
@@ -16,22 +18,28 @@ import {
 export class CredentialService {
   private readonly resolver: CredentialResolver;
   private readonly db: BetterSqlite3.Database;
+  private readonly auditEmitter: AuditEmitter;
 
-  constructor(config: CredentialServiceConfig, resolver?: CredentialResolver) {
+  constructor(
+    config: CredentialServiceConfig,
+    resolver?: CredentialResolver,
+    auditEmitter?: AuditEmitter,
+  ) {
     this.resolver = resolver ?? new CredentialResolver({
       envFilePath: config.envFilePath,
       keychainService: config.keychainService,
     });
     this.db = openCredentialDatabase(config.dbPath);
+    this.auditEmitter = auditEmitter ?? createSqliteAuditEmitter(this.db);
   }
 
   /**
-   * Handle a credential request: validate access → resolve → audit → respond.
+   * Handle a credential request: validate access -> resolve -> audit -> respond.
    */
   async handleRequest(request: CredentialRequest): Promise<CredentialResponse> {
     const { id, key, agentId, declaredCredentials } = request;
 
-    // 1. Access validation — check key is in agent's declared credentials
+    // 1. Access validation -- check key is in agent's declared credentials
     if (!declaredCredentials.includes(key)) {
       const reason = `Agent "${agentId}" has not declared credential "${key}"`;
       this.audit(id, request, "denied", reason, null);
@@ -47,7 +55,7 @@ export class CredentialService {
     const result = await this.resolver.resolve(key);
 
     if ("error" in result) {
-      // Resolution failed — credential not found in any source
+      // Resolution failed -- credential not found in any source
       this.audit(id, request, "error", result.error, null);
       return {
         id,
@@ -57,7 +65,7 @@ export class CredentialService {
       };
     }
 
-    // 3. Success — return resolved value
+    // 3. Success -- return resolved value
     this.audit(id, request, "granted", null, result.source);
     return {
       id,
@@ -106,7 +114,7 @@ export class CredentialService {
     denyReason: string | null,
     source: string | null,
   ): void {
-    insertCredentialAudit(this.db, {
+    const entry: CredentialAuditEntry = {
       id,
       timestamp: new Date().toISOString(),
       agent_id: request.agentId,
@@ -116,6 +124,7 @@ export class CredentialService {
       outcome,
       deny_reason: denyReason,
       source,
-    });
+    };
+    this.auditEmitter(entry);
   }
 }

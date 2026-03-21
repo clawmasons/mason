@@ -4,7 +4,7 @@ export { ToolRouter, ResourceRouter, PromptRouter } from "./router.js";
 export type { RouteEntry, ResourceRouteEntry, PromptRouteEntry } from "./router.js";
 export { UpstreamManager, createTransport } from "./upstream.js";
 export type { UpstreamAppConfig } from "./upstream.js";
-export { loadEnvFile, resolveEnvVars } from "./credentials.js";
+export { loadEnvFile, resolveEnvVars } from "./env-utils.js";
 export {
   openDatabase,
   insertAuditLog,
@@ -27,3 +27,32 @@ export { RelayServer } from "./relay/server.js";
 export type { RelayServerConfig } from "./relay/server.js";
 export { RelayClient } from "./relay/client.js";
 export type { RelayClientConfig } from "./relay/client.js";
+// Credential service (absorbed from @clawmasons/credential-service)
+export {
+  CredentialResolver,
+  CredentialService,
+  CredentialWSClient,
+  credentialRequestSchema,
+  credentialResponseSchema,
+  credentialSuccessSchema,
+  credentialErrorSchema,
+  credentialServiceConfigSchema,
+  openCredentialDatabase,
+  insertCredentialAudit,
+  queryCredentialAudit,
+  generateAuditId,
+  createSqliteAuditEmitter,
+} from "./credentials/index.js";
+export type {
+  CredentialResolverConfig,
+  ResolveResult,
+  ResolveSuccess,
+  ResolveError,
+  CredentialRequest,
+  CredentialResponse,
+  CredentialServiceConfig,
+  CredentialWSClientOptions,
+  AuditEmitter,
+  CredentialAuditEntry,
+  CredentialAuditFilters,
+} from "./credentials/index.js";

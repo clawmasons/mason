@@ -123,7 +123,10 @@ Absorb `packages/credential-service` into `packages/proxy/src/credentials/`. Del
 
 **Testable output:** `@clawmasons/credential-service` no longer exists. `CredentialResolver` imported from `@clawmasons/proxy` resolves credentials with same priority order (env > keychain > .env). `CredentialService.handleRequest()` validates access and resolves. All existing credential tests pass from new location. No TypeScript import errors. `npx tsc --noEmit` compiles. `npx vitest run packages/proxy/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — [Archived spec](../../changes/archive/2026-03-21-move-credential-service/)
+- [Proposal](../../changes/archive/2026-03-21-move-credential-service/proposal.md)
+- [Design](../../changes/archive/2026-03-21-move-credential-service/design.md)
+- [Tasks](../../changes/archive/2026-03-21-move-credential-service/tasks.md)
 
 ---
 

@@ -13,7 +13,7 @@ import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../
 import { loadConfigAgentEntry, loadConfigAliasEntry } from "@clawmasons/agent-sdk";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
-import { CredentialService, CredentialWSClient } from "@clawmasons/credential-service";
+import { CredentialService, CredentialWSClient } from "@clawmasons/proxy";
 import { createFileLogger, type AcpLogger } from "../../acp/logger.js";
 import { generateRoleDockerBuildDir, createSessionDirectory, getHostIds } from "../../materializer/docker-generator.js";
 import { ensureProxyDependencies, synthesizeRolePackages } from "../../materializer/proxy-dependencies.js";

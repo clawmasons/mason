@@ -1,4 +1,4 @@
-// Resolver (from CHANGE 2)
+// Resolver
 export {
   CredentialResolver,
   type CredentialResolverConfig,
@@ -32,6 +32,8 @@ export {
   insertCredentialAudit,
   queryCredentialAudit,
   generateAuditId,
+  createSqliteAuditEmitter,
+  type AuditEmitter,
   type CredentialAuditEntry,
   type CredentialAuditFilters,
 } from "./audit.js";
