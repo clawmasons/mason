@@ -23,7 +23,11 @@ Define the typed message protocol for the relay WebSocket. Pure types and valida
 
 **Testable output:** `parseRelayMessage(validCredentialRequest)` returns typed `CredentialRequestMessage`. `parseRelayMessage({type: "unknown"})` returns error. `parseRelayMessage({})` returns error (missing id and type). Each message type schema validates correct fields and rejects invalid ones. `npx tsc --noEmit` compiles. `npx vitest run packages/proxy/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — [Archived spec](../../changes/archive/2026-03-21-relay-message-protocol/)
+- [Proposal](../../changes/archive/2026-03-21-relay-message-protocol/proposal.md)
+- [Design](../../changes/archive/2026-03-21-relay-message-protocol/design.md)
+- [Tasks](../../changes/archive/2026-03-21-relay-message-protocol/tasks.md)
+- [Spec: relay-messages](../../changes/archive/2026-03-21-relay-message-protocol/specs/relay-messages/spec.md)
 
 ---
 
