@@ -243,7 +243,10 @@ Create the `HostProxy` class that combines relay client, credential service, app
 
 **Testable output:** `HostProxy.start()` connects to relay, registers handlers for all message types. Credential request received → resolved via `CredentialService`. Approval request received → dialog shown (mocked). Audit event received → written to JSONL. `HostProxy.stop()` disconnects cleanly. No port listening. `npx tsc --noEmit` compiles. `npx vitest run packages/proxy/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — [Archived spec](../../changes/archive/2026-03-21-host-proxy-orchestrator/)
+- [Proposal](../../changes/archive/2026-03-21-host-proxy-orchestrator/proposal.md)
+- [Design](../../changes/archive/2026-03-21-host-proxy-orchestrator/design.md)
+- [Tasks](../../changes/archive/2026-03-21-host-proxy-orchestrator/tasks.md)
 
 ---
 
