@@ -60,6 +60,28 @@ These functions SHALL be available from the SDK package.
 - **THEN** it SHALL return all unique skills from the roles
 - **AND** it SHALL NOT attempt to access `task.skills`
 
+### Requirement: Agent materializers use _agentPkg.tasks from parent AgentPackage
+
+Agent materializers SHALL reference `_agentPkg.tasks` from the parent `AgentPackage` (set via `_setAgentPackage()`) when calling `materializeTasks()`. They SHALL NOT duplicate inline `AgentTaskConfig` objects.
+
+#### Scenario: Claude-code-agent uses _agentPkg.tasks
+- **WHEN** the claude-code-agent materializer generates task files
+- **THEN** it SHALL call `materializeTasks(tasks, _agentPkg.tasks)` using the config from the AgentPackage
+- **AND** it SHALL NOT define a separate inline `AgentTaskConfig`
+
+#### Scenario: Pi-coding-agent uses _agentPkg.tasks
+- **WHEN** the pi-coding-agent materializer generates task files
+- **THEN** it SHALL call `materializeTasks(tasks, _agentPkg.tasks)` using the config from the AgentPackage
+
+### Requirement: Packaged roles include source.path
+
+The `package-reader.ts` SHALL include `path: packagePath` in the source object for packaged roles. This enables `resolveTaskContent()` to locate task files in packages.
+
+#### Scenario: Packaged role has source.path
+- **WHEN** a role is read from a package
+- **THEN** the `role.source` object SHALL include `path` set to the package directory path
+- **AND** `resolveTaskContent()` SHALL be able to use this path to find task files
+
 ### Requirement: SDK re-exports shared types for convenience
 
 The `@clawmasons/agent-sdk` package SHALL re-export the following types from `@clawmasons/shared`:

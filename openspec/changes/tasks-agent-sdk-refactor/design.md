@@ -15,9 +15,12 @@ TaskField (package.json) → resolveTask() [resolves apps, skills, sub-tasks]
 
 ### Target flow
 ```
-readTasks(sourceConfig, projectDir) → ResolvedTask[]
+adaptRoleToResolvedAgent(role) → ResolvedAgent with tasks having prompt: undefined
+  → resolveTaskContent(agent, role) → reads actual task files from source, populates prompt/metadata
   → materializeTasks(tasks, targetConfig) → markdown files in target agent's folder
 ```
+
+The key insight: the **role adapter** (`packages/shared`) is stateless and cannot read files — it only maps `TaskRef.name` to `ResolvedTask.name`. The **CLI materializer layer** handles reading actual task content from disk via `resolveTaskContent()`, which uses `readTasks()` from `agent-sdk` to read source task files and merge content back into the resolved tasks.
 
 ## Goals / Non-Goals
 
@@ -26,6 +29,9 @@ readTasks(sourceConfig, projectDir) → ResolvedTask[]
 - Define `AgentTaskConfig` on `AgentPackage` so agents declaratively describe their task file layout
 - Provide generic `readTasks()` and `materializeTasks()` in agent-sdk — config-driven read/write replacing per-agent hardcoded logic
 - Enable the full flow: read tasks from source agent → resolve to `ResolvedTask[]` → write to target agent
+- Ensure materialized task files preserve original prompt content — the adapter leaves prompt undefined, and `resolveTaskContent()` in the CLI materializer reads actual source files
+- Agent materializers reference `_agentPkg.tasks` from parent AgentPackage — no duplicated inline configs
+- Packaged roles include `source.path` so task files can be located for content resolution
 - Update docs/task.md, docs/architecture.md
 - Add doc "docs/add-new-agent.md" — guide on how to implement another agent for the agent SDK
 
@@ -196,7 +202,101 @@ tasks: {
 }
 ```
 
-### 7. Removal strategy for ResolvedTask properties
+### 7. Task content resolution — resolveTaskContent()
+
+The role adapter in `packages/shared` is stateless: it maps `TaskRef` (which is just `{ name, ref? }`) to `ResolvedTask` with `name` and `version: "0.0.0"`. It does **not** set `prompt` because `TaskRef` has no content — the actual task markdown lives on disk.
+
+The CLI materializer layer bridges this gap with `resolveTaskContent(agent, role)`:
+
+```typescript
+// packages/cli/src/materializer/role-materializer.ts
+
+const MASON_TASK_CONFIG: AgentTaskConfig = {
+  projectFolder: ".mason/tasks",
+  nameFormat: "{scopeKebab}-{taskName}.md",
+  scopeFormat: "kebab-case-prefix",
+  supportedFields: "all",
+  prompt: "markdown-body",
+};
+
+function getSourceTaskConfig(role: Role): AgentTaskConfig | undefined {
+  const dialect = role.source.agentDialect;
+  if (!dialect || dialect === "mason") return MASON_TASK_CONFIG;
+  const agentPkg = getAgentFromRegistry(dialect);
+  return agentPkg?.tasks ?? MASON_TASK_CONFIG;
+}
+
+function getSourceProjectDir(role: Role): string | undefined {
+  if (role.source.type === "package" && role.source.path) return role.source.path;
+  if (role.source.type === "local" && role.source.path) return path.resolve(role.source.path, "..", "..", "..");
+  return undefined;
+}
+
+export function resolveTaskContent(agent: ResolvedAgent, role: Role): void {
+  const sourceConfig = getSourceTaskConfig(role);
+  const sourceProjectDir = getSourceProjectDir(role);
+  if (!sourceConfig || !sourceProjectDir) return;
+  const sourceTasks = readTasks(sourceConfig, sourceProjectDir);
+  const sourceByName = new Map(sourceTasks.map((t) => [t.name, t]));
+  for (const resolvedRole of agent.roles) {
+    for (const task of resolvedRole.tasks) {
+      const source = sourceByName.get(task.name);
+      if (source) {
+        task.prompt = source.prompt;
+        if (source.displayName) task.displayName = source.displayName;
+        if (source.description) task.description = source.description;
+        if (source.category) task.category = source.category;
+        if (source.tags) task.tags = source.tags;
+        if (source.scope) task.scope = source.scope;
+      }
+    }
+  }
+}
+```
+
+This is called in two places:
+1. `materializeForAgent()` in `role-materializer.ts` — after `adaptRoleToResolvedAgent()` and before the materializer call
+2. The supervisor path in `docker-generator.ts` — after `adaptRoleToResolvedAgent(role, agentType)`
+
+**Rationale:** The adapter layer (`packages/shared`) cannot import from `agent-sdk` and should remain stateless — it doesn't know about file systems or agent registries. The CLI materializer is the right place because it already has access to the agent registry, file system, and the full `Role` object with source information. This keeps the clean separation: adapter maps structure, materializer resolves content.
+
+**Alternatives considered:**
+- Setting prompt in the adapter from `role.instructions` — this was the original bug; role instructions are not task content
+- Having the adapter accept a content-resolution callback — over-complicated for what is a CLI-layer concern
+- Reading task content in each agent's materializer — would duplicate the resolution logic across agents
+
+### 8. Agent materializers use _agentPkg.tasks
+
+Both `claude-code-agent` and `pi-coding-agent` materializers previously had inline `AgentTaskConfig` objects duplicating the values from their `AgentPackage.tasks` definitions. These are replaced with `_agentPkg.tasks` (set via `_setAgentPackage()`), eliminating duplication:
+
+```typescript
+// Before: inline taskConfig duplicating AgentPackage.tasks values
+const taskConfig: AgentTaskConfig = { projectFolder: ".claude/commands", ... };
+const taskFiles = materializeTasks(allTasks.map(([t]) => t), taskConfig);
+
+// After: use the canonical config from AgentPackage
+if (_agentPkg.tasks) {
+  const allTasks = collectAllTasks(agent.roles);
+  const taskFiles = materializeTasks(allTasks.map(([t]) => t), _agentPkg.tasks);
+  for (const [p, c] of taskFiles) result.set(p, c);
+}
+```
+
+### 9. Packaged roles include source.path
+
+`package-reader.ts` now includes `path: packagePath` in the source object for packaged roles:
+
+```typescript
+source: {
+  type: "package" as const,
+  packageName: pkgJson.name,
+  path: packagePath,  // NEW: enables resolveTaskContent to find task files
+},
+```
+
+This allows `resolveTaskContent()` to locate task files in both local roles (deriving project dir from `.mason/roles/<name>/` path) and packaged roles (using the package directory directly).
+
+### 10. Removal strategy for ResolvedTask properties
 
 **Remove from `ResolvedTask` interface** (types.ts):
 - `taskType`, `timeout`, `approval` — execution semantics, no longer modeled
@@ -226,7 +326,7 @@ tasks: {
 **Update `collectAllSkills()`** (helpers.ts):
 - Remove the inner loop that collects skills from `task.skills` (lines 62-67) — tasks no longer have skills
 
-### 8. Pi Coding Agent materializer impact
+### 11. Pi Coding Agent materializer impact
 
 **Research finding:** Pi does **not** natively discover prompts from a folder. It loads commands via extensions — the materializer generates `.pi/extensions/mason-mcp/index.ts` which calls `pi.registerCommand({ name, description, prompt })` for each task. There is no `.pi/prompts/` convention in the pi runtime.
 
@@ -239,7 +339,7 @@ This means pi-coding-agent cannot use `materializeTasks()` to write standalone m
 
 This keeps the generic read/write path clean while acknowledging pi's runtime requires the extension bridge.
 
-### 9. nameFormat token resolution
+### 12. nameFormat token resolution
 
 The `nameFormat` string is resolved by replacing tokens:
 - `{taskName}` → task.name (kebab-case, e.g., `"fix-bug"`)
@@ -257,6 +357,10 @@ When scope is empty, `{scopePath}` resolves to `""` (file at root of projectFold
 **[Breaking change to ResolvedTask]** → Any downstream code referencing removed properties will break at compile time. Mitigated by: TypeScript compiler catches all references; the blast radius is well-mapped (15 files).
 
 **[collectAllSkills loses task-level skill collection]** → Skills referenced only through tasks (not roles directly) would be missed. Mitigated by: with the new model, skills are declared on roles, not tasks. Tasks are just prompts and don't have skill dependencies.
+
+**[Adapter leaves prompt undefined]** → The adapter produces tasks with `prompt: undefined`, requiring a second pass (`resolveTaskContent`) to populate content. This is intentional — the adapter is stateless and cannot read files. Mitigated by: `resolveTaskContent()` is called in all materialization paths (both `materializeForAgent()` and docker-generator supervisor), ensuring content is always resolved before the materializer generates output files.
+
+**[Source path required for content resolution]** → If a role has no `source.path`, task content cannot be resolved and prompts remain undefined. Mitigated by: local roles always have a path, and packaged roles now include `path: packagePath` in their source object.
 
 ## Open Questions
 

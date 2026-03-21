@@ -42,9 +42,10 @@
 
 ## 6. Update Role Adapter
 
-- [x] 6.1 Simplify `adaptTask()` in `packages/shared/src/role/adapter.ts`: remove `taskType`, `apps`, `skills`, `subTasks`; add new fields
-- [x] 6.2 Update adapter tests in `packages/shared/tests/role-adapter.test.ts`
-- [x] 6.3 Run `npx vitest run packages/shared/tests/`
+- [x] 6.1 Simplify `adaptTask()` in `packages/shared/src/role/adapter.ts`: remove `taskType`, `apps`, `skills`, `subTasks`; remove `instructions` param; leave `prompt: undefined`
+- [x] 6.2 Update call site: `role.tasks.map((t) => adaptTask(t))` (drop second arg)
+- [x] 6.3 Update adapter tests in `packages/shared/tests/role-adapter.test.ts` — change prompt assertion to `toBeUndefined()`
+- [x] 6.4 Run `npx vitest run packages/shared/tests/`
 
 ## 7. Update Agent SDK Helpers
 
@@ -58,35 +59,42 @@
 - [x] 8.1 Add `tasks` config to claude-code-agent `AgentPackage` in `packages/claude-code-agent/src/index.ts`
 - [x] 8.2 Add `tasks` config to pi-coding-agent `AgentPackage` in `packages/pi-coding-agent/src/index.ts`
 - [x] 8.3 Remove `generateSlashCommand()` from `packages/claude-code-agent/src/materializer.ts`
-- [x] 8.4 Replace task loop in claude-code-agent `materializeWorkspace()` with `materializeTasks()` call
+- [x] 8.4 Replace task loop in claude-code-agent `materializeWorkspace()` with `materializeTasks(_agentPkg.tasks)` call (no inline config duplication)
 - [x] 8.5 Remove `generateCommandPrompt()` from `packages/pi-coding-agent/src/materializer.ts`
 - [x] 8.6 Update pi-coding-agent `generateExtensionIndexTs()` to read from materialized task files instead of building prompts from ResolvedTask + role context
-- [x] 8.7 Update claude-code-agent materializer tests in `packages/claude-code-agent/tests/materializer.test.ts`
-- [x] 8.8 Update pi-coding-agent materializer tests in `packages/pi-coding-agent/tests/materializer.test.ts`
-- [x] 8.9 Update CLI materializer tests in `packages/cli/tests/materializer/`
+- [x] 8.7 Replace inline `AgentTaskConfig` in both materializers with `_agentPkg.tasks` from parent AgentPackage
+- [x] 8.8 Update claude-code-agent materializer tests in `packages/claude-code-agent/tests/materializer.test.ts`
+- [x] 8.9 Update pi-coding-agent materializer tests in `packages/pi-coding-agent/tests/materializer.test.ts`
+- [x] 8.10 Update CLI materializer tests in `packages/cli/tests/materializer/`
 
-## 9. Update Remaining Test Helpers
+## 9. Task Content Resolution
 
-- [x] 9.1 Update `ResolvedTask` test helpers in `packages/cli/tests/validator/validate.test.ts`
-- [x] 9.2 Update `ResolvedTask` test helpers in `packages/cli/tests/generator/agent-dockerfile.test.ts`
-- [x] 9.3 Run full unit test suite across all changed packages
+- [x] 9.1 Add `source.path` to packaged roles in `packages/shared/src/role/package-reader.ts`
+- [x] 9.2 Update package-reader test assertion: `source.path` is now `toBeDefined()` instead of `toBeUndefined()`
+- [x] 9.3 Add `MASON_TASK_CONFIG` constant in `packages/cli/src/materializer/role-materializer.ts`
+- [x] 9.4 Add `getSourceTaskConfig(role)` helper — looks up source agent's `AgentTaskConfig` from dialect registry, falls back to MASON_TASK_CONFIG
+- [x] 9.5 Add `getSourceProjectDir(role)` helper — derives project dir from `role.source.path` (3 levels up for local, direct for packages)
+- [x] 9.6 Add `resolveTaskContent(agent, role)` — reads source task files via `readTasks()`, merges prompt/metadata by name into resolved tasks
+- [x] 9.7 Wire `resolveTaskContent()` into `materializeForAgent()` after `adaptRoleToResolvedAgent()` and before materializer call
+- [x] 9.8 Wire `resolveTaskContent()` into docker-generator supervisor path after `adaptRoleToResolvedAgent(role, agentType)`
+- [x] 9.9 Export `resolveTaskContent` from role-materializer for docker-generator import
 
-## Verify
-- [x] 11.1 Run `npx tsc --noEmit` across all packages, fix all issues
-- [x] 11.2 Run `npx eslint src/ tests/` across all packages fix all issues
-- [x] 11.3 Run `nm run clean` and `npm run build` across all packages, fix all issues
-- [x] 11.4 Run unit tests for all changed packages
+## 10. Update Remaining Test Helpers
 
-## 10. Documentation
+- [x] 10.1 Update `ResolvedTask` test helpers in `packages/cli/tests/validator/validate.test.ts`
+- [x] 10.2 Update `ResolvedTask` test helpers in `packages/cli/tests/generator/agent-dockerfile.test.ts`
+- [x] 10.3 Run full unit test suite across all changed packages
 
-- [x] 10.1 Update `docs/task.md` to reflect simplified task model and AgentTaskConfig
-- [x] 10.2 Update `docs/architecture.md` with new task read/write flow
-- [x] 10.3 Create `docs/add-new-agent.md` guide covering AgentPackage interface including `tasks` config
+## 11. Documentation
 
-## 11. Final Verification
+- [x] 11.1 Update `docs/task.md` to reflect simplified task model and AgentTaskConfig
+- [x] 11.2 Update `docs/architecture.md` with new task read/write flow
+- [x] 11.3 Create `docs/add-new-agent.md` guide covering AgentPackage interface including `tasks` config
 
-- [x] 11.1 Run `npx tsc --noEmit` across all packages
-- [x] 11.2 Run `npx eslint src/ tests/` across all packages
-- [x] 11.3 Run `nm run clean` and `npm run build` across all packages, fix all issues
-- [x] 11.4 Run unit tests for all changed packages
-- [x] 11.5 Run e2e tests from `packages/tests`
+## 12. Verification
+
+- [x] 12.1 Run `npx tsc --noEmit` across all packages, fix all issues
+- [x] 12.2 Run `npx eslint src/ tests/` across all packages, fix all issues
+- [x] 12.3 Run `npm run clean` and `npm run build` across all packages, fix all issues
+- [x] 12.4 Run unit tests for all changed packages (shared: 198, agent-sdk: 122, cli: 630, claude-code-agent: 48, pi-coding-agent: 39)
+- [x] 12.5 Run e2e tests from `packages/tests` (1 passed)
