@@ -5,6 +5,7 @@ export {
   getDialectByDirectory,
   getAllDialects,
   getKnownDirectories,
+  resolveDialectName,
   type DialectEntry,
   type DialectFieldMapping,
 } from "./dialect-registry.js";

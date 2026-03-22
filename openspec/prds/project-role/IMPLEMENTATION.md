@@ -64,7 +64,7 @@ This change only adds the flag parsing and source override on existing roles (us
 
 **Testable output:** `mason claude --role developer --source codex` loads the developer role but resolves tasks/skills from `.codex/`. Invalid `--source` values produce a clear error listing available sources.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-21-source-cli-flag/proposal.md) | [design](../../changes/archive/2026-03-21-source-cli-flag/design.md) | [tasks](../../changes/archive/2026-03-21-source-cli-flag/tasks.md)
 
 ---
 

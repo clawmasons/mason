@@ -72,6 +72,26 @@ export function getKnownDirectories(): string[] {
   return [...directoryToDialect.keys()];
 }
 
+/**
+ * Resolve a user-provided source name to the dialect registry key.
+ *
+ * Accepts any of:
+ *   - Full registry key: "claude-code-agent"
+ *   - Dot-prefixed directory: ".claude"
+ *   - Short directory name: "claude"
+ *
+ * Returns the dialect registry key (e.g., "claude-code-agent") or undefined
+ * if the input does not match any registered dialect.
+ */
+export function resolveDialectName(input: string): string | undefined {
+  // 1. Exact registry key match (e.g., "claude-code-agent")
+  if (getDialect(input)) return input;
+  // 2. Strip leading dot and try directory lookup (e.g., ".claude" → "claude")
+  const stripped = input.startsWith(".") ? input.slice(1) : input;
+  const entry = getDialectByDirectory(stripped);
+  return entry?.name;
+}
+
 // ---------------------------------------------------------------------------
 // Built-in dialects (per PRD Appendix B)
 // ---------------------------------------------------------------------------

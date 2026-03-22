@@ -15,6 +15,7 @@ import {
   getKnownAgentTypeNames,
   ensureMasonConfig,
   buildVscodeAttachUri,
+  normalizeSourceFlags,
 } from "../../src/cli/commands/run-agent.js";
 import {
   generateSessionComposeYml,
@@ -1283,6 +1284,170 @@ describe("CLI run --dev-container flag", () => {
       const opt = cmd.options.find((o) => o.long === "--dev-container");
       expect(opt).toBeDefined();
     }
+  });
+});
+
+// ── --source flag ─────────────────────────────────────────────────────────
+
+describe("CLI run --source flag", () => {
+  it("run command has --source option", () => {
+    const cmd = program.commands.find((c) => c.name() === "run");
+    expect(cmd).toBeDefined();
+    if (cmd) {
+      const opt = cmd.options.find((o) => o.long === "--source");
+      expect(opt).toBeDefined();
+    }
+  });
+});
+
+// ── normalizeSourceFlags ──────────────────────────────────────────────────
+
+describe("normalizeSourceFlags", () => {
+  let exitSpy: MockInstance;
+  let errorSpy: MockInstance;
+
+  beforeEach(() => {
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("normalizes short directory name 'claude' to 'claude-code-agent'", () => {
+    const result = normalizeSourceFlags(["claude"]);
+    expect(result).toEqual(["claude-code-agent"]);
+  });
+
+  it("normalizes dot-prefixed '.claude' to 'claude-code-agent'", () => {
+    const result = normalizeSourceFlags([".claude"]);
+    expect(result).toEqual(["claude-code-agent"]);
+  });
+
+  it("normalizes full registry key 'claude-code-agent'", () => {
+    const result = normalizeSourceFlags(["claude-code-agent"]);
+    expect(result).toEqual(["claude-code-agent"]);
+  });
+
+  it("normalizes multiple sources", () => {
+    const result = normalizeSourceFlags(["claude", "codex"]);
+    expect(result).toEqual(["claude-code-agent", "codex"]);
+  });
+
+  it("exits with error for invalid source", () => {
+    normalizeSourceFlags(["invalid-source"]);
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const output = errorSpy.mock.calls.flat().join("\n");
+    expect(output).toContain('Unknown source "invalid-source"');
+    expect(output).toContain("Available sources:");
+  });
+
+  it("exits with error listing available sources for invalid input", () => {
+    normalizeSourceFlags(["gpt"]);
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const output = errorSpy.mock.calls.flat().join("\n");
+    expect(output).toContain("claude");
+    expect(output).toContain("codex");
+    expect(output).toContain("aider");
+    expect(output).toContain("mcp");
+    expect(output).toContain("mason");
+  });
+});
+
+// ── source override applied to role ───────────────────────────────────────
+
+describe("source override applied to role", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-source-override-"));
+    // Create minimal .mason structure
+    fs.mkdirSync(path.join(tmpDir, ".mason"), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, ".mason", "config.json"), JSON.stringify({ agents: {}, aliases: {} }));
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeSourceTestRole(overrides?: Partial<Role>): Role {
+    return {
+      metadata: { name: "role-writer", version: "1.0.0" },
+      source: {
+        agentDialect: "claude-code-agent",
+        agentDir: ".claude",
+        roleDir: path.join(tmpDir, ".claude", "roles", "writer"),
+      },
+      skills: [],
+      commands: [],
+      tools: [],
+      apps: [],
+      sources: ["claude-code-agent"],
+      ...overrides,
+    } as Role;
+  }
+
+  function setupDockerBuildDir() {
+    const dockerDir = path.join(tmpDir, ".mason", "docker");
+    const dockerBuildDir = path.join(dockerDir, "writer");
+    fs.mkdirSync(path.join(dockerBuildDir, "claude-code-agent"), { recursive: true });
+    fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", "Dockerfile"), "FROM node:20\n");
+    const packagesHash = crypto.createHash("sha256").update(JSON.stringify({})).digest("hex");
+    fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", ".packages-hash"), packagesHash);
+    fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
+    fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
+  }
+
+  function makeSourceTestDeps(captureRef: { role?: Role }) {
+    return {
+      generateSessionIdFn: () => "test1234",
+      checkDockerComposeFn: () => {},
+      waitForProxyHealthFn: async () => {},
+      resolveRoleFn: async () => makeSourceTestRole(),
+      adaptRoleFn: (role: Role) => {
+        captureRef.role = role;
+        return {
+          name: "writer", version: "1.0.0", agentName: "writer", slug: "writer",
+          runtimes: ["claude-code-agent"], credentials: [],
+          roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
+        } as ResolvedAgent;
+      },
+      ensureGitignoreEntryFn: () => false,
+      existsSyncFn: (p: string) => fs.existsSync(p),
+      execComposeFn: async () => 0,
+      runAgentFn: async () => 0,
+      startHostProxyFn: async () => ({ stop: async () => {} }),
+    };
+  }
+
+  it("overrides role sources when sourceOverride is provided", async () => {
+    setupDockerBuildDir();
+    const capture: { role?: Role } = {};
+    const deps = makeSourceTestDeps(capture);
+
+    await runAgent(tmpDir, "claude-code-agent", "writer", deps, {
+      sourceOverride: ["codex"],
+    });
+
+    expect(capture.role).toBeDefined();
+    expect(capture.role!.sources).toEqual(["codex"]);
+  });
+
+  it("does not override role sources when sourceOverride is not provided", async () => {
+    setupDockerBuildDir();
+    const capture: { role?: Role } = {};
+    const deps = makeSourceTestDeps(capture);
+
+    await runAgent(tmpDir, "claude-code-agent", "writer", deps);
+
+    expect(capture.role).toBeDefined();
+    expect(capture.role!.sources).toEqual(["claude-code-agent"]);
   });
 });
 

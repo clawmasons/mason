@@ -74,6 +74,7 @@ export {
   getDialectByDirectory,
   getAllDialects,
   getKnownDirectories,
+  resolveDialectName,
   type DialectEntry,
   type DialectFieldMapping,
   readMaterializedRole,

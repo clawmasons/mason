@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { type Command, Option } from "commander";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -8,7 +8,7 @@ import { spawn } from "node:child_process";
 import { checkDockerCompose } from "./docker-utils.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedApp, Role } from "@clawmasons/shared";
-import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName } from "@clawmasons/shared";
+import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories } from "@clawmasons/shared";
 import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry, loadConfigAliasEntry } from "@clawmasons/agent-sdk";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
@@ -539,6 +539,25 @@ function expandHome(p: string): string {
 }
 
 /**
+ * Validate and normalize `--source` flag values against the dialect registry.
+ * Each value is resolved to a dialect registry key. If any value is invalid,
+ * an error is printed listing available sources and `process.exit(1)` is called.
+ */
+export function normalizeSourceFlags(sources: string[]): string[] {
+  const normalized: string[] = [];
+  for (const s of sources) {
+    const resolved = resolveDialectName(s);
+    if (!resolved) {
+      const available = getKnownDirectories().join(", ");
+      console.error(`\n  Error: Unknown source "${s}". Available sources: ${available}.\n`);
+      process.exit(1);
+    }
+    normalized.push(resolved);
+  }
+  return normalized;
+}
+
+/**
  * Create the action handler for the `run` command.
  */
 function createRunAction(overrideRole?: string, overridePrompt?: string) {
@@ -556,6 +575,7 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
       agent?: string;
       role?: string;
       home?: string;
+      source?: string[];
       proxyPort: string;
     },
   ) => {
@@ -647,6 +667,11 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     // agent-args from alias config (undefined if not an alias or no agent-args set)
     const agentArgs = aliasEntry?.agentArgs;
 
+    // Normalize --source flags: validate against dialect registry and convert to registry keys
+    const sourceOverride = options.source?.length
+      ? normalizeSourceFlags(options.source)
+      : undefined;
+
     if (options.proxyOnly) {
       await runProxyOnly(projectDir, resolvedAgentType, role, parseInt(options.proxyPort, 10));
     } else if (effectiveAcp) {
@@ -656,6 +681,7 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         homeOverride,
         agentConfigCredentials: configEntry?.credentials,
         agentArgs,
+        sourceOverride,
         // initialPrompt intentionally omitted for ACP mode
       });
     } else if (options.devContainer) {
@@ -668,6 +694,7 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         devContainerCustomizations: (configEntry as { devContainerCustomizations?: DevContainerCustomizations } | undefined)?.devContainerCustomizations,
         agentConfigCredentials: configEntry?.credentials,
         agentArgs,
+        sourceOverride,
         initialPrompt,
       });
     } else {
@@ -679,6 +706,7 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         homeOverride,
         agentConfigCredentials: configEntry?.credentials,
         agentArgs,
+        sourceOverride,
         initialPrompt,
       });
     }
@@ -702,6 +730,10 @@ export function registerRunCommand(program: Command): void {
     .option("--proxy-only", "Start proxy infrastructure only, output connection info as JSON")
     .option("--verbose", "Show Docker build and compose output")
     .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
+    .addOption(
+      new Option("--source <name>", "Agent source directory to scan (repeatable). Overrides role sources.")
+        .argParser((value: string, previous: string[] | undefined) => [...(previous ?? []), value]),
+    )
     .addHelpText("after", RUN_ACP_AGENT_HELP_EPILOG)
     .action(createRunAction());
 }
@@ -746,6 +778,7 @@ export async function runAgent(
     devContainerCustomizations?: DevContainerCustomizations;
     agentConfigCredentials?: string[];
     agentArgs?: string[];
+    sourceOverride?: string[];
     initialPrompt?: string;
   },
 ): Promise<void> {
@@ -770,10 +803,11 @@ export async function runAgent(
   const homeOverride = deps?.homeOverride ?? acpOptions?.homeOverride;
   const agentConfigCredentials = acpOptions?.agentConfigCredentials;
   const agentArgs = acpOptions?.agentArgs;
+  const sourceOverride = acpOptions?.sourceOverride;
   const initialPrompt = acpOptions?.initialPrompt;
 
   if (isAcpMode) {
-    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials, agentArgs);
+    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials, agentArgs, sourceOverride);
   } else if (isDevContainerMode) {
     const verbose = acpOptions?.verbose === true;
     return runAgentDevContainerMode(
@@ -782,10 +816,11 @@ export async function runAgent(
       agentConfigCredentials,
       agentArgs,
       initialPrompt,
+      sourceOverride,
     );
   } else {
     const verbose = acpOptions?.verbose === true;
-    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt);
+    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride);
   }
 }
 
@@ -827,6 +862,7 @@ async function runAgentInteractiveMode(
   agentConfigCredentials?: string[],
   agentArgs?: string[],
   initialPrompt?: string,
+  sourceOverride?: string[],
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const runAgent = deps?.runAgentFn ?? runAgentWithOciRestart;
@@ -838,6 +874,12 @@ async function runAgentInteractiveMode(
   try {
     // 1. Resolve role from project directory
     const roleType = await resolveRoleFn(role, projectDir);
+
+    // 1b. Apply --source override if provided
+    if (sourceOverride?.length) {
+      roleType.sources = sourceOverride;
+    }
+
     const roleName = getAppShortName(roleType.metadata.name);
 
     // 3. Infer or override agent type
@@ -1004,6 +1046,7 @@ async function runAgentDevContainerMode(
   agentConfigCredentials?: string[],
   agentArgs?: string[],
   initialPrompt?: string,
+  sourceOverride?: string[],
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
@@ -1015,6 +1058,12 @@ async function runAgentDevContainerMode(
   try {
     // 1. Resolve role
     const roleType = await resolveRoleFn(role, projectDir);
+
+    // 1b. Apply --source override if provided
+    if (sourceOverride?.length) {
+      roleType.sources = sourceOverride;
+    }
+
     const roleName = getAppShortName(roleType.metadata.name);
     const agentType = agentOverride ?? inferAgentType(roleType);
 
@@ -1291,6 +1340,7 @@ async function runAgentAcpMode(
   homeOverride?: string,
   agentConfigCredentials?: string[],
   agentArgs?: string[],
+  sourceOverride?: string[],
   // initialPrompt is intentionally omitted: ACP mode does not forward initial prompts
 ): Promise<void> {
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
@@ -1345,6 +1395,12 @@ async function runAgentAcpMode(
   try {
     // ── Step 1: Resolve role from project directory ──────────────────
     const roleType = await resolveRoleFn(role, projectDir);
+
+    // ── Step 1b: Apply --source override if provided ─────────────────
+    if (sourceOverride?.length) {
+      roleType.sources = sourceOverride;
+    }
+
     const roleName = getAppShortName(roleType.metadata.name);
 
     // ── Step 2: Infer or override agent type ─────────────────────────
