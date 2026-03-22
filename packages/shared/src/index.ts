@@ -71,6 +71,7 @@ export {
 // Role module (dialect registry, parser, resource scanner)
 export {
   registerDialect,
+  registerAgentDialect,
   getDialect,
   getDialectByDirectory,
   getAllDialects,
@@ -78,6 +79,7 @@ export {
   resolveDialectName,
   type DialectEntry,
   type DialectFieldMapping,
+  type AgentDialectInfo,
   readMaterializedRole,
   parseFrontmatter,
   detectDialect,

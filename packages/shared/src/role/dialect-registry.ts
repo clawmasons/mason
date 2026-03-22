@@ -99,28 +99,55 @@ export function resolveDialectName(input: string): string | undefined {
 }
 
 // ---------------------------------------------------------------------------
-// Built-in dialects (per PRD Appendix B)
+// Dynamic dialect registration from AgentPackage
 // ---------------------------------------------------------------------------
 
-registerDialect({
-  name: "claude-code-agent",
-  directory: "claude",
-  fieldMapping: {
-    tasks: "commands",
-    apps: "mcp_servers",
-    skills: "skills",
-  },
-  taskConfig: {
-    projectFolder: ".claude/commands",
-    nameFormat: "{scopePath}/{taskName}.md",
-    scopeFormat: "path",
-    supportedFields: ["name->displayName", "description", "category", "tags"],
-    prompt: "markdown-body",
-  },
-  skillConfig: {
-    projectFolder: ".claude/skills",
-  },
-});
+/**
+ * Lightweight info object for registering an agent's dialect.
+ * Uses a plain object (not AgentPackage) to avoid a dependency from
+ * @clawmasons/shared on @clawmasons/agent-sdk.
+ */
+export interface AgentDialectInfo {
+  /** Agent canonical name (e.g., "pi-coding-agent"). */
+  name: string;
+  /** Directory name without dot prefix (e.g., "pi"). */
+  dialect: string;
+  /** ROLE.md frontmatter field name overrides. */
+  dialectFields?: {
+    tasks?: string;
+    apps?: string;
+    skills?: string;
+  };
+  /** Task file layout config. */
+  tasks?: AgentTaskConfig;
+  /** Skill file layout config. */
+  skills?: AgentSkillConfig;
+}
+
+/**
+ * Register a dialect entry derived from an agent package's metadata.
+ *
+ * This is the preferred way for agent packages to self-register their dialect.
+ * The agent declares `dialect` on its AgentPackage export, and the CLI calls
+ * this function at init time.
+ */
+export function registerAgentDialect(info: AgentDialectInfo): void {
+  registerDialect({
+    name: info.name,
+    directory: info.dialect,
+    fieldMapping: {
+      tasks: info.dialectFields?.tasks ?? "tasks",
+      apps: info.dialectFields?.apps ?? "mcp_servers",
+      skills: info.dialectFields?.skills ?? "skills",
+    },
+    taskConfig: info.tasks,
+    skillConfig: info.skills,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Built-in static dialects (agent-agnostic or third-party without AgentPackage)
+// ---------------------------------------------------------------------------
 
 registerDialect({
   name: "codex",
@@ -139,56 +166,6 @@ registerDialect({
     tasks: "conventions",
     apps: "mcp_servers",
     skills: "skills",
-  },
-});
-
-registerDialect({
-  name: "mcp-agent",
-  directory: "mcp",
-  fieldMapping: {
-    tasks: "commands",
-    apps: "mcp_servers",
-    skills: "skills",
-  },
-});
-
-registerDialect({
-  name: "pi-coding-agent",
-  directory: "pi",
-  fieldMapping: {
-    tasks: "prompts",
-    apps: "mcp_servers",
-    skills: "skills",
-  },
-  taskConfig: {
-    projectFolder: ".pi/prompts",
-    nameFormat: "{scopeKebab}-{taskName}.md",
-    scopeFormat: "kebab-case-prefix",
-    supportedFields: ["description"],
-    prompt: "markdown-body",
-  },
-  skillConfig: {
-    projectFolder: "skills",
-  },
-});
-
-registerDialect({
-  name: "pi-coding-agent",
-  directory: "pi",
-  fieldMapping: {
-    tasks: "prompts",
-    apps: "mcp_servers",
-    skills: "skills",
-  },
-  taskConfig: {
-    projectFolder: ".pi/prompts",
-    nameFormat: "{scopeKebab}-{taskName}.md",
-    scopeFormat: "kebab-case-prefix",
-    supportedFields: ["description"],
-    prompt: "markdown-body",
-  },
-  skillConfig: {
-    projectFolder: "skills",
   },
 });
 

@@ -140,7 +140,10 @@ Also clean up the duplicate pi-coding-agent registration at lines 155-193.
 
 **Testable output:** `getAllDialects()` returns the same dialects as before. Removing a hardcoded dialect entry and adding `dialect` to the corresponding agent package produces identical scanner behavior. `npx vitest run packages/shared/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — See [archived spec](../../openspec/changes/archive/2026-03-22-dynamic-dialect-registration/):
+- [Proposal](../../openspec/changes/archive/2026-03-22-dynamic-dialect-registration/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-22-dynamic-dialect-registration/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-22-dynamic-dialect-registration/tasks.md)
 
 ---
 

@@ -8,6 +8,8 @@ export { piCodingAgentMaterializer } from "./materializer.js";
 const piCodingAgent: AgentPackage = {
   name: "pi-coding-agent",
   aliases: ["pi"],
+  dialect: "pi",
+  dialectFields: { tasks: "prompts" },
   materializer: piCodingAgentMaterializer,
   dockerfile: {
     installSteps: `

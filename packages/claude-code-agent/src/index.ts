@@ -6,6 +6,8 @@ export { claudeCodeMaterializer } from "./materializer.js";
 const claudeCodeAgent: AgentPackage = {
   name: "claude-code-agent",
   aliases: ["claude"],
+  dialect: "claude",
+  dialectFields: { tasks: "commands" },
   materializer: claudeCodeMaterializer,
   dockerfile: {
     installSteps: `
