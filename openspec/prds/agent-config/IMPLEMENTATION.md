@@ -105,7 +105,7 @@ Also wire the stored `config` values into `ResolvedAgent.llm` during the run flo
 - `packages/cli/src/cli/commands/run-agent.ts` — After config resolution, set `agent.llm = { provider: resolved["llm.provider"], model: resolved["llm.model"] }` before materialization
 - `packages/shared/src/role/adapter.ts` — Optionally accept `llm` parameter in `adaptRoleToResolvedAgent()` to populate the field
 
-**Testable output:** `mason run pi` with no stored config prompts for provider/model, persists to `.mason/config.json`, and launches. Second run skips prompts. `npx vitest run packages/pi-coding-agent/tests/` and `npx vitest run packages/cli/tests/` pass.
+**Testable output:** `mason run pi` with no stored config prompts for provider/model, persists to `agents.pi-coding-agent.config` in `.mason/config.json`, and launches. Second run skips prompts. `npx vitest run packages/pi-coding-agent/tests/` and `npx vitest run packages/cli/tests/` pass.
 
 **Not Implemented Yet**
 
@@ -185,7 +185,7 @@ End-to-end tests verifying the full agent config flow:
 4. **Credential guidance:** Missing API key → displays label, hint, obtainUrl before prompting
 5. **Self-registration:** Agent with `dialect: "pi"` auto-registers in dialect registry
 6. **Delegated validation:** Pi without LLM config → error from `AgentPackage.validate()`, not hardcoded branch
-7. **Config reconfiguration:** Delete `agentConfig.pi-coding-agent` from config.json → prompts again on next run
+7. **Config reconfiguration:** Delete `agents.pi-coding-agent.config` from config.json → prompts again on next run
 8. **Third-party agent:** Agent loaded via `.mason/config.json` `agents` section with `configSchema` → prompts work
 
 **Key files:**
