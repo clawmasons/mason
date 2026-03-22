@@ -147,6 +147,6 @@ End-to-end tests verifying the full project role flow:
 
 Follow existing test patterns in each directory (describe/it structure, existing test helpers and fixtures).
 
-**Testable output:** All tests pass. `npx vitest run packages/shared/tests/` and `npx vitest run packages/cli/tests/` green.
+**Testable output:** All tests pass. `npx vitest run packages/shared/tests/` and `npx vitest run packages/cli/tests/` green. E2e tests pass: `cd packages/tests && npx vitest run --config vitest.config.ts tests/project-role.test.ts`.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-22-integration-tests/proposal.md) | [design](../../changes/archive/2026-03-22-integration-tests/design.md) | [tasks](../../changes/archive/2026-03-22-integration-tests/tasks.md)
