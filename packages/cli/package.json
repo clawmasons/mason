@@ -1,6 +1,6 @@
 {
   "name": "@clawmasons/mason",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Mason — AI agent packaging, governance, and runtime orchestration",
   "type": "module",
   "bin": {
@@ -35,13 +35,12 @@
   "license": "MIT",
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.16.0",
-    "@clawmasons/shared": "^0.1.3",
-    "@clawmasons/agent-sdk": "^0.1.3",
-    "@clawmasons/claude-code-agent": "^0.1.3",
-    "@clawmasons/pi-coding-agent": "^0.1.3",
-    "@clawmasons/proxy": "^0.1.3",
-    "@clawmasons/mcp-agent": "^0.1.3",
-
+    "@clawmasons/shared": "^0.1.4",
+    "@clawmasons/agent-sdk": "^0.1.4",
+    "@clawmasons/claude-code-agent": "^0.1.4",
+    "@clawmasons/pi-coding-agent": "^0.1.4",
+    "@clawmasons/proxy": "^0.1.4",
+    "@clawmasons/mcp-agent": "^0.1.4",
     "commander": "^14.0.3"
   }
 }
