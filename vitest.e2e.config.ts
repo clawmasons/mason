@@ -2,10 +2,9 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["tests/**/*.test.ts"],
+    include: ["packages/*/tests/e2e/**/*.test.ts"],
     testTimeout: 60_000,
     fileParallelism: false,
     pool: "forks",
-    globalSetup: ["./global-setup.ts"],
   },
 });
