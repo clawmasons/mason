@@ -1,5 +1,6 @@
 import type { ResolvedAgent, ResolvedApp, ResolvedRole } from "@clawmasons/shared";
-import type { ValidationError, ValidationWarning, ValidationResult } from "./types.js";
+import type { AgentRegistry } from "@clawmasons/agent-sdk";
+import type { ValidationError, ValidationWarning, ValidationErrorCategory, ValidationWarningCategory, ValidationResult } from "./types.js";
 
 /**
  * Check tool existence: every tool in a role's allow-list must
@@ -113,42 +114,56 @@ function checkCredentialCoverage(
 }
 
 /**
- * Check LLM configuration: pi-coding-agent requires an `llm` field,
- * claude-code-agent warns when `llm` is present (it only supports Anthropic).
+ * Delegated agent validation: iterate registered agent packages for each
+ * runtime and call their `validate()` method, merging results.
+ *
+ * Replaces the former hardcoded `checkLlmConfig()` that had per-agent
+ * conditional branches. Each agent now owns its validation rules via
+ * `AgentPackage.validate()`.
  */
-function checkLlmConfig(
+function checkAgentValidation(
   agent: ResolvedAgent,
   errors: ValidationError[],
   warnings: ValidationWarning[],
+  agentRegistry?: AgentRegistry,
 ): void {
-  const hasPi = agent.runtimes.includes("pi-coding-agent");
-  const hasClaude = agent.runtimes.includes("claude-code-agent");
-  const hasLlm = agent.llm !== undefined;
+  if (!agentRegistry) return;
 
-  // Pi requires LLM config — it has no default provider
-  if (hasPi && !hasLlm) {
-    errors.push({
-      category: "llm-config",
-      message: `Agent "${agent.agentName}" uses runtime "pi-coding-agent" but has no "llm" configuration. Pi requires explicit provider and model.`,
-      context: { agent: agent.name, runtime: "pi-coding-agent" },
-    });
-  }
+  // Deduplicate: multiple runtimes may resolve to the same AgentPackage
+  const seen = new Set<string>();
+  for (const runtime of agent.runtimes) {
+    const agentPkg = agentRegistry.get(runtime);
+    if (!agentPkg || !agentPkg.validate || seen.has(agentPkg.name)) continue;
+    seen.add(agentPkg.name);
 
-  // Claude Code ignores LLM config — it only uses Anthropic
-  if (hasClaude && hasLlm) {
-    warnings.push({
-      category: "llm-config",
-      message: `Agent "${agent.agentName}" uses runtime "claude-code-agent" with an "llm" configuration. Claude Code only supports Anthropic — the "llm" field will be ignored.`,
-      context: { agent: agent.name, runtime: "claude-code-agent" },
-    });
+    const result = agentPkg.validate(agent);
+    for (const err of result.errors) {
+      errors.push({
+        category: err.category as ValidationErrorCategory,
+        message: err.message,
+        context: err.context as ValidationError["context"],
+      });
+    }
+    for (const warn of result.warnings) {
+      warnings.push({
+        category: warn.category as ValidationWarningCategory,
+        message: warn.message,
+        context: warn.context as ValidationWarning["context"],
+      });
+    }
   }
 }
 
 /**
  * Validate a resolved agent graph for semantic correctness.
  * Runs all validation checks and collects errors and warnings.
+ *
+ * @param agent - The resolved agent to validate
+ * @param agentRegistry - Optional agent registry for delegated validation.
+ *   When provided, each agent package's `validate()` is called for runtimes
+ *   in the agent. When omitted, agent-specific validation is skipped.
  */
-export function validateAgent(agent: ResolvedAgent): ValidationResult {
+export function validateAgent(agent: ResolvedAgent, agentRegistry?: AgentRegistry): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
@@ -163,8 +178,8 @@ export function validateAgent(agent: ResolvedAgent): ValidationResult {
     checkAppLaunchConfig(app, errors);
   }
 
-  // Check LLM configuration
-  checkLlmConfig(agent, errors, warnings);
+  // Delegated agent validation (replaces hardcoded checkLlmConfig)
+  checkAgentValidation(agent, errors, warnings, agentRegistry);
 
   // Check credential coverage
   checkCredentialCoverage(agent, warnings);

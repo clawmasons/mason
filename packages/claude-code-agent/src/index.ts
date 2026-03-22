@@ -1,4 +1,5 @@
-import type { AgentPackage } from "@clawmasons/agent-sdk";
+import type { AgentPackage, AgentValidationResult } from "@clawmasons/agent-sdk";
+import type { ResolvedAgent } from "@clawmasons/shared";
 import { claudeCodeMaterializer, _setAgentPackage } from "./materializer.js";
 
 export { claudeCodeMaterializer } from "./materializer.js";
@@ -35,6 +36,18 @@ RUN npm install -g @anthropic-ai/claude-code
   },
   skills: {
     projectFolder: ".claude/skills",
+  },
+
+  validate: (agent: ResolvedAgent): AgentValidationResult => {
+    const warnings = [];
+    if (agent.llm) {
+      warnings.push({
+        category: "llm-config",
+        message: `Agent "${agent.agentName}" uses runtime "claude-code-agent" with an "llm" configuration. Claude Code only supports Anthropic — the "llm" field will be ignored.`,
+        context: { agent: agent.name, runtime: "claude-code-agent" },
+      });
+    }
+    return { errors: [], warnings };
   },
 };
 

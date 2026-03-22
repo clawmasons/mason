@@ -164,7 +164,10 @@ Add `validate` to `claude-code-agent` that warns when `agent.llm` is set (Claude
 
 **Testable output:** Validation for Pi agent without LLM config produces the same error as before. Claude agent with LLM config produces the same warning. No agent-specific branches remain in `validate.ts`. `npx vitest run packages/cli/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — See [archived spec](../../openspec/changes/archive/2026-03-22-delegated-agent-validation/):
+- [Proposal](../../openspec/changes/archive/2026-03-22-delegated-agent-validation/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-22-delegated-agent-validation/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-22-delegated-agent-validation/tasks.md)
 
 ---
 

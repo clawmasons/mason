@@ -1,6 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { validateAgent } from "../../src/validator/validate.js";
 import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
+import type { AgentPackage, AgentRegistry } from "@clawmasons/agent-sdk";
+import piCodingAgent from "@clawmasons/pi-coding-agent";
+import claudeCodeAgent from "@clawmasons/claude-code-agent";
+
+// --- Mock agent registry ---
+
+function createMockRegistry(): AgentRegistry {
+  const registry: AgentRegistry = new Map();
+  registry.set("pi-coding-agent", piCodingAgent);
+  registry.set("claude-code-agent", claudeCodeAgent);
+  return registry;
+}
+
+const mockRegistry = createMockRegistry();
 
 // --- Test helpers ---
 
@@ -298,12 +312,12 @@ describe("validateAgent", () => {
       const result = validateAgent(makeMember({
         runtimes: ["pi-coding-agent"],
         // no llm field
-      }));
+      }), mockRegistry);
       expect(result.valid).toBe(false);
       const llmErrors = result.errors.filter((e) => e.category === "llm-config");
       expect(llmErrors).toHaveLength(1);
       expect(llmErrors[0].message).toContain("pi-coding-agent");
-      expect(llmErrors[0].message).toContain("no \"llm\" configuration");
+      expect(llmErrors[0].message).toContain("no LLM configuration");
       expect(llmErrors[0].context.agent).toBe("@clawmasons/agent-repo-ops");
       expect(llmErrors[0].context.runtime).toBe("pi-coding-agent");
       expect(result.warnings).toHaveLength(0);
@@ -313,7 +327,7 @@ describe("validateAgent", () => {
       const result = validateAgent(makeMember({
         runtimes: ["pi-coding-agent"],
         llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" },
-      }));
+      }), mockRegistry);
       const llmErrors = result.errors.filter((e) => e.category === "llm-config");
       expect(llmErrors).toHaveLength(0);
       expect(result.warnings).toHaveLength(0);
@@ -323,7 +337,7 @@ describe("validateAgent", () => {
       const result = validateAgent(makeMember({
         runtimes: ["claude-code-agent"],
         llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" },
-      }));
+      }), mockRegistry);
       expect(result.valid).toBe(true); // warnings don't affect validity
       expect(result.errors.filter((e) => e.category === "llm-config")).toHaveLength(0);
       expect(result.warnings).toHaveLength(1);
@@ -338,7 +352,7 @@ describe("validateAgent", () => {
       const result = validateAgent(makeMember({
         runtimes: ["claude-code-agent"],
         // no llm field — default behavior
-      }));
+      }), mockRegistry);
       expect(result.valid).toBe(true);
       expect(result.warnings).toHaveLength(0);
     });
@@ -347,7 +361,7 @@ describe("validateAgent", () => {
       const result = validateAgent(makeMember({
         runtimes: ["pi-coding-agent", "claude-code-agent"],
         // no llm — pi needs it, claude-code-agent is fine
-      }));
+      }), mockRegistry);
       expect(result.valid).toBe(false);
       const llmErrors = result.errors.filter((e) => e.category === "llm-config");
       expect(llmErrors).toHaveLength(1);
@@ -359,7 +373,7 @@ describe("validateAgent", () => {
       const result = validateAgent(makeMember({
         runtimes: ["pi-coding-agent", "claude-code-agent"],
         llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" },
-      }));
+      }), mockRegistry);
       expect(result.valid).toBe(true); // pi is satisfied, claude-code-agent just warns
       const llmErrors = result.errors.filter((e) => e.category === "llm-config");
       expect(llmErrors).toHaveLength(0);
@@ -370,7 +384,7 @@ describe("validateAgent", () => {
     it("skips llm check for human members", () => {
       const result = validateAgent(makeMember({
         runtimes: [], // humans don't have runtimes
-      }));
+      }), mockRegistry);
       // Human members should not trigger any llm-config errors or warnings
       const llmErrors = result.errors.filter((e) => e.category === "llm-config");
       expect(llmErrors).toHaveLength(0);
@@ -381,10 +395,85 @@ describe("validateAgent", () => {
       const result = validateAgent(makeMember({
         runtimes: ["codex"],
         // no llm — codex is not pi-coding-agent, so no error
+      }), mockRegistry);
+      const llmErrors = result.errors.filter((e) => e.category === "llm-config");
+      expect(llmErrors).toHaveLength(0);
+      expect(result.warnings).toHaveLength(0);
+    });
+  });
+
+  describe("delegated agent validation", () => {
+    it("skips agent-specific validation when no registry provided", () => {
+      // Without registry, no agent-specific validation runs (backward compat)
+      const result = validateAgent(makeMember({
+        runtimes: ["pi-coding-agent"],
+        // no llm — would normally error, but no registry
       }));
       const llmErrors = result.errors.filter((e) => e.category === "llm-config");
       expect(llmErrors).toHaveLength(0);
       expect(result.warnings).toHaveLength(0);
+    });
+
+    it("handles agent package without validate function", () => {
+      const noValidatePkg = {
+        name: "no-validate-agent",
+        // no validate function
+      } as unknown as AgentPackage;
+      const registry: AgentRegistry = new Map();
+      registry.set("no-validate-agent", noValidatePkg);
+
+      const result = validateAgent(makeMember({
+        runtimes: ["no-validate-agent"],
+      }), registry);
+      const llmErrors = result.errors.filter((e) => e.category === "llm-config");
+      expect(llmErrors).toHaveLength(0);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it("deduplicates validate calls for same agent package", () => {
+      let callCount = 0;
+      const countingPkg = {
+        name: "counting-agent",
+        validate: () => {
+          callCount++;
+          return { errors: [], warnings: [] };
+        },
+      } as unknown as AgentPackage;
+      const registry: AgentRegistry = new Map();
+      // Register same package under two runtime names
+      registry.set("runtime-a", countingPkg);
+      registry.set("runtime-b", countingPkg);
+
+      validateAgent(makeMember({
+        runtimes: ["runtime-a", "runtime-b"],
+      }), registry);
+      expect(callCount).toBe(1); // deduplicated by AgentPackage.name
+    });
+
+    it("calls validate for each distinct agent package", () => {
+      const calls: string[] = [];
+      const pkgA = {
+        name: "agent-a",
+        validate: () => {
+          calls.push("a");
+          return { errors: [], warnings: [] };
+        },
+      } as unknown as AgentPackage;
+      const pkgB = {
+        name: "agent-b",
+        validate: () => {
+          calls.push("b");
+          return { errors: [], warnings: [] };
+        },
+      } as unknown as AgentPackage;
+      const registry: AgentRegistry = new Map();
+      registry.set("runtime-a", pkgA);
+      registry.set("runtime-b", pkgB);
+
+      validateAgent(makeMember({
+        runtimes: ["runtime-a", "runtime-b"],
+      }), registry);
+      expect(calls).toEqual(["a", "b"]);
     });
   });
 
