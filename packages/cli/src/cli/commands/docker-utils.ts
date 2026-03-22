@@ -11,7 +11,9 @@ export function checkDockerCompose(): void {
     execSync("docker compose version", { stdio: "ignore" });
   } catch {
     throw new Error(
-      "Docker Compose v2 is required but not found. Install Docker Desktop or the compose plugin.",
+      "Docker Compose v2 is required but not found.\n" +
+      "  Install Docker Desktop: https://docs.docker.com/get-docker/\n" +
+      "  Or install Docker Compose: https://docs.docker.com/compose/install/",
     );
   }
 }

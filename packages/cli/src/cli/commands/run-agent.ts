@@ -752,6 +752,16 @@ export async function runAgent(
   // Initialize agent registry with config-declared agents from .mason/config.json
   await initRegistry(projectDir);
 
+  // Pre-flight: check Docker Compose is available before any mode-specific work
+  const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
+  try {
+    checkDocker();
+  } catch (err) {
+    console.error(`\n  ${(err as Error).message}\n`);
+    process.exit(1);
+    return;
+  }
+
   const isAcpMode = acpOptions?.acp === true;
   const isDevContainerMode = acpOptions?.devContainer === true;
   const proxyPort = acpOptions?.proxyPort ?? 3000;
@@ -820,17 +830,13 @@ async function runAgentInteractiveMode(
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const runAgent = deps?.runAgentFn ?? runAgentWithOciRestart;
-  const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
   const startHostProxy = deps?.startHostProxyFn ?? defaultStartHostProxy;
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
   const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
 
   try {
-    // 1. Pre-flight: check docker compose is available
-    checkDocker();
-
-    // 2. Resolve role from project directory
+    // 1. Resolve role from project directory
     const roleType = await resolveRoleFn(role, projectDir);
     const roleName = getAppShortName(roleType.metadata.name);
 
@@ -1000,7 +1006,6 @@ async function runAgentDevContainerMode(
   initialPrompt?: string,
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
-  const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
   const startHostProxy = deps?.startHostProxyFn ?? defaultStartHostProxy;
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
@@ -1008,10 +1013,7 @@ async function runAgentDevContainerMode(
   const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
 
   try {
-    // 1. Pre-flight
-    checkDocker();
-
-    // 2. Resolve role
+    // 1. Resolve role
     const roleType = await resolveRoleFn(role, projectDir);
     const roleName = getAppShortName(roleType.metadata.name);
     const agentType = agentOverride ?? inferAgentType(roleType);
@@ -1210,7 +1212,6 @@ export async function runProxyOnly(
   deps?: RunAgentDeps,
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
-  const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
 
@@ -1219,10 +1220,7 @@ export async function runProxyOnly(
   console.log = (...args: unknown[]) => console.error(...args);
 
   try {
-  // 1. Pre-flight: check docker compose is available
-  checkDocker();
-
-  // 2. Resolve role from project directory
+  // 1. Resolve role from project directory
   const roleType = await resolveRoleFn(role, projectDir);
   const roleName = getAppShortName(roleType.metadata.name);
 
