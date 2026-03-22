@@ -23,8 +23,8 @@
 - **Unit tests** (run for the package you changed): `npx vitest run packages/<name>/tests/`
   - Example: `npx vitest run packages/cli/tests/` or `npx vitest run packages/shared/tests/`
   - NEVER use bare `npx vitest run` from repo root — it includes e2e tests with the wrong config
-- **E2E tests** (run only before merging to main): `cd packages/tests && npx vitest run --config vitest.config.ts`
-  - NEVER run e2e from the repo root
+- **E2E tests** (run only before merging to main): `npm run test:e2e` (from repo root)
+  - Per-package: `npx vitest run --config packages/<name>/vitest.e2e.config.ts`
 - **Test process rules**:
   - NEVER run more than one vitest process at a time
   - NEVER run vitest with `run_in_background: true` — always wait for it in the foreground

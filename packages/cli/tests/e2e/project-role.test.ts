@@ -18,14 +18,13 @@ import { describe, it, expect, afterAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
-  copyFixtureWorkspace,
   masonExecExpectError,
   isDockerAvailable,
-} from "./helpers.js";
+} from "@clawmasons/agent-sdk/testing";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-const E2E_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const E2E_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname));
 const FIXTURES_BASE = path.join(E2E_ROOT, "fixtures");
 
 /**
@@ -47,18 +46,16 @@ function copyDirRecursive(src: string, dest: string): void {
 }
 
 /**
- * Create a workspace from the project-role fixture, including .codex/ which
- * is not in the default WORKSPACE_DIRS list.
+ * Create a workspace from the local project-role fixture.
+ * Copies the entire fixture tree (including .codex/) to a timestamped tmp dir.
  */
 function createProjectRoleWorkspace(name: string): string {
-  const workspaceDir = copyFixtureWorkspace(name, { fixture: "project-role" });
+  const fixtureDir = path.join(FIXTURES_BASE, "project-role");
+  const timestamp = Date.now();
+  const workspaceDir = path.join(E2E_ROOT, "tmp", `${name}-${timestamp}`);
+  fs.mkdirSync(workspaceDir, { recursive: true });
 
-  // Copy .codex/ directory (not handled by copyFixtureWorkspace)
-  const codexSrc = path.join(FIXTURES_BASE, "project-role", ".codex");
-  const codexDest = path.join(workspaceDir, ".codex");
-  if (fs.existsSync(codexSrc)) {
-    copyDirRecursive(codexSrc, codexDest);
-  }
+  copyDirRecursive(fixtureDir, workspaceDir);
 
   return workspaceDir;
 }
@@ -151,14 +148,14 @@ describe("project-role: CLI e2e", () => {
 
   // ── Scenario 5: Implied alias routing ────────────────────────────────
 
-  it("routes implied agent alias (mason codex) to run command", () => {
+  it("routes implied agent alias (mason pi) to run command", () => {
     const ws = createEmptyWorkspace("pr-implied-alias");
     workspacesToClean.push(ws);
 
-    // Run "mason codex" — no alias configured, but codex is a known agent type
-    // Should be rewritten to "mason run --agent codex" and then fail with
+    // Run "mason pi" — pi is a known agent alias (for pi-coding-agent)
+    // Should be rewritten to "mason run --agent pi" and then fail with
     // source-dir-not-found (proving the alias routing worked)
-    const result = masonExecExpectError(["codex"], ws);
+    const result = masonExecExpectError(["pi"], ws);
 
     expect(result.exitCode).not.toBe(0);
     const output = result.stderr + result.stdout;
@@ -166,9 +163,9 @@ describe("project-role: CLI e2e", () => {
     // Should NOT say "Unknown command" — that would mean alias routing failed
     expect(output).not.toContain("Unknown command");
 
-    // Should have reached the project role generation phase
-    // (fails with missing source directory, which is the expected behavior)
-    expect(output).toContain("Source directory");
+    // Should have reached the agent execution phase
+    // (pi-coding-agent requires config, proving the alias routing worked)
+    expect(output).toContain("pi-coding-agent");
   });
 
   // ── Scenario 6: Source override with explicit role ────────────────────

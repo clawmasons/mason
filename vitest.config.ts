@@ -17,6 +17,7 @@ export default defineConfig({
   },
   test: {
     include: ["packages/*/tests/**/*.test.ts"],
+    exclude: ["packages/*/tests/e2e/**/*.test.ts", "node_modules"],
     setupFiles: [resolve(__dirname, "packages/shared/tests/setup-dialects.ts")],
   },
 });

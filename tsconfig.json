@@ -18,6 +18,7 @@
 
       "@clawmasons/agent-entry": ["./packages/agent-entry/src/index.ts"],
       "@clawmasons/agent-sdk": ["./packages/agent-sdk/src/index.ts"],
+      "@clawmasons/agent-sdk/testing": ["./packages/agent-sdk/src/testing/index.ts"],
       "@clawmasons/mcp-agent": ["./packages/mcp-agent/src/index.ts"],
       "@clawmasons/mcp-agent/agent-package": ["./packages/mcp-agent/src/agent-package.ts"],
       "@clawmasons/pi-coding-agent": ["./packages/pi-coding-agent/src/index.ts"],

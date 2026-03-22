@@ -148,7 +148,10 @@ example/.forge-bak/
 
 tasks
 
-e2e
+/e2e
+
+# E2E test tmp directories
+**/tests/e2e/tmp
 
 .mason/docker
 .mason/sessions
