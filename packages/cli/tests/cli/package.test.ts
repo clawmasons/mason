@@ -310,7 +310,7 @@ describe("runPackage — npm lifecycle", () => {
   it("skips npm run build when no build script in package.json", async () => {
     await createMasonRole({ name: "no-build-role" });
 
-    const { spawnSync } = (await import("node:child_process")) as {
+    const { spawnSync } = (await import("node:child_process")) as unknown as {
       spawnSync: ReturnType<typeof vi.fn>;
     };
     vi.mocked(spawnSync).mockReturnValue({ status: 0, pid: 1, output: [], stdout: Buffer.from(""), stderr: Buffer.from(""), signal: null });

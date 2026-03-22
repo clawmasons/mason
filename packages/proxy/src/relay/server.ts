@@ -118,6 +118,29 @@ export class RelayServer {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
+  /**
+   * Wait for a host proxy client to connect.
+   * Resolves immediately if already connected, otherwise waits up to `timeoutMs`.
+   */
+  waitForConnection(timeoutMs: number = 5_000): Promise<void> {
+    if (this.isConnected()) return Promise.resolve();
+
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        clearInterval(poller);
+        reject(new Error("Timed out waiting for relay connection"));
+      }, timeoutMs);
+
+      const poller = setInterval(() => {
+        if (this.isConnected()) {
+          clearTimeout(timer);
+          clearInterval(poller);
+          resolve();
+        }
+      }, 100);
+    });
+  }
+
   /** Shut down the relay server: reject pending requests, close connection, close WSS. */
   shutdown(): void {
     // Reject all pending requests

@@ -387,10 +387,14 @@ export class ProxyServer {
         }
 
         if (!this.relayServer.isConnected()) {
-          return {
-            content: [{ type: "text" as const, text: "Credential error: Relay not connected" }],
-            isError: true,
-          };
+          try {
+            await this.relayServer.waitForConnection(10_000);
+          } catch {
+            return {
+              content: [{ type: "text" as const, text: "Credential error: Relay not connected" }],
+              isError: true,
+            };
+          }
         }
 
         try {
@@ -488,12 +492,21 @@ export class ProxyServer {
       // Host route — forward tool call over relay to host proxy
       if (route.isHostRoute) {
         if (!relay || !relay.isConnected()) {
-          const msg = `Host tool call failed: Relay not connected`;
-          auditPostHook(ctx, pre, msg, "error", relay);
-          return {
-            content: [{ type: "text" as const, text: msg }],
-            isError: true,
-          };
+          if (relay) {
+            try {
+              await relay.waitForConnection(10_000);
+            } catch {
+              // fall through to error
+            }
+          }
+          if (!relay || !relay.isConnected()) {
+            const msg = `Host tool call failed: Relay not connected`;
+            auditPostHook(ctx, pre, msg, "error", relay);
+            return {
+              content: [{ type: "text" as const, text: msg }],
+              isError: true,
+            };
+          }
         }
 
         try {

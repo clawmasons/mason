@@ -72,6 +72,7 @@ describe("RelayClient", () => {
       const badClient = new RelayClient({
         url: `ws://localhost:${port}/ws/relay`,
         token: "wrong-token",
+        maxReconnectAttempts: 1,
       });
 
       await expect(badClient.connect()).rejects.toThrow();
@@ -82,6 +83,7 @@ describe("RelayClient", () => {
       const badClient = new RelayClient({
         url: "ws://localhost:1/ws/relay",
         token: "test-token-456",
+        maxReconnectAttempts: 1,
       });
 
       await expect(badClient.connect()).rejects.toThrow();

@@ -10,6 +10,10 @@ export interface RelayClientConfig {
   token: string;
   /** Default timeout for request() calls in milliseconds. Default: 30000. */
   defaultTimeoutMs?: number;
+  /** Max reconnection attempts before giving up. Default: 10. */
+  maxReconnectAttempts?: number;
+  /** Initial reconnect delay in ms (doubles each attempt, caps at 8s). Default: 500. */
+  reconnectDelayMs?: number;
 }
 
 interface PendingRequest {
@@ -26,71 +30,56 @@ interface PendingRequest {
  * Connects to the Docker proxy's `/ws/relay` endpoint with bearer token
  * authentication, dispatches incoming messages to registered handlers by
  * type, and supports correlated request/response with configurable timeouts.
+ *
+ * Automatically reconnects with exponential backoff on unexpected disconnects.
  */
 export class RelayClient {
   private readonly url: string;
   private readonly token: string;
   private readonly defaultTimeoutMs: number;
+  private readonly maxReconnectAttempts: number;
+  private readonly baseReconnectDelayMs: number;
   private ws: WebSocket | null = null;
   private readonly handlers = new Map<string, (msg: RelayMessage) => void>();
   private readonly pendingRequests = new Map<string, PendingRequest>();
+  private intentionalDisconnect = false;
+  private reconnectAttempts = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(config: RelayClientConfig) {
     this.url = config.url;
     this.token = config.token;
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 30_000;
+    this.maxReconnectAttempts = config.maxReconnectAttempts ?? 10;
+    this.baseReconnectDelayMs = config.reconnectDelayMs ?? 500;
   }
 
   /**
    * Establish a WebSocket connection to the relay server.
-   * Resolves when the connection is open. Rejects on auth failure or error.
+   * Retries with exponential backoff on initial connection failure.
+   * Resolves when the connection is open. Rejects after all retries exhausted.
    */
-  connect(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(this.url, {
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-        },
-      });
+  async connect(): Promise<void> {
+    this.intentionalDisconnect = false;
+    this.reconnectAttempts = 0;
 
-      const onOpen = (): void => {
-        cleanup();
-        this.ws = ws;
+    let attempts = 0;
+    const maxAttempts = this.maxReconnectAttempts;
+    let delay = this.baseReconnectDelayMs;
 
-        ws.on("message", (data) => {
-          this.handleMessage(data);
-        });
-
-        ws.on("close", () => {
-          if (this.ws === ws) {
-            this.rejectAllPending("Relay client disconnected");
-            this.ws = null;
-          }
-        });
-
-        ws.on("error", () => {
-          if (this.ws === ws) {
-            this.rejectAllPending("Relay client disconnected");
-            this.ws = null;
-          }
-        });
-
-        resolve();
-      };
-
-      const onError = (err: Error): void => {
-        cleanup();
-        reject(err);
-      };
-
-      const cleanup = (): void => {
-        ws.removeListener("open", onOpen);
-        ws.removeListener("error", onError);
-      };
-
-      ws.on("open", onOpen);
-      ws.on("error", onError);
-    });
+    while (true) {
+      try {
+        await this.connectOnce();
+        return;
+      } catch (err) {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          throw err;
+        }
+        await new Promise<void>((r) => setTimeout(r, delay));
+        delay = Math.min(delay * 2, 8_000);
+      }
+    }
   }
 
   /**
@@ -146,8 +135,16 @@ export class RelayClient {
   /**
    * Disconnect from the relay server.
    * Rejects all pending requests and closes the WebSocket. No-op if not connected.
+   * Stops auto-reconnect.
    */
   disconnect(): void {
+    this.intentionalDisconnect = true;
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     if (!this.ws) {
       return;
     }
@@ -164,6 +161,83 @@ export class RelayClient {
   }
 
   // ── Private ──────────────────────────────────────────────────────────
+
+  /** Single connection attempt — no retries. */
+  private connectOnce(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(this.url, {
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+        },
+      });
+
+      const onOpen = (): void => {
+        cleanup();
+        this.ws = ws;
+        this.reconnectAttempts = 0;
+
+        ws.on("message", (data) => {
+          this.handleMessage(data);
+        });
+
+        ws.on("close", () => {
+          if (this.ws === ws) {
+            this.rejectAllPending("Relay client disconnected");
+            this.ws = null;
+            this.scheduleReconnect();
+          }
+        });
+
+        ws.on("error", () => {
+          if (this.ws === ws) {
+            this.rejectAllPending("Relay client disconnected");
+            this.ws = null;
+            // close event will fire after error, reconnect happens there
+          }
+        });
+
+        resolve();
+      };
+
+      const onError = (err: Error): void => {
+        cleanup();
+        reject(err);
+      };
+
+      const cleanup = (): void => {
+        ws.removeListener("open", onOpen);
+        ws.removeListener("error", onError);
+      };
+
+      ws.on("open", onOpen);
+      ws.on("error", onError);
+    });
+  }
+
+  /** Schedule a reconnect attempt with exponential backoff. */
+  private scheduleReconnect(): void {
+    if (this.intentionalDisconnect) return;
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
+
+    const delay = Math.min(
+      this.baseReconnectDelayMs * Math.pow(2, this.reconnectAttempts),
+      8_000,
+    );
+    this.reconnectAttempts++;
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connectOnce().then(
+        () => {
+          this.reconnectAttempts = 0;
+        },
+        () => {
+          // Failed — schedule another attempt
+          this.scheduleReconnect();
+        },
+      );
+    }, delay);
+  }
 
   private handleMessage(data: unknown): void {
     let parsed: unknown;
