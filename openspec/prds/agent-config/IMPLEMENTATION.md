@@ -91,7 +91,10 @@ Handles:
 
 **Testable output:** Unit tests with canned prompt answers verify: (1) all fields prompted when no stored config, (2) no prompts when all values stored, (3) `optionsFn` receives prior field values, (4) non-interactive mode collects missing fields without prompting. `npx vitest run packages/cli/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — See [archived spec](../../openspec/changes/archive/2026-03-22-config-resolution-engine/):
+- [Proposal](../../openspec/changes/archive/2026-03-22-config-resolution-engine/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-22-config-resolution-engine/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-22-config-resolution-engine/tasks.md)
 
 ---
 
