@@ -243,6 +243,59 @@ The `package-reader.ts` SHALL include `path: packagePath` in the source object f
 - **THEN** the `role.source` object SHALL include `path` set to the package directory path
 - **AND** `resolveTaskContent()` SHALL be able to use this path to find task files
 
+### Requirement: Testing subpath export provides shared e2e utilities
+
+The `@clawmasons/agent-sdk` package SHALL export a `./testing` subpath (`@clawmasons/agent-sdk/testing`) that provides shared e2e test utilities. The testing module SHALL export:
+- `PROJECT_ROOT: string` — absolute path to the monorepo root
+- `MASON_BIN: string` — absolute path to `scripts/mason.js`
+- `FIXTURES_DIR: string` — absolute path to `packages/agent-sdk/fixtures/`
+- `copyFixtureWorkspace(name, opts?)` — copies a fixture to a temp directory, returns the path
+- `masonExec(args, cwd, opts?)` — runs the mason CLI binary, returns stdout
+- `masonExecJson<T>(args, cwd, opts?)` — runs mason CLI with --json and parses output
+- `masonExecExpectError(args, cwd, opts?)` — runs a command expected to fail, returns `{ stdout, stderr, exitCode }`
+- `isDockerAvailable()` — checks if Docker daemon is reachable
+- `waitForHealth(url, timeoutMs, diagnostics?)` — polls a health endpoint
+- `cleanupDockerSessions(workspaceDir)` — tears down Docker Compose sessions
+
+The testing module SHALL NOT import from `@clawmasons/cli`, `@clawmasons/mcp-agent`, or any agent implementation package. It SHALL only use Node.js built-ins.
+
+#### Scenario: Import testing utilities from subpath
+- **WHEN** a test file runs `import { copyFixtureWorkspace, masonExec } from "@clawmasons/agent-sdk/testing"`
+- **THEN** the imports SHALL resolve correctly at both compile time and runtime
+
+#### Scenario: copyFixtureWorkspace creates temp workspace from fixture
+- **WHEN** `copyFixtureWorkspace("my-test")` is called
+- **THEN** it SHALL copy the default `claude-test-project` fixture to a temp directory
+- **AND** the returned path SHALL contain "mason-e2e-my-test"
+- **AND** the workspace SHALL contain `package.json`, `.claude/`, `.mason/` directories
+
+#### Scenario: copyFixtureWorkspace throws on missing fixture
+- **WHEN** `copyFixtureWorkspace("test", { fixture: "nonexistent" })` is called
+- **THEN** it SHALL throw an error containing "not found"
+
+#### Scenario: copyFixtureWorkspace supports extraDirs
+- **WHEN** `copyFixtureWorkspace("test", { extraDirs: [".codex"] })` is called
+- **THEN** it SHALL copy the `.codex/` directory from the fixture (or create an empty one if absent)
+
+#### Scenario: Testing module has no circular dependencies
+- **WHEN** the testing module source is inspected
+- **THEN** it SHALL contain zero imports from `@clawmasons/cli`, `@clawmasons/mcp-agent`, `@clawmasons/claude-code-agent`, or `@clawmasons/pi-coding-agent`
+
+### Requirement: Shared fixtures directory contains claude-test-project
+
+The `packages/agent-sdk/fixtures/` directory SHALL contain the `claude-test-project` fixture with:
+- `package.json` — minimal project manifest
+- `.claude/commands/take-notes.md` — note-taking slash command
+- `.claude/skills/markdown-conventions/SKILL.md` — markdown formatting skill
+- `.mason/roles/writer/ROLE.md` — writer role with MCP server config
+
+The `fixtures` directory SHALL be included in the package's `files` field for npm publishing.
+
+#### Scenario: FIXTURES_DIR resolves to existing directory
+- **WHEN** `FIXTURES_DIR` is resolved
+- **THEN** it SHALL point to `packages/agent-sdk/fixtures/`
+- **AND** the directory SHALL contain `claude-test-project/`
+
 ### Requirement: SDK re-exports shared types for convenience
 
 The `@clawmasons/agent-sdk` package SHALL re-export the following types from `@clawmasons/shared`:

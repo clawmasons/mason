@@ -28,7 +28,12 @@ See PRD §4 (Shared Testing Library) and §4.3 (Fixtures).
 
 **Testable output:** `npx tsc --noEmit` compiles cleanly. A minimal test file importing `{ FIXTURES_DIR, copyFixtureWorkspace }` from `@clawmasons/agent-sdk/testing` resolves correctly. IDE autocomplete works on the subpath.
 
-**Not Implemented Yet**
+**Implemented**
+
+- [Proposal](../../changes/archive/2026-03-22-shared-testing-library/proposal.md)
+- [Design](../../changes/archive/2026-03-22-shared-testing-library/design.md)
+- [Tasks](../../changes/archive/2026-03-22-shared-testing-library/tasks.md)
+- Spec: [agent-sdk](../../specs/agent-sdk/spec.md) (updated with testing subpath and fixtures requirements)
 
 ---
 
