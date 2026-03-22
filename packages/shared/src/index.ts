@@ -58,6 +58,7 @@ export type {
   ResolvedSkill,
   ResolvedTask,
   AgentSkillConfig,
+  AgentTaskConfig,
 } from "./types.js";
 
 // Tool filtering
@@ -96,6 +97,7 @@ export {
 export {
   scanProject,
   type ScanResult,
+  type ScanOptions,
   type DiscoveredSkill,
   type DiscoveredCommand,
   type DiscoveredMcpServer,

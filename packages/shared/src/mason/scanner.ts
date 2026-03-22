@@ -2,12 +2,13 @@
  * Mason Project Scanner — discovers existing project configuration.
  *
  * Scans a project directory for:
- * - Skills in `.<agent>/skills/` directories
- * - Commands in `.<agent>/commands/` directories
+ * - Skills in agent skill directories (determined by AgentSkillConfig or fallback)
+ * - Tasks/commands in agent task directories (determined by AgentTaskConfig or fallback)
  * - MCP server configurations from agent settings files
  * - System prompts from CLAUDE.md, AGENTS.md
  *
  * Uses the dialect registry to automatically scan all registered agent directories.
+ * Supports filtering by specific dialect names via ScanOptions.
  */
 
 import { readdir, readFile, stat } from "node:fs/promises";
@@ -64,6 +65,11 @@ export interface ScanResult {
   systemPrompt: string | undefined;
 }
 
+export interface ScanOptions {
+  /** When provided, only scan these dialect names. Otherwise scan all registered dialects. */
+  dialects?: string[];
+}
+
 // ---------------------------------------------------------------------------
 // Main Scanner
 // ---------------------------------------------------------------------------
@@ -71,14 +77,27 @@ export interface ScanResult {
 /**
  * Scan a project directory for existing agent configuration.
  *
- * Iterates over all registered dialects, scanning each agent directory for
- * skills, commands, and MCP server configurations.
+ * Iterates over registered dialects (or a filtered subset), scanning each
+ * agent directory for skills, commands/tasks, and MCP server configurations.
+ *
+ * Uses each dialect's AgentTaskConfig and AgentSkillConfig (when available)
+ * to determine directory names and scoping rules. Falls back to convention-based
+ * defaults when no config is registered.
  *
  * @param projectDir - Absolute path to the project root
+ * @param options - Optional scan options (e.g., dialect filter)
  * @returns Scan results with all discovered configuration
  */
-export async function scanProject(projectDir: string): Promise<ScanResult> {
-  const dialects = getAllDialects();
+export async function scanProject(
+  projectDir: string,
+  options?: ScanOptions,
+): Promise<ScanResult> {
+  let dialects = getAllDialects();
+
+  if (options?.dialects) {
+    const filterSet = new Set(options.dialects);
+    dialects = dialects.filter((d) => filterSet.has(d.name));
+  }
 
   const skills: DiscoveredSkill[] = [];
   const commands: DiscoveredCommand[] = [];
@@ -95,8 +114,8 @@ export async function scanProject(projectDir: string): Promise<ScanResult> {
     const discoveredSkills = await scanSkills(agentDir, dialect);
     skills.push(...discoveredSkills);
 
-    // Scan commands
-    const discoveredCommands = await scanCommands(agentDir, dialect);
+    // Scan commands/tasks
+    const discoveredCommands = await scanTasks(agentDir, dialect);
     commands.push(...discoveredCommands);
 
     // Scan MCP server configs
@@ -120,11 +139,30 @@ export async function scanProject(projectDir: string): Promise<ScanResult> {
 // Skills Scanner
 // ---------------------------------------------------------------------------
 
+/**
+ * Determine the skills subdirectory for a dialect.
+ *
+ * Uses AgentSkillConfig.projectFolder when available, extracting the
+ * subdirectory portion after the agent directory prefix (e.g., ".claude/skills" → "skills").
+ * Falls back to "skills" when no config is registered.
+ */
+function getSkillSubdir(dialect: DialectEntry): string {
+  if (dialect.skillConfig) {
+    const prefix = `.${dialect.directory}/`;
+    if (dialect.skillConfig.projectFolder.startsWith(prefix)) {
+      return dialect.skillConfig.projectFolder.slice(prefix.length);
+    }
+    return dialect.skillConfig.projectFolder;
+  }
+  return "skills";
+}
+
 async function scanSkills(
   agentDir: string,
   dialect: DialectEntry,
 ): Promise<DiscoveredSkill[]> {
-  const skillsDir = join(agentDir, "skills");
+  const skillSubdir = getSkillSubdir(dialect);
+  const skillsDir = join(agentDir, skillSubdir);
   if (!(await dirExists(skillsDir))) {
     return [];
   }
@@ -151,24 +189,65 @@ async function scanSkills(
 }
 
 // ---------------------------------------------------------------------------
-// Commands Scanner
+// Tasks/Commands Scanner
 // ---------------------------------------------------------------------------
 
-async function scanCommands(
+/**
+ * Determine the tasks subdirectory for a dialect.
+ *
+ * Uses AgentTaskConfig.projectFolder when available, extracting the
+ * subdirectory portion after the agent directory prefix (e.g., ".claude/commands" → "commands").
+ * Falls back to the dialect's fieldMapping.tasks value (e.g., "commands", "instructions").
+ */
+function getTaskSubdir(dialect: DialectEntry): string {
+  if (dialect.taskConfig) {
+    const prefix = `.${dialect.directory}/`;
+    if (dialect.taskConfig.projectFolder.startsWith(prefix)) {
+      return dialect.taskConfig.projectFolder.slice(prefix.length);
+    }
+    return dialect.taskConfig.projectFolder;
+  }
+  // Fallback: use field mapping name
+  return dialect.fieldMapping.tasks;
+}
+
+/**
+ * Scan tasks/commands from an agent directory, using the dialect's task config
+ * to determine directory structure and scoping rules.
+ *
+ * When scopeFormat is "path": recursively walk subdirectories, joining paths
+ * into scoped command names (e.g., "opsx/deploy").
+ *
+ * When scopeFormat is "kebab-case-prefix": scan flat files only (no recursion).
+ * Per PRD §4.3, it is impossible to distinguish scope boundaries from task name
+ * parts in kebab-case, so tasks are assumed to have no scope.
+ */
+async function scanTasks(
   agentDir: string,
   dialect: DialectEntry,
 ): Promise<DiscoveredCommand[]> {
-  const commandsDir = join(agentDir, "commands");
-  if (!(await dirExists(commandsDir))) {
+  const taskSubdir = getTaskSubdir(dialect);
+  const tasksDir = join(agentDir, taskSubdir);
+  if (!(await dirExists(tasksDir))) {
     return [];
   }
 
-  const results: DiscoveredCommand[] = [];
-  await walkCommands(commandsDir, commandsDir, dialect, results);
-  return results;
+  // Determine scoping behavior from task config
+  const usePathScoping = dialect.taskConfig
+    ? dialect.taskConfig.scopeFormat === "path"
+    : true; // default: assume path-based scoping (preserves current behavior)
+
+  if (usePathScoping) {
+    const results: DiscoveredCommand[] = [];
+    await walkTasks(tasksDir, tasksDir, dialect, results);
+    return results;
+  } else {
+    // Flat scan — no recursion into subdirectories, no scope
+    return flatScanTasks(tasksDir, dialect);
+  }
 }
 
-async function walkCommands(
+async function walkTasks(
   baseDir: string,
   currentDir: string,
   dialect: DialectEntry,
@@ -180,7 +259,7 @@ async function walkCommands(
     const fullPath = join(currentDir, entry.name);
 
     if (entry.isDirectory()) {
-      await walkCommands(baseDir, fullPath, dialect, results);
+      await walkTasks(baseDir, fullPath, dialect, results);
     } else if (entry.isFile() && entry.name.endsWith(".md")) {
       const relPath = relative(baseDir, fullPath);
       // Remove .md extension for command name
@@ -192,6 +271,33 @@ async function walkCommands(
       });
     }
   }
+}
+
+/**
+ * Flat scan for tasks — reads only .md files in the top-level directory,
+ * without recursing into subdirectories. Used for agents with
+ * kebab-case-prefix scope format where scope cannot be reliably determined.
+ */
+async function flatScanTasks(
+  tasksDir: string,
+  dialect: DialectEntry,
+): Promise<DiscoveredCommand[]> {
+  const results: DiscoveredCommand[] = [];
+  const entries = await readdir(tasksDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name.endsWith(".md")) {
+      const fullPath = join(tasksDir, entry.name);
+      const name = entry.name.replace(/\.md$/, "");
+      results.push({
+        name,
+        path: fullPath,
+        dialect: dialect.name,
+      });
+    }
+  }
+
+  return results;
 }
 
 // ---------------------------------------------------------------------------
