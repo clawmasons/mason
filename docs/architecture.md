@@ -7,6 +7,13 @@ description: How mason orchestrates agent execution at runtime
 
 Mason uses a two-container model for agent execution: a **Docker-Side Proxy** for tool filtering and a containerized **Agent** running the AI runtime. A **Host Proxy** runs in-process on the host for credential resolution, approval dialogs, audit logging, and host MCP server management. The two sides communicate over a unified **relay WebSocket**.
 
+**Key points:**
+
+- Agents run in isolated Docker containers
+- Agent credentials (e.g. LLM API keys) are requested at startup by agent-entry via the proxy, resolved on the host, and set as env vars in the agent runtime child process
+- MCP tool credentials (e.g. `GITHUB_TOKEN`) are injected directly into MCP server transport environments — they never reach the agent container
+- MCP servers can run in a Docker sidecar container or on the host when local tool access is needed
+
 ## Container Architecture
 
 ```mermaid
@@ -25,7 +32,7 @@ graph TB
 
 ## Role Startup Sequence
 
-When you run `mason run <agent-type> --role <name>`, the following sequence executes. See [Initialization](initialization.md) for details on how the `.mason` directory is set up before this point.
+When you run `mason run <agent-type> --role <name>`, the following sequence executes.
 
 ```mermaid
 sequenceDiagram
@@ -64,9 +71,11 @@ sequenceDiagram
     Proxy-->>Agent: Filtered tools (role permissions applied)
 ```
 
-## Tool Call Flow
+## MCP Tool Call Flow
 
 Every tool call passes through the proxy for filtering and audit:
+
+This example runs the mcp tool on the proxy.
 
 ```mermaid
 sequenceDiagram
@@ -89,6 +98,33 @@ sequenceDiagram
         Audit->>Audit: Send audit_event (post-call) via relay
         Router-->>Agent: Result
     end
+```
+
+## Host MCP Server Flow
+
+MCP servers with `location: host` run on the host machine, with tool calls relayed through the proxy:
+
+```mermaid
+sequenceDiagram
+    participant Agent as Agent Runtime
+    participant Proxy as Docker Proxy
+    participant HP as Host Proxy
+    participant MCP as Host MCP Server
+
+    Note over HP, MCP: During startup
+    HP->>MCP: Spawn and connect
+    HP->>MCP: listTools()
+    MCP-->>HP: Tool definitions
+    HP->>Proxy: mcp_tools_register (relay)
+    Proxy-->>HP: mcp_tools_registered
+
+    Note over Agent, MCP: During agent session
+    Agent->>Proxy: callTool("xcode_run_simulator", args)
+    Proxy->>HP: mcp_tool_call (relay)
+    HP->>MCP: callTool("run_simulator", args)
+    MCP-->>HP: Result
+    HP-->>Proxy: mcp_tool_result (relay)
+    Proxy-->>Agent: Result
 ```
 
 ## Approval Flow
@@ -119,20 +155,25 @@ sequenceDiagram
 
 ## Credential Resolution Flow
 
-Credentials are never stored in environment variables or Docker configuration:
+There are two categories of credentials, each handled differently:
+
+- **Agent credentials** (declared in `role.governance.credentials`): Requested by agent-entry at startup via the `credential_request` MCP tool on the proxy, resolved on the host, and set as env vars in the agent runtime child process. The agent runtime itself never calls `credential_request`.
+- **MCP server credentials** (declared in `app.credentials` / `app.env`): Injected directly into MCP server transport environments at startup. These never flow through `credential_request` and never reach the agent container.
 
 ```mermaid
 sequenceDiagram
-    participant Agent as Agent Runtime
+    participant AE as Agent Entry
     participant Proxy as Docker Proxy
     participant HP as Host Proxy
     participant Resolver as Credential Resolver
 
-    Agent->>Proxy: credential_request("GITHUB_TOKEN", sessionToken)
+    Note over AE, Resolver: Agent credentials only (e.g. LLM API keys)
+
+    AE->>Proxy: credential_request(key, sessionToken)
     Proxy->>Proxy: Validate session token
     Proxy->>HP: credential_request (relay)
 
-    HP->>HP: Check credential is declared by role
+    HP->>HP: Check credential is in declaredCredentials
 
     alt Not declared
         HP-->>Proxy: Error: credential not declared
@@ -142,35 +183,12 @@ sequenceDiagram
         HP-->>Proxy: credential_response with value
     end
 
-    Proxy-->>Agent: Credential value
+    Proxy-->>AE: Credential value
+
+    Note over AE: MCP server credentials (e.g. GITHUB_TOKEN) are injected<br/>directly into MCP server transport env — never reach the agent
 ```
 
-## Host MCP Server Flow
 
-MCP servers with `location: host` run on the host machine, with tool calls relayed through the proxy:
-
-```mermaid
-sequenceDiagram
-    participant Agent as Agent Runtime
-    participant Proxy as Docker Proxy
-    participant HP as Host Proxy
-    participant MCP as Host MCP Server
-
-    Note over HP, MCP: During startup
-    HP->>MCP: Spawn and connect
-    HP->>MCP: listTools()
-    MCP-->>HP: Tool definitions
-    HP->>Proxy: mcp_tools_register (relay)
-    Proxy-->>HP: mcp_tools_registered
-
-    Note over Agent, MCP: During agent session
-    Agent->>Proxy: callTool("xcode_run_simulator", args)
-    Proxy->>HP: mcp_tool_call (relay)
-    HP->>MCP: callTool("run_simulator", args)
-    MCP-->>HP: Result
-    HP-->>Proxy: mcp_tool_result (relay)
-    Proxy-->>Agent: Result
-```
 
 ## ACP Mode Architecture
 
@@ -267,6 +285,5 @@ See [Skill](skill.md) for the full skill model documentation.
 
 ## Related
 
-- [Initialization](initialization.md) — How lodges and runtime directories are set up
 - [Proxy](proxy.md) — Detailed proxy documentation
 - [Security](security.md) — The full security model
