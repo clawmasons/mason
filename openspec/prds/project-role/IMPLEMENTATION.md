@@ -44,7 +44,7 @@ The current pre-parse hook in `commands/index.ts` already checks `isKnownAgentTy
 
 **Testable output:** `mason codex` works without alias config. Unknown names produce an error listing available commands and agent types.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-21-implied-agent-alias-fallthrough/proposal.md) | [design](../../changes/archive/2026-03-21-implied-agent-alias-fallthrough/design.md) | [tasks](../../changes/archive/2026-03-21-implied-agent-alias-fallthrough/tasks.md)
 
 ---
 
