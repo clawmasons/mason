@@ -55,7 +55,7 @@ See PRD §5.1 (Project Role Tests) and §6.1 (Per-Package E2E).
 
 **Testable output:** `npx vitest run --config packages/cli/vitest.e2e.config.ts` runs project-role e2e tests and they pass with the same assertions as before.
 
-**Not Implemented Yet**
+**Implemented**
 
 ---
 
