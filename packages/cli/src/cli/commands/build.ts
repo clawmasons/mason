@@ -21,6 +21,7 @@ import {
   synthesizeRolePackages,
 } from "../../materializer/proxy-dependencies.js";
 import { inferAgentType, resolveAgentType } from "./run-agent.js";
+import { readDefaultAgent } from "@clawmasons/agent-sdk";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 
 /**
@@ -80,8 +81,9 @@ export async function runBuild(
   }
 
   // 3. Validate roles via adapter round-trip
+  const defaultAgent = readDefaultAgent(projectDir);
   for (const role of targetRoles) {
-    const agentType = agentTypeOverride ?? inferAgentType(role);
+    const agentType = agentTypeOverride ?? inferAgentType(role, defaultAgent);
     try {
       adaptRoleToResolvedAgent(role, agentType);
     } catch (err) {
@@ -105,7 +107,7 @@ export async function runBuild(
   console.log(`\n  Building ${targetRoles.length} role(s)...\n`);
 
   for (const role of targetRoles) {
-    const agentType = agentTypeOverride ?? inferAgentType(role);
+    const agentType = agentTypeOverride ?? inferAgentType(role, defaultAgent);
     const { roleName: name } = buildRole(role, agentType, projectDir);
     console.log(`  ✓ ${name} (${agentType}) → .mason/docker/${name}/`);
   }

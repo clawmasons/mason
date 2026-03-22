@@ -13,6 +13,7 @@ interface DoctorOptions {
 
 interface ScanResult {
   stoppedContainers: string[];
+  stuckContainers: string[];
   danglingImages: string[];
   orphanedSessions: string[];
   // Full mode only
@@ -119,6 +120,9 @@ function scanResources(
   // Stopped mason containers
   const stoppedContainers = listContainers(exec, "exited");
 
+  // Stuck containers (created but never started — typically a Docker daemon issue)
+  const stuckContainers = listContainers(exec, "created");
+
   // Dangling images
   const danglingImages = listDanglingImages(exec);
 
@@ -127,6 +131,7 @@ function scanResources(
 
   const result: ScanResult = {
     stoppedContainers,
+    stuckContainers,
     danglingImages,
     orphanedSessions,
   };
@@ -141,7 +146,7 @@ function scanResources(
   return result;
 }
 
-function listContainers(exec: (cmd: string) => string, status: "exited" | "running"): string[] {
+function listContainers(exec: (cmd: string) => string, status: "exited" | "running" | "created"): string[] {
   try {
     const output = exec(
       `docker ps --filter "status=${status}" --filter "label=com.docker.compose.project" --format "{{.ID}} {{.Names}}"`,
@@ -251,6 +256,11 @@ function reportScan(scan: ScanResult, quickMode: boolean, log: (msg: string) => 
     hasIssues = true;
   }
 
+  if (scan.stuckContainers.length > 0) {
+    log(`  Stuck containers (never started): ${scan.stuckContainers.length}`);
+    hasIssues = true;
+  }
+
   if (scan.danglingImages.length > 0) {
     log(`  Dangling images: ${scan.danglingImages.length}`);
     hasIssues = true;
@@ -332,6 +342,18 @@ function cleanup(
     if (!containerId) continue;
     try {
       exec(`docker rm ${containerId}`);
+      result.containersRemoved++;
+    } catch {
+      // Skip containers that can't be removed
+    }
+  }
+
+  // Force-remove stuck containers (created but never started)
+  for (const container of scan.stuckContainers) {
+    const containerId = container.split(" ")[0];
+    if (!containerId) continue;
+    try {
+      exec(`docker rm -f ${containerId}`);
       result.containersRemoved++;
     } catch {
       // Skip containers that can't be removed
@@ -422,6 +444,7 @@ export async function quickAutoCleanup(
 
   const hasIssues =
     scan.stoppedContainers.length > 0 ||
+    scan.stuckContainers.length > 0 ||
     scan.danglingImages.length > 0 ||
     scan.orphanedSessions.length > 0;
 

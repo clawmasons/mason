@@ -53,6 +53,13 @@ export async function startProxy(
   // Graceful shutdown handler
   const shutdown = async () => {
     console.log("\nShutting down mason proxy...");
+    // Safety timeout — force exit before Docker's SIGKILL (default 10s grace)
+    const forceExit = setTimeout(() => {
+      console.error("Shutdown timed out after 5s, forcing exit");
+      process.exit(1);
+    }, 5000);
+    forceExit.unref();
+
     try {
       if (server) await server.stop();
     } catch { /* best-effort */ }

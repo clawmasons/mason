@@ -10,8 +10,9 @@ import { quickAutoCleanup } from "./doctor.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedApp, Role, AppConfig, TaskRef, SkillRef } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect } from "@clawmasons/shared";
-import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../../materializer/role-materializer.js";
-import { loadConfigAgentEntry, loadConfigAliasEntry } from "@clawmasons/agent-sdk";
+import { getAgentFromRegistry, initRegistry, getAllRegisteredNames, BUILTIN_AGENTS } from "../../materializer/role-materializer.js";
+import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig, readDefaultAgent } from "@clawmasons/agent-sdk";
+import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
 import { HostProxy } from "@clawmasons/proxy";
@@ -46,12 +47,15 @@ function defaultAdaptRole(
 
 /**
  * Infer the agent type from a Role's source dialect.
- * Falls back to "claude-code-agent" if not determinable.
+ *
+ * When the dialect is "mason" or unset, uses the provided `defaultAgent`
+ * (typically from `.mason/config.json` `defaultAgent` field), falling back
+ * to "claude-code-agent" for backward compatibility.
  */
-export function inferAgentType(roleType: Role): string {
+export function inferAgentType(roleType: Role, defaultAgent?: string): string {
   const dialect = roleType.source.agentDialect;
-  // "mason" is the agent-agnostic canonical location — default to claude-code-agent
-  if (!dialect || dialect === "mason") return "claude-code-agent";
+  // "mason" is the agent-agnostic canonical location — use configurable default
+  if (!dialect || dialect === "mason") return defaultAgent ?? "claude-code-agent";
   return dialect;
 }
 
@@ -64,37 +68,17 @@ export function generateSessionId(): string {
   return crypto.randomBytes(4).toString("hex");
 }
 
-// ── Agent Type Aliases ────────────────────────────────────────────────
-
-/**
- * Legacy alias map kept for backward compatibility.
- * @deprecated Aliases are now declared by AgentPackage.aliases in agent packages.
- */
-export const AGENT_TYPE_ALIASES: Record<string, string> = {
-  claude: "claude-code-agent",
-  codex: "codex",
-  aider: "aider",
-  pi: "pi-coding-agent",
-  mcp: "mcp-agent",
-};
+// ── Agent Type Resolution ─────────────────────────────────────────────
 
 /**
  * Resolve a user-provided agent type string to the internal materializer name.
- * Checks the agent registry (which includes aliases from AgentPackage),
- * then falls back to the legacy alias map, then checks direct registered types.
+ * Checks the agent registry (which includes aliases from AgentPackage).
  *
  * @returns The resolved agent type, or undefined if not recognized
  */
 export function resolveAgentType(input: string): string | undefined {
-  // Check registry (includes aliases from AgentPackage)
   const agentPkg = getAgentFromRegistry(input);
-  if (agentPkg) return agentPkg.name;
-
-  // Legacy fallback: check hardcoded aliases for agents not yet packaged (codex, aider)
-  const aliased = AGENT_TYPE_ALIASES[input];
-  if (aliased) return aliased;
-
-  return undefined;
+  return agentPkg?.name;
 }
 
 /**
@@ -105,13 +89,10 @@ export function isKnownAgentType(input: string): boolean {
 }
 
 /**
- * Get a user-friendly list of known agent type names (aliases + registered).
+ * Get a user-friendly list of known agent type names (canonical names + aliases from registry).
  */
 export function getKnownAgentTypeNames(): string[] {
-  const names = new Set<string>(Object.keys(AGENT_TYPE_ALIASES));
-  for (const t of getRegisteredAgentTypes()) {
-    names.add(t);
-  }
+  const names = new Set<string>(getAllRegisteredNames());
   return [...names].sort();
 }
 
@@ -175,30 +156,51 @@ export function displayCredentials(
 export function execComposeCommand(
   composeFile: string,
   args: string[],
-  opts?: { interactive?: boolean; verbose?: boolean },
+  opts?: { interactive?: boolean; verbose?: boolean; timeoutMs?: number },
 ): Promise<number> {
   const baseArgs = ["compose", "-f", composeFile, ...args];
   const showOutput = opts?.interactive || opts?.verbose;
 
   return new Promise((resolve) => {
-    if (showOutput) {
-      const child = spawn("docker", baseArgs, { stdio: "inherit" });
-      child.on("close", (code) => resolve(code ?? 0));
-      child.on("error", () => resolve(1));
-    } else {
-      // Capture stderr so we can show it on failure
-      const child = spawn("docker", baseArgs, {
-        stdio: ["ignore", "ignore", "pipe"],
-      });
-      let stderr = "";
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const settle = (code: number) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(code);
+    };
+
+    const child = showOutput
+      ? spawn("docker", baseArgs, { stdio: "inherit" })
+      : spawn("docker", baseArgs, { stdio: ["ignore", "ignore", "pipe"] });
+
+    let stderr = "";
+    if (!showOutput) {
       child.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
-      child.on("close", (code) => {
-        if (code !== 0 && stderr) {
-          console.error(stderr);
+    }
+
+    child.on("close", (code) => {
+      if (!showOutput && code !== 0 && stderr) {
+        console.error(stderr);
+      }
+      settle(code ?? 0);
+    });
+    child.on("error", () => settle(1));
+
+    if (opts?.timeoutMs) {
+      const ms = opts.timeoutMs;
+      timer = setTimeout(() => {
+        if (!settled) {
+          child.kill("SIGKILL");
+          console.error(
+            `\n  Docker command timed out after ${Math.round(ms / 1000)}s.` +
+            `\n  Run \`mason doctor --auto\` to clean up stale resources, or restart Docker Desktop.\n`,
+          );
+          settle(1);
         }
-        resolve(code ?? 0);
-      });
-      child.on("error", () => resolve(1));
+      }, ms);
     }
   });
 }
@@ -341,7 +343,7 @@ async function ensureDockerBuild(
   roleType: Role,
   agentType: string,
   projectDir: string,
-  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations; agentConfigCredentials?: string[]; agentArgs?: string[]; initialPrompt?: string },
+  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations; agentConfigCredentials?: string[]; agentArgs?: string[]; initialPrompt?: string; llmConfig?: { provider: string; model: string } },
 ): Promise<{ dockerBuildDir: string; dockerDir: string }> {
   const existsSync = deps?.existsSyncFn ?? fs.existsSync;
   const roleName = getAppShortName(roleType.metadata.name);
@@ -392,6 +394,7 @@ async function ensureDockerBuild(
       devContainerCustomizations: deps?.devContainerCustomizations,
       agentConfigCredentials: deps?.agentConfigCredentials,
       agentArgs: deps?.agentArgs,
+      llmConfig: deps?.llmConfig,
     });
 
     // Populate shared proxy dependencies
@@ -451,17 +454,19 @@ Side Effects:
 
 // ── Config Auto-Init ──────────────────────────────────────────────────
 
-const DEFAULT_MASON_CONFIG = JSON.stringify(
-  {
-    agents: {
-      claude: { package: "@clawmasons/claude-code-agent" },
-      "pi-mono-agent": { package: "@clawmasons/pi-mono-agent" },
-      mcp: { package: "@clawmasons/mcp-agent" },
-    },
-  },
-  null,
-  2,
-);
+/**
+ * Build the default `.mason/config.json` content from the built-in agent
+ * packages. Uses the first alias as the config key (user-friendly short name)
+ * and derives the npm package name from the agent's canonical name.
+ */
+export function buildDefaultMasonConfig(): string {
+  const agents: Record<string, { package: string }> = {};
+  for (const agent of BUILTIN_AGENTS) {
+    const configKey = agent.aliases?.[0] ?? agent.name;
+    agents[configKey] = { package: `@clawmasons/${agent.name}` };
+  }
+  return JSON.stringify({ agents }, null, 2);
+}
 
 /**
  * Create .mason/config.json from the default template if it does not exist.
@@ -472,7 +477,7 @@ export function ensureMasonConfig(projectDir: string): void {
   const configPath = path.join(masonDir, "config.json");
   if (!fs.existsSync(configPath)) {
     fs.mkdirSync(masonDir, { recursive: true });
-    fs.writeFileSync(configPath, DEFAULT_MASON_CONFIG + "\n");
+    fs.writeFileSync(configPath, buildDefaultMasonConfig() + "\n");
     console.error(`  Created .mason/config.json with default agent configuration.`);
   }
 }
@@ -522,6 +527,8 @@ export interface RunAgentDeps {
   createLoggerFn?: (logDir: string) => AcpLogger;
   /** Override home path (for testing). */
   homeOverride?: string;
+  /** Override registry initialization (for testing). */
+  initRegistryFn?: (projectDir: string) => Promise<void>;
 }
 
 // ── Backward-compat aliases ───────────────────────────────────────────
@@ -789,6 +796,55 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
       }
     }
 
+    // ── Config Resolution (PRD §6.1) ─────────────────────────────────
+    // After agent type is resolved, check if the agent declares a configSchema.
+    // If so, resolve stored config, prompt for missing values, and persist.
+    // Then derive llmConfig and dynamic credentials from the resolved values.
+    let llmConfig: { provider: string; model: string } | undefined;
+    let dynamicCredentialKeys: string[] = [];
+    if (resolvedAgentType) {
+      const agentPkg = getAgentFromRegistry(resolvedAgentType);
+      if (agentPkg?.configSchema) {
+        try {
+          const storedConfig = getAgentConfig(projectDir, agentPkg.name);
+          const { resolved, newValues } = await promptConfig(
+            agentPkg.configSchema,
+            storedConfig,
+            agentPkg.name,
+          );
+          if (Object.keys(newValues).length > 0) {
+            saveAgentConfig(projectDir, agentPkg.name, newValues);
+          }
+
+          // Derive LLM config from resolved values (if both provider and model are set)
+          const provider = resolved["llm.provider"];
+          const model = resolved["llm.model"];
+          if (provider && model) {
+            llmConfig = { provider, model };
+          }
+
+          // Resolve dynamic credentials from the agent's credentialsFn
+          if (agentPkg.credentialsFn) {
+            const creds = agentPkg.credentialsFn(resolved);
+            dynamicCredentialKeys = creds.map((c) => c.key);
+          }
+        } catch (err) {
+          if (err instanceof ConfigResolutionError) {
+            console.error(`\n  ${err.message}\n`);
+            process.exit(1);
+            return;
+          }
+          throw err;
+        }
+      }
+    }
+
+    // Merge static credentials from config entry with dynamic credentials from credentialsFn
+    const effectiveCredentials = [
+      ...(configEntry?.credentials ?? []),
+      ...dynamicCredentialKeys,
+    ].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
+
     // Derive effective home: --home flag > config home > undefined
     let homeOverride: string | undefined;
     const rawHome = options.home ?? configEntry?.home;
@@ -841,10 +897,11 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         acp: true,
         proxyPort: parseInt(options.proxyPort, 10),
         homeOverride,
-        agentConfigCredentials: configEntry?.credentials,
+        agentConfigCredentials: effectiveCredentials.length > 0 ? effectiveCredentials : undefined,
         agentArgs,
         sourceOverride,
         preResolvedRole,
+        llmConfig,
         // initialPrompt intentionally omitted for ACP mode
       });
     } else if (options.devContainer) {
@@ -855,11 +912,12 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         verbose: options.verbose,
         homeOverride,
         devContainerCustomizations: (configEntry as { devContainerCustomizations?: DevContainerCustomizations } | undefined)?.devContainerCustomizations,
-        agentConfigCredentials: configEntry?.credentials,
+        agentConfigCredentials: effectiveCredentials.length > 0 ? effectiveCredentials : undefined,
         agentArgs,
         sourceOverride,
         preResolvedRole,
         initialPrompt,
+        llmConfig,
       });
     } else {
       await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
@@ -868,11 +926,12 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         build: options.build,
         verbose: options.verbose,
         homeOverride,
-        agentConfigCredentials: configEntry?.credentials,
+        agentConfigCredentials: effectiveCredentials.length > 0 ? effectiveCredentials : undefined,
         agentArgs,
         sourceOverride,
         preResolvedRole,
         initialPrompt,
+        llmConfig,
       });
     }
   };
@@ -946,10 +1005,12 @@ export async function runAgent(
     sourceOverride?: string[];
     initialPrompt?: string;
     preResolvedRole?: Role;
+    llmConfig?: { provider: string; model: string };
   },
 ): Promise<void> {
   // Initialize agent registry with config-declared agents from .mason/config.json
-  await initRegistry(projectDir);
+  const initRegistryFn = deps?.initRegistryFn ?? initRegistry;
+  await initRegistryFn(projectDir);
 
   // Pre-flight: check Docker Compose is available before any mode-specific work
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
@@ -980,9 +1041,10 @@ export async function runAgent(
   const sourceOverride = acpOptions?.sourceOverride;
   const initialPrompt = acpOptions?.initialPrompt;
   const preResolvedRole = acpOptions?.preResolvedRole;
+  const llmConfig = acpOptions?.llmConfig;
 
   if (isAcpMode) {
-    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials, agentArgs, sourceOverride, preResolvedRole);
+    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials, agentArgs, sourceOverride, preResolvedRole, llmConfig);
   } else if (isDevContainerMode) {
     const verbose = acpOptions?.verbose === true;
     return runAgentDevContainerMode(
@@ -993,10 +1055,11 @@ export async function runAgent(
       initialPrompt,
       sourceOverride,
       preResolvedRole,
+      llmConfig,
     );
   } else {
     const verbose = acpOptions?.verbose === true;
-    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole);
+    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole, llmConfig);
   }
 }
 
@@ -1040,6 +1103,7 @@ async function runAgentInteractiveMode(
   initialPrompt?: string,
   sourceOverride?: string[],
   preResolvedRole?: Role,
+  llmConfig?: { provider: string; model: string },
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const runAgent = deps?.runAgentFn ?? runAgentWithOciRestart;
@@ -1060,7 +1124,7 @@ async function runAgentInteractiveMode(
     const roleName = getAppShortName(roleType.metadata.name);
 
     // 3. Infer or override agent type
-    const agentType = agentOverride ?? inferAgentType(roleType);
+    const agentType = agentOverride ?? inferAgentType(roleType, readDefaultAgent(projectDir));
 
     console.log(`\n  Agent: ${agentType}`);
     console.log(`  Role: ${roleName} (${roleType.type})`);
@@ -1068,11 +1132,14 @@ async function runAgentInteractiveMode(
 
     // 4. Ensure docker build artifacts exist (auto-build if missing)
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
-      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs, initialPrompt },
+      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs, initialPrompt, llmConfig },
     );
 
     // 5. Ensure .mason is in project's .gitignore
     ensureGitignore(projectDir, ".mason");
+
+    // 5b. Pre-flight cleanup of stale Docker resources
+    await quickAutoCleanup(projectDir);
 
     // 6. Create session directory with compose file
     const { uid, gid } = getHostIds();
@@ -1094,6 +1161,7 @@ async function runAgentInteractiveMode(
       bashMode,
       verbose,
       sessionId: sessionIdOverride,
+      agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
     });
 
     const { sessionId, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
@@ -1121,7 +1189,7 @@ async function runAgentInteractiveMode(
     const proxyCode = await execCompose(
       composeFile,
       ["up", "-d", proxyServiceName],
-      { verbose },
+      { verbose, timeoutMs: 30_000 },
     );
     if (proxyCode !== 0) {
       throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
@@ -1136,6 +1204,7 @@ async function runAgentInteractiveMode(
     // 9. Collect env credentials, partition apps, and start host proxy in-process
     const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
     const resolvedAgent = adaptRoleFn(roleType, agentType);
+    if (llmConfig) resolvedAgent.llm = llmConfig;
     const envCredentials = collectEnvCredentials(resolvedAgent);
     const hostApps = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
 
@@ -1159,10 +1228,7 @@ async function runAgentInteractiveMode(
 
     // When stdin is not a TTY (e.g. piped from a test), pass -T to disable
     // pseudo-TTY allocation so docker compose run works with piped stdio.
-    const runArgs = ["run", "--rm", "--service-ports"];
-    if (buildMode) {
-      runArgs.push("--build");
-    }
+    const runArgs = ["run", "--rm", "--service-ports", "--build"];
     if (!process.stdin.isTTY) {
       runArgs.push("-T");
     }
@@ -1226,6 +1292,7 @@ async function runAgentDevContainerMode(
   initialPrompt?: string,
   sourceOverride?: string[],
   preResolvedRole?: Role,
+  llmConfig?: { provider: string; model: string },
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
@@ -1244,7 +1311,7 @@ async function runAgentDevContainerMode(
     }
 
     const roleName = getAppShortName(roleType.metadata.name);
-    const agentType = agentOverride ?? inferAgentType(roleType);
+    const agentType = agentOverride ?? inferAgentType(roleType, readDefaultAgent(projectDir));
 
     console.log(`\n  Agent: ${agentType}`);
     console.log(`  Role: ${roleName}`);
@@ -1254,7 +1321,7 @@ async function runAgentDevContainerMode(
     // 3. Ensure docker build artifacts
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
       roleType, agentType, projectDir,
-      { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations, agentConfigCredentials, agentArgs, initialPrompt },
+      { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations, agentConfigCredentials, agentArgs, initialPrompt, llmConfig },
     );
 
     // 4. Ensure .mason is in .gitignore
@@ -1283,6 +1350,9 @@ async function runAgentDevContainerMode(
       fs.writeFileSync(serverEnvSetupPath, serverEnvSetupContent, { mode: 0o755 });
     }
 
+    // 5b. Pre-flight cleanup of stale Docker resources
+    await quickAutoCleanup(projectDir);
+
     // 6. Create session directory with compose file
     const { uid, gid } = getHostIds();
     const declaredCredentialKeys = collectDeclaredCredentialKeys(agentType, agentConfigCredentials, roleType);
@@ -1303,6 +1373,7 @@ async function runAgentDevContainerMode(
       vscodeServerHostPath,
       verbose,
       sessionId: sessionIdOverride,
+      agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
     });
 
     const { sessionId, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
@@ -1323,7 +1394,7 @@ async function runAgentDevContainerMode(
     const buildCode = await execCompose(composeFile, buildArgs, { verbose });
     if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
 
-    const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose });
+    const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose, timeoutMs: 30_000 });
     if (proxyCode !== 0) throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
     console.log(`  Proxy started.`);
 
@@ -1332,6 +1403,7 @@ async function runAgentDevContainerMode(
 
     // 9. Start host proxy
     const resolvedAgent = adaptRoleFn(roleType, agentType);
+    if (llmConfig) resolvedAgent.llm = llmConfig;
     const envCredentials = collectEnvCredentials(resolvedAgent);
     const hostAppsDevContainer = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
     const hostProxyHandle = await startHostProxy({
@@ -1455,7 +1527,7 @@ export async function runProxyOnly(
   const roleName = getAppShortName(roleType.metadata.name);
 
   // 3. Infer or override agent type
-  const agentType = agentOverride ?? inferAgentType(roleType);
+  const agentType = agentOverride ?? inferAgentType(roleType, readDefaultAgent(projectDir));
 
   // 4. Ensure docker build artifacts exist (auto-build if missing)
   const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
@@ -1480,6 +1552,7 @@ export async function runProxyOnly(
     hostUid: uid,
     hostGid: gid,
     sessionId: sessionIdOverride,
+    agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
   });
 
   const { sessionId, composeFile, proxyToken, proxyServiceName } = session;
@@ -1523,6 +1596,7 @@ async function runAgentAcpMode(
   agentArgs?: string[],
   sourceOverride?: string[],
   preResolvedRole?: Role,
+  llmConfig?: { provider: string; model: string },
   // initialPrompt is intentionally omitted: ACP mode does not forward initial prompts
 ): Promise<void> {
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
@@ -1586,11 +1660,11 @@ async function runAgentAcpMode(
     const roleName = getAppShortName(roleType.metadata.name);
 
     // ── Step 2: Infer or override agent type ─────────────────────────
-    const agentType = agentOverride ?? inferAgentType(roleType);
+    const agentType = agentOverride ?? inferAgentType(roleType, readDefaultAgent(projectDir));
 
     // ── Step 3: Ensure docker build artifacts ────────────────────────
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
-      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, agentConfigCredentials, agentArgs },
+      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, agentConfigCredentials, agentArgs, llmConfig },
     );
 
     // ── Create file logger in session-local logs ─────────────────────
@@ -1615,6 +1689,7 @@ async function runAgentAcpMode(
     // ── Step 4: Resolve agent from role ──────────────────────────────
     logger.log(`[mason run --acp] Resolving role "${role}" for agent type "${agentType}"...`);
     const resolvedAgent = adaptRoleFn(roleType, agentType);
+    if (llmConfig) resolvedAgent.llm = llmConfig;
 
     // ── Step 5: Compute tool filters ─────────────────────────────────
     const toolFilters = computeToolFilters(resolvedAgent);

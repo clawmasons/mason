@@ -10,6 +10,18 @@ export type {
   MaterializeOptions,
 } from "./types.js";
 
+// Config Schema Types
+export type {
+  AgentConfigSchema,
+  ConfigGroup,
+  ConfigField,
+  ConfigOption,
+  AgentCredentialRequirement,
+  AgentValidationError,
+  AgentValidationWarning,
+  AgentValidationResult,
+} from "./config-schema.js";
+
 // Helpers
 export {
   PROVIDER_ENV_VARS,
@@ -36,6 +48,9 @@ export {
   readConfigAliasNames,
   getAgent,
   getRegisteredAgentNames,
+  getAgentConfig,
+  saveAgentConfig,
+  readDefaultAgent,
 } from "./discovery.js";
 export type { AgentRegistry, AgentEntryConfig, AliasEntryConfig, DevContainerCustomizations, DevContainerVscodeCustomizations } from "./discovery.js";
 export { DEFAULT_DEV_CONTAINER_CUSTOMIZATIONS } from "./discovery.js";

@@ -79,7 +79,7 @@ describe("RelayServer", () => {
   });
 
   afterEach(async () => {
-    relay.shutdown();
+    await relay.shutdown();
     await new Promise<void>((resolve, reject) => {
       httpServer.close((err) => (err ? reject(err) : resolve()));
     });
@@ -403,7 +403,7 @@ describe("RelayServer", () => {
       const ws = await connectWs(port, "/ws/relay", "relay-token-123");
       expect(relay.isConnected()).toBe(true);
 
-      relay.shutdown();
+      await relay.shutdown();
 
       await new Promise((r) => setTimeout(r, 50));
       expect(relay.isConnected()).toBe(false);
@@ -426,9 +426,10 @@ describe("RelayServer", () => {
       // Give time for the request to be sent
       await new Promise((r) => setTimeout(r, 50));
 
-      relay.shutdown();
-
-      await expect(promise).rejects.toThrow("Relay shutting down");
+      // Attach rejection handler before shutdown to avoid unhandled rejection
+      const rejection = expect(promise).rejects.toThrow("Relay shutting down");
+      await relay.shutdown();
+      await rejection;
 
       ws.close();
     });
@@ -437,7 +438,7 @@ describe("RelayServer", () => {
       const ws = await connectWs(port, "/ws/relay", "relay-token-123");
       expect(relay.isConnected()).toBe(true);
 
-      relay.shutdown();
+      await relay.shutdown();
       expect(relay.isConnected()).toBe(false);
 
       ws.close();

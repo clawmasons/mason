@@ -8,7 +8,7 @@
 
 import * as path from "node:path";
 import type { Role, ResolvedAgent } from "@clawmasons/shared";
-import { adaptRoleToResolvedAgent, getDialectByDirectory } from "@clawmasons/shared";
+import { adaptRoleToResolvedAgent, getDialectByDirectory, registerAgentDialect } from "@clawmasons/shared";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage, AgentRegistry, AgentTaskConfig, AgentSkillConfig } from "@clawmasons/agent-sdk";
 import { createAgentRegistry, getAgent, getRegisteredAgentNames, readTask, readSkills } from "@clawmasons/agent-sdk";
 
@@ -18,7 +18,7 @@ import piCodingAgent from "@clawmasons/pi-coding-agent";
 import { default as mcpAgent } from "@clawmasons/mcp-agent/agent-package";
 
 /** Built-in agent packages list. */
-const BUILTIN_AGENTS: AgentPackage[] = [claudeCodeAgent, piCodingAgent, mcpAgent];
+export const BUILTIN_AGENTS: AgentPackage[] = [claudeCodeAgent, piCodingAgent, mcpAgent];
 
 /** Default proxy endpoint used when none is provided. */
 const DEFAULT_PROXY_ENDPOINT = "http://mcp-proxy:9090";
@@ -52,6 +52,16 @@ function getRegistry(): AgentRegistry {
           _registry.set(alias, agent);
         }
       }
+      // Dynamic dialect self-registration
+      if (agent.dialect) {
+        registerAgentDialect({
+          name: agent.name,
+          dialect: agent.dialect,
+          dialectFields: agent.dialectFields,
+          tasks: agent.tasks,
+          skills: agent.skills,
+        });
+      }
     }
   }
   return _registry;
@@ -63,6 +73,22 @@ function getRegistry(): AgentRegistry {
  */
 export async function initRegistry(projectDir?: string): Promise<void> {
   _registry = await createAgentRegistry(BUILTIN_AGENTS, projectDir);
+
+  // Dynamic dialect self-registration from agent packages.
+  // Deduplicate: registry may have aliases pointing to the same agent.
+  const seen = new Set<string>();
+  for (const agent of _registry.values()) {
+    if (agent.dialect && !seen.has(agent.name)) {
+      seen.add(agent.name);
+      registerAgentDialect({
+        name: agent.name,
+        dialect: agent.dialect,
+        dialectFields: agent.dialectFields,
+        tasks: agent.tasks,
+        skills: agent.skills,
+      });
+    }
+  }
 }
 
 /**
@@ -90,6 +116,15 @@ export function getMaterializer(agentType: string): RuntimeMaterializer | undefi
  */
 export function getRegisteredAgentTypes(): string[] {
   return getRegisteredAgentNames(getRegistry());
+}
+
+/**
+ * Get all registered names in the agent registry (both canonical names and aliases).
+ *
+ * @returns Array of all keys in the registry map
+ */
+export function getAllRegisteredNames(): string[] {
+  return [...getRegistry().keys()];
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +323,11 @@ export function materializeForAgent(
 
   // Convert Role to ResolvedAgent via the adapter.
   const resolvedAgent = adaptRoleToResolvedAgent(role, agentType);
+
+  // Apply LLM configuration from agent config schema resolution.
+  if (options?.llmConfig) {
+    resolvedAgent.llm = options.llmConfig;
+  }
 
   // Resolve actual task prompt content from source files.
   resolveTaskContent(resolvedAgent, role);

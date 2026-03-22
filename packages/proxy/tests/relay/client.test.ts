@@ -53,7 +53,7 @@ describe("RelayClient", () => {
 
   afterEach(async () => {
     client.disconnect();
-    relay.shutdown();
+    await relay.shutdown();
     await new Promise<void>((resolve, reject) => {
       httpServer.close((err) => (err ? reject(err) : resolve()));
     });

@@ -31,6 +31,15 @@ export interface CredentialConfig {
   type: "env" | "file";
   /** File path to write the credential value to (required when type is "file"). */
   path?: string;
+
+  // ── Human-readable fields (PRD: agent-config §5.1) ──
+
+  /** Human-readable label displayed during prompting (e.g., "OpenRouter API Key"). */
+  label?: string;
+  /** URL where the user can obtain or manage this credential. */
+  obtainUrl?: string;
+  /** Hint text describing expected format or usage (e.g., "Starts with sk-or-v1-..."). */
+  hint?: string;
 }
 
 export interface AgentLaunchConfig {

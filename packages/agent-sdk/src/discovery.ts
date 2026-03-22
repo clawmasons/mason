@@ -76,6 +76,11 @@ export interface AgentEntryConfig {
    * Additional credential env var keys required by this agent in the current project.
    */
   credentials?: string[];
+  /**
+   * Per-agent configuration values stored by the config resolution engine.
+   * Keyed by group name, then field name (e.g., `{ llm: { provider: "openrouter" } }`).
+   */
+  config?: Record<string, Record<string, string>>;
 }
 
 /**
@@ -106,6 +111,7 @@ export interface AliasEntryConfig {
 interface MasonConfig {
   agents?: Record<string, unknown>;
   aliases?: Record<string, unknown>;
+  defaultAgent?: string;
 }
 
 const VALID_MODES = new Set<string>(["terminal", "acp", "bash"]);
@@ -179,6 +185,26 @@ function parseEntryConfig(name: string, raw: unknown): AgentEntryConfig | null {
     }
   }
 
+  if (obj.config !== undefined && typeof obj.config === "object" && obj.config !== null) {
+    const parsed: Record<string, Record<string, string>> = {};
+    for (const [groupKey, groupVal] of Object.entries(obj.config as Record<string, unknown>)) {
+      if (typeof groupVal === "object" && groupVal !== null && !Array.isArray(groupVal)) {
+        const fields: Record<string, string> = {};
+        for (const [fieldKey, fieldVal] of Object.entries(groupVal as Record<string, unknown>)) {
+          if (typeof fieldVal === "string") {
+            fields[fieldKey] = fieldVal;
+          }
+        }
+        if (Object.keys(fields).length > 0) {
+          parsed[groupKey] = fields;
+        }
+      }
+    }
+    if (Object.keys(parsed).length > 0) {
+      entry.config = parsed;
+    }
+  }
+
   return entry;
 }
 
@@ -197,6 +223,133 @@ function readMasonConfig(projectDir: string): MasonConfig | null {
     console.warn(`[agent-sdk] Failed to parse .mason/config.json`);
     return null;
   }
+}
+
+/**
+ * Read the raw JSON object from .mason/config.json, returning a plain object.
+ * Returns an empty object if the file is absent or unparseable.
+ */
+function readRawConfig(projectDir: string): Record<string, unknown> {
+  const configPath = path.join(projectDir, ".mason", "config.json");
+  if (!fs.existsSync(configPath)) return {};
+
+  try {
+    const raw = fs.readFileSync(configPath, "utf-8");
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Atomically write a JSON object to .mason/config.json.
+ * Creates the .mason/ directory if it does not exist.
+ * Uses a temp file + rename to prevent partial writes (PRD §10.4).
+ */
+function writeMasonConfigAtomic(projectDir: string, data: Record<string, unknown>): void {
+  const masonDir = path.join(projectDir, ".mason");
+  fs.mkdirSync(masonDir, { recursive: true });
+
+  const configPath = path.join(masonDir, "config.json");
+  const tmpPath = path.join(masonDir, "config.json.tmp");
+
+  fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+  fs.renameSync(tmpPath, configPath);
+}
+
+/**
+ * Read per-agent configuration from `.mason/config.json`.
+ *
+ * Returns the `agents.<agentName>.config` object, or an empty object
+ * when the file, agent entry, or config field is absent.
+ *
+ * @param projectDir - Absolute path to the project root
+ * @param agentName  - Canonical agent name (e.g., "pi-coding-agent")
+ */
+export function getAgentConfig(
+  projectDir: string,
+  agentName: string,
+): Record<string, Record<string, string>> {
+  const raw = readRawConfig(projectDir);
+  const agents = raw.agents;
+  if (!agents || typeof agents !== "object" || Array.isArray(agents)) return {};
+
+  const agentEntry = (agents as Record<string, unknown>)[agentName];
+  if (!agentEntry || typeof agentEntry !== "object" || Array.isArray(agentEntry)) return {};
+
+  const config = (agentEntry as Record<string, unknown>).config;
+  if (!config || typeof config !== "object" || Array.isArray(config)) return {};
+
+  // Validate structure: Record<string, Record<string, string>>
+  const result: Record<string, Record<string, string>> = {};
+  for (const [groupKey, groupVal] of Object.entries(config as Record<string, unknown>)) {
+    if (typeof groupVal === "object" && groupVal !== null && !Array.isArray(groupVal)) {
+      const fields: Record<string, string> = {};
+      for (const [fieldKey, fieldVal] of Object.entries(groupVal as Record<string, unknown>)) {
+        if (typeof fieldVal === "string") {
+          fields[fieldKey] = fieldVal;
+        }
+      }
+      if (Object.keys(fields).length > 0) {
+        result[groupKey] = fields;
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Persist per-agent configuration to `.mason/config.json`.
+ *
+ * Deep-merges the provided config into `agents.<agentName>.config`,
+ * preserving all other fields on the agent entry and all other agent entries.
+ * Creates the file, directory, and agent entry if they don't exist.
+ *
+ * Writes are atomic (temp file + rename) so Ctrl-C never leaves a partial file (PRD §10.4).
+ *
+ * @param projectDir - Absolute path to the project root
+ * @param agentName  - Canonical agent name (e.g., "pi-coding-agent")
+ * @param config     - Config values keyed by group, then field (e.g., `{ llm: { provider: "openrouter" } }`)
+ */
+export function saveAgentConfig(
+  projectDir: string,
+  agentName: string,
+  config: Record<string, Record<string, string>>,
+): void {
+  const raw = readRawConfig(projectDir);
+
+  // Ensure agents section exists
+  if (!raw.agents || typeof raw.agents !== "object" || Array.isArray(raw.agents)) {
+    raw.agents = {};
+  }
+  const agents = raw.agents as Record<string, unknown>;
+
+  // Ensure agent entry exists
+  if (!agents[agentName] || typeof agents[agentName] !== "object" || Array.isArray(agents[agentName])) {
+    agents[agentName] = { package: agentName };
+  }
+  const agentEntry = agents[agentName] as Record<string, unknown>;
+
+  // Deep-merge config into existing config
+  const existing = (typeof agentEntry.config === "object" && agentEntry.config !== null && !Array.isArray(agentEntry.config))
+    ? agentEntry.config as Record<string, unknown>
+    : {};
+
+  for (const [groupKey, groupFields] of Object.entries(config)) {
+    const existingGroup = (typeof existing[groupKey] === "object" && existing[groupKey] !== null && !Array.isArray(existing[groupKey]))
+      ? existing[groupKey] as Record<string, unknown>
+      : {};
+
+    existing[groupKey] = { ...existingGroup, ...groupFields };
+  }
+
+  agentEntry.config = existing;
+
+  writeMasonConfigAtomic(projectDir, raw);
 }
 
 /**
@@ -293,6 +446,20 @@ export function readConfigAgentNames(projectDir: string): string[] {
   const config = readMasonConfig(projectDir);
   if (!config?.agents || typeof config.agents !== "object") return [];
   return Object.keys(config.agents);
+}
+
+/**
+ * Read the optional `defaultAgent` field from `.mason/config.json`.
+ * Synchronous — safe to call before the async registry is initialised.
+ *
+ * @returns The default agent name, or undefined if not set.
+ */
+export function readDefaultAgent(projectDir: string): string | undefined {
+  const config = readMasonConfig(projectDir);
+  if (config?.defaultAgent && typeof config.defaultAgent === "string") {
+    return config.defaultAgent;
+  }
+  return undefined;
 }
 
 /**

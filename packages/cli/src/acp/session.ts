@@ -288,6 +288,7 @@ ${proxyVolumeLines.join("\n")}
     environment:
 ${proxyEnvLines.join("\n")}${proxyPortsSection}
     restart: "no"
+    init: true
 
   ${agentServiceName}:
     build:

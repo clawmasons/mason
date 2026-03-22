@@ -148,6 +148,32 @@ describe("runDoctor", () => {
     expect(logs.some((l) => l.includes("Unused networks: 1"))).toBe(true);
   });
 
+  it("reports and force-removes stuck containers", async () => {
+    const logs: string[] = [];
+    const removedContainers: string[] = [];
+    const deps = makeDeps({
+      execSyncFn: (cmd: string) => {
+        if (cmd.includes("docker info")) return "ok";
+        if (cmd.includes('status=exited')) return "";
+        if (cmd.includes('status=created')) return "def456 mason-proxy-project";
+        if (cmd.includes("dangling=true")) return "";
+        if (cmd.includes("docker compose ls")) return "[]";
+        if (cmd.includes("docker rm")) {
+          removedContainers.push(cmd);
+          return "";
+        }
+        return "";
+      },
+      logFn: (msg) => logs.push(msg),
+    });
+
+    await runDoctor(tmpDir, { quick: true, auto: true }, deps);
+
+    expect(logs.some((l) => l.includes("Stuck containers (never started): 1"))).toBe(true);
+    expect(removedContainers.length).toBe(1);
+    expect(removedContainers[0]).toContain("docker rm -f");
+  });
+
   it("quick mode does NOT scan volumes or networks", async () => {
     const logs: string[] = [];
     const deps = makeDeps({
@@ -194,6 +220,29 @@ describe("quickAutoCleanup", () => {
     await quickAutoCleanup(tmpDir, deps);
 
     expect(removedContainers.length).toBe(1);
+  });
+
+  it("force-removes stuck containers", async () => {
+    const removedContainers: string[] = [];
+    const deps = makeDeps({
+      execSyncFn: (cmd: string) => {
+        if (cmd.includes("docker info")) return "ok";
+        if (cmd.includes('status=exited')) return "";
+        if (cmd.includes('status=created')) return "def456 mason-proxy-project";
+        if (cmd.includes("dangling=true")) return "";
+        if (cmd.includes("docker compose ls")) return "[]";
+        if (cmd.includes("docker rm")) {
+          removedContainers.push(cmd);
+          return "";
+        }
+        return "";
+      },
+    });
+
+    await quickAutoCleanup(tmpDir, deps);
+
+    expect(removedContainers.length).toBe(1);
+    expect(removedContainers[0]).toContain("docker rm -f");
   });
 
   it("does nothing when Docker is unavailable", async () => {

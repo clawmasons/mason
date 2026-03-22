@@ -11,6 +11,15 @@ vi.mock("@clawmasons/agent-sdk", async (importOriginal) => {
   };
 });
 
+// Mock initRegistry to avoid slow dynamic imports in tests
+vi.mock("../../src/materializer/role-materializer.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/materializer/role-materializer.js")>();
+  return {
+    ...actual,
+    initRegistry: vi.fn(async () => {}),
+  };
+});
+
 import { registerCommands } from "../../src/cli/commands/index.js";
 
 describe("installAgentTypeShorthand", () => {
@@ -42,7 +51,7 @@ describe("installAgentTypeShorthand", () => {
   // ["claude", "--role", "dev"] means firstArg is "claude".
 
   it("rewrites a known agent type to run command", () => {
-    // "claude" is a known agent type via isKnownAgentType / AGENT_TYPE_ALIASES.
+    // "claude" is a known agent type via isKnownAgentType (resolved from agent registry).
     // When rewritten to "run claude", Commander will try to run the action which
     // may fail, but our shorthand hook should NOT call process.exit(1) with an
     // unknown command error.
@@ -205,9 +214,9 @@ describe("installAgentTypeShorthand", () => {
     }
 
     const errorOutput = errorSpy.mock.calls[0]?.[0] as string;
-    // Should include known agent type aliases
+    // Should include known agent types from registry (aliases + canonical names)
     expect(errorOutput).toContain("claude");
-    expect(errorOutput).toContain("codex");
+    expect(errorOutput).toContain("pi");
   });
 
   it("includes all known commands in error output", () => {

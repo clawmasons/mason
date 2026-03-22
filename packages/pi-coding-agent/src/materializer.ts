@@ -102,11 +102,15 @@ function generateExtensionIndexTs(
     const description = `${task.name}@${task.version}`;
     const prompt = task.prompt ?? "[no prompt defined]";
 
+    const safeName = taskShortName.replace(/"/g, '\\"');
+    const safeDesc = description.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
     lines.push("");
-    lines.push("  pi.registerCommand({");
-    lines.push(`    name: "${taskShortName}",`);
-    lines.push(`    description: "${escapeTemplateLiteral(description)}",`);
-    lines.push(`    prompt: \`${escapeTemplateLiteral(prompt)}\`,`);
+    lines.push(`  pi.registerCommand("${safeName}", {`);
+    lines.push(`    description: "${safeDesc}",`);
+    lines.push(`    handler: async (args, ctx) => {`);
+    lines.push(`      pi.sendUserMessage(\`${escapeTemplateLiteral(prompt)}\`);`);
+    lines.push(`    },`);
     lines.push("  });");
   }
 

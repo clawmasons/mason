@@ -129,26 +129,24 @@ describe("project-role: CLI e2e", () => {
 
   // ── Scenario 7c: Empty source directory ──────────────────────────────
 
-  it("warns on empty source directory (fails at Docker, not source validation)", () => {
+  it("does not fail with source-not-found for empty source directory", () => {
     const ws = createEmptyWorkspace("pr-empty-source");
     workspacesToClean.push(ws);
 
     // Create an empty .claude directory with no commands/skills/settings
     fs.mkdirSync(path.join(ws, ".claude"), { recursive: true });
 
+    // The command may succeed (Docker builds an empty project role) or fail
+    // at Docker compose, depending on the environment. Either way, it must
+    // NOT fail with a "Source directory not found" error — the dir exists.
     const result = masonExecExpectError(
       ["run", "--agent", "claude"],
       ws,
     );
 
-    // Should NOT contain "Source directory ... not found" — the dir exists
     const output = result.stderr + result.stdout;
     expect(output).not.toContain("Source directory");
     expect(output).not.toContain("not found in project");
-
-    // Should warn about empty source OR fail at Docker check (not source validation)
-    // The key assertion is it did NOT fail with "Source directory not found"
-    expect(result.exitCode).not.toBe(0);
   });
 
   // ── Scenario 5: Implied alias routing ────────────────────────────────
