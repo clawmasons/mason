@@ -198,25 +198,28 @@ This is the breaking change phase. Should include a deprecation period where leg
 
 ### CHANGE 8: Integration & E2E Tests
 
-End-to-end tests verifying the full agent config flow:
+Integration tests verifying the full agent config flow across packages:
 
-1. **First-run prompting:** `mason run pi` with no stored config → prompts for provider/model → agent launches
-2. **Persistent config:** Second `mason run pi` → no prompts, immediate launch
-3. **Non-interactive error:** `mason run pi` in CI (no TTY) with missing config → structured error listing missing fields
-4. **Credential guidance:** Missing API key → displays label, hint, obtainUrl before prompting
-5. **Self-registration:** Agent with `dialect: "pi"` auto-registers in dialect registry
-6. **Delegated validation:** Pi without LLM config → error from `AgentPackage.validate()`, not hardcoded branch
-7. **Config reconfiguration:** Delete `agents.pi-coding-agent.config` from config.json → prompts again on next run
-8. **Third-party agent:** Agent loaded via `.mason/config.json` `agents` section with `configSchema` → prompts work
+1. **First-run prompting:** Config resolution with no stored config → prompts for provider/model → saves → re-resolves cleanly
+2. **Persistent config:** Second resolution → no prompts, immediate resolution from stored values
+3. **Non-interactive error:** Missing config in non-interactive mode → structured ConfigResolutionError listing missing fields
+4. **Credential guidance:** credentialsFn integration → resolved config maps to correct API key name, label, obtainUrl
+5. **Self-registration:** Agent with `dialect: "pi"` auto-registers in dialect registry with correct field mappings
+6. **Delegated validation:** Pi without LLM config → error from `AgentPackage.validate()` through real registry
+7. **Config reconfiguration:** Delete `agents.pi-coding-agent.config` from config.json → re-resolves shows missing
+8. **Third-party agent:** Simulated agent with `configSchema` → prompts work through the full pipeline
 
 **Key files:**
-- `packages/cli/tests/config/resolve-config.test.ts` — Unit tests for config resolution engine (pure function tests)
-- `packages/cli/tests/config/prompt-config.test.ts` — Unit tests for prompting layer with injectable prompt function
-- `packages/agent-sdk/tests/discovery.test.ts` — Unit tests for `getAgentConfig()`/`saveAgentConfig()` round-trip
-- `packages/tests/agent-config.test.ts` — E2E tests for scenarios 1-8 above
+- `packages/cli/tests/config/integration.test.ts` — Integration tests for config resolution + storage + prompting pipeline (11 tests)
+- `packages/cli/tests/validator/integration.test.ts` — Integration tests for delegated validation with real agent packages (8 tests)
+- `packages/shared/tests/dialect-integration.test.ts` — Integration tests for dialect self-registration (16 tests)
+- `packages/agent-sdk/tests/config-roundtrip.test.ts` — Integration tests for config storage round-trip (7 tests)
 
-Follow existing test patterns. Use injectable prompt functions for unit tests; fixture projects for e2e.
+Per E2E test standards (AGENTS.md): tests that require only mocks and no external calls belong in package test directories, not in the e2e `packages/tests/` directory. These integration tests use mock prompt functions and temp directories — no Docker or external services.
 
-**Testable output:** All tests pass. `npx vitest run packages/cli/tests/` and `npx vitest run packages/agent-sdk/tests/` green. E2e: `cd packages/tests && npx vitest run --config vitest.config.ts tests/agent-config.test.ts`.
+**Testable output:** All tests pass. `npx vitest run packages/cli/tests/` (725 tests), `npx vitest run packages/shared/tests/` (262 tests), and `npx vitest run packages/agent-sdk/tests/` (175 tests) all green.
 
-**Not Implemented Yet**
+**Implemented** — See [archived spec](../../openspec/changes/archive/2026-03-22-integration-e2e-tests/):
+- [Proposal](../../openspec/changes/archive/2026-03-22-integration-e2e-tests/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-22-integration-e2e-tests/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-22-integration-e2e-tests/tasks.md)
