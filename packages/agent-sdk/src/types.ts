@@ -1,4 +1,9 @@
 import type { ResolvedAgent, AgentSkillConfig, AgentTaskConfig } from "@clawmasons/shared";
+import type {
+  AgentConfigSchema,
+  AgentCredentialRequirement,
+  AgentValidationResult,
+} from "./config-schema.js";
 
 // ── Core Materializer Types (moved from packages/cli/src/materializer/types.ts) ──
 
@@ -152,4 +157,26 @@ export interface AgentPackage {
 
   /** Declarative skill file layout config. Drives readSkills() and materializeSkills(). */
   skills?: AgentSkillConfig;
+
+  // ── Agent Config Framework (PRD: agent-config) ──
+
+  /** Declarative configuration schema. Groups of fields the CLI prompts for when missing. */
+  configSchema?: AgentConfigSchema;
+
+  /**
+   * Dynamic credential requirements computed from resolved config values.
+   * Called after configSchema fields are resolved, allowing credentials
+   * to depend on config values (e.g., different provider -> different API key).
+   */
+  credentialsFn?: (config: Record<string, string>) => AgentCredentialRequirement[];
+
+  /** Scanner dialect key for self-registration with the dialect registry. */
+  dialect?: string;
+
+  /**
+   * Agent-specific validation.
+   * Called during the validation phase with the fully resolved agent.
+   * Returns errors and warnings without requiring CLI-side conditionals.
+   */
+  validate?: (agent: ResolvedAgent) => AgentValidationResult;
 }

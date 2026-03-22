@@ -10,6 +10,18 @@ export type {
   MaterializeOptions,
 } from "./types.js";
 
+// Config Schema Types
+export type {
+  AgentConfigSchema,
+  ConfigGroup,
+  ConfigField,
+  ConfigOption,
+  AgentCredentialRequirement,
+  AgentValidationError,
+  AgentValidationWarning,
+  AgentValidationResult,
+} from "./config-schema.js";
+
 // Helpers
 export {
   PROVIDER_ENV_VARS,

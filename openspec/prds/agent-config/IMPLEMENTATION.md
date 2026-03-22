@@ -25,7 +25,10 @@ This is the foundation — all subsequent changes depend on these types existing
 
 **Testable output:** `npx tsc --noEmit` passes. A test agent package can declare all four new fields and compile cleanly. Existing agent packages compile without changes (all new fields are optional).
 
-**Not Implemented Yet**
+**Implemented** — See [archived spec](../../openspec/changes/archive/2026-03-22-config-schema-types/):
+- [Proposal](../../openspec/changes/archive/2026-03-22-config-schema-types/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-22-config-schema-types/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-22-config-schema-types/tasks.md)
 
 ---
 
