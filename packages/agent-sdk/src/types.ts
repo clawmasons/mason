@@ -176,6 +176,16 @@ export interface AgentPackage {
   dialect?: string;
 
   /**
+   * ROLE.md frontmatter field name overrides for this agent's dialect.
+   * When omitted, defaults to: tasks="tasks", apps="mcp_servers", skills="skills".
+   */
+  dialectFields?: {
+    tasks?: string;
+    apps?: string;
+    skills?: string;
+  };
+
+  /**
    * Agent-specific validation.
    * Called during the validation phase with the fully resolved agent.
    * Returns errors and warnings without requiring CLI-side conditionals.

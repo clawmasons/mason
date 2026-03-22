@@ -1,6 +1,7 @@
 // Dialect Registry
 export {
   registerDialect,
+  registerAgentDialect,
   getDialect,
   getDialectByDirectory,
   getAllDialects,
@@ -8,6 +9,7 @@ export {
   resolveDialectName,
   type DialectEntry,
   type DialectFieldMapping,
+  type AgentDialectInfo,
 } from "./dialect-registry.js";
 
 // Parser

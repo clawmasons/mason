@@ -8,7 +8,7 @@
 
 import * as path from "node:path";
 import type { Role, ResolvedAgent } from "@clawmasons/shared";
-import { adaptRoleToResolvedAgent, getDialectByDirectory } from "@clawmasons/shared";
+import { adaptRoleToResolvedAgent, getDialectByDirectory, registerAgentDialect } from "@clawmasons/shared";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage, AgentRegistry, AgentTaskConfig, AgentSkillConfig } from "@clawmasons/agent-sdk";
 import { createAgentRegistry, getAgent, getRegisteredAgentNames, readTask, readSkills } from "@clawmasons/agent-sdk";
 
@@ -52,6 +52,16 @@ function getRegistry(): AgentRegistry {
           _registry.set(alias, agent);
         }
       }
+      // Dynamic dialect self-registration
+      if (agent.dialect) {
+        registerAgentDialect({
+          name: agent.name,
+          dialect: agent.dialect,
+          dialectFields: agent.dialectFields,
+          tasks: agent.tasks,
+          skills: agent.skills,
+        });
+      }
     }
   }
   return _registry;
@@ -63,6 +73,22 @@ function getRegistry(): AgentRegistry {
  */
 export async function initRegistry(projectDir?: string): Promise<void> {
   _registry = await createAgentRegistry(BUILTIN_AGENTS, projectDir);
+
+  // Dynamic dialect self-registration from agent packages.
+  // Deduplicate: registry may have aliases pointing to the same agent.
+  const seen = new Set<string>();
+  for (const agent of _registry.values()) {
+    if (agent.dialect && !seen.has(agent.name)) {
+      seen.add(agent.name);
+      registerAgentDialect({
+        name: agent.name,
+        dialect: agent.dialect,
+        dialectFields: agent.dialectFields,
+        tasks: agent.tasks,
+        skills: agent.skills,
+      });
+    }
+  }
 }
 
 /**

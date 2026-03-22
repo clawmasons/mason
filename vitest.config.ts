@@ -17,5 +17,6 @@ export default defineConfig({
   },
   test: {
     include: ["packages/*/tests/**/*.test.ts"],
+    setupFiles: [resolve(__dirname, "packages/shared/tests/setup-dialects.ts")],
   },
 });
