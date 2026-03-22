@@ -11,7 +11,8 @@ import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedApp, Role, AppConfig, TaskRef, SkillRef } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect } from "@clawmasons/shared";
 import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../../materializer/role-materializer.js";
-import { loadConfigAgentEntry, loadConfigAliasEntry } from "@clawmasons/agent-sdk";
+import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig } from "@clawmasons/agent-sdk";
+import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
 import { HostProxy } from "@clawmasons/proxy";
@@ -786,6 +787,33 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         console.error(`\n  Unknown agent "${effectiveAgentInput}".\n  Available agents: ${known}\n`);
         process.exit(1);
         return;
+      }
+    }
+
+    // ── Config Resolution (PRD §6.1) ─────────────────────────────────
+    // After agent type is resolved, check if the agent declares a configSchema.
+    // If so, resolve stored config, prompt for missing values, and persist.
+    if (resolvedAgentType) {
+      const agentPkg = getAgentFromRegistry(resolvedAgentType);
+      if (agentPkg?.configSchema) {
+        try {
+          const storedConfig = getAgentConfig(projectDir, agentPkg.name);
+          const { newValues } = await promptConfig(
+            agentPkg.configSchema,
+            storedConfig,
+            agentPkg.name,
+          );
+          if (Object.keys(newValues).length > 0) {
+            saveAgentConfig(projectDir, agentPkg.name, newValues);
+          }
+        } catch (err) {
+          if (err instanceof ConfigResolutionError) {
+            console.error(`\n  ${err.message}\n`);
+            process.exit(1);
+            return;
+          }
+          throw err;
+        }
       }
     }
 
