@@ -20,7 +20,7 @@ import {
   readdir,
 } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join, resolve as pathResolve, basename, dirname, extname } from "node:path";
+import { join, resolve as pathResolve, basename, extname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { resolveRole, RoleDiscoveryError, readMaterializedRole } from "@clawmasons/shared";
 import { getDialectByDirectory, CLI_NAME_LOWERCASE } from "@clawmasons/shared";
@@ -99,7 +99,11 @@ export async function runPackage(
     }
 
     // 3. Assemble build directory
-    const buildDir = join(role.source.path!, "build");
+    const sourcePath = role.source.path;
+    if (!sourcePath) {
+      throw new Error("Role source path is not defined");
+    }
+    const buildDir = join(sourcePath, "build");
     console.log(`  Assembling build directory: ${buildDir}`);
     await assembleBuild(role, buildDir, resolvedTasks, resolvedSkills);
 
@@ -209,7 +213,6 @@ async function resolveRef(
     const sourceDir = join(projectDir, sourceEntry.replace(/\/$/, ""));
 
     // Determine which subdirectory to search based on dialect (if any)
-    const dirName = basename(sourceDir); // e.g., ".claude" → but sourceEntry is ".claude/"
     const rawDirName = sourceEntry.replace(/^\./, "").replace(/\/$/, ""); // "claude"
     const dialect = getDialectByDirectory(rawDirName);
 
@@ -316,7 +319,11 @@ async function writePackageJson(
   projectDir: string,
   buildDir: string,
 ): Promise<void> {
-  const userPkgPath = join(role.source.path!, "package.json");
+  const sourcePath = role.source.path;
+  if (!sourcePath) {
+    throw new Error("Role source path is not defined");
+  }
+  const userPkgPath = join(sourcePath, "package.json");
 
   let base: Record<string, unknown> = {
     name: role.metadata.package

@@ -76,7 +76,7 @@ Starts an ACP-compliant endpoint for editor integration via stdio ndjson.
 }
 ```
 
-In both modes, the MCP proxy runs in a Docker container and the credential service runs in-process on the host.
+In both modes, the MCP proxy runs in a Docker container and the [host proxy](proxy.md) runs in-process on the host for credential resolution, approvals, and audit logging.
 
 ### `mason package`
 

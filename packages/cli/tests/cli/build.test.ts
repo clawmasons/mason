@@ -84,7 +84,6 @@ describe("build command", () => {
 describe("runBuild", () => {
   let tmpDir: string;
   let exitSpy: MockInstance;
-  let logSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   let discoverRoles: ReturnType<typeof vi.fn>;
@@ -98,7 +97,7 @@ describe("runBuild", () => {
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-build-test-"));
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
-    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     // Get mocked module functions
