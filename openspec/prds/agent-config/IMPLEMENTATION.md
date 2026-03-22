@@ -64,7 +64,10 @@ Implement two new functions:
 
 **Testable output:** Unit test: `saveAgentConfig(dir, "pi-coding-agent", { llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" } })` followed by `getAgentConfig(dir, "pi-coding-agent")` returns the same object. Existing agent entry fields (package, credentials, etc.) are preserved. `npx vitest run packages/agent-sdk/tests/` passes.
 
-**Not Implemented Yet**
+**Implemented** — See [archived spec](../../openspec/changes/archive/2026-03-22-agent-config-storage/):
+- [Proposal](../../openspec/changes/archive/2026-03-22-agent-config-storage/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-22-agent-config-storage/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-22-agent-config-storage/tasks.md)
 
 ---
 
