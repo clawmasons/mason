@@ -4,5 +4,16 @@
     "dev": "mason run --agent claude --role developer",
     "lead": "mason run --agent claude --role lead --verbose",
     "lead-dev-container": "mason run --agent claude --role lead --verbose --dev-container"
+  },
+  "agents": {
+    "pi-coding-agent": {
+      "package": "pi-coding-agent",
+      "config": {
+        "llm": {
+          "provider": "openrouter",
+          "model": "anthropic/claude-sonnet-4"
+        }
+      }
+    }
   }
 }

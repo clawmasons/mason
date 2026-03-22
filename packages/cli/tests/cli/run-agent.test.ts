@@ -3,6 +3,16 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
+// Mock quickAutoCleanup to avoid slow Docker calls in tests
+vi.mock("../../src/cli/commands/doctor.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/cli/commands/doctor.js")>();
+  return {
+    ...actual,
+    quickAutoCleanup: vi.fn(async () => {}),
+  };
+});
+
 import { program } from "../../src/cli/index.js";
 import {
   generateSessionId,
@@ -640,6 +650,7 @@ describe("packages-hash invalidation", () => {
       execComposeFn: async () => 0,
       runAgentFn: async () => 0,
       startHostProxyFn: async () => ({ stop: async () => {} }),
+      initRegistryFn: async () => {},
     };
   }
 
@@ -828,6 +839,7 @@ describe("runAgent", () => {
           }
           return { stop: async () => {} };
         },
+        initRegistryFn: async () => {},
       },
     };
   }
@@ -914,6 +926,7 @@ describe("runAgent", () => {
       existsSyncFn: (p: string) => fs.existsSync(p),
       waitForProxyHealthFn: async () => {},
       startHostProxyFn: async () => ({ stop: async () => {} }),
+      initRegistryFn: async () => {},
     };
 
     // Pre-create docker build dirs for both runs
@@ -1486,6 +1499,7 @@ describe("source override applied to role", () => {
       execComposeFn: async () => 0,
       runAgentFn: async () => 0,
       startHostProxyFn: async () => ({ stop: async () => {} }),
+      initRegistryFn: async () => {},
     };
   }
 

@@ -213,7 +213,7 @@ export class ProxyServer {
   async stop(): Promise<void> {
     // Shut down relay server
     if (this.relayServer) {
-      this.relayServer.shutdown();
+      await this.relayServer.shutdown();
     }
 
     const closePromises = Array.from(this.activeTransports).map(async (t) => {
@@ -228,6 +228,8 @@ export class ProxyServer {
 
     const httpServer = this.httpServer;
     if (httpServer) {
+      // Force-destroy active connections so httpServer.close() resolves promptly
+      httpServer.closeAllConnections();
       await new Promise<void>((resolve, reject) => {
         httpServer.close((err) => (err ? reject(err) : resolve()));
       });

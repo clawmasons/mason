@@ -156,30 +156,51 @@ export function displayCredentials(
 export function execComposeCommand(
   composeFile: string,
   args: string[],
-  opts?: { interactive?: boolean; verbose?: boolean },
+  opts?: { interactive?: boolean; verbose?: boolean; timeoutMs?: number },
 ): Promise<number> {
   const baseArgs = ["compose", "-f", composeFile, ...args];
   const showOutput = opts?.interactive || opts?.verbose;
 
   return new Promise((resolve) => {
-    if (showOutput) {
-      const child = spawn("docker", baseArgs, { stdio: "inherit" });
-      child.on("close", (code) => resolve(code ?? 0));
-      child.on("error", () => resolve(1));
-    } else {
-      // Capture stderr so we can show it on failure
-      const child = spawn("docker", baseArgs, {
-        stdio: ["ignore", "ignore", "pipe"],
-      });
-      let stderr = "";
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const settle = (code: number) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(code);
+    };
+
+    const child = showOutput
+      ? spawn("docker", baseArgs, { stdio: "inherit" })
+      : spawn("docker", baseArgs, { stdio: ["ignore", "ignore", "pipe"] });
+
+    let stderr = "";
+    if (!showOutput) {
       child.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
-      child.on("close", (code) => {
-        if (code !== 0 && stderr) {
-          console.error(stderr);
+    }
+
+    child.on("close", (code) => {
+      if (!showOutput && code !== 0 && stderr) {
+        console.error(stderr);
+      }
+      settle(code ?? 0);
+    });
+    child.on("error", () => settle(1));
+
+    if (opts?.timeoutMs) {
+      const ms = opts.timeoutMs;
+      timer = setTimeout(() => {
+        if (!settled) {
+          child.kill("SIGKILL");
+          console.error(
+            `\n  Docker command timed out after ${Math.round(ms / 1000)}s.` +
+            `\n  Run \`mason doctor --auto\` to clean up stale resources, or restart Docker Desktop.\n`,
+          );
+          settle(1);
         }
-        resolve(code ?? 0);
-      });
-      child.on("error", () => resolve(1));
+      }, ms);
     }
   });
 }
@@ -506,6 +527,8 @@ export interface RunAgentDeps {
   createLoggerFn?: (logDir: string) => AcpLogger;
   /** Override home path (for testing). */
   homeOverride?: string;
+  /** Override registry initialization (for testing). */
+  initRegistryFn?: (projectDir: string) => Promise<void>;
 }
 
 // ── Backward-compat aliases ───────────────────────────────────────────
@@ -986,7 +1009,8 @@ export async function runAgent(
   },
 ): Promise<void> {
   // Initialize agent registry with config-declared agents from .mason/config.json
-  await initRegistry(projectDir);
+  const initRegistryFn = deps?.initRegistryFn ?? initRegistry;
+  await initRegistryFn(projectDir);
 
   // Pre-flight: check Docker Compose is available before any mode-specific work
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
@@ -1114,6 +1138,9 @@ async function runAgentInteractiveMode(
     // 5. Ensure .mason is in project's .gitignore
     ensureGitignore(projectDir, ".mason");
 
+    // 5b. Pre-flight cleanup of stale Docker resources
+    await quickAutoCleanup(projectDir);
+
     // 6. Create session directory with compose file
     const { uid, gid } = getHostIds();
     const declaredCredentialKeys = collectDeclaredCredentialKeys(agentType, agentConfigCredentials, roleType);
@@ -1134,6 +1161,7 @@ async function runAgentInteractiveMode(
       bashMode,
       verbose,
       sessionId: sessionIdOverride,
+      agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
     });
 
     const { sessionId, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
@@ -1161,7 +1189,7 @@ async function runAgentInteractiveMode(
     const proxyCode = await execCompose(
       composeFile,
       ["up", "-d", proxyServiceName],
-      { verbose },
+      { verbose, timeoutMs: 30_000 },
     );
     if (proxyCode !== 0) {
       throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
@@ -1200,10 +1228,7 @@ async function runAgentInteractiveMode(
 
     // When stdin is not a TTY (e.g. piped from a test), pass -T to disable
     // pseudo-TTY allocation so docker compose run works with piped stdio.
-    const runArgs = ["run", "--rm", "--service-ports"];
-    if (buildMode) {
-      runArgs.push("--build");
-    }
+    const runArgs = ["run", "--rm", "--service-ports", "--build"];
     if (!process.stdin.isTTY) {
       runArgs.push("-T");
     }
@@ -1325,6 +1350,9 @@ async function runAgentDevContainerMode(
       fs.writeFileSync(serverEnvSetupPath, serverEnvSetupContent, { mode: 0o755 });
     }
 
+    // 5b. Pre-flight cleanup of stale Docker resources
+    await quickAutoCleanup(projectDir);
+
     // 6. Create session directory with compose file
     const { uid, gid } = getHostIds();
     const declaredCredentialKeys = collectDeclaredCredentialKeys(agentType, agentConfigCredentials, roleType);
@@ -1345,6 +1373,7 @@ async function runAgentDevContainerMode(
       vscodeServerHostPath,
       verbose,
       sessionId: sessionIdOverride,
+      agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
     });
 
     const { sessionId, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
@@ -1365,7 +1394,7 @@ async function runAgentDevContainerMode(
     const buildCode = await execCompose(composeFile, buildArgs, { verbose });
     if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
 
-    const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose });
+    const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose, timeoutMs: 30_000 });
     if (proxyCode !== 0) throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
     console.log(`  Proxy started.`);
 
@@ -1523,6 +1552,7 @@ export async function runProxyOnly(
     hostUid: uid,
     hostGid: gid,
     sessionId: sessionIdOverride,
+    agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
   });
 
   const { sessionId, composeFile, proxyToken, proxyServiceName } = session;

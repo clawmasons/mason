@@ -248,8 +248,8 @@ describe("piCodingAgentMaterializer", () => {
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
-        expect(indexTs).toContain('name: "triage-issue"');
-        expect(indexTs).toContain('name: "review-pr"');
+        expect(indexTs).toContain('pi.registerCommand("triage-issue",');
+        expect(indexTs).toContain('pi.registerCommand("review-pr",');
       });
 
       it("includes task name and version in command description", () => {
@@ -260,7 +260,7 @@ describe("piCodingAgentMaterializer", () => {
         expect(indexTs).toContain("@clawmasons/task-triage-issue@0.3.1");
       });
 
-      it("includes prompt in command prompt field", () => {
+      it("includes prompt in command handler body", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 

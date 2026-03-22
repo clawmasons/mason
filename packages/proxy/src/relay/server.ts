@@ -142,7 +142,7 @@ export class RelayServer {
   }
 
   /** Shut down the relay server: reject pending requests, close connection, close WSS. */
-  shutdown(): void {
+  async shutdown(): Promise<void> {
     // Reject all pending requests
     for (const [id, pending] of this.pendingRequests) {
       clearTimeout(pending.timer);
@@ -151,11 +151,13 @@ export class RelayServer {
     }
 
     if (this.ws) {
-      this.ws.close(1000, "Relay shutting down");
+      this.ws.terminate(); // Force-close — no close handshake wait
       this.ws = null;
     }
 
-    this.wss.close();
+    await new Promise<void>((resolve) => {
+      this.wss.close(() => resolve());
+    });
   }
 
   // ── Private ──────────────────────────────────────────────────────────

@@ -296,11 +296,12 @@ export function generateRoleDockerBuildDir(
   // - project role: everything else → {agentDir}/build/workspace/project/  (per-file overlay mounts)
   // - supervisor role: everything else → {agentDir}/home/         (merged into home mount at /home/mason/)
   const proxyEp = proxyEndpoint ?? `http://proxy-${roleName}:9090`;
-  const materializeOpts = (opts.agentConfigCredentials?.length || opts.agentArgs?.length || opts.initialPrompt)
+  const materializeOpts = (opts.agentConfigCredentials?.length || opts.agentArgs?.length || opts.initialPrompt || opts.llmConfig)
     ? {
         ...(opts.agentConfigCredentials?.length ? { agentConfigCredentials: opts.agentConfigCredentials } : {}),
         ...(opts.agentArgs?.length ? { agentArgs: opts.agentArgs } : {}),
         ...(opts.initialPrompt ? { initialPrompt: opts.initialPrompt } : {}),
+        ...(opts.llmConfig ? { llmConfig: opts.llmConfig } : {}),
       }
     : undefined;
   const workspaceDir = path.join(agentDir, "workspace");
@@ -434,6 +435,8 @@ export interface SessionComposeOptions {
   bashMode?: boolean;
   /** Set AGENT_ENTRY_VERBOSE=1 in agent environment. */
   verbose?: boolean;
+  /** Short agent identifier (e.g. "pi", "claude") for Docker image naming. */
+  agentShortName?: string;
 }
 
 /**
@@ -476,6 +479,7 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
     vscodeServerHostPath,
     bashMode,
     verbose,
+    agentShortName,
   } = opts;
 
   // Unique compose project name derived from project directory
@@ -645,8 +649,9 @@ ${proxyEnvLines.join("\n")}
     ports:
       - "${proxyPort}:9090"
     restart: "no"
+    init: true
 
-  ${agentServiceName}:
+  ${agentServiceName}:${agentShortName ? `\n    image: ${composeName}-${agentServiceName}-${agentShortName}` : ""}
     build:
       context: ${relDockerDir}
       dockerfile: ${path.relative(dockerDir, path.join(dockerBuildDir, agentType, "Dockerfile"))}
@@ -707,6 +712,8 @@ export interface CreateSessionOptions {
   verbose?: boolean;
   /** Pre-determined session ID (overrides random generation, for testing). */
   sessionId?: string;
+  /** Short agent identifier (e.g. "pi", "claude") for Docker image naming. */
+  agentShortName?: string;
 }
 
 export interface SessionResult {

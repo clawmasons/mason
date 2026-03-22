@@ -11,6 +11,15 @@ vi.mock("@clawmasons/agent-sdk", async (importOriginal) => {
   };
 });
 
+// Mock initRegistry to avoid slow dynamic imports in tests
+vi.mock("../../src/materializer/role-materializer.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/materializer/role-materializer.js")>();
+  return {
+    ...actual,
+    initRegistry: vi.fn(async () => {}),
+  };
+});
+
 import { registerCommands } from "../../src/cli/commands/index.js";
 
 describe("installAgentTypeShorthand", () => {

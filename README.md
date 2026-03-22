@@ -18,7 +18,30 @@ Mason runs your agents in secure Docker containers scoped to what they need with
 npm install -g @clawmasons/mason
 ```
 
-### 2. Define your roles
+### 2. Run your agent in a container
+
+Run a project configured for claude code in a secure container
+```bash
+cd your-project-dir
+mason claude
+```
+
+You can also run projects with other agents using the claude config
+```bash
+mason pi --source claude
+```
+
+
+### 2. Define project roles
+
+The mason project uses roles to strictly define what an agent can doe.
+
+When masons is run without the "--role" argument, it builds a in memory role that
+has all of the "source" skills, mcp-servers, etc, and the container is configured
+too allow all of those operations.
+
+
+#### Use the configure command
 
 Have your agent [**configure**](docs/role-configure-project.md) your project's roles with mason.
 
