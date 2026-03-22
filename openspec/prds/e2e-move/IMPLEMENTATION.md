@@ -99,4 +99,4 @@ See PRD §5.3 (Package Removal), §6.2 (Aggregate E2E), and §6.3 (Global Setup)
 
 **Testable output:** `npm run test:e2e` discovers and runs all e2e tests across packages (currently project-role + mcp-proxy-agent). All pass. `packages/tests/` no longer exists. `npx tsc --noEmit` compiles cleanly. CI pipeline passes.
 
-**Not Implemented Yet**
+**Implemented**
