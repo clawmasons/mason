@@ -208,6 +208,8 @@ export interface GenerateBuildDirOptions {
   agentArgs?: string[];
   /** Initial prompt passed to the agent as the first user message at launch. */
   initialPrompt?: string;
+  /** LLM configuration resolved from agent config schema. Applied to ResolvedAgent.llm before materialization. */
+  llmConfig?: { provider: string; model: string };
 }
 
 export interface BuildDirResult {
@@ -268,6 +270,9 @@ export function generateRoleDockerBuildDir(
 
   // Agent Dockerfile
   const resolvedAgent = adaptRoleToResolvedAgent(role, agentType);
+  if (opts.llmConfig) {
+    resolvedAgent.llm = opts.llmConfig;
+  }
   resolveTaskContent(resolvedAgent, role);
   resolveSkillContent(resolvedAgent, role);
   const agentRole = resolvedAgent.roles[0];

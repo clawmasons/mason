@@ -116,7 +116,10 @@ Also wire the stored `config` values into `ResolvedAgent.llm` during the run flo
 
 **Testable output:** `mason run pi` with no stored config prompts for provider/model, persists to `agents.pi-coding-agent.config` in `.mason/config.json`, and launches. Second run skips prompts. `npx vitest run packages/pi-coding-agent/tests/` and `npx vitest run packages/cli/tests/` pass.
 
-**Not Implemented Yet**
+**Implemented** — See [archived spec](../../openspec/changes/archive/2026-03-22-pi-agent-config-schema/):
+- [Proposal](../../openspec/changes/archive/2026-03-22-pi-agent-config-schema/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-22-pi-agent-config-schema/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-22-pi-agent-config-schema/tasks.md)
 
 ---
 
