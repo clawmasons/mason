@@ -152,6 +152,46 @@ registerDialect({
   },
 });
 
+registerDialect({
+  name: "pi-coding-agent",
+  directory: "pi",
+  fieldMapping: {
+    tasks: "prompts",
+    apps: "mcp_servers",
+    skills: "skills",
+  },
+  taskConfig: {
+    projectFolder: ".pi/prompts",
+    nameFormat: "{scopeKebab}-{taskName}.md",
+    scopeFormat: "kebab-case-prefix",
+    supportedFields: ["description"],
+    prompt: "markdown-body",
+  },
+  skillConfig: {
+    projectFolder: "skills",
+  },
+});
+
+registerDialect({
+  name: "pi-coding-agent",
+  directory: "pi",
+  fieldMapping: {
+    tasks: "prompts",
+    apps: "mcp_servers",
+    skills: "skills",
+  },
+  taskConfig: {
+    projectFolder: ".pi/prompts",
+    nameFormat: "{scopeKebab}-{taskName}.md",
+    scopeFormat: "kebab-case-prefix",
+    supportedFields: ["description"],
+    prompt: "markdown-body",
+  },
+  skillConfig: {
+    projectFolder: "skills",
+  },
+});
+
 // The canonical mason location (.mason/roles/) uses generic field names
 registerDialect({
   name: "mason",

@@ -535,6 +535,8 @@ describe("packages-hash invalidation", () => {
   function makeRole(overrides?: Partial<Role>): Role {
     return {
       metadata: { name: "role-writer", version: "1.0.0" },
+      type: "project",
+      sources: ["claude"],
       source: { agentDialect: "claude-code-agent", agentDir: ".claude", roleDir: "" },
       skills: [], commands: [], tools: [], apps: [],
       ...overrides,
@@ -647,6 +649,8 @@ describe("runAgent", () => {
   function makeRole(overrides?: Partial<Role>): Role {
     return {
       metadata: { name: "role-writer", version: "1.0.0" },
+      type: "project",
+      sources: ["claude"],
       source: {
         agentDialect: "claude-code-agent",
         agentDir: ".claude",
@@ -1117,6 +1121,8 @@ describe("runProxyOnly", () => {
   function makeRole(overrides?: Partial<Role>): Role {
     return {
       metadata: { name: "role-writer", version: "1.0.0" },
+      type: "project",
+      sources: ["claude"],
       source: {
         agentDialect: "claude-code-agent",
         agentDir: ".claude",

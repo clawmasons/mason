@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { Readable, Writable } from "node:stream";
 import { spawn } from "node:child_process";
 import { checkDockerCompose } from "./docker-utils.js";
+import { quickAutoCleanup } from "./doctor.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedApp, Role, AppConfig, TaskRef, SkillRef } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect } from "@clawmasons/shared";
@@ -960,6 +961,14 @@ export async function runAgent(
     return;
   }
 
+  // Silent housekeeping: remove stopped containers, dangling images, orphaned sessions
+  try {
+    await quickAutoCleanup(projectDir);
+  } catch (cleanupErr) {
+    // Cleanup failures should never block the run
+    console.warn(`  Warning: auto-cleanup failed: ${(cleanupErr as Error).message}`);
+  }
+
   const isAcpMode = acpOptions?.acp === true;
   const isDevContainerMode = acpOptions?.devContainer === true;
   const proxyPort = acpOptions?.proxyPort ?? 3000;
@@ -1055,6 +1064,7 @@ async function runAgentInteractiveMode(
 
     console.log(`\n  Agent: ${agentType}`);
     console.log(`  Role: ${roleName} (${roleType.type})`);
+    console.log(`  Source: ${roleType.sources.length > 0 ? roleType.sources.join(", ") : "(none)"}`);
 
     // 4. Ensure docker build artifacts exist (auto-build if missing)
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
@@ -1238,6 +1248,7 @@ async function runAgentDevContainerMode(
 
     console.log(`\n  Agent: ${agentType}`);
     console.log(`  Role: ${roleName}`);
+    console.log(`  Source: ${roleType.sources.length > 0 ? roleType.sources.join(", ") : "(none)"}`);
     console.log(`  Mode: dev-container`);
 
     // 3. Ensure docker build artifacts
@@ -1615,6 +1626,7 @@ async function runAgentAcpMode(
 
     logger.log(`[mason agent --acp] Agent: ${resolvedAgent.name}`);
     logger.log(`[mason agent --acp] Role: ${roleName}`);
+    logger.log(`[mason agent --acp] Source: ${roleType.sources.length > 0 ? roleType.sources.join(", ") : "(none)"}`);
     logger.log(`[mason agent --acp] Tool filters: ${toolCount} app(s)`);
     if (envCredCount > 0) {
       logger.log(`[mason agent --acp] Env credentials: ${envCredCount} key(s) from process.env`);
@@ -1699,6 +1711,7 @@ async function runAgentAcpMode(
       `\n[mason agent --acp] Ready -- stdio transport active\n` +
       `  Agent:      ${resolvedAgent.name}\n` +
       `  Role:       ${roleName}\n` +
+      `  Source:     ${roleType.sources.length > 0 ? roleType.sources.join(", ") : "(none)"}\n` +
       `  Proxy port: ${proxyPort}\n` +
       `  Mode:       deferred (agent starts on session/new)\n`,
     );
