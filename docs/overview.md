@@ -15,7 +15,7 @@ Agents are powerful — but dangerous. They need tools, credentials, and broad s
 
 ### Secure Credential Isolation
 
-Credentials are never exposed via environment variables or Docker inspect. Instead, they're resolved on-demand through a dedicated credential service and injected only into the agent's child process memory. Every credential access is logged.
+Credentials are never exposed via environment variables or Docker inspect. Instead, they're resolved on-demand through the [host proxy](proxy.md) and injected only into the agent's child process memory. Every credential access is logged.
 
 ### Role-Based Tool Filtering
 
@@ -23,7 +23,7 @@ Agents don't get blanket access to all tools. Each agent runs under a **role** t
 
 ### Audit Logging
 
-Every tool call and credential request is logged to a local SQLite database with timestamps, agent identity, role context, and outcome. You can trace exactly what an agent did and when.
+Every tool call and credential request is logged to a local JSONL audit file (`~/.mason/data/audit.jsonl`) with timestamps, agent identity, role context, and outcome. You can trace exactly what an agent did and when.
 
 ### Runtime Portability
 

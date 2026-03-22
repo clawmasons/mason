@@ -36,7 +36,7 @@ const FRAMEWORK_PACKAGES = [
   "@clawmasons/mason",
   "@clawmasons/proxy",
   "@clawmasons/shared",
-  "@clawmasons/credential-service",
+
   "@clawmasons/mcp-agent",
   "@clawmasons/agent-entry",
 ];
@@ -492,37 +492,36 @@ export function synthesizeRolePackages(
     );
   }
 
-  // Synthesize role package
+  // Synthesize role package (always rewritten to pick up role definition changes)
   const roleName = role.metadata.name;
   const rolePkgDir = path.join(nodeModulesDir, roleName);
-  if (!fs.existsSync(rolePkgDir)) {
-    fs.mkdirSync(rolePkgDir, { recursive: true });
+  fs.mkdirSync(rolePkgDir, { recursive: true });
 
-    // Build permissions map from inline apps
-    const permissions: Record<string, { allow: string[]; deny: string[] }> = {};
-    for (const app of role.apps) {
-      permissions[app.name] = {
-        allow: [...(app.tools?.allow ?? [])],
-        deny: [...(app.tools?.deny ?? [])],
-      };
-    }
-
-    // Omit tasks and skills — the proxy only needs apps + permissions.
-    // Including tasks/skills would cause the proxy's package resolver
-    // to fail looking for them as npm packages.
-    const rolePkgJson = {
-      name: roleName,
-      version: role.metadata.version ?? "0.0.0",
-      [CLI_NAME_LOWERCASE]: {
-        type: "role",
-        description: role.metadata.description,
-        risk: role.governance.risk ?? "LOW",
-        permissions,
-      },
+  // Build permissions map from inline apps
+  const permissions: Record<string, { allow: string[]; deny: string[] }> = {};
+  for (const app of role.apps) {
+    permissions[app.name] = {
+      allow: [...(app.tools?.allow ?? [])],
+      deny: [...(app.tools?.deny ?? [])],
     };
-    fs.writeFileSync(
-      path.join(rolePkgDir, "package.json"),
-      JSON.stringify(rolePkgJson, null, 2) + "\n",
-    );
   }
+
+  // Omit tasks and skills — the proxy only needs apps + permissions.
+  // Including tasks/skills would cause the proxy's package resolver
+  // to fail looking for them as npm packages.
+  const rolePkgJson = {
+    name: roleName,
+    version: role.metadata.version ?? "0.0.0",
+    [CLI_NAME_LOWERCASE]: {
+      type: "role",
+      description: role.metadata.description,
+      risk: role.governance.risk ?? "LOW",
+      permissions,
+      constraints: role.governance.constraints,
+    },
+  };
+  fs.writeFileSync(
+    path.join(rolePkgDir, "package.json"),
+    JSON.stringify(rolePkgJson, null, 2) + "\n",
+  );
 }

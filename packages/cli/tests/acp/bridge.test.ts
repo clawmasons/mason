@@ -103,6 +103,7 @@ function startMockContainerAgent(
 ) {
   // The container reads from containerInput (what bridge writes to child.stdin)
   // The container writes to containerOutput (what bridge reads from child.stdout)
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { AgentSideConnection } = require("@agentclientprotocol/sdk") as typeof import("@agentclientprotocol/sdk");
 
   const inputWebStream = Readable.toWeb(containerInput) as ReadableStream<Uint8Array>;
@@ -117,12 +118,12 @@ function startMockContainerAgent(
         agentInfo: { name: "mock-agent", version: "0.1.0" },
       };
     },
-    async newSession(params) {
+    async newSession() {
       return {
         sessionId: "mock-session-123",
       };
     },
-    async prompt(params) {
+    async prompt() {
       return {
         stopReason: "end_turn",
       } satisfies PromptResponse;

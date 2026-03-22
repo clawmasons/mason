@@ -37,6 +37,7 @@ export const appConfigSchema = z.object({
   env: z.record(z.string(), z.string()).optional().default({}),
   tools: toolPermissionsSchema.optional().default({}),
   credentials: z.array(z.string()).optional().default([]),
+  location: z.enum(["proxy", "host"]).optional().default("proxy"),
 });
 
 export const mountConfigSchema = z.object({

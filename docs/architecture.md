@@ -5,22 +5,22 @@ description: How mason orchestrates agent execution at runtime
 
 # Runtime Architecture
 
-Mason uses a two-container model for agent execution: an **MCP Proxy** for tool filtering and a containerized **Agent** running the AI runtime. The **Credential Service** runs in-process on the host for secure secret management.
+Mason uses a two-container model for agent execution: a **Docker-Side Proxy** for tool filtering and a containerized **Agent** running the AI runtime. A **Host Proxy** runs in-process on the host for credential resolution, approval dialogs, audit logging, and host MCP server management. The two sides communicate over a unified **relay WebSocket**.
 
 ## Container Architecture
 
 ```mermaid
 graph TB
     CLI["mason run"]
-    CLI -->|docker compose up| Proxy["MCP Proxy<br/>(tool filtering + audit)"]
+    CLI -->|docker compose up| Proxy["Docker Proxy<br/>(tool filtering + audit)"]
     CLI -->|docker compose run| Agent["Agent Container<br/>(Claude Code / pi-coding-agent / MCP Agent)"]
-    CLI -.-|in-process| CredSvc["Credential Service<br/>(secret resolution)"]
+    CLI -.-|in-process| HostProxy["Host Proxy<br/>(credentials, approvals, audit, host MCP)"]
 
     Agent -->|MCP protocol| Proxy
-    CredSvc -->|WebSocket| Proxy
+    HostProxy -->|WebSocket /ws/relay| Proxy
     Proxy -->|stdio / SSE / HTTP| App1["App: filesystem"]
     Proxy -->|stdio / SSE / HTTP| App2["App: github"]
-    Proxy -->|stdio / SSE / HTTP| AppN["App: ..."]
+    HostProxy -->|stdio| HostApp["Host App: xcode-sim"]
 ```
 
 ## Role Startup Sequence
@@ -31,8 +31,8 @@ When you run `mason run <agent-type> --role <name>`, the following sequence exec
 sequenceDiagram
     participant CLI as mason CLI
     participant DC as Docker Compose
-    participant Proxy as MCP Proxy
-    participant CS as Credential Service (in-process)
+    participant Proxy as Docker Proxy
+    participant HP as Host Proxy (in-process)
     participant AE as Agent Entry
     participant Agent as Agent Runtime
 
@@ -41,8 +41,10 @@ sequenceDiagram
     CLI->>DC: docker compose up proxy (detached)
     DC->>Proxy: Start proxy on port 9090
     Proxy->>Proxy: Connect to upstream MCP apps
-    CLI->>CS: Start credential service in-process
-    CS->>Proxy: Connect via WebSocket
+    CLI->>HP: Start host proxy in-process
+    HP->>HP: Start host MCP servers (if any)
+    HP->>Proxy: Connect via WebSocket /ws/relay
+    HP->>Proxy: Register host MCP server tools
     CLI->>DC: docker compose run agent (interactive)
     DC->>AE: Start agent-entry bootstrap
     AE->>Proxy: POST /connect-agent (Bearer token)
@@ -50,9 +52,9 @@ sequenceDiagram
 
     loop For each declared credential
         AE->>Proxy: credential_request(key, sessionToken)
-        Proxy->>CS: Forward via WebSocket
-        CS->>CS: Resolve from env / keychain / .env
-        CS-->>Proxy: Credential value
+        Proxy->>HP: credential_request (relay)
+        HP->>HP: Resolve from env / keychain / .env
+        HP-->>Proxy: credential_response (relay)
         Proxy-->>AE: Credential value
     end
 
@@ -69,7 +71,7 @@ Every tool call passes through the proxy for filtering and audit:
 ```mermaid
 sequenceDiagram
     participant Agent as Agent Runtime
-    participant Proxy as MCP Proxy
+    participant Proxy as Docker Proxy
     participant Router as Tool Router
     participant Audit as Audit Hook
     participant App as Upstream App
@@ -81,11 +83,37 @@ sequenceDiagram
     alt Tool denied
         Router-->>Agent: Error: tool not permitted
     else Tool allowed
-        Audit->>Audit: Log pre-call (tool, args, timestamp)
+        Audit->>Audit: Send audit_event (pre-call) via relay
         Router->>App: callTool("create_pr", args)
         App-->>Router: Result
-        Audit->>Audit: Log post-call (result, duration, status)
+        Audit->>Audit: Send audit_event (post-call) via relay
         Router-->>Agent: Result
+    end
+```
+
+## Approval Flow
+
+When a tool call matches a role's `requireApprovalFor` pattern:
+
+```mermaid
+sequenceDiagram
+    participant Agent as Agent Runtime
+    participant Proxy as Docker Proxy
+    participant HP as Host Proxy
+    participant Dialog as macOS Dialog
+
+    Agent->>Proxy: callTool("filesystem_write_file", args)
+    Proxy->>Proxy: Match against approval patterns
+    Proxy->>HP: approval_request (relay)
+    HP->>Dialog: osascript display dialog
+    Dialog-->>HP: User clicks Approve/Deny
+    HP-->>Proxy: approval_response (relay)
+
+    alt Approved
+        Proxy->>Proxy: Execute tool call normally
+        Proxy-->>Agent: Result
+    else Denied
+        Proxy-->>Agent: Error: tool call denied
     end
 ```
 
@@ -96,26 +124,52 @@ Credentials are never stored in environment variables or Docker configuration:
 ```mermaid
 sequenceDiagram
     participant Agent as Agent Runtime
-    participant Proxy as MCP Proxy
-    participant CS as Credential Service
-    participant Audit as Audit Log
+    participant Proxy as Docker Proxy
+    participant HP as Host Proxy
+    participant Resolver as Credential Resolver
 
     Agent->>Proxy: credential_request("GITHUB_TOKEN", sessionToken)
     Proxy->>Proxy: Validate session token
-    Proxy->>CS: Forward request via WebSocket
+    Proxy->>HP: credential_request (relay)
 
-    CS->>CS: Check credential is declared by role
+    HP->>HP: Check credential is declared by role
 
     alt Not declared
-        CS->>Audit: Log DENIED (undeclared)
-        CS-->>Proxy: Error: credential not declared
+        HP-->>Proxy: Error: credential not declared
     else Declared
-        CS->>CS: Resolve priority: session > env > keychain > .env
-        CS->>Audit: Log GRANTED (source: env)
-        CS-->>Proxy: Credential value
+        HP->>Resolver: Resolve priority: session > env > keychain > .env
+        Resolver-->>HP: Credential value
+        HP-->>Proxy: credential_response with value
     end
 
     Proxy-->>Agent: Credential value
+```
+
+## Host MCP Server Flow
+
+MCP servers with `location: host` run on the host machine, with tool calls relayed through the proxy:
+
+```mermaid
+sequenceDiagram
+    participant Agent as Agent Runtime
+    participant Proxy as Docker Proxy
+    participant HP as Host Proxy
+    participant MCP as Host MCP Server
+
+    Note over HP, MCP: During startup
+    HP->>MCP: Spawn and connect
+    HP->>MCP: listTools()
+    MCP-->>HP: Tool definitions
+    HP->>Proxy: mcp_tools_register (relay)
+    Proxy-->>HP: mcp_tools_registered
+
+    Note over Agent, MCP: During agent session
+    Agent->>Proxy: callTool("xcode_run_simulator", args)
+    Proxy->>HP: mcp_tool_call (relay)
+    HP->>MCP: callTool("run_simulator", args)
+    MCP-->>HP: Result
+    HP-->>Proxy: mcp_tool_result (relay)
+    Proxy-->>Agent: Result
 ```
 
 ## ACP Mode Architecture
@@ -127,7 +181,7 @@ sequenceDiagram
     participant Editor as Editor (Zed / JetBrains)
     participant Bridge as ACP Bridge
     participant DC as Docker Compose
-    participant Proxy as MCP Proxy
+    participant Proxy as Docker Proxy
     participant Agent as Agent Container
 
     Editor->>Bridge: initialize (stdio/ndjson)
@@ -214,6 +268,5 @@ See [Skill](skill.md) for the full skill model documentation.
 ## Related
 
 - [Initialization](initialization.md) — How lodges and runtime directories are set up
-- [MCP Proxy](component-mcp-proxy.md) — Detailed proxy documentation
-- [Credential Service](component-credential-service.md) — How credentials are resolved
+- [Proxy](proxy.md) — Detailed proxy documentation
 - [Security](security.md) — The full security model

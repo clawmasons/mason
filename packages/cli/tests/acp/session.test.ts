@@ -116,7 +116,7 @@ describe("generateAcpComposeYml", () => {
     role: "writer",
     logsDir: "/projects/my-project/.mason/sessions/abc123/docker/logs",
     proxyToken: "test-proxy-token",
-    credentialProxyToken: "test-cred-token",
+    relayToken: "test-cred-token",
   };
 
   it("generates two services: proxy and agent (no credential-service)", () => {
@@ -163,7 +163,7 @@ describe("generateAcpComposeYml", () => {
     const proxySection = yml.split("agent-writer:")[0]!;
 
     expect(proxySection).toContain("MASON_PROXY_TOKEN=test-proxy-token");
-    expect(proxySection).toContain("CREDENTIAL_PROXY_TOKEN=test-cred-token");
+    expect(proxySection).toContain("RELAY_TOKEN=test-cred-token");
   });
 
   it("proxy has MASON_SESSION_TYPE=acp", () => {
@@ -502,7 +502,7 @@ describe("AcpSession", () => {
       expect(info.proxyServiceName).toBe("proxy-writer");
       expect(info.agentServiceName).toBe("agent-writer");
       expect(info.proxyToken).toBeDefined();
-      expect(info.credentialProxyToken).toBeDefined();
+      expect(info.relayToken).toBeDefined();
       expect(info.dockerBuildDir).toBeDefined();
       expect(info.composeFile).toContain("infra001");
     });

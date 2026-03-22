@@ -117,7 +117,7 @@ When you run `mason run <agent-type> --role <name>`, the following happens:
 4. **Generate Docker artifacts** — Build Dockerfiles and install dependencies if needed
 5. **Create a session** — Set up `.mason/sessions/<id>/` with compose config
 6. **Start the MCP proxy** — Build and launch the proxy container (detached)
-7. **Start the credential service** — Run in-process on the host
+7. **Start the host proxy** — Run in-process on the host (credentials, approvals, audit, host MCP servers)
 8. **Start the agent container** — Launch interactively or in ACP mode
 
 See [Architecture](architecture.md) for the full sequence diagram.

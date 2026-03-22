@@ -94,7 +94,7 @@ export class AcpSdkBridge {
     const stream = ndJsonStream(editorOutput, editorInput);
 
     this.editorConnection = new AgentSideConnection(
-      (conn) => this.createEditorAgent(conn),
+      () => this.createEditorAgent(),
       stream,
     );
 
@@ -128,7 +128,7 @@ export class AcpSdkBridge {
 
   // ── Editor-Facing Agent Implementation ──────────────────────────────
 
-  private createEditorAgent(_conn: AgentSideConnection): Agent {
+  private createEditorAgent(): Agent {
     return {
       initialize: (params) => this.handleInitialize(params),
       newSession: (params) => this.handleNewSession(params),
@@ -182,7 +182,7 @@ export class AcpSdkBridge {
     const containerStream = ndJsonStream(containerOutput, containerInput);
 
     this.containerConnection = new ClientSideConnection(
-      (agent) => this.createContainerClient(agent),
+      () => this.createContainerClient(),
       containerStream,
     );
 
@@ -273,7 +273,7 @@ export class AcpSdkBridge {
    * Create a Client implementation for the ClientSideConnection.
    * Forwards notifications from the container back to the editor. (REQ-SDK-010)
    */
-  private createContainerClient(_agent: Agent): Client {
+  private createContainerClient(): Client {
     return {
       requestPermission: (params: RequestPermissionRequest) => this.forwardRequestPermission(params),
       sessionUpdate: (params: SessionNotification) => this.forwardSessionUpdate(params),
@@ -331,7 +331,7 @@ export class AcpSdkBridge {
     return this.editorConnection.extMethod("terminal/output", params as unknown as Record<string, unknown>) as Promise<TerminalOutputResponse>;
   }
 
-  private async forwardReleaseTerminal(params: ReleaseTerminalRequest): Promise<ReleaseTerminalResponse | void> {
+  private async forwardReleaseTerminal(params: ReleaseTerminalRequest): Promise<ReleaseTerminalResponse | undefined> {
     if (!this.editorConnection) return;
     return this.editorConnection.extMethod("terminal/release", params as unknown as Record<string, unknown>) as Promise<ReleaseTerminalResponse>;
   }
@@ -343,7 +343,7 @@ export class AcpSdkBridge {
     return this.editorConnection.extMethod("terminal/waitForExit", params as unknown as Record<string, unknown>) as Promise<WaitForTerminalExitResponse>;
   }
 
-  private async forwardKillTerminal(params: KillTerminalRequest): Promise<KillTerminalResponse | void> {
+  private async forwardKillTerminal(params: KillTerminalRequest): Promise<KillTerminalResponse | undefined> {
     if (!this.editorConnection) return;
     return this.editorConnection.extMethod("terminal/kill", params as unknown as Record<string, unknown>) as Promise<KillTerminalResponse>;
   }

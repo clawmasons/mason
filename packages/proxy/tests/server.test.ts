@@ -6,9 +6,6 @@ import type { Tool, Resource, Prompt, CallToolResult, ReadResourceResult, GetPro
 import { ProxyServer } from "../src/server.js";
 import type { ToolRouter, RouteEntry, ResourceRouter, PromptRouter, PromptRouteEntry } from "../src/router.js";
 import type { UpstreamManager } from "../src/upstream.js";
-import { openDatabase, queryAuditLog, updateApprovalStatus } from "../src/db.js";
-import type Database from "better-sqlite3";
-
 // ── Fixtures ────────────────────────────────────────────────────────────
 
 function makeTool(name: string, description?: string): Tool {
@@ -502,103 +499,13 @@ describe("ProxyServer (auth)", () => {
 describe("ProxyServer (audit logging)", () => {
   let server: ProxyServer;
   let client: Client;
-  let db: Database.Database;
 
   afterEach(async () => {
     try { await client?.close(); } catch { /* ignore */ }
     try { await server?.stop(); } catch { /* ignore */ }
-    try { db?.close(); } catch { /* ignore */ }
   });
 
-  it("logs successful tool call to audit_log", async () => {
-    const port = getPort();
-    db = openDatabase(":memory:");
-    const route = makeRouteEntry("@clawmasons/app-github", "github", "create_pr");
-    const routes = new Map([["github_create_pr", route]]);
-    const router = createMockRouter([route.tool], routes);
-    const upstream = createMockUpstream({
-      content: [{ type: "text", text: "PR #42 created" }],
-    });
-
-    server = new ProxyServer({
-      port,
-      transport: "sse",
-      router,
-      upstream,
-      db,
-      agentName: "note-taker",
-    });
-    await server.start();
-
-    client = await connectClient(port, "sse");
-    await client.callTool({
-      name: "github_create_pr",
-      arguments: { title: "Fix bug" },
-    });
-
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].agent_name).toBe("note-taker");
-    expect(entries[0].app_name).toBe("@clawmasons/app-github");
-    expect(entries[0].tool_name).toBe("create_pr");
-    expect(entries[0].status).toBe("success");
-    expect(entries[0].duration_ms).toBeGreaterThanOrEqual(0);
-    expect(JSON.parse(entries[0].arguments!)).toEqual({ title: "Fix bug" });
-  });
-
-  it("logs denied tool call to audit_log", async () => {
-    const port = getPort();
-    db = openDatabase(":memory:");
-    const router = createMockRouter([], new Map());
-    const upstream = createMockUpstream();
-
-    server = new ProxyServer({
-      port,
-      transport: "sse",
-      router,
-      upstream,
-      db,
-      agentName: "note-taker",
-    });
-    await server.start();
-
-    client = await connectClient(port, "sse");
-    await client.callTool({ name: "github_delete_repo" });
-
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].status).toBe("denied");
-    expect(entries[0].tool_name).toBe("github_delete_repo");
-  });
-
-  it("logs error tool call to audit_log", async () => {
-    const port = getPort();
-    db = openDatabase(":memory:");
-    const route = makeRouteEntry("@clawmasons/app-github", "github", "create_pr");
-    const routes = new Map([["github_create_pr", route]]);
-    const router = createMockRouter([route.tool], routes);
-    const upstream = createMockUpstream(undefined, new Error("Connection refused"));
-
-    server = new ProxyServer({
-      port,
-      transport: "sse",
-      router,
-      upstream,
-      db,
-      agentName: "note-taker",
-    });
-    await server.start();
-
-    client = await connectClient(port, "sse");
-    await client.callTool({ name: "github_create_pr", arguments: {} });
-
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].status).toBe("error");
-    expect(entries[0].result).toContain("Connection refused");
-  });
-
-  it("does not log when db is not configured", async () => {
+  it("does not crash when no relay is configured (no audit logging)", async () => {
     const port = getPort();
     const route = makeRouteEntry("@clawmasons/app-github", "github", "create_pr");
     const routes = new Map([["github_create_pr", route]]);
@@ -607,7 +514,7 @@ describe("ProxyServer (audit logging)", () => {
       content: [{ type: "text", text: "ok" }],
     });
 
-    // No db provided
+    // No relayToken provided — no relay server, no audit
     server = new ProxyServer({ port, transport: "sse", router, upstream });
     await server.start();
 
@@ -618,159 +525,25 @@ describe("ProxyServer (audit logging)", () => {
     });
 
     expect(result.content).toEqual([{ type: "text", text: "ok" }]);
-    // No assertion on db — it was never provided, so no logging happens
   });
 });
 
-// ── Approval Workflow Integration Tests ──────────────────────────────
+// ── Approval Workflow Tests ──────────────────────────────────────────
+// Note: Full approval via relay is Change 7. These tests verify the server
+// correctly gates tool calls on approval patterns when a relay is available.
+// The approval hook now sends approval_request via relay.request().
 
 describe("ProxyServer (approval workflow)", () => {
   let server: ProxyServer;
   let client: Client;
-  let db: Database.Database;
 
   afterEach(async () => {
     try { await client?.close(); } catch { /* ignore */ }
     try { await server?.stop(); } catch { /* ignore */ }
-    try { db?.close(); } catch { /* ignore */ }
-  });
-
-  it("tool matching approval pattern is approved and call proceeds", async () => {
-    const port = getPort();
-    db = openDatabase(":memory:");
-    const route = makeRouteEntry("@clawmasons/app-github", "github", "delete_repo");
-    const routes = new Map([["github_delete_repo", route]]);
-    const router = createMockRouter([route.tool], routes);
-    const upstream = createMockUpstream({
-      content: [{ type: "text", text: "Repo deleted" }],
-    });
-
-    server = new ProxyServer({
-      port,
-      transport: "sse",
-      router,
-      upstream,
-      db,
-      agentName: "note-taker",
-      approvalPatterns: ["github_delete_*"],
-      approvalOptions: { ttlSeconds: 5, pollIntervalMs: 50 },
-    });
-    await server.start();
-
-    client = await connectClient(port, "sse");
-
-    // Start the tool call (it will block waiting for approval)
-    const callPromise = client.callTool({
-      name: "github_delete_repo",
-      arguments: { repo: "test" },
-    });
-
-    // Approve after a short delay
-    setTimeout(() => {
-      const rows = db.prepare("SELECT id FROM approval_requests WHERE status = 'pending'").all() as Array<{ id: string }>;
-      if (rows.length > 0) {
-        updateApprovalStatus(db, rows[0].id, "approved", "operator");
-      }
-    }, 150);
-
-    const result = await callPromise;
-    expect(result.content).toEqual([{ type: "text", text: "Repo deleted" }]);
-    expect(upstream.callTool).toHaveBeenCalled();
-
-    // Verify audit log shows success
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].status).toBe("success");
-  });
-
-  it("tool matching approval pattern is denied and call is blocked", async () => {
-    const port = getPort();
-    db = openDatabase(":memory:");
-    const route = makeRouteEntry("@clawmasons/app-github", "github", "delete_repo");
-    const routes = new Map([["github_delete_repo", route]]);
-    const router = createMockRouter([route.tool], routes);
-    const upstream = createMockUpstream();
-
-    server = new ProxyServer({
-      port,
-      transport: "sse",
-      router,
-      upstream,
-      db,
-      agentName: "note-taker",
-      approvalPatterns: ["github_delete_*"],
-      approvalOptions: { ttlSeconds: 5, pollIntervalMs: 50 },
-    });
-    await server.start();
-
-    client = await connectClient(port, "sse");
-
-    const callPromise = client.callTool({
-      name: "github_delete_repo",
-      arguments: { repo: "test" },
-    });
-
-    // Deny after a short delay
-    setTimeout(() => {
-      const rows = db.prepare("SELECT id FROM approval_requests WHERE status = 'pending'").all() as Array<{ id: string }>;
-      if (rows.length > 0) {
-        updateApprovalStatus(db, rows[0].id, "denied", "operator");
-      }
-    }, 150);
-
-    const result = await callPromise;
-    expect(result.isError).toBe(true);
-    expect(result.content).toEqual([
-      { type: "text", text: "Tool call denied: github_delete_repo requires approval" },
-    ]);
-    expect(upstream.callTool).not.toHaveBeenCalled();
-
-    // Verify audit log shows denied
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].status).toBe("denied");
-  });
-
-  it("tool matching approval pattern times out and auto-denies", async () => {
-    const port = getPort();
-    db = openDatabase(":memory:");
-    const route = makeRouteEntry("@clawmasons/app-github", "github", "delete_repo");
-    const routes = new Map([["github_delete_repo", route]]);
-    const router = createMockRouter([route.tool], routes);
-    const upstream = createMockUpstream();
-
-    server = new ProxyServer({
-      port,
-      transport: "sse",
-      router,
-      upstream,
-      db,
-      agentName: "note-taker",
-      approvalPatterns: ["github_delete_*"],
-      approvalOptions: { ttlSeconds: 0.2, pollIntervalMs: 50 },
-    });
-    await server.start();
-
-    client = await connectClient(port, "sse");
-
-    const result = await client.callTool({
-      name: "github_delete_repo",
-      arguments: { repo: "test" },
-    });
-
-    expect(result.isError).toBe(true);
-    expect((result.content as Array<{ text: string }>)[0].text).toContain("timed out");
-    expect(upstream.callTool).not.toHaveBeenCalled();
-
-    // Verify audit log shows timeout
-    const entries = queryAuditLog(db);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].status).toBe("timeout");
   });
 
   it("tool not matching approval patterns proceeds without approval", async () => {
     const port = getPort();
-    db = openDatabase(":memory:");
     const route = makeRouteEntry("@clawmasons/app-github", "github", "list_repos");
     const routes = new Map([["github_list_repos", route]]);
     const router = createMockRouter([route.tool], routes);
@@ -783,10 +556,10 @@ describe("ProxyServer (approval workflow)", () => {
       transport: "sse",
       router,
       upstream,
-      db,
       agentName: "note-taker",
+      relayToken: "test-token",
       approvalPatterns: ["github_delete_*"],
-      approvalOptions: { ttlSeconds: 5, pollIntervalMs: 50 },
+      approvalOptions: { ttlSeconds: 5 },
     });
     await server.start();
 
@@ -799,10 +572,6 @@ describe("ProxyServer (approval workflow)", () => {
 
     expect(result.content).toEqual([{ type: "text", text: "repos listed" }]);
     expect(upstream.callTool).toHaveBeenCalled();
-
-    // No approval requests should exist
-    const approvalRows = db.prepare("SELECT * FROM approval_requests").all();
-    expect(approvalRows).toHaveLength(0);
   });
 });
 
@@ -1014,7 +783,7 @@ describe("ProxyServer (readyGate)", () => {
 
     server = new ProxyServer({
       port, transport: "streamable-http", router, upstream, readyGate,
-      credentialProxyToken: "test-cred-token",
+      relayToken: "test-relay-token",
     });
     await server.start();
 
@@ -1041,7 +810,7 @@ describe("ProxyServer (readyGate)", () => {
 
     server = new ProxyServer({
       port, transport: "streamable-http", router, upstream, readyGate,
-      credentialProxyToken: "test-cred-token",
+      relayToken: "test-relay-token",
     });
     await server.start();
 

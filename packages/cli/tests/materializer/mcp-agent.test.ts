@@ -13,6 +13,7 @@ function makeFilesystemApp(): ResolvedApp {
     tools: ["read_file", "write_file", "list_directory"],
     capabilities: ["tools"],
     credentials: [],
+    location: "proxy",
   };
 }
 

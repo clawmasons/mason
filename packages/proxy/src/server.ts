@@ -13,7 +13,6 @@ import {
   GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import type Database from "better-sqlite3";
 import type { ToolRouter, ResourceRouter, PromptRouter } from "./router.js";
 import type { UpstreamManager } from "./upstream.js";
 import { auditPreHook, auditPostHook } from "./hooks/audit.js";
@@ -21,7 +20,8 @@ import type { HookContext } from "./hooks/audit.js";
 import { matchesApprovalPattern, requestApproval } from "./hooks/approval.js";
 import type { ApprovalOptions } from "./hooks/approval.js";
 import { SessionStore, handleConnectAgent, type RiskLevel } from "./handlers/connect-agent.js";
-import { CredentialRelay } from "./handlers/credential-relay.js";
+import { RelayServer } from "./relay/server.js";
+import { createRelayMessage, type CredentialResponseMessage, type McpToolResultMessage, type McpToolsRegisterMessage, type McpToolsRegisteredMessage } from "./relay/messages.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -30,17 +30,18 @@ export interface ProxyServerConfig {
   transport: "sse" | "streamable-http";
   router: ToolRouter;
   upstream: UpstreamManager;
-  db?: Database.Database;
   agentName?: string;
   authToken?: string;
   approvalPatterns?: string[];
   approvalOptions?: ApprovalOptions;
   resourceRouter?: ResourceRouter;
   promptRouter?: PromptRouter;
-  /** Token for authenticating credential service WebSocket connections. */
-  credentialProxyToken?: string;
+  /** Token for authenticating relay WebSocket connections (/ws/relay). */
+  relayToken?: string;
   /** Timeout for credential requests in milliseconds. Default: 30000. */
   credentialRequestTimeoutMs?: number;
+  /** Timeout for host MCP tool calls in milliseconds. Default: 60000. */
+  hostToolCallTimeoutMs?: number;
   /** Agent's declared credential keys (for credential_request tool). */
   declaredCredentials?: string[];
   /** Role name for the agent session. */
@@ -87,15 +88,33 @@ export class ProxyServer {
   private httpServer: HttpServer | null = null;
   private activeTransports: Set<SSEServerTransport | StreamableHTTPServerTransport> = new Set();
   private sessionStore: SessionStore;
-  private credentialRelay: CredentialRelay | null = null;
+  private relayServer: RelayServer | null = null;
   constructor(config: ProxyServerConfig) {
     this.config = { ...config, port: config.port ?? DEFAULT_PORT };
     this.sessionStore = new SessionStore(config.riskLevel);
 
-    if (config.credentialProxyToken) {
-      this.credentialRelay = new CredentialRelay({
-        credentialProxyToken: config.credentialProxyToken,
-        requestTimeoutMs: config.credentialRequestTimeoutMs,
+    if (config.relayToken) {
+      this.relayServer = new RelayServer({
+        token: config.relayToken,
+      });
+
+      // Handle host MCP server tool registration
+      this.relayServer.registerHandler("mcp_tools_register", (msg) => {
+        const regMsg = msg as McpToolsRegisterMessage;
+        const tools: Tool[] = regMsg.tools.map((t) => ({
+          name: t.name,
+          description: t.description,
+          inputSchema: t.inputSchema as Tool["inputSchema"],
+        }));
+        this.config.router.addRoutes(regMsg.app_name, tools);
+
+        // Send confirmation with same id for request/response correlation
+        const confirmation: McpToolsRegisteredMessage = {
+          id: regMsg.id,
+          type: "mcp_tools_registered",
+          app_name: regMsg.app_name,
+        };
+        this.relayServer!.send(confirmation);
       });
     }
   }
@@ -110,9 +129,9 @@ export class ProxyServer {
     return this.sessionStore;
   }
 
-  /** Expose the credential relay for external access. */
-  getCredentialRelay(): CredentialRelay | null {
-    return this.credentialRelay;
+  /** Expose the relay server for external access (e.g., registering handlers). */
+  getRelayServer(): RelayServer | null {
+    return this.relayServer;
   }
 
   async start(): Promise<void> {
@@ -168,13 +187,13 @@ export class ProxyServer {
       }
     });
 
-    // WebSocket upgrade handler for credential service
-    if (this.credentialRelay) {
-      const relay = this.credentialRelay;
+    // WebSocket upgrade handler for relay
+    if (this.relayServer) {
+      const relayServer = this.relayServer;
       this.httpServer.on("upgrade", (req, socket, head) => {
         const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-        if (url.pathname === "/ws/credentials") {
-          relay.handleUpgrade(req, socket, head as Buffer);
+        if (url.pathname === "/ws/relay") {
+          relayServer.handleUpgrade(req, socket, head as Buffer);
         } else {
           socket.destroy();
         }
@@ -192,9 +211,9 @@ export class ProxyServer {
   }
 
   async stop(): Promise<void> {
-    // Close credential relay first
-    if (this.credentialRelay) {
-      this.credentialRelay.close();
+    // Shut down relay server
+    if (this.relayServer) {
+      this.relayServer.shutdown();
     }
 
     const closePromises = Array.from(this.activeTransports).map(async (t) => {
@@ -316,10 +335,8 @@ export class ProxyServer {
   // ── MCP Server Factory ────────────────────────────────────────────
 
   private createMcpServer(): Server {
-    // Destructure only stable (non-late-bound) fields.
-    // router, upstream, resourceRouter, promptRouter are accessed via
-    // this.config.* so they pick up values set by setRouting().
-    const { db, agentName, approvalPatterns, approvalOptions } = this.config;
+    const { agentName, approvalPatterns, approvalOptions } = this.config;
+    const relay = this.relayServer;
 
     const capabilities: Record<string, Record<string, never>> = {
       tools: {},
@@ -339,7 +356,7 @@ export class ProxyServer {
       if (this.config.readyGate) await this.config.readyGate;
 
       const tools = this.config.router.listTools();
-      if (this.credentialRelay) {
+      if (this.relayServer) {
         tools.push(CREDENTIAL_REQUEST_TOOL);
       }
       return { tools };
@@ -349,7 +366,7 @@ export class ProxyServer {
       const { name, arguments: args } = request.params;
 
       // Handle internal credential_request tool — no readyGate needed
-      if (name === "credential_request" && this.credentialRelay) {
+      if (name === "credential_request" && this.relayServer) {
         const key = (args as Record<string, unknown> | undefined)?.key as string | undefined;
         const sessionToken = (args as Record<string, unknown> | undefined)?.session_token as string | undefined;
 
@@ -360,23 +377,57 @@ export class ProxyServer {
           };
         }
 
-        const result = await this.credentialRelay.handleCredentialRequest(
-          this.sessionStore,
-          key,
-          sessionToken,
-          this.config.declaredCredentials,
-        );
-
-        if (result.error) {
+        // Validate session token
+        const session = this.sessionStore.getByToken(sessionToken);
+        if (!session) {
           return {
-            content: [{ type: "text" as const, text: `Credential error: ${result.error}` }],
+            content: [{ type: "text" as const, text: "Credential error: Invalid session token" }],
             isError: true,
           };
         }
 
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ key: result.key, value: result.value }) }],
-        };
+        if (!this.relayServer.isConnected()) {
+          try {
+            await this.relayServer.waitForConnection(10_000);
+          } catch {
+            return {
+              content: [{ type: "text" as const, text: "Credential error: Relay not connected" }],
+              isError: true,
+            };
+          }
+        }
+
+        try {
+          const relayMsg = createRelayMessage("credential_request", {
+            key,
+            agentId: session.agentId,
+            role: session.role,
+            sessionId: session.sessionId,
+            declaredCredentials: this.config.declaredCredentials ?? [],
+          });
+
+          const response = await this.relayServer.request(
+            relayMsg,
+            this.config.credentialRequestTimeoutMs,
+          ) as CredentialResponseMessage;
+
+          if (response.error) {
+            return {
+              content: [{ type: "text" as const, text: `Credential error: ${response.error}` }],
+              isError: true,
+            };
+          }
+
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify({ key: response.key, value: response.value }) }],
+          };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return {
+            content: [{ type: "text" as const, text: `Credential error: ${message}` }],
+            isError: true,
+          };
+        }
       }
 
       // All other tools require upstreams to be ready
@@ -385,48 +436,42 @@ export class ProxyServer {
       const { router, upstream } = this.config;
       const route = router.resolve(name);
       if (!route) {
-        if (db) {
-          const ctx: HookContext = {
-            agentName: agentName ?? "unknown",
-            roleName: "unknown",
-            appName: "unknown",
-            toolName: name,
-            prefixedToolName: name,
-            arguments: args,
-            sessionType: this.config.sessionType,
-            acpClient: this.config.acpClient,
-          };
-          const pre = auditPreHook(ctx);
-          auditPostHook(ctx, pre, `Unknown tool: ${name}`, "denied", db);
-        }
+        const ctx: HookContext = {
+          agentName: agentName ?? "unknown",
+          roleName: "unknown",
+          appName: "unknown",
+          toolName: name,
+          prefixedToolName: name,
+          arguments: args,
+          sessionType: this.config.sessionType,
+          acpClient: this.config.acpClient,
+        };
+        const pre = auditPreHook(ctx);
+        auditPostHook(ctx, pre, `Unknown tool: ${name}`, "denied", relay);
         return {
           content: [{ type: "text" as const, text: `Unknown tool: ${name}` }],
           isError: true,
         };
       }
 
-      const ctx: HookContext | undefined = db
-        ? {
-            agentName: agentName ?? "unknown",
-            roleName: "unknown",
-            appName: route.appName,
-            toolName: route.originalToolName,
-            prefixedToolName: route.prefixedToolName,
-            arguments: args,
-            sessionType: this.config.sessionType,
-            acpClient: this.config.acpClient,
-          }
-        : undefined;
-      const pre = ctx ? auditPreHook(ctx) : undefined;
+      const ctx: HookContext = {
+        agentName: agentName ?? "unknown",
+        roleName: "unknown",
+        appName: route.appName,
+        toolName: route.originalToolName,
+        prefixedToolName: route.prefixedToolName,
+        arguments: args,
+        sessionType: this.config.sessionType,
+        acpClient: this.config.acpClient,
+      };
+      const pre = auditPreHook(ctx);
 
       // Approval check — between audit pre-hook and upstream call
-      if (db && ctx && approvalPatterns?.length && matchesApprovalPattern(route.prefixedToolName, approvalPatterns)) {
-        const approval = await requestApproval(ctx, db, approvalOptions);
+      if (relay && approvalPatterns?.length && matchesApprovalPattern(route.prefixedToolName, approvalPatterns)) {
+        const approval = await requestApproval(ctx, relay, approvalOptions);
         if (approval === "denied") {
           const msg = `Tool call denied: ${route.prefixedToolName} requires approval`;
-          if (pre) {
-            auditPostHook(ctx, pre, msg, "denied", db);
-          }
+          auditPostHook(ctx, pre, msg, "denied", relay);
           return {
             content: [{ type: "text" as const, text: msg }],
             isError: true,
@@ -435,9 +480,7 @@ export class ProxyServer {
         if (approval === "timeout") {
           const ttl = approvalOptions?.ttlSeconds ?? 300;
           const msg = `Tool call timed out: ${route.prefixedToolName} approval expired after ${ttl} seconds`;
-          if (pre) {
-            auditPostHook(ctx, pre, msg, "timeout", db);
-          }
+          auditPostHook(ctx, pre, msg, "timeout", relay);
           return {
             content: [{ type: "text" as const, text: msg }],
             isError: true,
@@ -446,21 +489,68 @@ export class ProxyServer {
         // approval === "approved" — fall through to upstream call
       }
 
+      // Host route — forward tool call over relay to host proxy
+      if (route.isHostRoute) {
+        if (!relay || !relay.isConnected()) {
+          if (relay) {
+            try {
+              await relay.waitForConnection(10_000);
+            } catch {
+              // fall through to error
+            }
+          }
+          if (!relay || !relay.isConnected()) {
+            const msg = `Host tool call failed: Relay not connected`;
+            auditPostHook(ctx, pre, msg, "error", relay);
+            return {
+              content: [{ type: "text" as const, text: msg }],
+              isError: true,
+            };
+          }
+        }
+
+        try {
+          const mcpToolCallMsg = createRelayMessage("mcp_tool_call", {
+            app_name: route.appName,
+            tool_name: route.originalToolName,
+            arguments: args as Record<string, unknown> | undefined,
+          });
+
+          const timeoutMs = this.config.hostToolCallTimeoutMs ?? 60_000;
+          const response = await relay.request(mcpToolCallMsg, timeoutMs) as McpToolResultMessage;
+
+          if (response.error) {
+            auditPostHook(ctx, pre, response.error, "error", relay);
+            return {
+              content: [{ type: "text" as const, text: response.error }],
+              isError: true,
+            };
+          }
+
+          const result = response.result ?? { content: [] };
+          auditPostHook(ctx, pre, result, "success", relay);
+          return result;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          auditPostHook(ctx, pre, message, "error", relay);
+          return {
+            content: [{ type: "text" as const, text: message }],
+            isError: true,
+          };
+        }
+      }
+
       try {
         const result = await upstream.callTool(
           route.appName,
           route.originalToolName,
           args as Record<string, unknown> | undefined,
         );
-        if (db && ctx && pre) {
-          auditPostHook(ctx, pre, result, "success", db);
-        }
+        auditPostHook(ctx, pre, result, "success", relay);
         return result;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        if (db && ctx && pre) {
-          auditPostHook(ctx, pre, message, "error", db);
-        }
+        auditPostHook(ctx, pre, message, "error", relay);
         return {
           content: [{ type: "text" as const, text: message }],
           isError: true,

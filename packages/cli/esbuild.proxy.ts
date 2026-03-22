@@ -9,10 +9,6 @@ await build({
   format: "cjs",
   sourcemap: true,
   minify: false,
-  external: [
-    // Native addon — must be resolved from node_modules at runtime
-    "better-sqlite3",
-  ],
 });
 
 console.log("Built dist/proxy-bundle.cjs");

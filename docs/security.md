@@ -11,7 +11,7 @@ Mason is built around the principle that AI agents should operate under explicit
 
 **Problem**: Most agent frameworks pass credentials via environment variables, which are visible through `docker inspect`, `/proc/*/environ`, and shell history.
 
-**Solution**: Mason resolves credentials on-demand through the [credential service](component-credential-service.md):
+**Solution**: Mason resolves credentials on-demand through the [host proxy](proxy.md):
 
 - Credentials are **never stored** in Docker environment variables or compose files
 - The agent-entry bootstrap requests credentials through the MCP proxy at startup
@@ -23,7 +23,7 @@ Mason is built around the principle that AI agents should operate under explicit
 Credentials are resolved in priority order:
 
 1. **Session overrides** — ACP editor configuration
-2. **Environment variables** — Credential service process env
+2. **Environment variables** — Host process env
 3. **macOS Keychain** — System keychain lookup
 4. **`.env` file** — Project-level dotenv
 
@@ -31,21 +31,18 @@ Credentials are resolved in priority order:
 
 Every agent runs under a [role](role.md) that defines explicit tool permissions:
 
-```json
-{
-  "permissions": {
-    "@acme/app-github": {
-      "allow": ["create_pr", "list_issues"],
-      "deny": ["delete_repo"]
-    }
-  }
-}
+```yaml
+mcp_servers:
+  - name: github
+    tools:
+      allow: [create_pr, list_issues]
+      deny: [delete_repo]
 ```
 
 - **Allow lists** — Only listed tools are exposed
 - **Deny lists** — Override allow (deny wins)
 - **Unlisted apps** — Completely hidden from the agent
-- **Enforced at runtime** — The [MCP proxy](component-mcp-proxy.md) filters tools before the agent sees them
+- **Enforced at runtime** — The [proxy](proxy.md) filters tools before the agent sees them
 
 ### Risk Levels
 
@@ -58,15 +55,14 @@ Roles declare a risk level (`LOW`, `MEDIUM`, `HIGH`) that affects:
 
 Roles can require human approval for sensitive operations:
 
-```json
-{
-  "constraints": {
-    "requireApprovalFor": ["delete_*", "push_*"]
-  }
-}
+```yaml
+constraints:
+  requireApprovalFor:
+    - "github_delete_*"
+    - "*_write_file"
 ```
 
-Tool calls matching these patterns pause for human confirmation before execution.
+Tool calls matching these patterns trigger a native macOS dialog (via `osascript`) where the operator can approve or deny the action. The request includes the tool name and arguments. If the operator doesn't respond within the TTL (default 300s), the call is auto-denied. On non-macOS platforms, calls are auto-approved with a warning log.
 
 ## Container Isolation
 
@@ -78,7 +74,7 @@ Agents run in Docker containers with:
 
 ## Audit Logging
 
-All operations are logged to a SQLite database (`mason.db`):
+All operations are logged to `~/.mason/data/audit.jsonl` as JSON lines on the host machine. Audit events are sent from the Docker proxy to the host proxy via relay messages (fire-and-forget).
 
 ### Tool Call Audit
 - Tool name, arguments, and result
@@ -95,18 +91,18 @@ All operations are logged to a SQLite database (`mason.db`):
 
 ## Token Authentication
 
-The system uses two authentication tokens:
+The system uses three authentication tokens:
 
 | Token | Purpose | Scope |
 |-------|---------|-------|
-| `MCP_PROXY_TOKEN` | Agent-to-proxy authentication | Authenticates the agent container to the proxy |
+| `MCP_PROXY_TOKEN` | Agent-to-proxy authentication | Agent container → Docker proxy |
+| `RELAY_TOKEN` | Host-to-proxy relay authentication | Host proxy → Docker proxy WebSocket |
 | Session token | Credential request authentication | Returned by `/connect-agent`, required for credential requests |
 
 Tokens are generated per session and not reused.
 
 ## Related
 
-- [Credential Service](component-credential-service.md) — How credentials are resolved
-- [MCP Proxy](component-mcp-proxy.md) — Runtime enforcement of permissions
+- [Proxy](proxy.md) — How credentials are resolved and tools are filtered
 - [Role](role.md) — Defining permissions and risk levels
 - [Architecture](architecture.md) — Full runtime architecture

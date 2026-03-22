@@ -7,13 +7,13 @@ import { Readable, Writable } from "node:stream";
 import { spawn } from "node:child_process";
 import { checkDockerCompose } from "./docker-utils.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
-import type { ResolvedAgent, Role } from "@clawmasons/shared";
+import type { ResolvedAgent, ResolvedApp, Role } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName } from "@clawmasons/shared";
 import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry, loadConfigAliasEntry } from "@clawmasons/agent-sdk";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
-import { CredentialService, CredentialWSClient } from "@clawmasons/credential-service";
+import { HostProxy } from "@clawmasons/proxy";
 import { createFileLogger, type AcpLogger } from "../../acp/logger.js";
 import { generateRoleDockerBuildDir, createSessionDirectory, getHostIds } from "../../materializer/docker-generator.js";
 import { ensureProxyDependencies, synthesizeRolePackages } from "../../materializer/proxy-dependencies.js";
@@ -508,12 +508,13 @@ export interface RunAgentDeps {
   existsSyncFn?: (filePath: string) => boolean;
   /** Override the agent run function (for testing). When set, bypasses OCI restart logic. */
   runAgentFn?: (composeFile: string, args: string[]) => Promise<number>;
-  /** Override credential service startup (for testing). */
-  startCredentialServiceFn?: (opts: {
+  /** Override host proxy startup (for testing). */
+  startHostProxyFn?: (opts: {
     proxyPort: number;
-    credentialProxyToken: string;
+    relayToken: string;
     envCredentials: Record<string, string>;
-  }) => Promise<{ disconnect: () => void; close: () => void }>;
+    hostApps?: ResolvedApp[];
+  }) => Promise<{ stop: () => Promise<void> }>;
   /** Override proxy health check (for testing). */
   waitForProxyHealthFn?: (url: string, timeoutMs: number) => Promise<void>;
   /** Override logger creation (for testing, ACP mode). */
@@ -821,7 +822,7 @@ async function runAgentInteractiveMode(
   const runAgent = deps?.runAgentFn ?? runAgentWithOciRestart;
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
-  const startCredService = deps?.startCredentialServiceFn ?? defaultStartCredentialService;
+  const startHostProxy = deps?.startHostProxyFn ?? defaultStartHostProxy;
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
   const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
 
@@ -869,7 +870,7 @@ async function runAgentInteractiveMode(
       sessionId: sessionIdOverride,
     });
 
-    const { sessionId, composeFile, credentialProxyToken, proxyServiceName, agentServiceName } = session;
+    const { sessionId, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
     console.log(`  Session: ${sessionId}`);
     console.log(`  Compose: .mason/sessions/${sessionId}/docker-compose.yaml`);
 
@@ -906,23 +907,25 @@ async function runAgentInteractiveMode(
     await waitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
     console.log(`  Proxy ready.`);
 
-    // 9. Collect env credentials and start credential service in-process
+    // 9. Collect env credentials, partition apps, and start host proxy in-process
     const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
     const resolvedAgent = adaptRoleFn(roleType, agentType);
     const envCredentials = collectEnvCredentials(resolvedAgent);
+    const hostApps = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
 
-    console.log(`  Starting credential service (in-process)...`);
+    console.log(`  Starting host proxy (in-process)...`);
 
-    let credServiceHandle: { disconnect: () => void; close: () => void } | null = null;
+    let hostProxyHandle: { stop: () => Promise<void> } | null = null;
     try {
-      credServiceHandle = await startCredService({
+      hostProxyHandle = await startHostProxy({
         proxyPort,
-        credentialProxyToken,
+        relayToken,
         envCredentials,
+        hostApps: hostApps.length > 0 ? hostApps : undefined,
       });
-      console.log(`  Credential service connected to proxy.`);
+      console.log(`  Host proxy connected to Docker proxy.`);
     } catch (err) {
-      throw new Error(`Failed to start credential service: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(`Failed to start host proxy: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     // 10. Start agent interactively
@@ -945,9 +948,8 @@ async function runAgentInteractiveMode(
     console.log(`\n  Agent exited (code ${agentCode}). Tearing down services...`);
 
     try {
-      if (credServiceHandle) {
-        credServiceHandle.disconnect();
-        credServiceHandle.close();
+      if (hostProxyHandle) {
+        await hostProxyHandle.stop();
       }
     } catch { /* best-effort */ }
 
@@ -1000,7 +1002,7 @@ async function runAgentDevContainerMode(
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
-  const startCredService = deps?.startCredentialServiceFn ?? defaultStartCredentialService;
+  const startHostProxy = deps?.startHostProxyFn ?? defaultStartHostProxy;
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
   const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
   const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
@@ -1072,7 +1074,7 @@ async function runAgentDevContainerMode(
       sessionId: sessionIdOverride,
     });
 
-    const { sessionId, composeFile, credentialProxyToken, proxyServiceName, agentServiceName } = session;
+    const { sessionId, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
 
     // Derive compose project name for container name (VSCode attach)
     const projectHash = crypto.createHash("sha256").update(projectDir).digest("hex").slice(0, 8);
@@ -1097,11 +1099,17 @@ async function runAgentDevContainerMode(
     await waitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
     console.log(`  Proxy ready.`);
 
-    // 9. Start credential service
+    // 9. Start host proxy
     const resolvedAgent = adaptRoleFn(roleType, agentType);
     const envCredentials = collectEnvCredentials(resolvedAgent);
-    const credServiceHandle = await startCredService({ proxyPort, credentialProxyToken, envCredentials });
-    console.log(`  Credential service connected.`);
+    const hostAppsDevContainer = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
+    const hostProxyHandle = await startHostProxy({
+      proxyPort,
+      relayToken,
+      envCredentials,
+      hostApps: hostAppsDevContainer.length > 0 ? hostAppsDevContainer : undefined,
+    });
+    console.log(`  Host proxy connected.`);
 
     // 10. Build and start agent container in background (detached)
     console.log(`\n  Building agent (${agentServiceName})...`);
@@ -1145,7 +1153,7 @@ async function runAgentDevContainerMode(
 
     // 14. Tear down
     console.log(`\n  Tearing down services...`);
-    try { credServiceHandle.disconnect(); credServiceHandle.close(); } catch { /* best-effort */ }
+    try { await hostProxyHandle.stop(); } catch { /* best-effort */ }
     await execCompose(composeFile, ["down"], { verbose });
     console.log(`  Services stopped.`);
     console.log(`  Session retained at: .mason/sessions/${sessionId}/`);
@@ -1308,9 +1316,8 @@ async function runAgentAcpMode(
 
   let session: AcpSession | null = null;
   let bridge: AcpSdkBridge | null = null;
-  let credentialWsClient: CredentialWSClient | null = null;
+  let hostProxyHandle: { stop: () => Promise<void> } | null = null;
   let shuttingDown = false;
-  let credentialService: CredentialService | null = null;
 
   // Graceful shutdown handler
   const shutdown = async () => {
@@ -1324,10 +1331,7 @@ async function runAgentAcpMode(
       if (bridge) await bridge.stop();
     } catch { /* best-effort */ }
     try {
-      if (credentialWsClient) credentialWsClient.disconnect();
-    } catch { /* best-effort */ }
-    try {
-      if (credentialService) credentialService.close();
+      if (hostProxyHandle) await hostProxyHandle.stop();
     } catch { /* best-effort */ }
     try { log.close(); } catch { /* best-effort */ }
     try {
@@ -1426,18 +1430,18 @@ async function runAgentAcpMode(
     const infraInfo = await session.startInfrastructure();
     logger.log(`[mason agent --acp] Infrastructure started (${infraInfo.sessionId})`);
 
-    // ── Step 6b: Start credential service in-process ─────────────────
-    logger.log("[mason agent --acp] Starting credential service (in-process)...");
-    const startCredService = deps?.startCredentialServiceFn ?? defaultStartCredentialService;
+    // ── Step 6b: Start host proxy in-process ──────────────────────────
+    logger.log("[mason agent --acp] Starting host proxy (in-process)...");
+    const startHostProxy = deps?.startHostProxyFn ?? defaultStartHostProxy;
+    const hostAppsAcp = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
 
-    const credServiceHandle = await startCredService({
+    hostProxyHandle = await startHostProxy({
       proxyPort,
-      credentialProxyToken: infraInfo.credentialProxyToken,
+      relayToken: infraInfo.relayToken,
       envCredentials,
+      hostApps: hostAppsAcp.length > 0 ? hostAppsAcp : undefined,
     });
-    credentialWsClient = { disconnect: credServiceHandle.disconnect } as CredentialWSClient;
-    credentialService = { close: credServiceHandle.close } as CredentialService;
-    logger.log("[mason agent --acp] Credential service connected to proxy.");
+    logger.log("[mason agent --acp] Host proxy connected to Docker proxy.");
 
     // ── Step 7: Create and start ACP SDK bridge ──────────────────────
     const logRef = logger;
@@ -1507,28 +1511,21 @@ async function defaultWaitForProxyHealth(url: string, timeoutMs: number): Promis
   throw new Error(`Proxy health endpoint did not become ready within ${timeoutMs}ms`);
 }
 
-// ── Default credential service startup ────────────────────────────────
+// ── Default host proxy startup ─────────────────────────────────────────
 
-async function defaultStartCredentialService(opts: {
+async function defaultStartHostProxy(opts: {
   proxyPort: number;
-  credentialProxyToken: string;
+  relayToken: string;
   envCredentials: Record<string, string>;
-}): Promise<{ disconnect: () => void; close: () => void }> {
-  const svc = new CredentialService({
-    dbPath: ":memory:",
+  hostApps?: ResolvedApp[];
+}): Promise<{ stop: () => Promise<void> }> {
+  const hostProxy = new HostProxy({
+    relayUrl: `ws://localhost:${opts.proxyPort}/ws/relay`,
+    token: opts.relayToken,
     keychainService: "mason",
+    envCredentials: opts.envCredentials,
+    hostApps: opts.hostApps,
   });
-  const credCount = Object.keys(opts.envCredentials).length;
-  if (credCount > 0) {
-    svc.setSessionOverrides(opts.envCredentials);
-  }
-  const client = new CredentialWSClient(svc, {
-    maxRetries: 60,
-    retryDelayMs: 2000,
-  });
-  await client.connect(
-    `ws://localhost:${opts.proxyPort}/ws/credentials`,
-    opts.credentialProxyToken,
-  );
-  return { disconnect: () => client.disconnect(), close: () => svc.close() };
+  await hostProxy.start();
+  return { stop: () => hostProxy.stop() };
 }

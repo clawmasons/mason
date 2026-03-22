@@ -15,11 +15,11 @@ Instead of giving an agent blanket access to every tool and credential on your m
 
 ## Privileged Credential Management
 
-Credentials are never exposed to the agent container via environment variables or Docker inspect. Instead, the [credential service](component-credential-service.md) resolves them on-demand and injects them only into the agent's child process memory. Every access is logged for audit.
+Credentials are never exposed to the agent container via environment variables or Docker inspect. Instead, the [host proxy](proxy.md) resolves them on-demand and injects them only into the agent's child process memory. Every access is logged for audit.
 
 ### Credential Refreshes
 
-Since credentials are managed by the [MCP proxy](component-mcp-proxy.md) rather than the agent itself, long-lived tokens can be shared with the proxy, which can automatically refresh short-term credentials needed by MCP tools. Neither the agent nor the container ever sees the long-lived token directly.
+Since credentials are managed by the [proxy](proxy.md) rather than the agent itself, long-lived tokens can be shared with the proxy, which can automatically refresh short-term credentials needed by MCP tools. Neither the agent nor the container ever sees the long-lived token directly.
 
 ## Focus
 
@@ -35,5 +35,4 @@ Subagents help here too, but agents can be resourceful. Role-based isolation pro
 
 - [Security Model](security.md) — Full security architecture
 - [Role](role.md) — Defining roles with permissions
-- [MCP Proxy](component-mcp-proxy.md) — Tool filtering at runtime
-- [Credential Service](component-credential-service.md) — Secure credential resolution
+- [Proxy](proxy.md) — Tool filtering and credential resolution at runtime

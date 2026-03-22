@@ -13,6 +13,7 @@ function makeApp(overrides: Partial<ResolvedApp> & { name: string }): ResolvedAp
     tools: [],
     capabilities: [],
     credentials: [],
+    location: "proxy",
     ...overrides,
   };
 }

@@ -75,7 +75,7 @@ Connects to a remote MCP server:
 
 The `tools` array must list every tool the app exposes. This is used for:
 - **Validation** — Ensuring roles don't reference nonexistent tools
-- **Permission filtering** — The [MCP proxy](component-mcp-proxy.md) uses this to build allow lists
+- **Permission filtering** — The [proxy](proxy.md) uses this to build allow lists
 - **Documentation** — Shows what capabilities are available
 
 ### Credentials
@@ -91,7 +91,7 @@ Apps that need secrets (API keys, tokens) declare them:
 }
 ```
 
-The `env` field maps environment variable names to credential keys. At runtime, the [credential service](component-credential-service.md) resolves the values securely.
+The `env` field maps environment variable names to credential keys. At runtime, the [proxy](proxy.md) resolves the values securely via the host-side credential resolver.
 
 ## Tool Prefixing
 
@@ -101,4 +101,4 @@ At runtime, the MCP proxy prefixes tool names with a short app identifier to avo
 
 - [Role](role.md) — Roles define which app tools are permitted
 - [Task](task.md) — Tasks declare which apps they require
-- [MCP Proxy](component-mcp-proxy.md) — Manages app connections and tool routing
+- [Proxy](proxy.md) — Manages app connections and tool routing

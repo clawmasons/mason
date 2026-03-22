@@ -1,5 +1,10 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import { program } from "../../src/cli/index.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe("CLI entry point", () => {
   it("has the correct program name", () => {
@@ -7,7 +12,10 @@ describe("CLI entry point", () => {
   });
 
   it("has a version matching package.json", () => {
-    expect(program.version()).toBe("0.1.3");
+    const pkg = JSON.parse(
+      readFileSync(join(__dirname, "../../package.json"), "utf-8"),
+    ) as { version: string };
+    expect(program.version()).toBe(pkg.version);
   });
 
   it("has a description", () => {

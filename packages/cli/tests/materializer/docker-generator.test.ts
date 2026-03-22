@@ -36,6 +36,7 @@ function makeTestRole(overrides?: Partial<Role>): Role {
           deny: ["delete_repo"],
         },
         credentials: ["GITHUB_TOKEN"],
+        location: "proxy",
       },
     ],
     skills: [{ name: "prd-writing" }],
@@ -448,7 +449,7 @@ describe("generateSessionComposeYml", () => {
     agentType: "claude-code-agent",
     agentName: "@acme/agent",
     proxyToken: "test-proxy-token",
-    credentialProxyToken: "test-cred-token",
+    relayToken: "test-cred-token",
     proxyPort: 3000,
     volumeMasks: generateVolumeMasks([".mason/", ".claude/", ".env"]),
     sessionDir: "/project/.mason/sessions/abc12345",
@@ -574,7 +575,7 @@ describe("generateSessionComposeYml", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
     expect(yml).toContain("MASON_PROXY_TOKEN=test-proxy-token");
-    expect(yml).toContain("CREDENTIAL_PROXY_TOKEN=test-cred-token");
+    expect(yml).toContain("RELAY_TOKEN=test-cred-token");
     expect(yml).toContain("MCP_PROXY_TOKEN=test-proxy-token");
   });
 
@@ -761,8 +762,8 @@ describe("createSessionDirectory", () => {
     );
 
     expect(result.proxyToken).toBeDefined();
-    expect(result.credentialProxyToken).toBeDefined();
-    expect(result.proxyToken).not.toBe(result.credentialProxyToken);
+    expect(result.relayToken).toBeDefined();
+    expect(result.proxyToken).not.toBe(result.relayToken);
   });
 
   it("includes volume masks in compose for role with ignore paths", () => {

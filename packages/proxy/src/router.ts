@@ -15,6 +15,8 @@ export interface RouteEntry {
   prefixedToolName: string;
   /** MCP Tool object with name rewritten to the prefixed form. */
   tool: Tool;
+  /** True if this route is for a host MCP server tool (forwarded via relay). */
+  isHostRoute?: boolean;
 }
 
 // ── ToolRouter ─────────────────────────────────────────────────────────
@@ -74,6 +76,40 @@ export class ToolRouter {
   /** Prefix a tool name with an app short name. */
   static prefixName(appShortName: string, toolName: string): string {
     return `${appShortName}_${toolName}`;
+  }
+
+  /**
+   * Dynamically add routes for host MCP server tools.
+   * Called when the relay server receives mcp_tools_register.
+   *
+   * @param appName - The app name (used for short name derivation via getAppShortName)
+   * @param tools - Tool definitions from the host MCP server
+   * @throws If any prefixed tool name collides with an existing route
+   */
+  addRoutes(appName: string, tools: Tool[]): void {
+    const appShortName = getAppShortName(appName);
+
+    for (const tool of tools) {
+      const prefixedToolName = ToolRouter.prefixName(appShortName, tool.name);
+
+      const existing = this.routes.get(prefixedToolName);
+      if (existing) {
+        throw new Error(
+          `Duplicate prefixed tool name "${prefixedToolName}" from apps "${existing.appName}" and "${appName}"`,
+        );
+      }
+
+      const prefixedTool: Tool = { ...tool, name: prefixedToolName };
+
+      this.routes.set(prefixedToolName, {
+        appName,
+        appShortName,
+        originalToolName: tool.name,
+        prefixedToolName,
+        tool: prefixedTool,
+        isHostRoute: true,
+      });
+    }
   }
 
   /** Strip the app short name prefix from a prefixed tool name. */

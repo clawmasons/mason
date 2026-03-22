@@ -7,7 +7,7 @@ description: Primary deployable unit defining tools, permissions, and system pro
 
 A **role** is the primary deployable unit in mason. It defines which [tasks](task.md), [skills](skill.md), and [apps](app.md) are available, sets explicit allow/deny lists for individual tools, and provides the system prompt for the agent runtime.
 
-Roles are the security enforcement point in mason. The [MCP proxy](component-mcp-proxy.md) reads the role's permissions at runtime and filters tool access accordingly.
+Roles are the security enforcement point in mason. The [proxy](proxy.md) reads the role's permissions at runtime and filters tool access accordingly.
 
 ## ROLE.md Format
 
@@ -211,6 +211,6 @@ The `permissions` field (in package.json) or `mcp_servers` (in ROLE.md) maps app
 
 - [Task](task.md) — Units of work available in a role
 - [App](app.md) — MCP servers whose tools are gated by roles
-- [MCP Proxy](component-mcp-proxy.md) — Enforces role permissions at runtime
+- [Proxy](proxy.md) — Enforces role permissions at runtime
 - [Security](security.md) — The full security model
 - [CLI Reference](cli.md) — Running roles from the command line
