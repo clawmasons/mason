@@ -189,7 +189,10 @@ This is the breaking change phase. Should include a deprecation period where leg
 
 **Testable output:** `mason run pi` still works (resolved via `AgentPackage.aliases`). `mason run claude` still works. All existing tests pass. `npx vitest run packages/cli/tests/` green.
 
-**Not Implemented Yet**
+**Implemented** — See [archived spec](../../openspec/changes/archive/2026-03-22-remove-legacy-hardcoded/):
+- [Proposal](../../openspec/changes/archive/2026-03-22-remove-legacy-hardcoded/proposal.md)
+- [Design](../../openspec/changes/archive/2026-03-22-remove-legacy-hardcoded/design.md)
+- [Tasks](../../openspec/changes/archive/2026-03-22-remove-legacy-hardcoded/tasks.md)
 
 ---
 

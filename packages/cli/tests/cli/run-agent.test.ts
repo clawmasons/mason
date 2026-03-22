@@ -14,9 +14,11 @@ import {
   isKnownAgentType,
   getKnownAgentTypeNames,
   ensureMasonConfig,
+  buildDefaultMasonConfig,
   buildVscodeAttachUri,
   normalizeSourceFlags,
   generateProjectRole,
+  inferAgentType,
 } from "../../src/cli/commands/run-agent.js";
 import {
   generateSessionComposeYml,
@@ -153,6 +155,59 @@ describe("getKnownAgentTypeNames", () => {
     const names = getKnownAgentTypeNames();
     const sorted = [...names].sort();
     expect(names).toEqual(sorted);
+  });
+});
+
+// ── inferAgentType ───────────────────────────────────────────────────────
+
+describe("inferAgentType", () => {
+  const masonRole = {
+    source: { agentDialect: "mason" },
+  } as import("@clawmasons/shared").Role;
+
+  const unsetDialectRole = {
+    source: {},
+  } as import("@clawmasons/shared").Role;
+
+  const piRole = {
+    source: { agentDialect: "pi-coding-agent" },
+  } as import("@clawmasons/shared").Role;
+
+  it("defaults to claude-code-agent when dialect is mason and no default provided", () => {
+    expect(inferAgentType(masonRole)).toBe("claude-code-agent");
+  });
+
+  it("defaults to claude-code-agent when dialect is unset and no default provided", () => {
+    expect(inferAgentType(unsetDialectRole)).toBe("claude-code-agent");
+  });
+
+  it("uses configurable default when dialect is mason", () => {
+    expect(inferAgentType(masonRole, "pi-coding-agent")).toBe("pi-coding-agent");
+  });
+
+  it("uses configurable default when dialect is unset", () => {
+    expect(inferAgentType(unsetDialectRole, "pi-coding-agent")).toBe("pi-coding-agent");
+  });
+
+  it("returns dialect regardless of default when dialect is agent-specific", () => {
+    expect(inferAgentType(piRole, "claude-code-agent")).toBe("pi-coding-agent");
+  });
+});
+
+// ── buildDefaultMasonConfig ─────────────────────────────────────────────
+
+describe("buildDefaultMasonConfig", () => {
+  it("generates config with entries for all built-in agents", () => {
+    const config = JSON.parse(buildDefaultMasonConfig()) as { agents: Record<string, { package: string }> };
+    expect(config.agents).toBeDefined();
+    // Uses first alias as key, @clawmasons/<name> as package
+    expect(config.agents["claude"]?.package).toBe("@clawmasons/claude-code-agent");
+    expect(config.agents["pi"]?.package).toBe("@clawmasons/pi-coding-agent");
+    expect(config.agents["mcp"]?.package).toBe("@clawmasons/mcp-agent");
+  });
+
+  it("returns valid JSON string", () => {
+    expect(() => JSON.parse(buildDefaultMasonConfig())).not.toThrow();
   });
 });
 
@@ -485,7 +540,7 @@ describe("ensureMasonConfig", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("creates .mason/config.json with default template when absent", () => {
+  it("creates .mason/config.json with default template derived from BUILTIN_AGENTS", () => {
     ensureMasonConfig(tmpDir);
 
     const configPath = path.join(tmpDir, ".mason", "config.json");
@@ -494,8 +549,9 @@ describe("ensureMasonConfig", () => {
     const content = JSON.parse(fs.readFileSync(configPath, "utf-8")) as Record<string, unknown>;
     const agents = content.agents as Record<string, { package: string }>;
     expect(agents).toBeDefined();
+    // Derived from AgentPackage: first alias as key, @clawmasons/<name> as package
     expect(agents["claude"]?.package).toBe("@clawmasons/claude-code-agent");
-    expect(agents["pi-mono-agent"]?.package).toBe("@clawmasons/pi-mono-agent");
+    expect(agents["pi"]?.package).toBe("@clawmasons/pi-coding-agent");
     expect(agents["mcp"]?.package).toBe("@clawmasons/mcp-agent");
   });
 

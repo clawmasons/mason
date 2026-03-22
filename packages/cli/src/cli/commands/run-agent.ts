@@ -10,8 +10,8 @@ import { quickAutoCleanup } from "./doctor.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedApp, Role, AppConfig, TaskRef, SkillRef } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect } from "@clawmasons/shared";
-import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../../materializer/role-materializer.js";
-import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig } from "@clawmasons/agent-sdk";
+import { getAgentFromRegistry, initRegistry, getAllRegisteredNames, BUILTIN_AGENTS } from "../../materializer/role-materializer.js";
+import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig, readDefaultAgent } from "@clawmasons/agent-sdk";
 import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
@@ -47,12 +47,15 @@ function defaultAdaptRole(
 
 /**
  * Infer the agent type from a Role's source dialect.
- * Falls back to "claude-code-agent" if not determinable.
+ *
+ * When the dialect is "mason" or unset, uses the provided `defaultAgent`
+ * (typically from `.mason/config.json` `defaultAgent` field), falling back
+ * to "claude-code-agent" for backward compatibility.
  */
-export function inferAgentType(roleType: Role): string {
+export function inferAgentType(roleType: Role, defaultAgent?: string): string {
   const dialect = roleType.source.agentDialect;
-  // "mason" is the agent-agnostic canonical location — default to claude-code-agent
-  if (!dialect || dialect === "mason") return "claude-code-agent";
+  // "mason" is the agent-agnostic canonical location — use configurable default
+  if (!dialect || dialect === "mason") return defaultAgent ?? "claude-code-agent";
   return dialect;
 }
 
@@ -65,37 +68,17 @@ export function generateSessionId(): string {
   return crypto.randomBytes(4).toString("hex");
 }
 
-// ── Agent Type Aliases ────────────────────────────────────────────────
-
-/**
- * Legacy alias map kept for backward compatibility.
- * @deprecated Aliases are now declared by AgentPackage.aliases in agent packages.
- */
-export const AGENT_TYPE_ALIASES: Record<string, string> = {
-  claude: "claude-code-agent",
-  codex: "codex",
-  aider: "aider",
-  pi: "pi-coding-agent",
-  mcp: "mcp-agent",
-};
+// ── Agent Type Resolution ─────────────────────────────────────────────
 
 /**
  * Resolve a user-provided agent type string to the internal materializer name.
- * Checks the agent registry (which includes aliases from AgentPackage),
- * then falls back to the legacy alias map, then checks direct registered types.
+ * Checks the agent registry (which includes aliases from AgentPackage).
  *
  * @returns The resolved agent type, or undefined if not recognized
  */
 export function resolveAgentType(input: string): string | undefined {
-  // Check registry (includes aliases from AgentPackage)
   const agentPkg = getAgentFromRegistry(input);
-  if (agentPkg) return agentPkg.name;
-
-  // Legacy fallback: check hardcoded aliases for agents not yet packaged (codex, aider)
-  const aliased = AGENT_TYPE_ALIASES[input];
-  if (aliased) return aliased;
-
-  return undefined;
+  return agentPkg?.name;
 }
 
 /**
@@ -106,13 +89,10 @@ export function isKnownAgentType(input: string): boolean {
 }
 
 /**
- * Get a user-friendly list of known agent type names (aliases + registered).
+ * Get a user-friendly list of known agent type names (canonical names + aliases from registry).
  */
 export function getKnownAgentTypeNames(): string[] {
-  const names = new Set<string>(Object.keys(AGENT_TYPE_ALIASES));
-  for (const t of getRegisteredAgentTypes()) {
-    names.add(t);
-  }
+  const names = new Set<string>(getAllRegisteredNames());
   return [...names].sort();
 }
 
@@ -453,17 +433,19 @@ Side Effects:
 
 // ── Config Auto-Init ──────────────────────────────────────────────────
 
-const DEFAULT_MASON_CONFIG = JSON.stringify(
-  {
-    agents: {
-      claude: { package: "@clawmasons/claude-code-agent" },
-      "pi-mono-agent": { package: "@clawmasons/pi-mono-agent" },
-      mcp: { package: "@clawmasons/mcp-agent" },
-    },
-  },
-  null,
-  2,
-);
+/**
+ * Build the default `.mason/config.json` content from the built-in agent
+ * packages. Uses the first alias as the config key (user-friendly short name)
+ * and derives the npm package name from the agent's canonical name.
+ */
+export function buildDefaultMasonConfig(): string {
+  const agents: Record<string, { package: string }> = {};
+  for (const agent of BUILTIN_AGENTS) {
+    const configKey = agent.aliases?.[0] ?? agent.name;
+    agents[configKey] = { package: `@clawmasons/${agent.name}` };
+  }
+  return JSON.stringify({ agents }, null, 2);
+}
 
 /**
  * Create .mason/config.json from the default template if it does not exist.
@@ -474,7 +456,7 @@ export function ensureMasonConfig(projectDir: string): void {
   const configPath = path.join(masonDir, "config.json");
   if (!fs.existsSync(configPath)) {
     fs.mkdirSync(masonDir, { recursive: true });
-    fs.writeFileSync(configPath, DEFAULT_MASON_CONFIG + "\n");
+    fs.writeFileSync(configPath, buildDefaultMasonConfig() + "\n");
     console.error(`  Created .mason/config.json with default agent configuration.`);
   }
 }
@@ -1118,7 +1100,7 @@ async function runAgentInteractiveMode(
     const roleName = getAppShortName(roleType.metadata.name);
 
     // 3. Infer or override agent type
-    const agentType = agentOverride ?? inferAgentType(roleType);
+    const agentType = agentOverride ?? inferAgentType(roleType, readDefaultAgent(projectDir));
 
     console.log(`\n  Agent: ${agentType}`);
     console.log(`  Role: ${roleName} (${roleType.type})`);
@@ -1304,7 +1286,7 @@ async function runAgentDevContainerMode(
     }
 
     const roleName = getAppShortName(roleType.metadata.name);
-    const agentType = agentOverride ?? inferAgentType(roleType);
+    const agentType = agentOverride ?? inferAgentType(roleType, readDefaultAgent(projectDir));
 
     console.log(`\n  Agent: ${agentType}`);
     console.log(`  Role: ${roleName}`);
@@ -1516,7 +1498,7 @@ export async function runProxyOnly(
   const roleName = getAppShortName(roleType.metadata.name);
 
   // 3. Infer or override agent type
-  const agentType = agentOverride ?? inferAgentType(roleType);
+  const agentType = agentOverride ?? inferAgentType(roleType, readDefaultAgent(projectDir));
 
   // 4. Ensure docker build artifacts exist (auto-build if missing)
   const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
@@ -1648,7 +1630,7 @@ async function runAgentAcpMode(
     const roleName = getAppShortName(roleType.metadata.name);
 
     // ── Step 2: Infer or override agent type ─────────────────────────
-    const agentType = agentOverride ?? inferAgentType(roleType);
+    const agentType = agentOverride ?? inferAgentType(roleType, readDefaultAgent(projectDir));
 
     // ── Step 3: Ensure docker build artifacts ────────────────────────
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
