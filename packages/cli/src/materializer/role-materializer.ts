@@ -18,7 +18,7 @@ import piCodingAgent from "@clawmasons/pi-coding-agent";
 import { default as mcpAgent } from "@clawmasons/mcp-agent/agent-package";
 
 /** Built-in agent packages list. */
-const BUILTIN_AGENTS: AgentPackage[] = [claudeCodeAgent, piCodingAgent, mcpAgent];
+export const BUILTIN_AGENTS: AgentPackage[] = [claudeCodeAgent, piCodingAgent, mcpAgent];
 
 /** Default proxy endpoint used when none is provided. */
 const DEFAULT_PROXY_ENDPOINT = "http://mcp-proxy:9090";
@@ -116,6 +116,15 @@ export function getMaterializer(agentType: string): RuntimeMaterializer | undefi
  */
 export function getRegisteredAgentTypes(): string[] {
   return getRegisteredAgentNames(getRegistry());
+}
+
+/**
+ * Get all registered names in the agent registry (both canonical names and aliases).
+ *
+ * @returns Array of all keys in the registry map
+ */
+export function getAllRegisteredNames(): string[] {
+  return [...getRegistry().keys()];
 }
 
 // ---------------------------------------------------------------------------

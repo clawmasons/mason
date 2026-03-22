@@ -111,6 +111,7 @@ export interface AliasEntryConfig {
 interface MasonConfig {
   agents?: Record<string, unknown>;
   aliases?: Record<string, unknown>;
+  defaultAgent?: string;
 }
 
 const VALID_MODES = new Set<string>(["terminal", "acp", "bash"]);
@@ -445,6 +446,20 @@ export function readConfigAgentNames(projectDir: string): string[] {
   const config = readMasonConfig(projectDir);
   if (!config?.agents || typeof config.agents !== "object") return [];
   return Object.keys(config.agents);
+}
+
+/**
+ * Read the optional `defaultAgent` field from `.mason/config.json`.
+ * Synchronous — safe to call before the async registry is initialised.
+ *
+ * @returns The default agent name, or undefined if not set.
+ */
+export function readDefaultAgent(projectDir: string): string | undefined {
+  const config = readMasonConfig(projectDir);
+  if (config?.defaultAgent && typeof config.defaultAgent === "string") {
+    return config.defaultAgent;
+  }
+  return undefined;
 }
 
 /**
