@@ -148,14 +148,14 @@ describe("project-role: CLI e2e", () => {
 
   // ── Scenario 5: Implied alias routing ────────────────────────────────
 
-  it("routes implied agent alias (mason codex) to run command", () => {
+  it("routes implied agent alias (mason pi) to run command", () => {
     const ws = createEmptyWorkspace("pr-implied-alias");
     workspacesToClean.push(ws);
 
-    // Run "mason codex" — no alias configured, but codex is a known agent type
-    // Should be rewritten to "mason run --agent codex" and then fail with
+    // Run "mason pi" — pi is a known agent alias (for pi-coding-agent)
+    // Should be rewritten to "mason run --agent pi" and then fail with
     // source-dir-not-found (proving the alias routing worked)
-    const result = masonExecExpectError(["codex"], ws);
+    const result = masonExecExpectError(["pi"], ws);
 
     expect(result.exitCode).not.toBe(0);
     const output = result.stderr + result.stdout;
@@ -163,9 +163,9 @@ describe("project-role: CLI e2e", () => {
     // Should NOT say "Unknown command" — that would mean alias routing failed
     expect(output).not.toContain("Unknown command");
 
-    // Should have reached the project role generation phase
-    // (fails with missing source directory, which is the expected behavior)
-    expect(output).toContain("Source directory");
+    // Should have reached the agent execution phase
+    // (pi-coding-agent requires config, proving the alias routing worked)
+    expect(output).toContain("pi-coding-agent");
   });
 
   // ── Scenario 6: Source override with explicit role ────────────────────
