@@ -23,7 +23,7 @@ Currently `checkDocker()` is called as step 1 inside each mode function (interac
 
 **Testable output:** `mason claude` on a machine without Docker exits immediately with a helpful error message and non-zero exit code.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-21-docker-pre-flight-check/proposal.md) | [design](../../changes/archive/2026-03-21-docker-pre-flight-check/design.md) | [tasks](../../changes/archive/2026-03-21-docker-pre-flight-check/tasks.md)
 
 ---
 

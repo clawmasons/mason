@@ -1041,7 +1041,36 @@ describe("runAgent", () => {
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");
-    expect(errorOutput).toContain("agent failed");
+    expect(errorOutput).toContain("Docker Compose");
+  });
+
+  it("docker check runs before role resolution", async () => {
+    let roleResolved = false;
+    const { deps } = makeMockDeps();
+    deps.checkDockerComposeFn = () => {
+      throw new Error("Docker Compose v2 is required");
+    };
+    deps.resolveRoleFn = async () => {
+      roleResolved = true;
+      return makeMockDeps().deps.resolveRoleFn!("writer", projectDir);
+    };
+
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(roleResolved).toBe(false);
+  });
+
+  it("ACP mode fails fast when docker is unavailable", async () => {
+    const { deps } = makeMockDeps();
+    deps.checkDockerComposeFn = () => {
+      throw new Error("Docker Compose v2 is required");
+    };
+
+    await runAgent(projectDir, "claude-code-agent", "writer", deps, { acp: true });
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const errorOutput = errorSpy.mock.calls.flat().join("\n");
     expect(errorOutput).toContain("Docker Compose");
   });
 
