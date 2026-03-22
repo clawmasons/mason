@@ -10,6 +10,8 @@
  * New runtimes are registered by calling `registerDialect()`.
  */
 
+import type { AgentTaskConfig, AgentSkillConfig } from "../types.js";
+
 export interface DialectFieldMapping {
   /** Agent-specific field name for tasks (e.g., "commands") */
   tasks: string;
@@ -26,6 +28,10 @@ export interface DialectEntry {
   directory: string;
   /** Mapping from generic field names to agent-specific field names */
   fieldMapping: DialectFieldMapping;
+  /** Optional task file layout config for this dialect's agent. */
+  taskConfig?: AgentTaskConfig;
+  /** Optional skill file layout config for this dialect's agent. */
+  skillConfig?: AgentSkillConfig;
 }
 
 // Internal mutable registry
@@ -104,6 +110,16 @@ registerDialect({
     apps: "mcp_servers",
     skills: "skills",
   },
+  taskConfig: {
+    projectFolder: ".claude/commands",
+    nameFormat: "{scopePath}/{taskName}.md",
+    scopeFormat: "path",
+    supportedFields: ["name->displayName", "description", "category", "tags"],
+    prompt: "markdown-body",
+  },
+  skillConfig: {
+    projectFolder: ".claude/skills",
+  },
 });
 
 registerDialect({
@@ -144,6 +160,16 @@ registerDialect({
     tasks: "tasks",
     apps: "mcp_servers",
     skills: "skills",
+  },
+  taskConfig: {
+    projectFolder: ".mason/tasks",
+    nameFormat: "{scopePath}/{taskName}.md",
+    scopeFormat: "path",
+    supportedFields: "all",
+    prompt: "markdown-body",
+  },
+  skillConfig: {
+    projectFolder: ".mason/skills",
   },
 });
 

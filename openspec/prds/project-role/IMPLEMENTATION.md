@@ -90,7 +90,7 @@ See PRD §4.3 and the note on line 87 of PRD.md.
 
 **Testable output:** `scanProject(projectDir, { dialects: ["claude-code-agent"] })` returns only items from `.claude/`. Task names respect the agent's scoping rules. Unit tests verify scanning with different agent configs.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-21-agent-aware-scanner/proposal.md) | [design](../../changes/archive/2026-03-21-agent-aware-scanner/design.md) | [tasks](../../changes/archive/2026-03-21-agent-aware-scanner/tasks.md)
 
 ---
 
