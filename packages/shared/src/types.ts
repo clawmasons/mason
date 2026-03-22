@@ -40,6 +40,24 @@ export interface ResolvedSkill {
 }
 
 /**
+ * Declarative configuration for how an agent stores task files.
+ * Drives both readTasks() and materializeTasks() in the SDK,
+ * and directory/scoping resolution in the project scanner.
+ */
+export interface AgentTaskConfig {
+  /** Folder where task files live, relative to workspace root (e.g., ".claude/commands"). */
+  projectFolder: string;
+  /** File name template. Tokens: {scopePath}, {scopeKebab}, {taskName} */
+  nameFormat: string;
+  /** How scope is encoded in the file system. */
+  scopeFormat: "path" | "kebab-case-prefix";
+  /** Which ResolvedTask fields map to YAML frontmatter. "all" or array of field names/mappings (e.g., "name->displayName"). */
+  supportedFields: "all" | Array<string>;
+  /** Where the prompt content is stored in the file. */
+  prompt: "markdown-body";
+}
+
+/**
  * Declarative configuration for how an agent stores skill files.
  * Drives both readSkills() and materializeSkills() in the SDK.
  */

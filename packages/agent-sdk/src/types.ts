@@ -1,4 +1,4 @@
-import type { ResolvedAgent, AgentSkillConfig } from "@clawmasons/shared";
+import type { ResolvedAgent, AgentSkillConfig, AgentTaskConfig } from "@clawmasons/shared";
 
 // ── Core Materializer Types (moved from packages/cli/src/materializer/types.ts) ──
 
@@ -76,24 +76,8 @@ export interface RuntimeMaterializer {
   ): MaterializationResult;
 }
 
-// ── Agent Task Config ──
-
-/**
- * Declarative configuration for how an agent stores task files.
- * Drives both readTasks() and materializeTasks() in the SDK.
- */
-export interface AgentTaskConfig {
-  /** Folder where task files live, relative to workspace root (e.g., ".claude/commands"). */
-  projectFolder: string;
-  /** File name template. Tokens: {scopePath}, {scopeKebab}, {taskName} */
-  nameFormat: string;
-  /** How scope is encoded in the file system. */
-  scopeFormat: "path" | "kebab-case-prefix";
-  /** Which ResolvedTask fields map to YAML frontmatter. "all" or array of field names/mappings (e.g., "name->displayName"). */
-  supportedFields: "all" | Array<string>;
-  /** Where the prompt content is stored in the file. */
-  prompt: "markdown-body";
-}
+// Re-export AgentTaskConfig from shared (canonical definition lives in @clawmasons/shared)
+export type { AgentTaskConfig } from "@clawmasons/shared";
 
 // ── Agent Package Types ──
 

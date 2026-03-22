@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { scanProject } from "@clawmasons/shared";
+import { scanProject, registerDialect } from "@clawmasons/shared";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -244,6 +244,165 @@ describe("scanProject", () => {
       const result = await scanProject(testDir);
 
       expect(result.mcpServers).toHaveLength(0);
+    });
+  });
+
+  describe("dialect filtering", () => {
+    it("returns only items from specified dialects", async () => {
+      await createFile(".claude/commands/deploy.md", "# Deploy");
+      await createFile(".claude/skills/my-skill/SKILL.md", "# Skill");
+      await createFile(".codex/instructions/setup.md", "# Setup");
+
+      const result = await scanProject(testDir, {
+        dialects: ["claude-code-agent"],
+      });
+
+      expect(result.commands).toHaveLength(1);
+      expect(result.commands[0].dialect).toBe("claude-code-agent");
+      expect(result.skills).toHaveLength(1);
+      expect(result.skills[0].dialect).toBe("claude-code-agent");
+    });
+
+    it("returns empty results when filtering to nonexistent dialect", async () => {
+      await createFile(".claude/commands/deploy.md", "# Deploy");
+
+      const result = await scanProject(testDir, {
+        dialects: ["nonexistent"],
+      });
+
+      expect(result.commands).toHaveLength(0);
+      expect(result.skills).toHaveLength(0);
+      expect(result.mcpServers).toHaveLength(0);
+    });
+
+    it("returns empty results when filtering to empty dialect list", async () => {
+      await createFile(".claude/commands/deploy.md", "# Deploy");
+
+      const result = await scanProject(testDir, { dialects: [] });
+
+      expect(result.commands).toHaveLength(0);
+      expect(result.skills).toHaveLength(0);
+      expect(result.mcpServers).toHaveLength(0);
+    });
+
+    it("can filter to multiple dialects", async () => {
+      await createFile(".claude/commands/deploy.md", "# Deploy");
+      await createFile(".mason/tasks/build.md", "# Build");
+
+      const result = await scanProject(testDir, {
+        dialects: ["claude-code-agent", "mason"],
+      });
+
+      expect(result.commands).toHaveLength(2);
+      const dialects = result.commands.map((c) => c.dialect).sort();
+      expect(dialects).toEqual(["claude-code-agent", "mason"]);
+    });
+
+    it("still reads system prompt when dialect filter is applied", async () => {
+      await createFile("CLAUDE.md", "System prompt content");
+
+      const result = await scanProject(testDir, {
+        dialects: ["claude-code-agent"],
+      });
+
+      expect(result.systemPrompt).toBe("System prompt content");
+    });
+
+    it("scans all dialects when no options provided (backward compatible)", async () => {
+      await createFile(".claude/commands/deploy.md", "# Deploy");
+      await createFile(".mason/tasks/build.md", "# Build");
+
+      const result = await scanProject(testDir);
+
+      expect(result.commands.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe("agent-config-aware task scanning", () => {
+    it("uses taskConfig directory for mason dialect (tasks/ not commands/)", async () => {
+      // Mason's taskConfig says projectFolder is ".mason/tasks"
+      await createFile(".mason/tasks/build.md", "# Build task");
+
+      const result = await scanProject(testDir, { dialects: ["mason"] });
+
+      expect(result.commands).toHaveLength(1);
+      expect(result.commands[0].name).toBe("build");
+      expect(result.commands[0].dialect).toBe("mason");
+    });
+
+    it("uses path-based scoping for claude commands (subdirs are scopes)", async () => {
+      await createFile(".claude/commands/opsx/deploy.md", "# Deploy");
+      await createFile(".claude/commands/opsx/triage.md", "# Triage");
+
+      const result = await scanProject(testDir, {
+        dialects: ["claude-code-agent"],
+      });
+
+      expect(result.commands).toHaveLength(2);
+      const names = result.commands.map((c) => c.name).sort();
+      expect(names).toEqual(["opsx/deploy", "opsx/triage"]);
+    });
+
+    it("uses flat scanning for kebab-case-prefix agents (no recursion)", async () => {
+      // Register a test dialect with kebab-case scope format
+      registerDialect({
+        name: "test-kebab-agent",
+        directory: "testkebab",
+        fieldMapping: { tasks: "prompts", apps: "mcp_servers", skills: "skills" },
+        taskConfig: {
+          projectFolder: ".testkebab/prompts",
+          nameFormat: "{scopeKebab}-{taskName}.md",
+          scopeFormat: "kebab-case-prefix",
+          supportedFields: ["description"],
+          prompt: "markdown-body",
+        },
+      });
+
+      // Create flat task files and a subdirectory that should be ignored
+      await createFile(".testkebab/prompts/ops-deploy.md", "# Deploy");
+      await createFile(".testkebab/prompts/review.md", "# Review");
+      await createFile(".testkebab/prompts/subdir/nested.md", "# Should be ignored");
+
+      const result = await scanProject(testDir, {
+        dialects: ["test-kebab-agent"],
+      });
+
+      // Only flat files should be discovered (subdirectory ignored)
+      expect(result.commands).toHaveLength(2);
+      const names = result.commands.map((c) => c.name).sort();
+      expect(names).toEqual(["ops-deploy", "review"]);
+    });
+
+    it("uses skillConfig directory for scanning skills", async () => {
+      // Mason has skillConfig: { projectFolder: ".mason/skills" }
+      await createFile(".mason/skills/my-skill/SKILL.md", "# My Mason Skill");
+
+      const result = await scanProject(testDir, { dialects: ["mason"] });
+
+      expect(result.skills).toHaveLength(1);
+      expect(result.skills[0].name).toBe("my-skill");
+      expect(result.skills[0].dialect).toBe("mason");
+    });
+
+    it("falls back to fieldMapping.tasks when no taskConfig is registered", async () => {
+      // codex dialect has no taskConfig but fieldMapping.tasks = "instructions"
+      await createFile(".codex/instructions/setup.md", "# Setup");
+
+      const result = await scanProject(testDir, { dialects: ["codex"] });
+
+      expect(result.commands).toHaveLength(1);
+      expect(result.commands[0].name).toBe("setup");
+      expect(result.commands[0].dialect).toBe("codex");
+    });
+
+    it("falls back to skills/ when no skillConfig is registered", async () => {
+      // codex dialect has no skillConfig, should fall back to "skills"
+      await createFile(".codex/skills/codex-skill/SKILL.md", "# Codex Skill");
+
+      const result = await scanProject(testDir, { dialects: ["codex"] });
+
+      expect(result.skills).toHaveLength(1);
+      expect(result.skills[0].name).toBe("codex-skill");
     });
   });
 });

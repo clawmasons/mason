@@ -2,6 +2,7 @@
 export {
   scanProject,
   type ScanResult,
+  type ScanOptions,
   type DiscoveredSkill,
   type DiscoveredCommand,
   type DiscoveredMcpServer,
