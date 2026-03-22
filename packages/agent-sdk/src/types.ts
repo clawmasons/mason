@@ -25,6 +25,8 @@ export interface MaterializeOptions {
   agentArgs?: string[];
   /** Initial prompt passed to the agent as the first user message at launch. */
   initialPrompt?: string;
+  /** LLM configuration resolved from agent config schema. Applied to ResolvedAgent.llm before materialization. */
+  llmConfig?: { provider: string; model: string };
 }
 
 /**

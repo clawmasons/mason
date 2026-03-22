@@ -289,6 +289,11 @@ export function materializeForAgent(
   // Convert Role to ResolvedAgent via the adapter.
   const resolvedAgent = adaptRoleToResolvedAgent(role, agentType);
 
+  // Apply LLM configuration from agent config schema resolution.
+  if (options?.llmConfig) {
+    resolvedAgent.llm = options.llmConfig;
+  }
+
   // Resolve actual task prompt content from source files.
   resolveTaskContent(resolvedAgent, role);
 

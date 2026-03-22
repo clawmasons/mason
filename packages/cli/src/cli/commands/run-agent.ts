@@ -342,7 +342,7 @@ async function ensureDockerBuild(
   roleType: Role,
   agentType: string,
   projectDir: string,
-  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations; agentConfigCredentials?: string[]; agentArgs?: string[]; initialPrompt?: string },
+  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations; agentConfigCredentials?: string[]; agentArgs?: string[]; initialPrompt?: string; llmConfig?: { provider: string; model: string } },
 ): Promise<{ dockerBuildDir: string; dockerDir: string }> {
   const existsSync = deps?.existsSyncFn ?? fs.existsSync;
   const roleName = getAppShortName(roleType.metadata.name);
@@ -393,6 +393,7 @@ async function ensureDockerBuild(
       devContainerCustomizations: deps?.devContainerCustomizations,
       agentConfigCredentials: deps?.agentConfigCredentials,
       agentArgs: deps?.agentArgs,
+      llmConfig: deps?.llmConfig,
     });
 
     // Populate shared proxy dependencies
@@ -793,18 +794,34 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     // ── Config Resolution (PRD §6.1) ─────────────────────────────────
     // After agent type is resolved, check if the agent declares a configSchema.
     // If so, resolve stored config, prompt for missing values, and persist.
+    // Then derive llmConfig and dynamic credentials from the resolved values.
+    let llmConfig: { provider: string; model: string } | undefined;
+    let dynamicCredentialKeys: string[] = [];
     if (resolvedAgentType) {
       const agentPkg = getAgentFromRegistry(resolvedAgentType);
       if (agentPkg?.configSchema) {
         try {
           const storedConfig = getAgentConfig(projectDir, agentPkg.name);
-          const { newValues } = await promptConfig(
+          const { resolved, newValues } = await promptConfig(
             agentPkg.configSchema,
             storedConfig,
             agentPkg.name,
           );
           if (Object.keys(newValues).length > 0) {
             saveAgentConfig(projectDir, agentPkg.name, newValues);
+          }
+
+          // Derive LLM config from resolved values (if both provider and model are set)
+          const provider = resolved["llm.provider"];
+          const model = resolved["llm.model"];
+          if (provider && model) {
+            llmConfig = { provider, model };
+          }
+
+          // Resolve dynamic credentials from the agent's credentialsFn
+          if (agentPkg.credentialsFn) {
+            const creds = agentPkg.credentialsFn(resolved);
+            dynamicCredentialKeys = creds.map((c) => c.key);
           }
         } catch (err) {
           if (err instanceof ConfigResolutionError) {
@@ -816,6 +833,12 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         }
       }
     }
+
+    // Merge static credentials from config entry with dynamic credentials from credentialsFn
+    const effectiveCredentials = [
+      ...(configEntry?.credentials ?? []),
+      ...dynamicCredentialKeys,
+    ].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
 
     // Derive effective home: --home flag > config home > undefined
     let homeOverride: string | undefined;
@@ -869,10 +892,11 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         acp: true,
         proxyPort: parseInt(options.proxyPort, 10),
         homeOverride,
-        agentConfigCredentials: configEntry?.credentials,
+        agentConfigCredentials: effectiveCredentials.length > 0 ? effectiveCredentials : undefined,
         agentArgs,
         sourceOverride,
         preResolvedRole,
+        llmConfig,
         // initialPrompt intentionally omitted for ACP mode
       });
     } else if (options.devContainer) {
@@ -883,11 +907,12 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         verbose: options.verbose,
         homeOverride,
         devContainerCustomizations: (configEntry as { devContainerCustomizations?: DevContainerCustomizations } | undefined)?.devContainerCustomizations,
-        agentConfigCredentials: configEntry?.credentials,
+        agentConfigCredentials: effectiveCredentials.length > 0 ? effectiveCredentials : undefined,
         agentArgs,
         sourceOverride,
         preResolvedRole,
         initialPrompt,
+        llmConfig,
       });
     } else {
       await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
@@ -896,11 +921,12 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         build: options.build,
         verbose: options.verbose,
         homeOverride,
-        agentConfigCredentials: configEntry?.credentials,
+        agentConfigCredentials: effectiveCredentials.length > 0 ? effectiveCredentials : undefined,
         agentArgs,
         sourceOverride,
         preResolvedRole,
         initialPrompt,
+        llmConfig,
       });
     }
   };
@@ -974,6 +1000,7 @@ export async function runAgent(
     sourceOverride?: string[];
     initialPrompt?: string;
     preResolvedRole?: Role;
+    llmConfig?: { provider: string; model: string };
   },
 ): Promise<void> {
   // Initialize agent registry with config-declared agents from .mason/config.json
@@ -1008,9 +1035,10 @@ export async function runAgent(
   const sourceOverride = acpOptions?.sourceOverride;
   const initialPrompt = acpOptions?.initialPrompt;
   const preResolvedRole = acpOptions?.preResolvedRole;
+  const llmConfig = acpOptions?.llmConfig;
 
   if (isAcpMode) {
-    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials, agentArgs, sourceOverride, preResolvedRole);
+    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials, agentArgs, sourceOverride, preResolvedRole, llmConfig);
   } else if (isDevContainerMode) {
     const verbose = acpOptions?.verbose === true;
     return runAgentDevContainerMode(
@@ -1021,10 +1049,11 @@ export async function runAgent(
       initialPrompt,
       sourceOverride,
       preResolvedRole,
+      llmConfig,
     );
   } else {
     const verbose = acpOptions?.verbose === true;
-    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole);
+    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole, llmConfig);
   }
 }
 
@@ -1068,6 +1097,7 @@ async function runAgentInteractiveMode(
   initialPrompt?: string,
   sourceOverride?: string[],
   preResolvedRole?: Role,
+  llmConfig?: { provider: string; model: string },
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const runAgent = deps?.runAgentFn ?? runAgentWithOciRestart;
@@ -1096,7 +1126,7 @@ async function runAgentInteractiveMode(
 
     // 4. Ensure docker build artifacts exist (auto-build if missing)
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
-      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs, initialPrompt },
+      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs, initialPrompt, llmConfig },
     );
 
     // 5. Ensure .mason is in project's .gitignore
@@ -1164,6 +1194,7 @@ async function runAgentInteractiveMode(
     // 9. Collect env credentials, partition apps, and start host proxy in-process
     const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
     const resolvedAgent = adaptRoleFn(roleType, agentType);
+    if (llmConfig) resolvedAgent.llm = llmConfig;
     const envCredentials = collectEnvCredentials(resolvedAgent);
     const hostApps = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
 
@@ -1254,6 +1285,7 @@ async function runAgentDevContainerMode(
   initialPrompt?: string,
   sourceOverride?: string[],
   preResolvedRole?: Role,
+  llmConfig?: { provider: string; model: string },
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
@@ -1282,7 +1314,7 @@ async function runAgentDevContainerMode(
     // 3. Ensure docker build artifacts
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
       roleType, agentType, projectDir,
-      { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations, agentConfigCredentials, agentArgs, initialPrompt },
+      { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations, agentConfigCredentials, agentArgs, initialPrompt, llmConfig },
     );
 
     // 4. Ensure .mason is in .gitignore
@@ -1360,6 +1392,7 @@ async function runAgentDevContainerMode(
 
     // 9. Start host proxy
     const resolvedAgent = adaptRoleFn(roleType, agentType);
+    if (llmConfig) resolvedAgent.llm = llmConfig;
     const envCredentials = collectEnvCredentials(resolvedAgent);
     const hostAppsDevContainer = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
     const hostProxyHandle = await startHostProxy({
@@ -1551,6 +1584,7 @@ async function runAgentAcpMode(
   agentArgs?: string[],
   sourceOverride?: string[],
   preResolvedRole?: Role,
+  llmConfig?: { provider: string; model: string },
   // initialPrompt is intentionally omitted: ACP mode does not forward initial prompts
 ): Promise<void> {
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
@@ -1618,7 +1652,7 @@ async function runAgentAcpMode(
 
     // ── Step 3: Ensure docker build artifacts ────────────────────────
     const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
-      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, agentConfigCredentials, agentArgs },
+      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, agentConfigCredentials, agentArgs, llmConfig },
     );
 
     // ── Create file logger in session-local logs ─────────────────────
@@ -1643,6 +1677,7 @@ async function runAgentAcpMode(
     // ── Step 4: Resolve agent from role ──────────────────────────────
     logger.log(`[mason run --acp] Resolving role "${role}" for agent type "${agentType}"...`);
     const resolvedAgent = adaptRoleFn(roleType, agentType);
+    if (llmConfig) resolvedAgent.llm = llmConfig;
 
     // ── Step 5: Compute tool filters ─────────────────────────────────
     const toolFilters = computeToolFilters(resolvedAgent);
