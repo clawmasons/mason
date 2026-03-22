@@ -74,7 +74,7 @@ See PRD §5.2 (MCP Proxy Agent Tests) and §6.1 (Per-Package E2E).
 
 **Testable output:** `npx vitest run --config packages/mcp-agent/vitest.e2e.config.ts` runs MCP agent e2e tests and they pass with the same assertions as before.
 
-**Not Implemented Yet**
+**Implemented**
 
 ---
 
