@@ -16,6 +16,7 @@ import {
   ensureMasonConfig,
   buildVscodeAttachUri,
   normalizeSourceFlags,
+  generateProjectRole,
 } from "../../src/cli/commands/run-agent.js";
 import {
   generateSessionComposeYml,
@@ -1448,6 +1449,145 @@ describe("source override applied to role", () => {
 
     expect(capture.role).toBeDefined();
     expect(capture.role!.sources).toEqual(["claude-code-agent"]);
+  });
+});
+
+// ── generateProjectRole ────────────────────────────────────────────────
+
+describe("generateProjectRole", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-project-role-"));
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("generates Role from single source with tasks, skills, and apps", async () => {
+    // Create .claude directory with commands, skills, and settings
+    fs.mkdirSync(path.join(tmpDir, ".claude", "commands"), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, ".claude", "commands", "review.md"), "# Review");
+    fs.mkdirSync(path.join(tmpDir, ".claude", "skills", "testing"), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, ".claude", "skills", "testing", "SKILL.md"), "# Testing Skill");
+    fs.writeFileSync(
+      path.join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ mcpServers: { "my-server": { command: "node", args: ["server.js"] } } }),
+    );
+
+    const role = await generateProjectRole(tmpDir, ["claude-code-agent"]);
+
+    expect(role.metadata.name).toBe("project");
+    expect(role.type).toBe("project");
+    expect(role.tasks).toHaveLength(1);
+    expect(role.tasks[0].name).toBe("review");
+    expect(role.skills).toHaveLength(1);
+    expect(role.skills[0].name).toBe("testing");
+    expect(role.apps).toHaveLength(1);
+    expect(role.apps[0].name).toBe("my-server");
+    expect(role.apps[0].command).toBe("node");
+    expect(role.apps[0].args).toEqual(["server.js"]);
+  });
+
+  it("handles multi-source with first-wins deduplication", async () => {
+    // Create .claude with a review command
+    fs.mkdirSync(path.join(tmpDir, ".claude", "commands"), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, ".claude", "commands", "review.md"), "# Claude Review");
+
+    // Create .codex with the same review command name
+    fs.mkdirSync(path.join(tmpDir, ".codex", "instructions"), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, ".codex", "instructions", "review.md"), "# Codex Review");
+
+    const role = await generateProjectRole(tmpDir, ["claude-code-agent", "codex"]);
+
+    // First-wins: only one review task from claude
+    expect(role.tasks).toHaveLength(1);
+    expect(role.tasks[0].name).toBe("review");
+    // Both source dirs should be in ignore paths
+    expect(role.container.ignore.paths).toContain(".claude/");
+    expect(role.container.ignore.paths).toContain(".codex/");
+  });
+
+  it("exits with error when source directory does not exist", async () => {
+    await generateProjectRole(tmpDir, ["claude-code-agent"]);
+
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('Source directory ".claude/" not found'),
+    );
+  });
+
+  it("warns but proceeds when source directory is empty", async () => {
+    fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
+
+    const role = await generateProjectRole(tmpDir, ["claude-code-agent"]);
+
+    expect(process.exit).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("No tasks, skills, or MCP servers found"),
+    );
+    expect(role.tasks).toHaveLength(0);
+    expect(role.skills).toHaveLength(0);
+    expect(role.apps).toHaveLength(0);
+  });
+
+  it("adds .env to ignore paths when present at project root", async () => {
+    fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, ".env"), "SECRET=value");
+
+    const role = await generateProjectRole(tmpDir, ["claude-code-agent"]);
+
+    expect(role.container.ignore.paths).toContain(".env");
+    expect(role.container.ignore.paths).toContain(".claude/");
+  });
+
+  it("does not add .env to ignore paths when absent", async () => {
+    fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
+
+    const role = await generateProjectRole(tmpDir, ["claude-code-agent"]);
+
+    expect(role.container.ignore.paths).not.toContain(".env");
+  });
+
+  it("sets instructions to empty string", async () => {
+    fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
+
+    const role = await generateProjectRole(tmpDir, ["claude-code-agent"]);
+
+    expect(role.instructions).toBe("");
+  });
+
+  it("sets correct metadata and source fields", async () => {
+    fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
+
+    const role = await generateProjectRole(tmpDir, ["claude-code-agent"]);
+
+    expect(role.metadata.name).toBe("project");
+    expect(role.metadata.description).toContain("claude");
+    expect(role.source.type).toBe("local");
+    expect(role.source.agentDialect).toBe("claude-code-agent");
+    expect(role.governance.risk).toBe("LOW");
+    expect(role.sources).toEqual(["claude-code-agent"]);
+  });
+
+  it("maps MCP server with URL to sse transport", async () => {
+    fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".claude", "settings.json"),
+      JSON.stringify({ mcpServers: { "remote-server": { url: "http://localhost:8080" } } }),
+    );
+
+    const role = await generateProjectRole(tmpDir, ["claude-code-agent"]);
+
+    expect(role.apps).toHaveLength(1);
+    expect(role.apps[0].transport).toBe("sse");
+    expect(role.apps[0].url).toBe("http://localhost:8080");
   });
 });
 

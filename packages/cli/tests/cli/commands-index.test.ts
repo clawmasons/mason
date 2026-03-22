@@ -155,10 +155,17 @@ describe("installAgentTypeShorthand", () => {
   });
 
   it("works with parseAsync for known agent types", async () => {
+    // This test verifies the shorthand hook recognizes "claude" as an agent type.
+    // parseAsync triggers the full run action (which calls generateProjectRole, Docker checks, etc.)
+    // but we only care that the pre-parse hook did not emit "Unknown command".
+    // We race against a short timer since the mocked process.exit doesn't halt execution.
     try {
-      await program.parseAsync(["claude"], { from: "user" });
+      await Promise.race([
+        program.parseAsync(["claude"], { from: "user" }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 2000)),
+      ]);
     } catch {
-      // Commander may throw
+      // Commander may throw, or our timeout fires — both are fine
     }
     const unknownCmdCalls = errorSpy.mock.calls.filter(
       (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("Unknown command"),

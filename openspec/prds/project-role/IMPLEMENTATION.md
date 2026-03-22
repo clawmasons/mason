@@ -124,7 +124,7 @@ This is the core feature. It:
 
 **Testable output:** `mason claude` in a project with `.claude/commands/` and `.claude/settings.json` starts a containerized agent with all discovered tasks and MCP servers proxied. No ROLE.md file is created on disk.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-22-in-memory-project-role/proposal.md) | [design](../../changes/archive/2026-03-22-in-memory-project-role/design.md) | [tasks](../../changes/archive/2026-03-22-in-memory-project-role/tasks.md)
 
 ---
 

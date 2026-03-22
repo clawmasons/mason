@@ -7,8 +7,8 @@ import { Readable, Writable } from "node:stream";
 import { spawn } from "node:child_process";
 import { checkDockerCompose } from "./docker-utils.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
-import type { ResolvedAgent, ResolvedApp, Role } from "@clawmasons/shared";
-import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories } from "@clawmasons/shared";
+import type { ResolvedAgent, ResolvedApp, Role, AppConfig, TaskRef, SkillRef } from "@clawmasons/shared";
+import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect } from "@clawmasons/shared";
 import { getRegisteredAgentTypes, getAgentFromRegistry, initRegistry } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry, loadConfigAliasEntry } from "@clawmasons/agent-sdk";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
@@ -543,6 +543,148 @@ function expandHome(p: string): string {
  * Each value is resolved to a dialect registry key. If any value is invalid,
  * an error is printed listing available sources and `process.exit(1)` is called.
  */
+/**
+ * Generate an in-memory project Role by scanning source agent directories.
+ *
+ * Used when `mason run <agent-type>` is invoked without `--role` and no alias
+ * provides a default role. The generated Role feeds into the existing
+ * materialization pipeline via `adaptRoleToResolvedAgent()`.
+ *
+ * @param projectDir - Absolute path to the project root
+ * @param sources - Dialect registry keys (e.g., ["claude-code-agent"])
+ * @returns A Role object (never persisted to disk)
+ */
+export async function generateProjectRole(
+  projectDir: string,
+  sources: string[],
+): Promise<Role> {
+  // 1. Validate that at least one source directory exists
+  const sourceDirectories: string[] = [];
+  for (const dialectName of sources) {
+    const dialect = getDialect(dialectName);
+    if (!dialect) {
+      const available = getKnownDirectories().join(", ");
+      console.error(`\n  Error: Unknown source "${dialectName}". Available sources: ${available}.\n`);
+      process.exit(1);
+    }
+    sourceDirectories.push(dialect.directory);
+  }
+
+  const existingDirs: string[] = [];
+  const missingDirs: string[] = [];
+  for (const dir of sourceDirectories) {
+    const fullPath = path.join(projectDir, `.${dir}`);
+    if (fs.existsSync(fullPath)) {
+      existingDirs.push(dir);
+    } else {
+      missingDirs.push(dir);
+    }
+  }
+
+  if (existingDirs.length === 0) {
+    // All source directories are missing — error per PRD §8.3
+    const dirList = sourceDirectories.map((d) => `.${d}/`).join(", ");
+    console.error(
+      `\n  Error: Source directory "${dirList}" not found in project.` +
+      `\n  Run from a project with agent configuration or specify a different --source.\n`,
+    );
+    process.exit(1);
+  }
+
+  // Warn about missing dirs when some exist (multi-source partial miss)
+  for (const dir of missingDirs) {
+    console.warn(`  Warning: Source directory ".${dir}/" not found, skipping.`);
+  }
+
+  // 2. Scan project filtered to source dialects
+  const scanResult = await scanProject(projectDir, { dialects: sources });
+
+  // 3. Check for empty scan — warn but proceed (per PRD §8.3)
+  const totalItems = scanResult.commands.length + scanResult.skills.length + scanResult.mcpServers.length;
+  if (totalItems === 0) {
+    console.warn("  Warning: No tasks, skills, or MCP servers found in source directories. Proceeding with empty project role.");
+  }
+
+  // 4. Deduplicate by name (first-wins) — scanProject iterates dialects in order
+  const seenTasks = new Set<string>();
+  const tasks: TaskRef[] = [];
+  for (const cmd of scanResult.commands) {
+    if (!seenTasks.has(cmd.name)) {
+      seenTasks.add(cmd.name);
+      tasks.push({ name: cmd.name });
+    }
+  }
+
+  const seenSkills = new Set<string>();
+  const skills: SkillRef[] = [];
+  for (const skill of scanResult.skills) {
+    if (!seenSkills.has(skill.name)) {
+      seenSkills.add(skill.name);
+      skills.push({ name: skill.name });
+    }
+  }
+
+  const seenApps = new Set<string>();
+  const apps: AppConfig[] = [];
+  for (const server of scanResult.mcpServers) {
+    if (!seenApps.has(server.name)) {
+      seenApps.add(server.name);
+      const app: AppConfig = {
+        name: server.name,
+        transport: server.url ? "sse" : "stdio",
+        env: server.env ?? {},
+        tools: { allow: [], deny: [] },
+        credentials: [],
+        location: "proxy",
+      };
+      if (server.command) app.command = server.command;
+      if (server.args) app.args = server.args;
+      if (server.url) app.url = server.url;
+      apps.push(app);
+    }
+  }
+
+  // 5. Build container.ignore.paths
+  const ignorePaths: string[] = [];
+  for (const dir of existingDirs) {
+    ignorePaths.push(`.${dir}/`);
+  }
+  if (fs.existsSync(path.join(projectDir, ".env"))) {
+    ignorePaths.push(".env");
+  }
+
+  // 6. Determine the primary source dialect for source.agentDialect
+  const primaryDialect = sources[0];
+
+  // 7. Build the Role object
+  const sourceNames = sources
+    .map((s) => getDialect(s)?.directory ?? s)
+    .join(", ");
+
+  const role: Role = {
+    metadata: {
+      name: "project",
+      description: `Auto-generated from project's ${sourceNames} configuration`,
+    },
+    type: "project",
+    instructions: "",
+    tasks,
+    skills,
+    apps,
+    sources: sources,
+    container: {
+      packages: { apt: [], npm: [], pip: [] },
+      ignore: { paths: ignorePaths },
+      mounts: [],
+    },
+    governance: { risk: "LOW", credentials: [] },
+    resources: [],
+    source: { type: "local", agentDialect: primaryDialect },
+  };
+
+  return role;
+}
+
 export function normalizeSourceFlags(sources: string[]): string[] {
   const normalized: string[] = [];
   for (const s of sources) {
@@ -617,16 +759,8 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     // Runtime config: alias fields take precedence, fall back to agent config entry (deprecated)
     const configEntry = aliasEntry ?? (agentInput ? loadConfigAgentEntry(projectDir, agentInput) : undefined);
 
-    // Derive effective role: override (for configure) > --role flag > config role > error
+    // Derive effective role: override (for configure) > --role flag > config role > project role
     const role = overrideRole ?? options.role ?? configEntry?.role;
-    if (!role) {
-      console.error(
-        "\n  --role <name> is required (or set \"role\" in .mason/config.json for this agent or alias).\n" +
-        "  Usage: mason run --role <name> [--agent <name>]\n",
-      );
-      process.exit(1);
-      return;
-    }
 
     if (options.bash && options.acp) {
       console.error("\n  --bash and --acp are mutually exclusive.\n");
@@ -672,20 +806,48 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
       ? normalizeSourceFlags(options.source)
       : undefined;
 
+    // Generate project role when no explicit role is provided
+    let preResolvedRole: Role | undefined;
+    if (!role) {
+      // Determine sources: --source flags take precedence, else derive from agent type
+      const effectiveSources = sourceOverride ?? (() => {
+        if (resolvedAgentType) {
+          const dialectName = resolveDialectName(resolvedAgentType);
+          if (dialectName) return [dialectName];
+        }
+        return [];
+      })();
+
+      if (effectiveSources.length === 0) {
+        console.error(
+          "\n  --role <name> is required (or set \"role\" in .mason/config.json for this agent or alias).\n" +
+          "  Usage: mason run --role <name> [--agent <name>]\n",
+        );
+        process.exit(1);
+        return;
+      }
+
+      preResolvedRole = await generateProjectRole(projectDir, effectiveSources);
+    }
+
+    // Effective role name: explicit role name or "project" for auto-generated
+    const effectiveRoleName = role ?? "project";
+
     if (options.proxyOnly) {
-      await runProxyOnly(projectDir, resolvedAgentType, role, parseInt(options.proxyPort, 10));
+      await runProxyOnly(projectDir, resolvedAgentType, effectiveRoleName, parseInt(options.proxyPort, 10), undefined, preResolvedRole);
     } else if (effectiveAcp) {
-      await runAgent(projectDir, resolvedAgentType, role, undefined, {
+      await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
         acp: true,
         proxyPort: parseInt(options.proxyPort, 10),
         homeOverride,
         agentConfigCredentials: configEntry?.credentials,
         agentArgs,
         sourceOverride,
+        preResolvedRole,
         // initialPrompt intentionally omitted for ACP mode
       });
     } else if (options.devContainer) {
-      await runAgent(projectDir, resolvedAgentType, role, undefined, {
+      await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
         devContainer: true,
         proxyPort: parseInt(options.proxyPort, 10),
         build: options.build,
@@ -695,10 +857,11 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         agentConfigCredentials: configEntry?.credentials,
         agentArgs,
         sourceOverride,
+        preResolvedRole,
         initialPrompt,
       });
     } else {
-      await runAgent(projectDir, resolvedAgentType, role, undefined, {
+      await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
         proxyPort: parseInt(options.proxyPort, 10),
         bash: effectiveBash,
         build: options.build,
@@ -707,6 +870,7 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         agentConfigCredentials: configEntry?.credentials,
         agentArgs,
         sourceOverride,
+        preResolvedRole,
         initialPrompt,
       });
     }
@@ -780,6 +944,7 @@ export async function runAgent(
     agentArgs?: string[];
     sourceOverride?: string[];
     initialPrompt?: string;
+    preResolvedRole?: Role;
   },
 ): Promise<void> {
   // Initialize agent registry with config-declared agents from .mason/config.json
@@ -805,9 +970,10 @@ export async function runAgent(
   const agentArgs = acpOptions?.agentArgs;
   const sourceOverride = acpOptions?.sourceOverride;
   const initialPrompt = acpOptions?.initialPrompt;
+  const preResolvedRole = acpOptions?.preResolvedRole;
 
   if (isAcpMode) {
-    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials, agentArgs, sourceOverride);
+    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials, agentArgs, sourceOverride, preResolvedRole);
   } else if (isDevContainerMode) {
     const verbose = acpOptions?.verbose === true;
     return runAgentDevContainerMode(
@@ -817,10 +983,11 @@ export async function runAgent(
       agentArgs,
       initialPrompt,
       sourceOverride,
+      preResolvedRole,
     );
   } else {
     const verbose = acpOptions?.verbose === true;
-    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride);
+    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole);
   }
 }
 
@@ -863,6 +1030,7 @@ async function runAgentInteractiveMode(
   agentArgs?: string[],
   initialPrompt?: string,
   sourceOverride?: string[],
+  preResolvedRole?: Role,
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const runAgent = deps?.runAgentFn ?? runAgentWithOciRestart;
@@ -872,8 +1040,8 @@ async function runAgentInteractiveMode(
   const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
 
   try {
-    // 1. Resolve role from project directory
-    const roleType = await resolveRoleFn(role, projectDir);
+    // 1. Resolve role from project directory (skip if pre-resolved)
+    const roleType = preResolvedRole ?? await resolveRoleFn(role, projectDir);
 
     // 1b. Apply --source override if provided
     if (sourceOverride?.length) {
@@ -1047,6 +1215,7 @@ async function runAgentDevContainerMode(
   agentArgs?: string[],
   initialPrompt?: string,
   sourceOverride?: string[],
+  preResolvedRole?: Role,
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
@@ -1056,8 +1225,8 @@ async function runAgentDevContainerMode(
   const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
 
   try {
-    // 1. Resolve role
-    const roleType = await resolveRoleFn(role, projectDir);
+    // 1. Resolve role (skip if pre-resolved)
+    const roleType = preResolvedRole ?? await resolveRoleFn(role, projectDir);
 
     // 1b. Apply --source override if provided
     if (sourceOverride?.length) {
@@ -1259,6 +1428,7 @@ export async function runProxyOnly(
   role: string,
   proxyPort: number,
   deps?: RunAgentDeps,
+  preResolvedRole?: Role,
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
@@ -1269,8 +1439,8 @@ export async function runProxyOnly(
   console.log = (...args: unknown[]) => console.error(...args);
 
   try {
-  // 1. Resolve role from project directory
-  const roleType = await resolveRoleFn(role, projectDir);
+  // 1. Resolve role from project directory (skip if pre-resolved)
+  const roleType = preResolvedRole ?? await resolveRoleFn(role, projectDir);
   const roleName = getAppShortName(roleType.metadata.name);
 
   // 3. Infer or override agent type
@@ -1341,6 +1511,7 @@ async function runAgentAcpMode(
   agentConfigCredentials?: string[],
   agentArgs?: string[],
   sourceOverride?: string[],
+  preResolvedRole?: Role,
   // initialPrompt is intentionally omitted: ACP mode does not forward initial prompts
 ): Promise<void> {
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
@@ -1393,8 +1564,8 @@ async function runAgentAcpMode(
   process.on("SIGTERM", onSignal);
 
   try {
-    // ── Step 1: Resolve role from project directory ──────────────────
-    const roleType = await resolveRoleFn(role, projectDir);
+    // ── Step 1: Resolve role from project directory (skip if pre-resolved) ──
+    const roleType = preResolvedRole ?? await resolveRoleFn(role, projectDir);
 
     // ── Step 1b: Apply --source override if provided ─────────────────
     if (sourceOverride?.length) {
