@@ -61,8 +61,15 @@ The "source" determines which agent directory is scanned to populate the project
 
 **Resolution order:**
 
-1. **CLI `--source` flag(s):** If one or more `--source` flags are provided, use those exclusively. Each value is an agent directory name (e.g., `claude`, `codex`, `aider`).
+1. **CLI `--source` flag(s):** If one or more `--source` flags are provided, use those exclusively.
 2. **Agent type as default:** If no `--source` flag is provided, the agent type being run is used as the source. Example: `mason claude` → source is `claude` → scans `.claude/`.
+
+**Accepted `--source` formats:** The flag accepts any of the following forms, all normalized to the dialect registry key:
+- Dot-prefixed directory name: `".claude"`
+- Short name: `"claude"`
+- Full registered agent name: `"claude-code-agent"`
+
+Invalid values produce an error listing available sources (see §8.3).
 
 **Multiple sources:** The user can specify `--source` multiple times:
 
@@ -76,15 +83,15 @@ This scans both `.claude/` and `.codex/` directories. Items are merged with **fi
 
 For each source directory, the scanner discovers:
 
-| Asset Type | Location | Example |
-|-----------|----------|---------|
-| Tasks (commands) | `.<source>/commands/**/*.md` | `.claude/commands/review.md` |
-| Skills | `.<source>/skills/<name>/SKILL.md` | `.claude/skills/openspec/SKILL.md` |
-| MCP Servers | `.<source>/settings.json` + `.<source>/settings.local.json` | `mcpServers` key in settings |
+| Asset Type | Location | Determined By |
+|-----------|----------|---------------|
+| Tasks | `.<source>/<task-dir>/**/*.md` | `AgentTaskConfig.dir` (e.g., `commands/` for Claude, `tasks/` for Mason) |
+| Skills | `.<source>/<skill-dir>/<name>/SKILL.md` | `AgentSkillConfig.dir` (e.g., `skills/` for Claude) |
+| MCP Servers | `.<source>/settings.json` + `.<source>/settings.local.json` | Convention — `settings.local.json` entries override `settings.json` entries with the same key |
 
-The existing `scanProject()` function in `packages/shared/src/mason/scanner.ts` already implements this scanning logic. The project role feature leverages this scanner, filtered to the resolved source dialect(s) rather than scanning all dialects.
+The scanner uses each agent's `AgentTaskConfig` and `AgentSkillConfig` to determine the correct directory names and whether subdirectories represent scopes or are part of the task name. If an agent uses kebab-case for scopes, assume tasks have no scope (it is impossible to distinguish where the scope ends and the task name begins).
 
-scanner should use the agents tasks and skills config to figure out the directory for tasks and skills and wether sub-directories will be processed for paths.  If agent uses kebab case for scopes, then assume now tasks have a scope since it will be impossible to tell when the task name starts and scope ends.
+The existing `scanProject()` function in `packages/shared/src/mason/scanner.ts` already implements the core scanning logic. The project role feature leverages this scanner, filtered to the resolved source dialect(s) rather than scanning all dialects.
 
 ### 4.4 Project Role Construction
 
@@ -97,11 +104,11 @@ Role {
     description: "Auto-generated from project's <source> configuration"
   }
   type: "project"
-  instructions: "" (empty — no system prompt)
+  instructions: ""                 // MUST be empty — see note below
   tasks: [mapped from discovered commands]
   skills: [mapped from discovered skills]
   apps: [mapped from discovered MCP servers]
-  sources: [resolved source directories]
+  sources: [normalized dialect names, e.g., "claude-code-agent"]
   container: {
     ignore: {
       paths: [
@@ -114,6 +121,10 @@ Role {
   source: { type: "local", agentDialect: <source-dialect> }
 }
 ```
+
+**Instructions are always empty.** The project role's `instructions` field must be an empty string. The project role does not extend or modify the agent's system prompt. Users who need custom instructions should create a ROLE.md.
+
+**Governance and credentials.** Credentials for MCP servers in the project role flow through the existing credential service and MCP proxy — they are not declared in the role's governance block. The `LOW` risk level reflects that the project role makes no additional credential claims beyond what the MCP proxy handles.
 
 ### 4.5 Container Ignore Rules
 
@@ -173,7 +184,7 @@ mason claude --source codex "fix the bug in auth.ts"
 
 If the argument matches neither a command, alias, nor agent type, the CLI exits with an error listing available commands and agent types.
 
-**Note:** The current shorthand detection already partially implements this (checking `isKnownAgentType()` in the pre-parse hook). This requirement ensures the check is comprehensive and includes config-declared agent types.
+**Note:** The current pre-parse hook in `commands/index.ts` already checks both `isKnownAgentType(arg)` and `readConfigAgentNames()`. This requirement ensures the fallthrough chain is comprehensive and well-tested: known commands → configured aliases → registered agent types → error with available options. Verify that no edge cases are missed (e.g., agent types added via config but not in the built-in registry) before treating this as fully implemented.
 
 ### 5.3 Docker Pre-flight Check
 

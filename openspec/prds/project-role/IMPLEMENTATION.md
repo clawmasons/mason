@@ -18,7 +18,7 @@ Currently `checkDocker()` is called as step 1 inside each mode function (interac
 **User Story:** As a user without Docker installed, when I run `mason claude`, I get a clear error with installation links within 2 seconds — not a cryptic failure after role resolution completes.
 
 **Key files:**
-- `packages/cli/src/cli/commands/run-agent.ts` — `createRunAction()` (hoist check before role resolution at ~line 600), remove duplicate checks from `runAgentInteractiveMode()` (~line 831), `runAgentDevContainerMode()` (~line 1012)
+- `packages/cli/src/cli/commands/run-agent.ts` — `createRunAction()` (hoist check before role resolution at ~line 600), remove duplicate checks from `runAgentInteractiveMode()` (~line 831), `runAgentDevContainerMode()` (~line 1012), and `runAgentAcpMode()` (~line 1287, which currently has no Docker check at all)
 - `packages/cli/src/cli/commands/docker-utils.ts` — existing `checkDockerCompose()` utility
 
 **Testable output:** `mason claude` on a machine without Docker exits immediately with a helpful error message and non-zero exit code.
@@ -31,7 +31,9 @@ Currently `checkDocker()` is called as step 1 inside each mode function (interac
 
 Extend the CLI pre-parse hook so that when a first positional argument doesn't match any known command or configured alias, it checks the agent registry for a matching agent type.
 
-The current pre-parse hook in `commands/index.ts` already checks `isKnownAgentType()` and `readConfigAgentNames()`. This change ensures the fallthrough is comprehensive: commands → aliases → agent types → error with available options.
+The current pre-parse hook in `commands/index.ts` already checks `isKnownAgentType()` and `readConfigAgentNames()` at lines 57-58. This change ensures the fallthrough is comprehensive: commands → aliases → agent types → error with available options.
+
+**Pre-implementation verification:** Before writing code, confirm that `mason codex` (without alias config) does NOT already work. If it does, this change is verification-only: add a test and document the existing behavior. Check for edge cases such as agent types added via config but not in the built-in registry.
 
 **User Story:** As a user, I can type `mason codex` without configuring an alias — the CLI recognizes `codex` as a registered agent type and rewrites it to `mason run --agent codex`.
 
@@ -50,15 +52,15 @@ The current pre-parse hook in `commands/index.ts` already checks `isKnownAgentTy
 
 Add a repeatable `--source <name>` flag to the `run` command. Values are validated against the dialect registry. When provided, the flag overrides the `sources` field on the resolved role.
 
+The flag accepts any of: `".claude"`, `"claude"`, or full agent name (`"claude-code-agent"`). All forms are normalized to the dialect registry key using `getDialect()`. Invalid values produce an error listing available sources.
+
 This change only adds the flag parsing and source override on existing roles (used with `--role`). Project role generation (using `--source` without `--role`) is handled in Change 5.
 
 **User Story:** As a developer, I can run `mason claude --role developer --source codex` to use my developer role but resolve task/skill content from `.codex/` instead of `.claude/`.
 
 **Key files:**
-- `packages/cli/src/cli/commands/run-agent.ts` — add `--source` option (repeatable) to run command definition, pass through to role resolution
-- `packages/shared/src/role/dialect-registry.ts` — `getDialect()` / `getAllDialects()` for validation of source names
-- `packages/shared/src/role/discovery.ts` — `resolveRole()` may need to accept source overrides
-- `packages/cli/src/materializer/role-materializer.ts` — source override applied before `materializeForAgent()`
+- `packages/cli/src/cli/commands/run-agent.ts` — add `--source` option (repeatable) to run command definition. Apply `--source` override in `createRunAction()` after role resolution — mutate the resolved role's `sources` field before passing to materialization. `resolveRole()` is unchanged.
+- `packages/shared/src/role/dialect-registry.ts` — `getDialect()` / `getAllDialects()` for validation and normalization of source names
 
 **Testable output:** `mason claude --role developer --source codex` loads the developer role but resolves tasks/skills from `.codex/`. Invalid `--source` values produce a clear error listing available sources.
 
@@ -83,8 +85,8 @@ See PRD §4.3 and the note on line 87 of PRD.md.
 
 **Key files:**
 - `packages/shared/src/mason/scanner.ts` — `scanProject()` (add dialect filter parameter), `scanCommands()` and `scanSkills()` (use agent task/skill config instead of hardcoded paths)
-- `packages/cli/src/materializer/role-materializer.ts` — `MASON_TASK_CONFIG`, `MASON_SKILL_CONFIG`, and per-agent configs (`AgentTaskConfig`, `AgentSkillConfig`)
-- `packages/shared/src/role/dialect-registry.ts` — may need to expose task/skill config per dialect
+- `packages/agent-sdk/src/discovery.ts` — `readTask()` and `readSkills()` provide task/skill reading; `AgentTaskConfig` and `AgentSkillConfig` types (from `@clawmasons/agent-sdk`) define directory structure per agent
+- `packages/shared/src/role/dialect-registry.ts` — expose task/skill config per dialect so the scanner can look up the correct directory names
 
 **Testable output:** `scanProject(projectDir, { dialects: ["claude-code-agent"] })` returns only items from `.claude/`. Task names respect the agent's scoping rules. Unit tests verify scanning with different agent configs.
 
@@ -100,8 +102,14 @@ This is the core feature. It:
 1. Resolves source directories from `--source` flags (or defaults to agent type)
 2. Calls the enhanced scanner (Change 4) filtered to the resolved sources
 3. Maps `ScanResult` → `Role` object with discovered tasks, skills, and apps
-4. Adds container.ignore.paths for source directories + `.env` (if exists)
-5. Passes the in-memory Role into the existing materialization pipeline via `adaptRoleToResolvedAgent()`
+4. Sets `instructions` to an empty string — the project role must NOT extend or modify the agent's system prompt
+5. Adds container.ignore.paths for source directories + `.env` (if exists)
+6. Passes the in-memory Role into the existing materialization pipeline via `adaptRoleToResolvedAgent()`
+
+**Error handling** (per PRD §8.3): `generateProjectRole()` must handle:
+1. **No source directory:** If the resolved source directory (e.g., `.claude/`) does not exist, exit with: `Error: Source directory ".<source>/" not found in project. Run from a project with agent configuration or specify a different --source.`
+2. **Empty source directory:** If the source directory exists but contains no tasks, skills, or MCP servers, warn but proceed with an empty project role.
+3. **Invalid `--source` value:** If the value does not match any registered dialect (after normalization), exit with: `Error: Unknown source "<value>". Available sources: claude, codex, aider, mcp, mason.`
 
 **User Story:** As a developer with a `.claude/` directory containing commands, skills, and MCP settings, I run `mason claude` and get a fully configured containerized agent session — no ROLE.md needed.
 
@@ -112,7 +120,7 @@ This is the core feature. It:
 - `packages/shared/src/role/adapter.ts` — `adaptRoleToResolvedAgent()` bridges to existing pipeline
 - `packages/cli/src/materializer/role-materializer.ts` — materialization proceeds normally with the generated role
 
-**Dependencies:** Change 3 (`--source` flag), Change 4 (scanner enhancement)
+**Dependencies:** Change 1 (Docker pre-flight hoisted before role resolution), Change 3 (`--source` flag), Change 4 (scanner enhancement)
 
 **Testable output:** `mason claude` in a project with `.claude/commands/` and `.claude/settings.json` starts a containerized agent with all discovered tasks and MCP servers proxied. No ROLE.md file is created on disk.
 
@@ -133,9 +141,11 @@ End-to-end tests verifying the full project role flow:
 7. **Error cases:** Missing source directory, invalid `--source` value, empty source directory
 
 **Key files:**
-- `packages/tests/` — e2e test directory
-- `packages/shared/tests/` — unit tests for scanner, role construction
-- `packages/cli/tests/` — unit tests for CLI flag parsing, project role generation
+- `packages/shared/tests/mason/scanner.test.ts` — unit tests for `scanProject()` with dialect filtering, agent-config-aware directory resolution
+- `packages/cli/tests/commands/run-agent.test.ts` — unit tests for `generateProjectRole()`, `--source` flag parsing and normalization, error cases from PRD §8.3
+- `packages/tests/project-role.test.ts` — e2e tests for the full project role flow (scenarios 1-7 above)
+
+Follow existing test patterns in each directory (describe/it structure, existing test helpers and fixtures).
 
 **Testable output:** All tests pass. `npx vitest run packages/shared/tests/` and `npx vitest run packages/cli/tests/` green.
 
