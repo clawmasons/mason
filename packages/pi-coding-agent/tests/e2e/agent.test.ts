@@ -1,14 +1,14 @@
 /**
- * E2E Test: Claude Code Agent — print mode via CLI
+ * E2E Test: Pi Coding Agent — print mode via CLI
  *
- * Validates the claude-code-agent print mode pipeline by:
+ * Validates the pi-coding-agent print mode pipeline by:
  *   1. Copying the claude-test-project fixture
- *   2. Running `mason run --role writer --agent claude -p <prompt>`
+ *   2. Running `mason run --role writer --agent pi --source claude -p <prompt>`
  *   3. Verifying session logs and file artifacts
  *
  * Requires:
  *   - Docker daemon running
- *   - CLAUDE_CODE_OAUTH_TOKEN env var set
+ *   - OPENROUTER_API_KEY env var set
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -27,10 +27,10 @@ import {
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-const hasClaudeToken = !!process.env.CLAUDE_CODE_OAUTH_TOKEN;
+const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
 
 function canRun(): boolean {
-  return isDockerAvailable() && hasClaudeToken;
+  return isDockerAvailable() && hasOpenRouterKey;
 }
 
 /**
@@ -48,7 +48,6 @@ function runMasonPrint(
       stdio: ["pipe", "pipe", "pipe"],
       env: {
         ...process.env,
-        TEST_TOKEN: "e2e-test-token",
       },
     });
 
@@ -76,30 +75,45 @@ function runMasonPrint(
 
 // ── Test Suite ──────────────────────────────────────────────────────────
 
-describe("claude-code-agent: print mode via CLI", () => {
+describe("pi-coding-agent: print mode via CLI", () => {
   let workspaceDir: string;
   let lastProc: ChildProcess | null = null;
 
   beforeAll(() => {
     if (!canRun()) return;
 
-    workspaceDir = copyFixtureWorkspace("claude-code-agent", {
+    workspaceDir = copyFixtureWorkspace("pi-coding-agent", {
       fixture: "claude-test-project",
     });
 
     // Create notes directory required by the filesystem MCP server
     fs.mkdirSync(path.join(workspaceDir, "notes"), { recursive: true });
+
+    // Write pi-coding-agent LLM config (required by pi's validate())
+    const configPath = path.join(workspaceDir, ".mason", "config.json");
+    fs.writeFileSync(configPath, JSON.stringify({
+      agents: {
+        "pi-coding-agent": {
+          config: {
+            llm: {
+              provider: "openrouter",
+              model: "anthropic/claude-sonnet-4",
+            },
+          },
+        },
+      },
+    }, null, 2));
   }, 30_000);
 
   afterAll(async () => {
     await stopProcessAndDocker(lastProc, workspaceDir);
   }, 120_000);
 
-  it("executes a prompt and logs to session.log with no role", async () => {
+  it("executes a prompt and logs to session.log", async () => {
     if (!canRun()) return;
 
     const { proc, stdout, stderr, exitCode } = await runMasonPrint(
-      ["run", "--agent", "claude", "-p", "what is 2+2 equal?"],
+      ["run", "--role", "writer", "--agent", "pi", "--source", "claude", "-p", "what is 2+2 equal?"],
       workspaceDir,
     );
     lastProc = proc;
@@ -112,30 +126,7 @@ describe("claude-code-agent: print mode via CLI", () => {
     expect(stdout.trim()).toBe("4");
 
     // Session log should exist and contain evidence the agent ran
-    testSessionLogContains(workspaceDir, '"type":"result"');
-
-    // Process and Docker should have stopped after print mode
-    testIfProcessAndDockerStopped(proc.pid!, workspaceDir);
-  }, 300_000);
-
-  it("executes a prompt and logs to session.log with role writer", async () => {
-    if (!canRun()) return;
-
-    const { proc, stdout, stderr, exitCode } = await runMasonPrint(
-      ["run", "--role", "writer", "--agent", "claude", "-p", "what is 2+2 equal?"],
-      workspaceDir,
-    );
-    lastProc = proc;
-
-    if (exitCode !== 0) {
-      console.error(`CLI exited with code ${exitCode}. stderr:\n${stderr}`);
-    }
-
-    // Print mode should output the result to stdout
-    expect(stdout.trim()).toBe("4");
-
-    // Session log should exist and contain evidence the agent ran
-    testSessionLogContains(workspaceDir, '"type":"result"');
+    testSessionLogContains(workspaceDir, '"agent_end"');
 
     // Process and Docker should have stopped after print mode
     testIfProcessAndDockerStopped(proc.pid!, workspaceDir);
@@ -146,7 +137,7 @@ describe("claude-code-agent: print mode via CLI", () => {
 
     const { proc, stderr, exitCode } = await runMasonPrint(
       [
-        "run", "--role", "writer", "--agent", "claude",
+        "run", "--role", "writer", "--agent", "pi", "--source", "claude",
         "-p", "/take-notes write a file test-file.md with the contents 'test-passed'",
       ],
       workspaceDir,

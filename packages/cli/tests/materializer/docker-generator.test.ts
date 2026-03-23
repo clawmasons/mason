@@ -468,11 +468,13 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain("agent-create-prd:");
   });
 
-  it("includes volume masking for directories as named volumes", () => {
+  it("includes volume masking for directories as named volumes (skipping overlay conflicts)", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
+    // .mason is masked (no overlay for it)
     expect(yml).toContain("ignore-mason:/home/mason/workspace/project/.mason");
-    expect(yml).toContain("ignore-claude:/home/mason/workspace/project/.claude");
+    // .claude is NOT masked — it has a build overlay directory that supersedes the mask
+    expect(yml).not.toContain("ignore-claude:/home/mason/workspace/project/.claude");
   });
 
   it("includes volume masking for files as Docker Compose configs (VirtioFS-safe)", () => {
@@ -484,12 +486,13 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain("empty-file");
   });
 
-  it("includes named volumes declaration section", () => {
+  it("includes named volumes declaration section (excluding overlay conflicts)", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
     expect(yml).toContain("volumes:");
     expect(yml).toContain("  ignore-mason:");
-    expect(yml).toContain("  ignore-claude:");
+    // .claude is superseded by the build overlay — no named volume needed
+    expect(yml).not.toContain("  ignore-claude:");
   });
 
   it("mounts project at /home/mason/workspace/project without :ro (agents need write access)", () => {

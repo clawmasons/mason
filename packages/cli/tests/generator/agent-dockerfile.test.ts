@@ -278,28 +278,28 @@ describe("generateAgentDockerfile", () => {
     const result = generateAgentDockerfile(agent, role);
 
     expect(result).toContain("apt-get update");
-    expect(result).toContain("apt-get install -y --no-install-recommends git curl jq");
+    expect(result).toContain("apt-get install -y --no-install-recommends vim-tiny git curl jq");
     expect(result).toContain("rm -rf /var/lib/apt/lists/*");
   });
 
-  it("does not include apt-get step when aptPackages is undefined", () => {
+  it("includes default apt packages when aptPackages is undefined", () => {
     const agent = makeNoteTakerAgent();
     const role = { ...agent.roles[0] };
     delete role.aptPackages;
     const result = generateAgentDockerfile(agent, role);
 
-    expect(result).not.toContain("apt-get");
+    expect(result).toContain("apt-get install -y --no-install-recommends vim-tiny");
   });
 
-  it("does not include apt-get step when aptPackages is empty", () => {
+  it("includes default apt packages when aptPackages is empty", () => {
     const agent = makeNoteTakerAgent();
     const role = { ...agent.roles[0], aptPackages: [] };
     const result = generateAgentDockerfile(agent, role);
 
-    expect(result).not.toContain("apt-get");
+    expect(result).toContain("apt-get install -y --no-install-recommends vim-tiny");
   });
 
-  it("Dockerfile without baseImage or aptPackages is unchanged from default", () => {
+  it("Dockerfile without baseImage or aptPackages still installs defaults", () => {
     const agent = makeNoteTakerAgent();
     const role = { ...agent.roles[0] };
     delete role.baseImage;
@@ -307,7 +307,7 @@ describe("generateAgentDockerfile", () => {
     const result = generateAgentDockerfile(agent, role);
 
     expect(result).toContain("FROM node:22-slim");
-    expect(result).not.toContain("apt-get");
+    expect(result).toContain("apt-get install -y --no-install-recommends vim-tiny");
   });
 
   it("combines baseImage and aptPackages correctly", () => {
@@ -320,7 +320,7 @@ describe("generateAgentDockerfile", () => {
     const result = generateAgentDockerfile(agent, role);
 
     expect(result).toContain("FROM ubuntu:24.04");
-    expect(result).toContain("apt-get install -y --no-install-recommends python3 make");
+    expect(result).toContain("apt-get install -y --no-install-recommends vim-tiny python3 make");
   });
 
   // ── Npm Packages Tests ───────────────────────────────────────────────

@@ -156,7 +156,7 @@ export function displayCredentials(
 export function execComposeCommand(
   composeFile: string,
   args: string[],
-  opts?: { interactive?: boolean; verbose?: boolean; timeoutMs?: number },
+  opts?: { interactive?: boolean; verbose?: boolean; timeoutMs?: number; logger?: AcpLogger },
 ): Promise<number> {
   const baseArgs = ["compose", "-f", composeFile, ...args];
   const showOutput = opts?.interactive || opts?.verbose;
@@ -173,8 +173,15 @@ export function execComposeCommand(
     };
 
     const child = showOutput
-      ? spawn("docker", baseArgs, { stdio: "inherit" })
+      ? (opts?.logger
+        ? spawn("docker", baseArgs, { stdio: ["ignore", "pipe", "pipe"] })
+        : spawn("docker", baseArgs, { stdio: "inherit" }))
       : spawn("docker", baseArgs, { stdio: ["ignore", "ignore", "pipe"] });
+
+    if (showOutput && opts?.logger) {
+      child.stdout?.on("data", (chunk: Buffer) => { opts.logger!.log(chunk.toString().trimEnd()); });
+      child.stderr?.on("data", (chunk: Buffer) => { opts.logger!.error(chunk.toString().trimEnd()); });
+    }
 
     let stderr = "";
     if (!showOutput) {
@@ -247,7 +254,7 @@ export function execComposeRunWithStreamCapture(
   const baseArgs = ["compose", "-f", composeFile, ...args];
   return new Promise((resolve) => {
     const child = spawn("docker", baseArgs, {
-      stdio: ["inherit", "pipe", "pipe"],
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     let stderr = "";
@@ -385,7 +392,7 @@ export function collectEnvCredentials(
 /**
  * Ensure docker build artifacts exist for a role. If not, trigger docker-init.
  */
-async function ensureDockerBuild(
+export async function ensureDockerBuild(
   roleType: Role,
   agentType: string,
   projectDir: string,
@@ -540,7 +547,7 @@ export interface RunAgentDeps {
   execComposeFn?: (
     composeFile: string,
     args: string[],
-    opts?: { interactive?: boolean; verbose?: boolean },
+    opts?: { interactive?: boolean; verbose?: boolean; logger?: AcpLogger },
   ) => Promise<number>;
   /** Override session ID generation (for testing). */
   generateSessionIdFn?: () => string;
@@ -735,7 +742,7 @@ export async function generateProjectRole(
     },
     governance: { risk: "LOW", credentials: [] },
     resources: [],
-    source: { type: "local", agentDialect: primaryDialect },
+    source: { type: "local", agentDialect: primaryDialect, path: path.join(projectDir, ".mason", "roles", "project") },
   };
 
   return role;
@@ -1498,10 +1505,10 @@ async function runAgentPrintMode(
     const buildArgs = ["build"];
     if (buildMode) buildArgs.push("--no-cache");
     buildArgs.push(proxyServiceName);
-    const buildCode = await execCompose(composeFile, buildArgs, { verbose });
+    const buildCode = await execCompose(composeFile, buildArgs, { verbose, logger: fileLogger });
     if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
 
-    const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose, timeoutMs: 30_000 });
+    const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose, logger: fileLogger, timeoutMs: 30_000 });
     if (proxyCode !== 0) throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
 
     await waitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
@@ -1538,10 +1545,13 @@ async function runAgentPrintMode(
     const { code: agentCode } = await execComposeRunWithStreamCapture(composeFile, runArgs, (line) => {
       fileLogger.log(`[stream] ${line}`);
       if (parseFinalResult && finalResult === null) {
-        try {
-          finalResult = parseFinalResult(line);
-        } catch (err) {
-          fileLogger.error(`[stream] parse error: ${err instanceof Error ? err.message : String(err)}`);
+        const trimmed = line.trimStart();
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+          try {
+            finalResult = parseFinalResult(line);
+          } catch (err) {
+            fileLogger.error(`[stream] parse error: ${err instanceof Error ? err.message : String(err)}`);
+          }
         }
       }
     });

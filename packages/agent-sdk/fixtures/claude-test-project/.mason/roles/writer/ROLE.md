@@ -2,7 +2,8 @@
 name: writer
 description: Manages notes on the filesystem using inline MCP server config
 version: 1.0.0
-
+sources:
+  - claude
 tasks:
   - take-notes
 
@@ -11,6 +12,7 @@ skills:
 
 mcp_servers:
   - name: filesystem
+    location: proxy
     transport: stdio
     command: npx
     args:

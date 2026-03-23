@@ -78,8 +78,12 @@ export function generateAgentDockerfile(
   // Base image: role overrides agent, agent overrides default
   const baseImage = role.baseImage ?? dockerfileConfig?.baseImage ?? "node:22-slim";
 
+  // Default apt packages for all agent containers
+  const DEFAULT_APT_PACKAGES = ["vim-tiny"];
+
   // Merge apt packages from agent and role, deduplicate
   const allAptPackages = [
+    ...DEFAULT_APT_PACKAGES,
     ...(dockerfileConfig?.aptPackages ?? []),
     ...(role.aptPackages ?? []),
   ];

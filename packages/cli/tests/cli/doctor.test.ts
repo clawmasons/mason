@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -13,6 +13,7 @@ function makeDeps(overrides: Partial<DoctorDeps> = {}): DoctorDeps {
     rmSyncFn: overrides.rmSyncFn ?? (() => {}),
     confirmFn: overrides.confirmFn ?? (async () => true),
     logFn: overrides.logFn ?? (() => {}),
+    logCmdFn: overrides.logCmdFn ?? (() => {}),
   };
 }
 
@@ -21,6 +22,10 @@ describe("runDoctor", () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-doctor-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it("exits early with clean message when no issues found", async () => {
@@ -189,8 +194,61 @@ describe("runDoctor", () => {
 
     await runDoctor(tmpDir, { quick: true, auto: true }, deps);
 
-    expect(logs.every((l) => !l.includes("volume"))).toBe(true);
-    expect(logs.every((l) => !l.includes("network"))).toBe(true);
+    expect(logs.every((l) => !l.includes("Unused volumes"))).toBe(true);
+    expect(logs.every((l) => !l.includes("Unused networks"))).toBe(true);
+  });
+
+  it("prints deep clean suggestions after cleanup", async () => {
+    const logs: string[] = [];
+    const deps = makeDeps({
+      execSyncFn: (cmd: string) => {
+        if (cmd.includes("docker info")) return "ok";
+        if (cmd.includes('status=exited')) return "abc123 mason-writer-agent";
+        if (cmd.includes("dangling=true")) return "";
+        if (cmd.includes("docker compose ls")) return "[]";
+        if (cmd.includes("docker rm")) return "";
+        return "";
+      },
+      logFn: (msg) => logs.push(msg),
+    });
+
+    await runDoctor(tmpDir, { quick: true, auto: true }, deps);
+
+    expect(logs.some((l) => l.includes("Deep clean"))).toBe(true);
+    expect(logs.some((l) => l.includes("docker system prune -a"))).toBe(true);
+    expect(logs.some((l) => l.includes("docker volume prune"))).toBe(true);
+    expect(logs.some((l) => l.includes("docker builder prune"))).toBe(true);
+  });
+
+  it("prints deep clean suggestions when system is clean", async () => {
+    const logs: string[] = [];
+    const deps = makeDeps({
+      logFn: (msg) => logs.push(msg),
+    });
+
+    await runDoctor(tmpDir, { quick: true, auto: true }, deps);
+
+    expect(logs.some((l) => l.includes("Deep clean"))).toBe(true);
+  });
+
+  it("logs commands via logCmdFn during scan and cleanup", async () => {
+    const cmdLogs: string[] = [];
+    const deps = makeDeps({
+      execSyncFn: (cmd: string) => {
+        if (cmd.includes("docker info")) return "ok";
+        if (cmd.includes('status=exited')) return "abc123 mason-writer-agent";
+        if (cmd.includes("dangling=true")) return "";
+        if (cmd.includes("docker compose ls")) return "[]";
+        if (cmd.includes("docker rm")) return "";
+        return "";
+      },
+      logCmdFn: (cmd) => cmdLogs.push(cmd),
+    });
+
+    await runDoctor(tmpDir, { quick: true, auto: true }, deps);
+
+    expect(cmdLogs.some((c) => c.includes("docker ps"))).toBe(true);
+    expect(cmdLogs.some((c) => c.includes("docker rm"))).toBe(true);
   });
 });
 
@@ -199,6 +257,10 @@ describe("quickAutoCleanup", () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-qac-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it("runs silently and removes stopped containers", async () => {

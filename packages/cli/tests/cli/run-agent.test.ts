@@ -13,6 +13,15 @@ vi.mock("../../src/cli/commands/doctor.js", async (importOriginal) => {
   };
 });
 
+// Mock ensureProxyDependencies to avoid expensive node_modules BFS/copy in tests
+vi.mock("../../src/materializer/proxy-dependencies.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/materializer/proxy-dependencies.js")>();
+  return {
+    ...actual,
+    ensureProxyDependencies: vi.fn(() => {}),
+  };
+});
+
 import { program } from "../../src/cli/index.js";
 import {
   generateSessionId,
@@ -29,6 +38,7 @@ import {
   normalizeSourceFlags,
   generateProjectRole,
   inferAgentType,
+  ensureDockerBuild,
 } from "../../src/cli/commands/run-agent.js";
 import {
   generateSessionComposeYml,
@@ -634,33 +644,15 @@ describe("packages-hash invalidation", () => {
     return dockerBuildDir;
   }
 
-  function makeDeps(roleType: Role) {
-    return {
-      generateSessionIdFn: () => "test1234",
-      checkDockerComposeFn: () => {},
-      waitForProxyHealthFn: async () => {},
-      resolveRoleFn: async () => roleType,
-      adaptRoleFn: () => ({
-        name: "writer", version: "1.0.0", agentName: "writer", slug: "writer",
-        runtimes: ["claude-code-agent"], credentials: [],
-        roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
-      } as ResolvedAgent),
-      ensureGitignoreEntryFn: () => false,
-      existsSyncFn: (p: string) => fs.existsSync(p),
-      execComposeFn: async () => 0,
-      runAgentFn: async () => 0,
-      startHostProxyFn: async () => ({ stop: async () => {} }),
-      initRegistryFn: async () => {},
-    };
-  }
-
   it("skips rebuild when packages hash matches", async () => {
     const role = makeRole();
     const dockerBuildDir = makeDockerBuildDir(role.container?.packages ?? {});
     const dockerfilePath = path.join(dockerBuildDir, "claude-code-agent", "Dockerfile");
     const mtime = fs.statSync(dockerfilePath).mtimeMs;
 
-    await runAgent(projectDir, "claude-code-agent", "writer", makeDeps(role));
+    await ensureDockerBuild(role, "claude-code-agent", projectDir, {
+      existsSyncFn: (p: string) => fs.existsSync(p),
+    }).catch(() => {});
 
     // Dockerfile should not have been regenerated
     expect(fs.statSync(dockerfilePath).mtimeMs).toBe(mtime);
@@ -672,11 +664,10 @@ describe("packages-hash invalidation", () => {
     const dockerBuildDir = makeDockerBuildDir({});
     const dockerfilePath = path.join(dockerBuildDir, "claude-code-agent", "Dockerfile");
 
-    // runAgent will detect hash mismatch and try to rebuild
-    // generateRoleDockerBuildDir will be called — it may partially fail in test env, but the key
-    // thing is the OLD build dir is deleted (Dockerfile removed) before rebuild attempt
     const originalDockerfileContent = fs.readFileSync(dockerfilePath, "utf-8");
-    await runAgent(projectDir, "claude-code-agent", "writer", makeDeps(role)).catch(() => {});
+    await ensureDockerBuild(role, "claude-code-agent", projectDir, {
+      existsSyncFn: (p: string) => fs.existsSync(p),
+    }).catch(() => {});
 
     // The old Dockerfile content ("FROM node:20") should be gone — build was invalidated
     const newContent = fs.existsSync(dockerfilePath) ? fs.readFileSync(dockerfilePath, "utf-8") : null;
@@ -691,7 +682,9 @@ describe("packages-hash invalidation", () => {
 
     expect(fs.existsSync(hashFilePath)).toBe(false);
 
-    await runAgent(projectDir, "claude-code-agent", "writer", makeDeps(role)).catch(() => {});
+    await ensureDockerBuild(role, "claude-code-agent", projectDir, {
+      existsSyncFn: (p: string) => fs.existsSync(p),
+    }).catch(() => {});
 
     // Hash file should be written after build (even if some steps fail in test env)
     // The hash for empty packages is deterministic
@@ -1648,6 +1641,9 @@ describe("generateProjectRole", () => {
     expect(role.metadata.description).toContain("claude");
     expect(role.source.type).toBe("local");
     expect(role.source.agentDialect).toBe("claude-code-agent");
+    expect(role.source.path).toBe(path.join(tmpDir, ".mason", "roles", "project"));
+    // Verify getSourceProjectDir would resolve back to projectDir (3 levels up)
+    expect(path.resolve(role.source.path!, "..", "..", "..")).toBe(tmpDir);
     expect(role.governance.risk).toBe("LOW");
     expect(role.sources).toEqual(["claude-code-agent"]);
   });

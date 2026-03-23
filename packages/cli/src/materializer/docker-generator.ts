@@ -529,8 +529,12 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
   agentVolumeLines.push(`      - ${relProjectDir}:${PROJECT_MOUNT_PATH}`);
 
   // Volume masks: directories only (named volumes); file masks routed through configs below
+  // Skip masks whose container path overlaps with a build overlay directory — the overlay replaces them.
+  const overlayContainerPaths = new Set(
+    (buildWorkspaceProjectDirEntries ?? []).map((e) => `${PROJECT_MOUNT_PATH}/${e}`),
+  );
   for (const mask of volumeMasks) {
-    if (mask.type === "directory") {
+    if (mask.type === "directory" && !overlayContainerPaths.has(mask.containerPath)) {
       agentVolumeLines.push(`      - ${mask.volumeName}:${mask.containerPath}`);
     }
   }
@@ -626,7 +630,8 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
     : "";
 
   // --- Named volumes declaration ---
-  const namedVolumes = volumeMasks.filter((m) => m.type === "directory");
+  // Exclude volumes that are superseded by build overlay directories
+  const namedVolumes = volumeMasks.filter((m) => m.type === "directory" && !overlayContainerPaths.has(m.containerPath));
   const volumesSection = namedVolumes.length > 0
     ? `\nvolumes:\n${namedVolumes.map((v) => `  ${v.volumeName}:`).join("\n")}\n`
     : "";
