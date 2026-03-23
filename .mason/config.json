@@ -7,7 +7,7 @@
   },
   "agents": {
     "pi-coding-agent": {
-      "package": "pi-coding-agent",
+      "package": "@clawmasons/pi-coding-agent",
       "config": {
         "llm": {
           "provider": "openrouter",

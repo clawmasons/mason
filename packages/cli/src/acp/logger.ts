@@ -1,9 +1,9 @@
 /**
- * File-based logger for ACP runtime.
+ * File-based session logger.
  *
- * Writes timestamped log lines to `{logDir}/acp.log`.
- * Used in both stdio and HTTP transport modes so that diagnostic
- * output never pollutes stdout (which stdio transport needs for JSON-RPC).
+ * Writes timestamped log lines to `{logDir}/session.log`.
+ * Used by ACP mode and print mode so that diagnostic
+ * output never pollutes stdout.
  */
 
 import * as fs from "node:fs";
@@ -16,13 +16,13 @@ export interface AcpLogger {
 }
 
 /**
- * Create a file-appending logger that writes to `{logDir}/acp.log`.
+ * Create a file-appending logger that writes to `{logDir}/session.log`.
  * Creates the directory if it doesn't exist.
  */
 export function createFileLogger(logDir: string): AcpLogger {
   fs.mkdirSync(logDir, { recursive: true });
 
-  const logPath = path.join(logDir, "acp.log");
+  const logPath = path.join(logDir, "session.log");
   const stream = fs.createWriteStream(logPath, { flags: "a" });
 
   function write(level: string, args: unknown[]): void {

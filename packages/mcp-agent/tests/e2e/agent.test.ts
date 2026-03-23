@@ -13,11 +13,13 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import {
   copyFixtureWorkspace,
   MASON_BIN,
   isDockerAvailable,
+  testIfProcessAndDockerStopped,
+  stopProcessAndDocker,
 } from "@clawmasons/agent-sdk/testing";
 
 // ── stdout helpers ──────────────────────────────────────────────────────
@@ -96,36 +98,7 @@ describe("mcp-proxy-agent: agent↔proxy via CLI", () => {
   }, 30_000);
 
   afterAll(async () => {
-    // Kill the CLI process (it will attempt its own cleanup)
-    if (cliProcess && !cliProcess.killed) {
-      cliProcess.kill("SIGTERM");
-      await new Promise((r) => setTimeout(r, 3_000));
-      if (!cliProcess.killed) {
-        cliProcess.kill("SIGKILL");
-      }
-    }
-
-    // Best-effort: tear down any leftover docker compose sessions
-    if (workspaceDir) {
-      const sessionsDir = path.join(workspaceDir, ".mason", "sessions");
-      if (fs.existsSync(sessionsDir)) {
-        for (const sessionId of fs.readdirSync(sessionsDir)) {
-          const composeFile = path.join(sessionsDir, sessionId, "docker", "docker-compose.yml");
-          if (fs.existsSync(composeFile)) {
-            try {
-              execSync(
-                `docker compose -f "${composeFile}" down --rmi local --volumes`,
-                { stdio: "pipe", timeout: 60_000 },
-              );
-            } catch { /* best-effort cleanup */ }
-          }
-        }
-      }
-    }
-
-    if (workspaceDir && fs.existsSync(workspaceDir)) {
-      fs.rmSync(workspaceDir, { recursive: true, force: true });
-    }
+    await stopProcessAndDocker(cliProcess, workspaceDir);
   }, 120_000);
 
   it("starts agent via CLI, lists tools, and calls tools via REPL", async () => {
@@ -227,5 +200,8 @@ describe("mcp-proxy-agent: agent↔proxy via CLI", () => {
         resolve();
       });
     });
+
+    // --- Verify cleanup: process and Docker containers should have stopped ---
+    testIfProcessAndDockerStopped(cliProcess.pid!, workspaceDir);
   }, 300_000);
 });

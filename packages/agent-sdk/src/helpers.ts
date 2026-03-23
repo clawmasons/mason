@@ -117,6 +117,7 @@ export function generateAgentLaunchJson(
   instructions?: string,
   agentArgs?: string[],
   initialPrompt?: string,
+  printMode?: boolean,
 ): string {
   // Start with runtime-specific credentials from the agent package
   const credentials: LaunchCredentialConfig[] = [
@@ -153,9 +154,13 @@ export function generateAgentLaunchJson(
     args = [...(args ?? []), ...agentArgs];
   }
 
-  // Append initial prompt as final bare positional arg
+  // Append initial prompt (print mode uses json stream args + -p flag; otherwise bare positional)
   if (initialPrompt && !acpMode) {
-    args = [...(args ?? []), initialPrompt];
+    if (printMode && agentPkg.printMode) {
+      args = [...(args ?? []), ...agentPkg.printMode.jsonStreamArgs, "-p", initialPrompt];
+    } else {
+      args = [...(args ?? []), initialPrompt];
+    }
   }
 
   const config: Record<string, unknown> = { credentials, command };

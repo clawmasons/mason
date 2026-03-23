@@ -38,6 +38,17 @@ RUN npm install -g @anthropic-ai/claude-code
     projectFolder: ".claude/skills",
   },
 
+  printMode: {
+    jsonStreamArgs: ["--output-format", "stream-json", "--verbose"],
+    parseJsonStreamFinalResult(line: string): string | null {
+      const event = JSON.parse(line);
+      if (event.type === "result") {
+        return event.result ?? "";
+      }
+      return null;
+    },
+  },
+
   validate: (agent: ResolvedAgent): AgentValidationResult => {
     const warnings = [];
     if (agent.llm) {

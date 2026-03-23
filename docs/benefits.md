@@ -31,6 +31,16 @@ Mason allowed us to finally control the test development workflow by giving the 
 
 Subagents help here too, but agents can be resourceful. Role-based isolation provides a hard boundary.
 
+## Print Mode and Session Logging
+
+Mason's print mode (`-p` / `--print`) lets you run an agent non-interactively and capture only the final result on stdout — ideal for scripting, CI pipelines, and automation.
+
+Behind the scenes, Mason uses each agent's native JSON streaming output to capture the full session. Every streamed event is written to `.mason/logs/session.log`, giving you a complete record of the agent's reasoning and tool usage without polluting the terminal. Only the final result text is printed to stdout when the agent finishes.
+
+This is accomplished through an adapter layer in the Agent Package SDK. Each agent package declares its own streaming format — for example, Claude Code uses `--output-format stream-json` while Pi uses `--mode json` — along with a parser that extracts the final result from the stream. Mason handles the rest: redirecting logs, capturing output line by line, and forwarding the exit code.
+
+The same `session.log` file is used by ACP mode, so diagnostic output is always in a consistent location regardless of how the agent was launched.
+
 ## Related
 
 - [Security Model](security.md) — Full security architecture

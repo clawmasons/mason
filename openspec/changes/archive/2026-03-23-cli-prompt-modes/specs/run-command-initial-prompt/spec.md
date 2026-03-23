@@ -1,10 +1,4 @@
-# Spec: run-command-initial-prompt
-
-## Purpose
-
-Defines how `mason run` accepts positional arguments as an initial prompt passed to the agent at launch, enabling one-liner task invocations like `mason run --agent claude "do this task"`.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: run command accepts positional args as initial prompt
 
