@@ -251,8 +251,20 @@ describe("piCodingAgentMaterializer", () => {
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
-        expect(indexTs).toContain('name: "triage-issue"');
-        expect(indexTs).toContain('name: "review-pr"');
+        expect(indexTs).toContain('registerCommand("triage-issue"');
+        expect(indexTs).toContain('registerCommand("review-pr"');
+      });
+
+      it("prefixes command name with scope when task has a scope", () => {
+        const agent = makePiAgent();
+        // Add scope to the triage task
+        agent.roles[0].tasks[0] = { ...agent.roles[0].tasks[0], scope: "opsx" };
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
+        expect(indexTs).toContain('registerCommand("opsx-triage-issue"');
+        // review-pr has no scope, should remain unprefixed
+        expect(indexTs).toContain('registerCommand("review-pr"');
       });
 
       it("includes task description in command", () => {

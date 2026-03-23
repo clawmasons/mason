@@ -34,11 +34,11 @@ mason pi --source claude
 
 ### 2. Define project roles
 
-The mason project uses roles to strictly define what an agent can doe.
+The mason project uses roles to strictly define what an agent can do.
 
-When masons is run without the "--role" argument, it builds a in memory role that
+When mason is run without the "--role" argument, it builds an in-memory role that
 has all of the "source" skills, mcp-servers, etc, and the container is configured
-too allow all of those operations.
+to allow all of those operations.
 
 
 #### Use the configure command
