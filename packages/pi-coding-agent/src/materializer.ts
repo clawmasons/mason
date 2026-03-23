@@ -99,10 +99,11 @@ function generateExtensionIndexTs(
   const allTasks = collectAllTasks(agent.roles);
   for (const [task] of allTasks) {
     const taskShortName = getAppShortName(task.name);
+    const commandName = task.scope ? `${task.scope}-${taskShortName}` : taskShortName;
     const description = `${task.name}@${task.version}`;
     const prompt = task.prompt ?? "[no prompt defined]";
 
-    const safeName = taskShortName.replace(/"/g, '\\"');
+    const safeName = commandName.replace(/"/g, '\\"');
     const safeDesc = description.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
     lines.push("");
