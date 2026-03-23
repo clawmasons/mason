@@ -1,6 +1,26 @@
 import { randomUUID } from "node:crypto";
+import { appendFileSync } from "node:fs";
 import { createRelayMessage } from "../relay/messages.js";
 import type { RelayServer } from "../relay/server.js";
+
+// ── Local Audit Log ──────────────────────────────────────────────────
+
+let localAuditPath: string | undefined;
+
+/**
+ * Set the path for local audit log file.
+ * When set, audit events are written to this file regardless of relay status.
+ */
+export function setLocalAuditPath(path: string): void {
+  localAuditPath = path;
+}
+
+function writeLocalAudit(msg: unknown): void {
+  if (!localAuditPath) return;
+  try {
+    appendFileSync(localAuditPath, JSON.stringify(msg) + "\n");
+  } catch { /* best-effort */ }
+}
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -41,8 +61,6 @@ export function auditPostHook(
   status: AuditStatus,
   relay: RelayServer | null,
 ): void {
-  if (!relay) return;
-
   const durationMs = Date.now() - preResult.startTime;
 
   const msg = createRelayMessage("audit_event", {
@@ -56,6 +74,10 @@ export function auditPostHook(
     duration_ms: durationMs,
     timestamp: new Date().toISOString(),
   });
+
+  writeLocalAudit(msg);
+
+  if (!relay) return;
 
   try {
     relay.send(msg);
@@ -85,8 +107,6 @@ export function logDroppedServers(
   roleName: string,
   _acpClient?: string,
 ): void {
-  if (!relay) return;
-
   for (const server of unmatched) {
     const msg = createRelayMessage("audit_event", {
       agent_name: agentName,
@@ -99,6 +119,10 @@ export function logDroppedServers(
       duration_ms: 0,
       timestamp: new Date().toISOString(),
     });
+
+    writeLocalAudit(msg);
+
+    if (!relay) continue;
 
     try {
       relay.send(msg);

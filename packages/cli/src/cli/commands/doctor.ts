@@ -39,6 +39,7 @@ export interface DoctorDeps {
   rmSyncFn?: (p: string, opts?: { recursive?: boolean; force?: boolean }) => void;
   confirmFn?: (message: string) => Promise<boolean>;
   logFn?: (message: string) => void;
+  logCmdFn?: (cmd: string) => void;
 }
 
 // ── Command Registration ───────────────────────────────────────────────
@@ -63,6 +64,7 @@ export async function runDoctor(
 ): Promise<void> {
   const exec = deps?.execSyncFn ?? defaultExecSync;
   const log = deps?.logFn ?? console.log;
+  const logCmd = deps?.logCmdFn ?? defaultLogCmd(log);
 
   // Check Docker availability
   try {
@@ -79,13 +81,14 @@ export async function runDoctor(
   log(`\n  Mason Doctor${isQuick ? " (quick)" : ""}\n`);
 
   // Scan
-  const scan = scanResources(projectDir, isQuick, deps);
+  const scan = scanResources(projectDir, isQuick, { ...deps, logCmdFn: logCmd });
 
   // Report
   const hasIssues = reportScan(scan, isQuick, log);
 
   if (!hasIssues) {
     log("  ✓ System is clean — no stale resources found.\n");
+    printDeepCleanSuggestions(log);
     return;
   }
 
@@ -100,8 +103,9 @@ export async function runDoctor(
   }
 
   // Cleanup
-  const result = cleanup(scan, isQuick, deps);
+  const result = cleanup(scan, isQuick, { ...deps, logCmdFn: logCmd });
   reportCleanup(result, log);
+  printDeepCleanSuggestions(log);
 }
 
 // ── Scanning ───────────────────────────────────────────────────────────
@@ -112,22 +116,23 @@ function scanResources(
   deps?: DoctorDeps,
 ): ScanResult {
   const exec = deps?.execSyncFn ?? defaultExecSync;
+  const logCmd = deps?.logCmdFn ?? (() => {});
   const readdir = deps?.readdirSyncFn ?? ((p: string) => {
     try { return fs.readdirSync(p); } catch { return []; }
   });
   const exists = deps?.existsSyncFn ?? fs.existsSync;
 
   // Stopped mason containers
-  const stoppedContainers = listContainers(exec, "exited");
+  const stoppedContainers = listContainers(exec, logCmd, "exited");
 
   // Stuck containers (created but never started — typically a Docker daemon issue)
-  const stuckContainers = listContainers(exec, "created");
+  const stuckContainers = listContainers(exec, logCmd, "created");
 
   // Dangling images
-  const danglingImages = listDanglingImages(exec);
+  const danglingImages = listDanglingImages(exec, logCmd);
 
   // Orphaned session directories
-  const orphanedSessions = findOrphanedSessions(projectDir, exec, readdir, exists);
+  const orphanedSessions = findOrphanedSessions(projectDir, exec, logCmd, readdir, exists);
 
   const result: ScanResult = {
     stoppedContainers,
@@ -137,29 +142,31 @@ function scanResources(
   };
 
   if (!quickMode) {
-    result.runningContainers = listContainers(exec, "running");
-    result.unusedVolumes = listUnusedVolumes(exec);
-    result.unusedNetworks = listUnusedNetworks(exec);
-    result.diskUsage = getDiskUsage(exec);
+    result.runningContainers = listContainers(exec, logCmd, "running");
+    result.unusedVolumes = listUnusedVolumes(exec, logCmd);
+    result.unusedNetworks = listUnusedNetworks(exec, logCmd);
+    result.diskUsage = getDiskUsage(exec, logCmd);
   }
 
   return result;
 }
 
-function listContainers(exec: (cmd: string) => string, status: "exited" | "running" | "created"): string[] {
+function listContainers(exec: (cmd: string) => string, logCmd: (cmd: string) => void, status: "exited" | "running" | "created"): string[] {
   try {
-    const output = exec(
-      `docker ps --filter "status=${status}" --filter "label=com.docker.compose.project" --format "{{.ID}} {{.Names}}"`,
-    );
+    const cmd = `docker ps --filter "status=${status}" --filter "label=com.docker.compose.project" --format "{{.ID}} {{.Names}}"`;
+    logCmd(cmd);
+    const output = exec(cmd);
     return output.split("\n").filter((line) => line.trim() && isMasonResource(line));
   } catch {
     return [];
   }
 }
 
-function listDanglingImages(exec: (cmd: string) => string): string[] {
+function listDanglingImages(exec: (cmd: string) => string, logCmd: (cmd: string) => void): string[] {
   try {
-    const output = exec('docker images --filter "dangling=true" --format "{{.ID}} {{.Repository}}:{{.Tag}}"');
+    const cmd = 'docker images --filter "dangling=true" --format "{{.ID}} {{.Repository}}:{{.Tag}}"';
+    logCmd(cmd);
+    const output = exec(cmd);
     return output.split("\n").filter((line) => line.trim());
   } catch {
     return [];
@@ -169,6 +176,7 @@ function listDanglingImages(exec: (cmd: string) => string): string[] {
 function findOrphanedSessions(
   projectDir: string,
   exec: (cmd: string) => string,
+  logCmd: (cmd: string) => void,
   readdir: (p: string) => string[],
   exists: (p: string) => boolean,
 ): string[] {
@@ -181,7 +189,9 @@ function findOrphanedSessions(
   // Get list of running compose projects
   let runningProjects: Set<string>;
   try {
-    const output = exec("docker compose ls --format json");
+    const cmd = "docker compose ls --format json";
+    logCmd(cmd);
+    const output = exec(cmd);
     const projects = JSON.parse(output) as Array<{ Name: string }>;
     runningProjects = new Set(projects.map((p) => p.Name));
   } catch {
@@ -209,19 +219,22 @@ function findOrphanedSessions(
   return orphaned;
 }
 
-function listUnusedVolumes(exec: (cmd: string) => string): string[] {
+function listUnusedVolumes(exec: (cmd: string) => string, logCmd: (cmd: string) => void): string[] {
   try {
-    const output = exec('docker volume ls --filter "dangling=true" --format "{{.Name}}"');
+    const cmd = 'docker volume ls --filter "dangling=true" --format "{{.Name}}"';
+    logCmd(cmd);
+    const output = exec(cmd);
     return output.split("\n").filter((line) => line.trim() && isMasonResource(line));
   } catch {
     return [];
   }
 }
 
-function listUnusedNetworks(exec: (cmd: string) => string): string[] {
+function listUnusedNetworks(exec: (cmd: string) => string, logCmd: (cmd: string) => void): string[] {
   try {
-    // List networks not used by any container, excluding default ones
-    const output = exec('docker network ls --format "{{.ID}} {{.Name}}"');
+    const cmd = 'docker network ls --format "{{.ID}} {{.Name}}"';
+    logCmd(cmd);
+    const output = exec(cmd);
     const lines = output.split("\n").filter((line) => line.trim());
     return lines.filter((line) => {
       const name = line.split(" ")[1] ?? "";
@@ -232,9 +245,11 @@ function listUnusedNetworks(exec: (cmd: string) => string): string[] {
   }
 }
 
-function getDiskUsage(exec: (cmd: string) => string): string {
+function getDiskUsage(exec: (cmd: string) => string, logCmd: (cmd: string) => void): string {
   try {
-    return exec("docker system df");
+    const cmd = "docker system df";
+    logCmd(cmd);
+    return exec(cmd);
   } catch {
     return "Unable to retrieve disk usage.";
   }
@@ -326,6 +341,7 @@ function cleanup(
   deps?: DoctorDeps,
 ): CleanupResult {
   const exec = deps?.execSyncFn ?? defaultExecSync;
+  const logCmd = deps?.logCmdFn ?? (() => {});
   const rm = deps?.rmSyncFn ?? fs.rmSync;
 
   const result: CleanupResult = {
@@ -341,7 +357,9 @@ function cleanup(
     const containerId = container.split(" ")[0];
     if (!containerId) continue;
     try {
-      exec(`docker rm ${containerId}`);
+      const cmd = `docker rm ${containerId}`;
+      logCmd(cmd);
+      exec(cmd);
       result.containersRemoved++;
     } catch {
       // Skip containers that can't be removed
@@ -353,7 +371,9 @@ function cleanup(
     const containerId = container.split(" ")[0];
     if (!containerId) continue;
     try {
-      exec(`docker rm -f ${containerId}`);
+      const cmd = `docker rm -f ${containerId}`;
+      logCmd(cmd);
+      exec(cmd);
       result.containersRemoved++;
     } catch {
       // Skip containers that can't be removed
@@ -363,7 +383,9 @@ function cleanup(
   // Prune dangling images
   if (scan.danglingImages.length > 0) {
     try {
-      exec("docker image prune -f");
+      const cmd = "docker image prune -f";
+      logCmd(cmd);
+      exec(cmd);
       result.imagesRemoved = true;
     } catch {
       // Non-fatal
@@ -375,7 +397,9 @@ function cleanup(
     try {
       // Try to stop any lingering containers for this session first
       try {
-        exec(`docker compose -f .mason/sessions/${sessionId}/docker-compose.yaml down 2>/dev/null`);
+        const cmd = `docker compose -f .mason/sessions/${sessionId}/docker-compose.yaml down 2>/dev/null`;
+        logCmd(cmd);
+        exec(cmd);
       } catch {
         // Compose file might not be valid or containers already gone
       }
@@ -393,7 +417,9 @@ function cleanup(
         const volumeName = volume.trim();
         if (!volumeName) continue;
         try {
-          exec(`docker volume rm ${volumeName}`);
+          const cmd = `docker volume rm ${volumeName}`;
+          logCmd(cmd);
+          exec(cmd);
           result.volumesRemoved++;
         } catch {
           // Skip volumes that can't be removed
@@ -406,7 +432,9 @@ function cleanup(
         const networkId = network.split(" ")[0];
         if (!networkId) continue;
         try {
-          exec(`docker network rm ${networkId}`);
+          const cmd = `docker network rm ${networkId}`;
+          logCmd(cmd);
+          exec(cmd);
           result.networksRemoved++;
         } catch {
           // Skip networks that can't be removed
@@ -459,6 +487,18 @@ export async function quickAutoCleanup(
 
 function defaultExecSync(cmd: string): string {
   return execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+}
+
+function defaultLogCmd(log: (msg: string) => void): (cmd: string) => void {
+  return (cmd: string) => log(`  \x1b[2m$ ${cmd}\x1b[0m`);
+}
+
+function printDeepCleanSuggestions(log: (msg: string) => void): void {
+  log("  Deep clean (run manually if needed):");
+  log("    docker system prune -a    Remove all unused images, containers, networks");
+  log("    docker volume prune       Remove all unused volumes");
+  log("    docker builder prune      Clear build cache");
+  log("");
 }
 
 async function defaultConfirm(message: string): Promise<boolean> {

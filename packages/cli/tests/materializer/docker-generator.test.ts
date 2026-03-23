@@ -454,6 +454,7 @@ describe("generateSessionComposeYml", () => {
     volumeMasks: generateVolumeMasks([".mason/", ".claude/", ".env"]),
     sessionDir: "/project/.mason/sessions/abc12345",
     logsDir: "/project/.mason/sessions/abc12345/logs",
+    masonLogsDir: "/project/.mason/logs",
     workspacePath: "/project/.mason/docker/create-prd/claude-code-agent/workspace",
     buildWorkspaceProjectPath: "/project/.mason/docker/create-prd/claude-code-agent/build/workspace/project",
     buildWorkspaceProjectFileEntries: ["agent-launch.json"],
@@ -468,11 +469,13 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain("agent-create-prd:");
   });
 
-  it("includes volume masking for directories as named volumes", () => {
+  it("includes volume masking for directories as named volumes (skipping overlay conflicts)", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
+    // .mason is masked (no overlay for it)
     expect(yml).toContain("ignore-mason:/home/mason/workspace/project/.mason");
-    expect(yml).toContain("ignore-claude:/home/mason/workspace/project/.claude");
+    // .claude is NOT masked — it has a build overlay directory that supersedes the mask
+    expect(yml).not.toContain("ignore-claude:/home/mason/workspace/project/.claude");
   });
 
   it("includes volume masking for files as Docker Compose configs (VirtioFS-safe)", () => {
@@ -484,12 +487,13 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain("empty-file");
   });
 
-  it("includes named volumes declaration section", () => {
+  it("includes named volumes declaration section (excluding overlay conflicts)", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
     expect(yml).toContain("volumes:");
     expect(yml).toContain("  ignore-mason:");
-    expect(yml).toContain("  ignore-claude:");
+    // .claude is superseded by the build overlay — no named volume needed
+    expect(yml).not.toContain("  ignore-claude:");
   });
 
   it("mounts project at /home/mason/workspace/project without :ro (agents need write access)", () => {
@@ -563,6 +567,12 @@ describe("generateSessionComposeYml", () => {
         }
       }
     }
+  });
+
+  it("mounts mason logs directory at /mason-logs on proxy service", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+    const proxySection = yml.split("agent-create-prd:")[0]!;
+    expect(proxySection).toContain(":/mason-logs");
   });
 
   it("includes PROJECT_DIR in proxy environment", () => {

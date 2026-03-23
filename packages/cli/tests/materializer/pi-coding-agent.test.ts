@@ -193,7 +193,7 @@ describe("piCodingAgentMaterializer", () => {
 
         const mcpJson = JSON.parse(result.get(".pi/mcp.json")!);
         expect(mcpJson.mcpServers.mason.url).toBe("http://mcp-proxy:9090/mcp");
-        expect(mcpJson.mcpServers.mason.type).toBe("streamable-http");
+        expect(mcpJson.mcpServers.mason.type).toBe("http");
       });
 
       it("defaults to SSE when no proxy type specified", () => {

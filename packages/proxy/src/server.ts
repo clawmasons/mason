@@ -366,6 +366,7 @@ export class ProxyServer {
 
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
+      console.log(`[proxy] tool_call: ${name}`, args != null ? JSON.stringify(args) : "");
 
       // Handle internal credential_request tool — no readyGate needed
       if (name === "credential_request" && this.relayServer) {
@@ -449,6 +450,7 @@ export class ProxyServer {
           acpClient: this.config.acpClient,
         };
         const pre = auditPreHook(ctx);
+        console.log(`[proxy] tool_not_found: ${name}`);
         auditPostHook(ctx, pre, `Unknown tool: ${name}`, "denied", relay);
         return {
           content: [{ type: "text" as const, text: `Unknown tool: ${name}` }],
@@ -512,6 +514,7 @@ export class ProxyServer {
         }
 
         try {
+          console.log(`[proxy] relay_forward: ${route.appName}/${route.originalToolName}`);
           const mcpToolCallMsg = createRelayMessage("mcp_tool_call", {
             app_name: route.appName,
             tool_name: route.originalToolName,
@@ -522,6 +525,7 @@ export class ProxyServer {
           const response = await relay.request(mcpToolCallMsg, timeoutMs) as McpToolResultMessage;
 
           if (response.error) {
+            console.error(`[proxy] tool_error: ${name}`, response.error);
             auditPostHook(ctx, pre, response.error, "error", relay);
             return {
               content: [{ type: "text" as const, text: response.error }],
@@ -530,10 +534,12 @@ export class ProxyServer {
           }
 
           const result = response.result ?? { content: [] };
+          console.log(`[proxy] tool_result: ${name} status=success`);
           auditPostHook(ctx, pre, result, "success", relay);
           return result;
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
+          console.error(`[proxy] tool_error: ${name}`, message);
           auditPostHook(ctx, pre, message, "error", relay);
           return {
             content: [{ type: "text" as const, text: message }],
@@ -543,15 +549,18 @@ export class ProxyServer {
       }
 
       try {
+        console.log(`[proxy] upstream_call: ${route.appName}/${route.originalToolName}`);
         const result = await upstream.callTool(
           route.appName,
           route.originalToolName,
           args as Record<string, unknown> | undefined,
         );
+        console.log(`[proxy] tool_result: ${name} status=success`);
         auditPostHook(ctx, pre, result, "success", relay);
         return result;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        console.error(`[proxy] tool_error: ${name}`, message);
         auditPostHook(ctx, pre, message, "error", relay);
         return {
           content: [{ type: "text" as const, text: message }],

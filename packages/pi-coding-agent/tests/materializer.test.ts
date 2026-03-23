@@ -189,14 +189,14 @@ describe("piCodingAgentMaterializer", () => {
         expect(mcpJson.mcpServers.mason.type).toBe("sse");
       });
 
-      it("uses streamable-http path when proxy type is streamable-http", () => {
+      it("uses streamable-http path and normalizes type to 'http'", () => {
         const agent = makePiAgent();
         agent.proxy = { port: 9090, type: "streamable-http" };
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
 
         const mcpJson = JSON.parse(result.get(".pi/mcp.json")!);
         expect(mcpJson.mcpServers.mason.url).toBe("http://mcp-proxy:9090/mcp");
-        expect(mcpJson.mcpServers.mason.type).toBe("streamable-http");
+        expect(mcpJson.mcpServers.mason.type).toBe("http");
       });
 
       it("defaults to SSE when no proxy type specified", () => {
@@ -228,14 +228,6 @@ describe("piCodingAgentMaterializer", () => {
     });
 
     describe(".pi/extensions/mason-mcp/index.ts", () => {
-      it("does not contain registerMcpServer (MCP config is in .pi/mcp.json)", () => {
-        const agent = makePiAgent();
-        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
-
-        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
-        expect(indexTs).not.toContain("pi.registerMcpServer(");
-      });
-
       it("includes registerCommand for each unique task", () => {
         const agent = makePiAgent();
         const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
@@ -299,6 +291,46 @@ describe("piCodingAgentMaterializer", () => {
         const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
         expect(indexTs).toContain("export default (pi) => {");
         expect(indexTs.trim().endsWith("};")).toBe(true);
+      });
+
+      it("contains MCP client code with proxy URL baked in", () => {
+        const agent = makePiAgent();
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
+        // SSE proxy type → /sse endpoint
+        expect(indexTs).toContain("http://mcp-proxy:9090/sse");
+        expect(indexTs).toContain("mcpRequest");
+        expect(indexTs).toContain("MCP_PROXY_TOKEN");
+      });
+
+      it("uses /mcp endpoint when proxy is streamable-http", () => {
+        const agent = makePiAgent();
+        agent.proxy = { port: 9090, type: "streamable-http" };
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
+        expect(indexTs).toContain("http://mcp-proxy:9090/mcp");
+      });
+
+      it("discovers tools at module load and registers via pi.registerTool", () => {
+        const agent = makePiAgent();
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
+        expect(indexTs).toContain("pi.registerTool(");
+        expect(indexTs).toContain("tools/list");
+        expect(indexTs).toContain("tools/call");
+        // Tools are discovered via top-level await, not session_start
+        expect(indexTs).toContain("_mcpTools");
+      });
+
+      it("does not require external dependencies like @sinclair/typebox", () => {
+        const agent = makePiAgent();
+        const result = piCodingAgentMaterializer.materializeWorkspace(agent, "http://mcp-proxy:9090");
+
+        const indexTs = result.get(".pi/extensions/mason-mcp/index.ts")!;
+        expect(indexTs).not.toContain("import ");
       });
     });
 

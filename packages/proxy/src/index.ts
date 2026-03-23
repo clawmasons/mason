@@ -5,7 +5,7 @@ export type { RouteEntry, ResourceRouteEntry, PromptRouteEntry } from "./router.
 export { UpstreamManager, createTransport } from "./upstream.js";
 export type { UpstreamAppConfig } from "./upstream.js";
 export { loadEnvFile, resolveEnvVars } from "./env-utils.js";
-export { auditPreHook, auditPostHook, logDroppedServers } from "./hooks/audit.js";
+export { auditPreHook, auditPostHook, logDroppedServers, setLocalAuditPath } from "./hooks/audit.js";
 export type { HookContext, AuditPreHookResult, AuditStatus, DroppedServer } from "./hooks/audit.js";
 export { matchesApprovalPattern, requestApproval } from "./hooks/approval.js";
 export type { ApprovalOptions } from "./hooks/approval.js";

@@ -416,6 +416,8 @@ export interface SessionComposeOptions {
   sessionDir: string;
   /** Absolute path to logs directory. */
   logsDir: string;
+  /** Absolute path to project-level mason logs directory ({project}/.mason/logs/). */
+  masonLogsDir: string;
   /** Absolute path to the materialized agent home directory (if exists). */
   homePath?: string;
   /** Host user UID for container user matching. */
@@ -471,6 +473,7 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
     acpCommand,
     sessionDir,
     logsDir,
+    masonLogsDir,
     homePath,
     hostUid,
     hostGid,
@@ -498,6 +501,7 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
   const relDockerDir = rel(dockerDir);
   const relProjectDir = rel(projectDir);
   const relLogsDir = rel(logsDir);
+  const relMasonLogsDir = rel(masonLogsDir);
   const relSentinel = rel(path.join(projectDir, SENTINEL_RELATIVE_PATH));
 
   const proxyServiceName = `proxy-${roleName}`;
@@ -529,8 +533,12 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
   agentVolumeLines.push(`      - ${relProjectDir}:${PROJECT_MOUNT_PATH}`);
 
   // Volume masks: directories only (named volumes); file masks routed through configs below
+  // Skip masks whose container path overlaps with a build overlay directory — the overlay replaces them.
+  const overlayContainerPaths = new Set(
+    (buildWorkspaceProjectDirEntries ?? []).map((e) => `${PROJECT_MOUNT_PATH}/${e}`),
+  );
   for (const mask of volumeMasks) {
-    if (mask.type === "directory") {
+    if (mask.type === "directory" && !overlayContainerPaths.has(mask.containerPath)) {
       agentVolumeLines.push(`      - ${mask.volumeName}:${mask.containerPath}`);
     }
   }
@@ -626,7 +634,8 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
     : "";
 
   // --- Named volumes declaration ---
-  const namedVolumes = volumeMasks.filter((m) => m.type === "directory");
+  // Exclude volumes that are superseded by build overlay directories
+  const namedVolumes = volumeMasks.filter((m) => m.type === "directory" && !overlayContainerPaths.has(m.containerPath));
   const volumesSection = namedVolumes.length > 0
     ? `\nvolumes:\n${namedVolumes.map((v) => `  ${v.volumeName}:`).join("\n")}\n`
     : "";
@@ -646,6 +655,7 @@ services:
     volumes:
       - ${relProjectDir}:${PROJECT_MOUNT_PATH}
       - ${relLogsDir}:/logs
+      - ${relMasonLogsDir}:/mason-logs
       - ${rel(path.join(dockerBuildDir, "mcp-proxy", ".cache"))}:/app/.cache
     environment:
 ${proxyEnvLines.join("\n")}
@@ -771,6 +781,10 @@ export function createSessionDirectory(
   const logsDir = path.join(sessionDir, "logs");
   deps.mkdirSync(logsDir, { recursive: true });
 
+  // Create project-level mason logs directory
+  const masonLogsDir = path.join(projectDir, ".mason", "logs");
+  deps.mkdirSync(masonLogsDir, { recursive: true });
+
   // Ensure sentinel file exists
   ensureSentinelFile(projectDir, fsDeps ? {
     existsSync: () => false, // always create in test mode
@@ -819,6 +833,7 @@ export function createSessionDirectory(
     volumeMasks,
     sessionDir,
     logsDir,
+    masonLogsDir,
     homePath: homeExists ? homePath : undefined,
     workspacePath,
     buildWorkspaceProjectPath,
