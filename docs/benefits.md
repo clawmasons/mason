@@ -7,6 +7,16 @@ description: Why role-based agent containers improve security and productivity
 
 Mason's role-based container model delivers two key advantages: stronger security through isolation, and better agent performance through focus.
 
+## Write once, run anywhere
+
+Add your skills to one agent format, using its syntax, run it in any agent in docker.
+
+In docker, ```mason``` will adapt the config from the source agent to make it work with the agent running in the container
+  - mcp servers references rewritten
+  - skills directory moved
+  - commands/named prompts correctly setup
+  - permissions applied
+  
 ## Role-Based Access Control
 
 RBAC is a well-established pattern for user credential management. Mason applies these same principles to AI agents and their container runtime environments.

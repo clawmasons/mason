@@ -95,6 +95,9 @@ export {
   RoleDiscoveryError,
 } from "./role/index.js";
 
+// MCP name rewriting
+export { convertMcpFormat } from "./mcp-name-rewriter.js";
+
 // Mason module (project scanner, ROLE.md proposer)
 export {
   scanProject,

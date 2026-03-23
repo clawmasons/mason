@@ -37,6 +37,7 @@ RUN npm install -g @anthropic-ai/claude-code
   skills: {
     projectFolder: ".claude/skills",
   },
+  mcpNameTemplate: "mcp__mason__${server}_${tool}",
 
   printMode: {
     jsonStreamArgs: ["--output-format", "stream-json", "--verbose"],

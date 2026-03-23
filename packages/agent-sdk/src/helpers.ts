@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import yaml from "js-yaml";
 import type { ResolvedRole, ResolvedTask, ResolvedSkill, AgentSkillConfig } from "@clawmasons/shared";
-import { getAppShortName } from "@clawmasons/shared";
+import { getAppShortName, convertMcpFormat } from "@clawmasons/shared";
 import type { AgentPackage, AgentTaskConfig, MaterializationResult } from "./types.js";
 
 /**
@@ -255,6 +255,7 @@ export function readSkills(
 export function materializeSkills(
   skills: ResolvedSkill[],
   config: AgentSkillConfig,
+  mcpNameTemplate?: string,
 ): MaterializationResult {
   const result: MaterializationResult = new Map();
 
@@ -262,8 +263,9 @@ export function materializeSkills(
     if (!skill.contentMap || skill.contentMap.size === 0) continue;
 
     const shortName = getAppShortName(skill.name);
-    for (const [relPath, content] of skill.contentMap) {
+    for (const [relPath, fileContent] of skill.contentMap) {
       const fullPath = path.posix.join(config.projectFolder, shortName, relPath);
+      const content = mcpNameTemplate ? convertMcpFormat(fileContent, mcpNameTemplate) : fileContent;
       result.set(fullPath, content);
     }
   }
@@ -529,6 +531,7 @@ export function readTask(
 export function materializeTasks(
   tasks: ResolvedTask[],
   config: AgentTaskConfig,
+  mcpNameTemplate?: string,
 ): MaterializationResult {
   const result: MaterializationResult = new Map();
   const mappings = getFieldMappings(config);
@@ -539,7 +542,11 @@ export function materializeTasks(
 
     const frontmatter = buildFrontmatter(task, mappings);
     const body = task.prompt ?? "";
-    const content = frontmatter ? `${frontmatter}${body}` : body;
+    let content = frontmatter ? `${frontmatter}${body}` : body;
+
+    if (mcpNameTemplate) {
+      content = convertMcpFormat(content, mcpNameTemplate);
+    }
 
     result.set(fullPath, content);
   }
