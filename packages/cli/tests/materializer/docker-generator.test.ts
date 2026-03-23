@@ -454,6 +454,7 @@ describe("generateSessionComposeYml", () => {
     volumeMasks: generateVolumeMasks([".mason/", ".claude/", ".env"]),
     sessionDir: "/project/.mason/sessions/abc12345",
     logsDir: "/project/.mason/sessions/abc12345/logs",
+    masonLogsDir: "/project/.mason/logs",
     workspacePath: "/project/.mason/docker/create-prd/claude-code-agent/workspace",
     buildWorkspaceProjectPath: "/project/.mason/docker/create-prd/claude-code-agent/build/workspace/project",
     buildWorkspaceProjectFileEntries: ["agent-launch.json"],
@@ -566,6 +567,12 @@ describe("generateSessionComposeYml", () => {
         }
       }
     }
+  });
+
+  it("mounts mason logs directory at /mason-logs on proxy service", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+    const proxySection = yml.split("agent-create-prd:")[0]!;
+    expect(proxySection).toContain(":/mason-logs");
   });
 
   it("includes PROJECT_DIR in proxy environment", () => {

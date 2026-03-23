@@ -113,7 +113,7 @@ describe("pi-coding-agent: print mode via CLI", () => {
     if (!canRun()) return;
 
     const { proc, stdout, stderr, exitCode } = await runMasonPrint(
-      ["run", "--role", "writer", "--agent", "pi", "--source", "claude", "-p", "what is 2+2 equal?"],
+      ["run", "--role", "writer", "--agent", "pi", "--source", "claude", "-p", "what is 2+2 equal?  Just give the answer."],
       workspaceDir,
     );
     lastProc = proc;

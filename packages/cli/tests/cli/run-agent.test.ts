@@ -370,6 +370,7 @@ describe("generateSessionComposeYml (run-agent scenarios)", () => {
     proxyPort: 3000,
     sessionDir: "/projects/my-project/.mason/sessions/abc123",
     logsDir: "/projects/my-project/.mason/sessions/abc123/logs",
+    masonLogsDir: "/projects/my-project/.mason/logs",
     workspacePath: "/projects/my-project/.mason/docker/writer/claude-code-agent/workspace",
     buildWorkspaceProjectPath: "/projects/my-project/.mason/docker/writer/claude-code-agent/build/workspace/project",
     buildWorkspaceProjectFileEntries: [] as string[],
@@ -557,7 +558,11 @@ describe("ensureMasonConfig", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (process.env.MASON_TEST_KEEP_WORKSPACE) {
+      console.log(`[MASON_TEST_KEEP_WORKSPACE] Preserved workspace: ${tmpDir}`);
+    } else {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it("creates .mason/config.json with default template derived from BUILTIN_AGENTS", () => {
@@ -630,7 +635,11 @@ describe("packages-hash invalidation", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (process.env.MASON_TEST_KEEP_WORKSPACE) {
+      console.log(`[MASON_TEST_KEEP_WORKSPACE] Preserved workspace: ${tmpDir}`);
+    } else {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   function makeDockerBuildDir(packagesForHash: object) {
@@ -736,7 +745,11 @@ describe("runAgent", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (process.env.MASON_TEST_KEEP_WORKSPACE) {
+      console.log(`[MASON_TEST_KEEP_WORKSPACE] Preserved workspace: ${tmpDir}`);
+    } else {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   function makeMockDeps(overrides?: {
@@ -1219,7 +1232,11 @@ describe("runProxyOnly", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (process.env.MASON_TEST_KEEP_WORKSPACE) {
+      console.log(`[MASON_TEST_KEEP_WORKSPACE] Preserved workspace: ${tmpDir}`);
+    } else {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   function makeDeps(overrides?: { sessionId?: string; buildExitCode?: number; upExitCode?: number }) {
@@ -1442,7 +1459,11 @@ describe("source override applied to role", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (process.env.MASON_TEST_KEEP_WORKSPACE) {
+      console.log(`[MASON_TEST_KEEP_WORKSPACE] Preserved workspace: ${tmpDir}`);
+    } else {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   function makeSourceTestRole(overrides?: Partial<Role>): Role {
@@ -1536,7 +1557,11 @@ describe("generateProjectRole", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (process.env.MASON_TEST_KEEP_WORKSPACE) {
+      console.log(`[MASON_TEST_KEEP_WORKSPACE] Preserved workspace: ${tmpDir}`);
+    } else {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it("generates Role from single source with tasks, skills, and apps", async () => {

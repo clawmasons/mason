@@ -47,8 +47,8 @@ ARG HOST_GID=1000
 RUN (getent group $HOST_GID | cut -d: -f1 | xargs -r groupdel 2>/dev/null || true) \\
     && (getent passwd $HOST_UID | cut -d: -f1 | xargs -r userdel 2>/dev/null || true) \\
     && groupadd -g $HOST_GID mason && useradd -m -u $HOST_UID -g $HOST_GID mason \\
-    && mkdir -p /home/mason/data /logs /app/.cache/v8 /app/.cache/npm \\
-    && chown -R mason:mason /app /home/mason/data /logs
+    && mkdir -p /home/mason/data /logs /mason-logs /app/.cache/v8 /app/.cache/npm \\
+    && chown -R mason:mason /app /home/mason/data /logs /mason-logs
 
 USER mason
 

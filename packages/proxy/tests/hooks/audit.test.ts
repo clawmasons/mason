@@ -1,7 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
-import { auditPreHook, auditPostHook, logDroppedServers } from "../../src/hooks/audit.js";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { auditPreHook, auditPostHook, logDroppedServers, setLocalAuditPath } from "../../src/hooks/audit.js";
 import type { HookContext } from "../../src/hooks/audit.js";
 import type { RelayServer } from "../../src/relay/server.js";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 
 // ── Fixtures ────────────────────────────────────────────────────────────
 
@@ -157,7 +160,7 @@ describe("auditPostHook", () => {
     stderrSpy.mockRestore();
   });
 
-  it("does nothing when relay is null", () => {
+  it("does nothing when relay is null (no local path)", () => {
     const ctx = makeContext();
     const pre = { id: "test-id-8", startTime: Date.now() };
 
@@ -165,6 +168,47 @@ describe("auditPostHook", () => {
     expect(() => {
       auditPostHook(ctx, pre, null, "success", null);
     }).not.toThrow();
+  });
+
+  it("writes audit event to local file when setLocalAuditPath is configured", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "audit-test-"));
+    const auditFile = path.join(tmpDir, "audit.log");
+    setLocalAuditPath(auditFile);
+
+    const ctx = makeContext();
+    const pre = { id: "test-id-local-1", startTime: Date.now() - 10 };
+
+    auditPostHook(ctx, pre, { content: [{ type: "text", text: "ok" }] }, "success", null);
+
+    const content = fs.readFileSync(auditFile, "utf-8");
+    const parsed = JSON.parse(content.trim());
+    expect(parsed.type).toBe("audit_event");
+    expect(parsed.tool_name).toBe("create_pr");
+    expect(parsed.status).toBe("success");
+
+    // Cleanup
+    setLocalAuditPath(undefined as unknown as string);
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it("writes to local file AND sends via relay when both available", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "audit-test-"));
+    const auditFile = path.join(tmpDir, "audit.log");
+    setLocalAuditPath(auditFile);
+
+    const relay = createMockRelay();
+    const ctx = makeContext();
+    const pre = { id: "test-id-local-2", startTime: Date.now() };
+
+    auditPostHook(ctx, pre, null, "success", relay);
+
+    // Both local file and relay should have the event
+    expect(fs.existsSync(auditFile)).toBe(true);
+    expect(relay.send).toHaveBeenCalledTimes(1);
+
+    // Cleanup
+    setLocalAuditPath(undefined as unknown as string);
+    fs.rmSync(tmpDir, { recursive: true });
   });
 });
 
@@ -218,11 +262,31 @@ describe("logDroppedServers", () => {
     expect(relay.send).not.toHaveBeenCalled();
   });
 
-  it("does nothing when relay is null", () => {
+  it("does nothing when relay is null and no local path", () => {
     // Should not throw
     expect(() => {
       logDroppedServers(null, [{ name: "notes", reason: "no match" }], "agent", "role");
     }).not.toThrow();
+  });
+
+  it("writes dropped servers to local file when configured", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "audit-test-"));
+    const auditFile = path.join(tmpDir, "audit.log");
+    setLocalAuditPath(auditFile);
+
+    logDroppedServers(null, [
+      { name: "notes", reason: "no match" },
+      { name: "calendar", reason: "no match" },
+    ], "agent", "role");
+
+    const lines = fs.readFileSync(auditFile, "utf-8").trim().split("\n");
+    expect(lines).toHaveLength(2);
+    expect(JSON.parse(lines[0]).app_name).toBe("notes");
+    expect(JSON.parse(lines[1]).app_name).toBe("calendar");
+
+    // Cleanup
+    setLocalAuditPath(undefined as unknown as string);
+    fs.rmSync(tmpDir, { recursive: true });
   });
 
   it("swallows relay errors without throwing", () => {

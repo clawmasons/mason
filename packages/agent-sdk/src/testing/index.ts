@@ -393,12 +393,16 @@ export async function stopProcessAndDocker(
     }
   }
 
-  // Remove workspace
+  // Remove workspace (skip if MASON_TEST_KEEP_WORKSPACE is set, for debugging)
   if (workspaceDir && fs.existsSync(workspaceDir)) {
-    try {
-      fs.rmSync(workspaceDir, { recursive: true, force: true });
-    } catch {
-      /* best-effort */
+    if (process.env.MASON_TEST_KEEP_WORKSPACE) {
+      console.log(`[MASON_TEST_KEEP_WORKSPACE] Preserved workspace: ${workspaceDir}`);
+    } else {
+      try {
+        fs.rmSync(workspaceDir, { recursive: true, force: true });
+      } catch {
+        /* best-effort */
+      }
     }
   }
 }
