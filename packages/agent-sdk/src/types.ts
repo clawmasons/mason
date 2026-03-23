@@ -27,6 +27,8 @@ export interface MaterializeOptions {
   initialPrompt?: string;
   /** LLM configuration resolved from agent config schema. Applied to ResolvedAgent.llm before materialization. */
   llmConfig?: { provider: string; model: string };
+  /** When true, enable print mode: append JSON stream args and -p flag in agent-launch.json. */
+  printMode?: boolean;
 }
 
 /**
@@ -191,4 +193,15 @@ export interface AgentPackage {
    * Returns errors and warnings without requiring CLI-side conditionals.
    */
   validate?: (agent: ResolvedAgent) => AgentValidationResult;
+
+  /** Print mode configuration for non-interactive prompt execution with JSON streaming. */
+  printMode?: {
+    /** Args to append to agent command to enable JSON streaming output. */
+    jsonStreamArgs: string[];
+    /**
+     * Parse a line from the JSON stream. Return the final result text when found, or null to keep reading.
+     * Called with try/catch — exceptions are logged and treated as null.
+     */
+    parseJsonStreamFinalResult(line: string): string | null;
+  };
 }

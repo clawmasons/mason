@@ -27,19 +27,23 @@ mason configure [options]
 
 ### `mason run`
 
-Run a role on the specified agent runtime, either interactively or as an ACP endpoint for editor integration.
+Run a role on the specified agent runtime, either interactively, as an ACP endpoint, or in print mode.
 
 ```bash
 mason run <agent-type> --role <name> [options]
+mason run <agent-type> --role <name> [prompt]
+mason run <agent-type> --role <name> -p <prompt>
 ```
 
 | Argument | Description |
 |----------|-------------|
 | `<agent-type>` | Agent runtime to use (e.g., `claude` → `claude-code-agent`, `pi` → `pi-coding-agent`, `mcp-agent`) |
+| `[prompt]` | Optional initial prompt to send to the agent on startup (interactive mode) |
 
 | Option | Description |
 |--------|-------------|
 | `--role <name>` | **(required)** Role name to run |
+| `-p, --print <prompt>` | Run in print mode: execute the prompt non-interactively and output only the final response |
 | `--acp` | Start in ACP mode for editor integration (stdio ndjson) |
 | `--dev-container` | Start in dev container mode for editor integration (stdio ndjson) |
 
@@ -52,6 +56,23 @@ mason run claude --role writer
 ```
 
 Starts the MCP proxy and agent containers via Docker Compose, then attaches interactively.
+
+You can also pass an initial prompt as a positional argument to start the agent with a specific instruction while remaining in interactive mode:
+
+```bash
+mason run claude --role writer "review the latest changes"
+```
+
+**Print mode** (`-p` / `--print`):
+
+```bash
+mason run claude --role writer -p "summarize this project"
+mason run pi --role writer --print "explain the architecture"
+```
+
+Runs the agent non-interactively with the given prompt. All agent activity is captured to `.mason/logs/session.log` via JSON streaming, while the terminal receives only the final result text. The process exits with the agent's exit code, making it suitable for scripting and CI pipelines.
+
+Print mode is mutually exclusive with `--acp`, `--bash`, `--dev-container`, and `--proxy-only`.
 
 **ACP mode** (`--acp`):
 
@@ -283,7 +304,7 @@ Register custom or third-party agent runtimes for a project. Built-in agents (`c
 |-------|------|----------|-------------|
 | `package` | string | yes | npm package name implementing the Agent Package SDK |
 | `role` | string | no | Default role name when `--role` is omitted |
-| `mode` | `"terminal"` \| `"acp"` \| `"bash"` | no | Default startup mode (overridden by CLI flags) |
+| `mode` | `"terminal"` \| `"acp"` \| `"bash"` \| `"print"` | no | Default startup mode (overridden by CLI flags) |
 | `home` | string | no | Host path to bind-mount at `/home/mason/` in the agent container; `~` is expanded |
 | `dev-container-customizations` | object | no | VSCode extensions and settings to embed in the agent image at build time |
 

@@ -98,6 +98,25 @@ RUN npm install -g @mariozechner/pi-coding-agent
     ];
   },
 
+  printMode: {
+    jsonStreamArgs: ["--mode", "json"],
+    parseJsonStreamFinalResult(line: string): string | null {
+      const event = JSON.parse(line);
+      if (event.type === "agent_end" && Array.isArray(event.messages)) {
+        const lastAssistant = [...event.messages]
+          .reverse()
+          .find((m: Record<string, unknown>) => m.role === "assistant");
+        if (lastAssistant?.content) {
+          return (lastAssistant.content as Array<{ type: string; text: string }>)
+            .filter((block) => block.type === "text")
+            .map((block) => block.text)
+            .join("\n");
+        }
+      }
+      return null;
+    },
+  },
+
   validate: (agent: ResolvedAgent): AgentValidationResult => {
     const errors = [];
     if (!agent.llm) {

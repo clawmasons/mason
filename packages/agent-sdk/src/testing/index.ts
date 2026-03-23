@@ -12,7 +12,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { execFileSync, execSync } from "node:child_process";
+import { execFileSync, execSync, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 // ── Path Constants ──────────────────────────────────────────────────────
@@ -305,5 +305,133 @@ export function cleanupDockerSessions(workspaceDir: string): void {
         /* best-effort cleanup */
       }
     }
+  }
+}
+
+/**
+ * Assert that a CLI process and its Docker sessions have stopped.
+ * Call this at the end of a test to verify graceful shutdown.
+ * Throws if the process is still alive or Docker containers are still running.
+ */
+export function testIfProcessAndDockerStopped(
+  pid: number,
+  workspaceDir: string,
+): void {
+  // Check if process is still alive
+  try {
+    process.kill(pid, 0); // signal 0 = existence check, doesn't kill
+    throw new Error(
+      `CLI process (pid ${pid}) is still running after graceful shutdown`,
+    );
+  } catch (err: unknown) {
+    const e = err as NodeJS.ErrnoException;
+    if (e.code !== "ESRCH") {
+      // ESRCH = no such process (good — it exited). Any other error means it's still alive.
+      throw new Error(
+        `CLI process (pid ${pid}) is still running after graceful shutdown`,
+      );
+    }
+  }
+
+  // Check if any Docker Compose sessions still have running containers
+  const sessionsDir = path.join(workspaceDir, ".mason", "sessions");
+  if (!fs.existsSync(sessionsDir)) return;
+
+  for (const sessionId of fs.readdirSync(sessionsDir)) {
+    const composeFile = path.join(
+      sessionsDir,
+      sessionId,
+      "docker",
+      "docker-compose.yml",
+    );
+    if (!fs.existsSync(composeFile)) continue;
+
+    try {
+      const output = execSync(
+        `docker compose -f "${composeFile}" ps -q`,
+        { stdio: "pipe", timeout: 10_000 },
+      ).toString().trim();
+
+      if (output.length > 0) {
+        throw new Error(
+          `Docker containers still running for session ${sessionId}. Container IDs: ${output}`,
+        );
+      }
+    } catch (err: unknown) {
+      // Re-throw our own assertion errors
+      if (err instanceof Error && err.message.includes("Docker containers still running")) {
+        throw err;
+      }
+      // Ignore docker command failures (compose file might reference removed networks, etc.)
+    }
+  }
+}
+
+/**
+ * Best-effort cleanup: kill a CLI process, tear down Docker sessions, and remove the workspace.
+ * Suitable for `afterAll` — never throws.
+ */
+export async function stopProcessAndDocker(
+  proc: ChildProcess | null,
+  workspaceDir: string,
+): Promise<void> {
+  // Kill CLI process with escalation
+  if (proc && !proc.killed) {
+    proc.kill("SIGTERM");
+    await new Promise((r) => setTimeout(r, 3_000));
+    if (!proc.killed) {
+      proc.kill("SIGKILL");
+    }
+  }
+
+  // Tear down Docker sessions
+  if (workspaceDir) {
+    try {
+      cleanupDockerSessions(workspaceDir);
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  // Remove workspace
+  if (workspaceDir && fs.existsSync(workspaceDir)) {
+    try {
+      fs.rmSync(workspaceDir, { recursive: true, force: true });
+    } catch {
+      /* best-effort */
+    }
+  }
+}
+
+/**
+ * Assert that the session log exists and contains the given text.
+ * Print mode writes to `.mason/logs/session.log`.
+ */
+export function testSessionLogContains(workspaceDir: string, text: string): void {
+  const logPath = path.join(workspaceDir, ".mason", "logs", "session.log");
+  if (!fs.existsSync(logPath)) {
+    throw new Error(`session.log not found at ${logPath}`);
+  }
+  const contents = fs.readFileSync(logPath, "utf-8");
+  if (!contents.includes(text)) {
+    throw new Error(
+      `session.log does not contain "${text}".\nLog contents:\n${contents.slice(0, 2000)}`,
+    );
+  }
+}
+
+/**
+ * Assert that a file in the workspace exists and contains the expected text.
+ */
+export function testFileContents(workspaceDir: string, relPath: string, expected: string): void {
+  const filePath = path.join(workspaceDir, relPath);
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`File not found: ${filePath}`);
+  }
+  const contents = fs.readFileSync(filePath, "utf-8");
+  if (!contents.includes(expected)) {
+    throw new Error(
+      `File ${relPath} does not contain "${expected}".\nFile contents:\n${contents.slice(0, 2000)}`,
+    );
   }
 }

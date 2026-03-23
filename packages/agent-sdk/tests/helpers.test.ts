@@ -422,6 +422,54 @@ describe("generateAgentLaunchJson", () => {
     const config = JSON.parse(generateAgentLaunchJson(pkg, [], true, undefined, undefined, "do this"));
     expect(config.args).toBeUndefined();
   });
+
+  it("appends json stream args and -p flag when printMode is true", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--effort", "max"] },
+      printMode: {
+        jsonStreamArgs: ["--output-format", "stream-json"],
+        parseJsonStreamFinalResult: () => null,
+      },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, "say hello", true));
+    expect(config.args).toEqual(["--effort", "max", "--output-format", "stream-json", "-p", "say hello"]);
+  });
+
+  it("appends bare positional when printMode is false", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--flag"] },
+      printMode: {
+        jsonStreamArgs: ["--output-format", "stream-json"],
+        parseJsonStreamFinalResult: () => null,
+      },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, "say hello", false));
+    expect(config.args).toEqual(["--flag", "say hello"]);
+  });
+
+  it("does not append prompt in ACP mode even when printMode is true", () => {
+    const pkg = makeAgentPackage({
+      acp: { command: "cmd-acp" },
+      printMode: {
+        jsonStreamArgs: ["--output-format", "stream-json"],
+        parseJsonStreamFinalResult: () => null,
+      },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], true, undefined, undefined, "do this", true));
+    expect(config.args).toBeUndefined();
+  });
+
+  it("places json stream args after agentArgs in print mode", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--effort", "max"], supportsAppendSystemPrompt: true },
+      printMode: {
+        jsonStreamArgs: ["--output-format", "stream-json"],
+        parseJsonStreamFinalResult: () => null,
+      },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, "sys", ["--extra"], "go", true));
+    expect(config.args).toEqual(["--effort", "max", "--append-system-prompt", "sys", "--extra", "--output-format", "stream-json", "-p", "go"]);
+  });
 });
 
 // ── readSkills ────────────────────────────────────────────────────────────────

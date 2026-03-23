@@ -91,7 +91,7 @@ Each agent package SHALL export its `AgentPackage` object as the default export 
 ### Requirement: SDK exports common helper functions
 
 The `@clawmasons/agent-sdk` package SHALL export the following helper functions for use by agent materializer implementations:
-- `generateAgentLaunchJson(agentPkg: AgentPackage, roleCredentials: string[], acpMode?: boolean, instructions?: string, agentArgs?: string[], initialPrompt?: string): string`
+- `generateAgentLaunchJson(agentPkg: AgentPackage, roleCredentials: string[], acpMode?: boolean, instructions?: string, agentArgs?: string[], initialPrompt?: string, printMode?: boolean): string`
 - `formatPermittedTools(permissions): string`
 - `collectAllTasks(roles: ResolvedRole[]): Array<[ResolvedTask, ResolvedRole[]]>`
 - `readTasks(config: AgentTaskConfig, projectDir: string): ResolvedTask[]`
@@ -119,35 +119,94 @@ These functions SHALL be available from the SDK package.
 
 ### Requirement: generateAgentLaunchJson accepts initialPrompt as final positional arg
 
-`generateAgentLaunchJson` SHALL accept an optional `initialPrompt?: string` parameter (after `agentArgs`). When `initialPrompt` is a non-empty string and `acpMode` is false, it SHALL be appended as the final positional argument in the generated `args` array, after all flags and `agentArgs`.
+`generateAgentLaunchJson` SHALL accept an optional `initialPrompt?: string` parameter (after `agentArgs`) and an optional `printMode?: boolean` parameter (after `initialPrompt`).
 
-The full args ordering SHALL be:
+When `printMode` is `false` or omitted: if `initialPrompt` is a non-empty string and `acpMode` is false, it SHALL be appended as the final bare positional argument in the generated `args` array.
+
+When `printMode` is `true` and `acpMode` is `false`:
+1. The agent's `printMode.jsonStreamArgs` SHALL be appended to the args array
+2. The `initialPrompt` SHALL be passed as `["-p", initialPrompt]` instead of a bare positional arg
+
+The full args ordering in print mode SHALL be:
 1. Base `runtime.args` (e.g., `["--effort", "max"]`)
 2. `["--append-system-prompt", instructions]` when applicable
 3. `agentArgs` (alias-level overrides)
-4. `initialPrompt` as a bare positional string
+4. JSON stream args (e.g., `["--output-format", "stream-json"]`)
+5. `["-p", initialPrompt]`
 
-#### Scenario: initialPrompt appended as final positional
+#### Scenario: initialPrompt appended as final positional (non-print mode)
 
-- **WHEN** `generateAgentLaunchJson` is called with `initialPrompt = "do this task"` and `acpMode = false`
-- **THEN** the resulting `args` SHALL have `"do this task"` as the last element
-- **AND** all flag args SHALL precede it
+- **WHEN** `generateAgentLaunchJson` is called with `initialPrompt = "do this task"`, `printMode = false`, and `acpMode = false`
+- **THEN** the resulting `args` SHALL have `"do this task"` as the last element as a bare positional arg
 
-#### Scenario: Full arg ordering with all params
+#### Scenario: Print mode emits json stream args and -p flag
 
-- **WHEN** `generateAgentLaunchJson` is called with `instructions`, `agentArgs = ["--extra"]`, and `initialPrompt = "go"`
+- **WHEN** `generateAgentLaunchJson` is called with `initialPrompt = "say hello"`, `printMode = true`, and `acpMode = false`
+- **AND** the agent's `printMode.jsonStreamArgs` is `["--output-format", "stream-json"]`
+- **THEN** `args` SHALL include `["--output-format", "stream-json", "-p", "say hello"]` after all other flags
+
+#### Scenario: Full arg ordering with all params in print mode
+
+- **WHEN** `generateAgentLaunchJson` is called with `instructions`, `agentArgs = ["--extra"]`, `initialPrompt = "go"`, and `printMode = true`
 - **AND** `supportsAppendSystemPrompt = true` and `acpMode = false`
-- **THEN** `args` SHALL be `[...baseArgs, "--append-system-prompt", instructions, "--extra", "go"]`
+- **AND** `jsonStreamArgs = ["--output-format", "stream-json"]`
+- **THEN** `args` SHALL be `[...baseArgs, "--append-system-prompt", instructions, "--extra", "--output-format", "stream-json", "-p", "go"]`
 
 #### Scenario: initialPrompt not injected when undefined or empty
 
 - **WHEN** `initialPrompt` is `undefined` or `""`
-- **THEN** no bare positional string SHALL be appended to `args`
+- **THEN** no bare positional string or `-p` flag SHALL be appended to `args`
 
 #### Scenario: initialPrompt not injected in ACP mode
 
 - **WHEN** `acpMode = true` and `initialPrompt = "do this"`
-- **THEN** `"do this"` SHALL NOT appear in `args`
+- **THEN** `"do this"` SHALL NOT appear in `args` regardless of `printMode`
+
+### Requirement: AgentPackage includes optional printMode config
+
+The `AgentPackage` interface SHALL include an optional `printMode` field with the following shape:
+
+- `jsonStreamArgs: string[]` — args appended to the agent command to enable JSON streaming output (e.g., `["--output-format", "stream-json"]` for claude, `["--mode", "json"]` for pi)
+- `parseJsonStreamFinalResult(line: string): string | null` — a method that parses a single line from the JSON stream and returns the final result text when found, or `null` to continue reading. Callers SHALL invoke this method within a try/catch; exceptions are logged and treated as `null`.
+
+When `printMode` is omitted, the agent does not support non-interactive print mode.
+
+#### Scenario: Agent package declares printMode
+
+- **WHEN** an agent package exports an `AgentPackage` with `printMode: { jsonStreamArgs: ["--output-format", "stream-json"], parseJsonStreamFinalResult: ... }`
+- **THEN** the agent registry SHALL accept it
+- **AND** print mode SHALL be available for this agent
+
+#### Scenario: Agent package omits printMode
+
+- **WHEN** an agent package exports an `AgentPackage` without `printMode`
+- **THEN** the agent registry SHALL accept it
+- **AND** attempting to use `-p` with this agent SHALL produce an error indicating print mode is not supported
+
+#### Scenario: parseJsonStreamFinalResult returns null for non-final lines
+
+- **WHEN** `parseJsonStreamFinalResult` is called with a line that does not contain the final result
+- **THEN** it SHALL return `null`
+
+#### Scenario: parseJsonStreamFinalResult returns result text for final line
+
+- **WHEN** `parseJsonStreamFinalResult` is called with a line containing the final result
+- **THEN** it SHALL return the extracted result text as a string
+
+### Requirement: MaterializeOptions includes printMode boolean
+
+The `MaterializeOptions` interface SHALL include an optional `printMode?: boolean` field. When `true`, materializers SHALL pass print mode to `generateAgentLaunchJson` so that JSON streaming args and `-p` prompt flag are included in `agent-launch.json`.
+
+#### Scenario: printMode passed through materialization
+
+- **WHEN** a materializer is called with `options.printMode = true`
+- **THEN** it SHALL pass `printMode: true` to `generateAgentLaunchJson`
+- **AND** the resulting `agent-launch.json` SHALL include the agent's JSON streaming args and `-p` prompt flag
+
+#### Scenario: printMode omitted defaults to false
+
+- **WHEN** a materializer is called without `printMode` in options
+- **THEN** it SHALL NOT add JSON streaming args or `-p` flag to `agent-launch.json`
 
 ### Requirement: AgentPackage includes optional tasks config
 
