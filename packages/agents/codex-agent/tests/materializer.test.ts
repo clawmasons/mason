@@ -2,9 +2,22 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { codexAgentMaterializer, generateConfigToml, generatePromptFile, generatePromptFiles } from "@clawmasons/codex-agent";
+import { codexAgentMaterializer, generateConfigToml, generatePromptFile, generatePromptFiles, generateAgentsMd } from "@clawmasons/codex-agent";
 import { parse as tomlParse } from "smol-toml";
 import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from "@clawmasons/shared";
+
+function makeSkill(overrides?: Partial<ResolvedSkill>): ResolvedSkill {
+  return {
+    name: "markdown-conventions",
+    version: "0.0.0",
+    artifacts: ["SKILL.md"],
+    description: "Markdown formatting conventions",
+    contentMap: new Map([
+      ["SKILL.md", "---\nname: markdown-conventions\ndescription: Markdown formatting conventions\n---\n\nUse kebab-case file names with date prefixes."],
+    ]),
+    ...overrides,
+  };
+}
 
 function makeMinimalRole(): ResolvedRole {
   return {
@@ -123,6 +136,27 @@ describe("codexAgentMaterializer", () => {
       const parsed = tomlParse(tomlContent) as Record<string, Record<string, Record<string, string>>>;
       expect(parsed.mcp_servers.mason.url).toBe("http://mcp-proxy:9090/sse");
     });
+
+    it("generates AGENTS.md", () => {
+      const agent = makeCodexAgent();
+      const result = codexAgentMaterializer.materializeWorkspace(
+        agent, "http://mcp-proxy:9090",
+      );
+
+      expect(result.has("AGENTS.md")).toBe(true);
+    });
+
+    it("generates agent-launch.json", () => {
+      const agent = makeCodexAgent();
+      const result = codexAgentMaterializer.materializeWorkspace(
+        agent, "http://mcp-proxy:9090",
+      );
+
+      expect(result.has("agent-launch.json")).toBe(true);
+      const launchJson = JSON.parse(result.get("agent-launch.json")!);
+      expect(launchJson).toHaveProperty("command");
+      expect(launchJson).toHaveProperty("credentials");
+    });
   });
 
   describe("materializeHome", () => {
@@ -194,16 +228,6 @@ describe("codexAgentMaterializer", () => {
         version: "1.0.0",
         description: "Take notes using MCP filesystem tools",
         prompt: "Use the mcp__filesystem__write_file tool to create notes.",
-        ...overrides,
-      };
-    }
-
-    function makeSkill(overrides?: Partial<ResolvedSkill>): ResolvedSkill {
-      return {
-        name: "markdown-conventions",
-        version: "0.0.0",
-        artifacts: ["SKILL.md"],
-        description: "Markdown formatting conventions",
         ...overrides,
       };
     }
@@ -395,6 +419,281 @@ describe("codexAgentMaterializer", () => {
         const promptFiles = [...result.keys()].filter(k => k.startsWith(".codex/prompts/"));
         expect(promptFiles).toHaveLength(0);
       });
+    });
+  });
+
+  describe("skill conversion", () => {
+    function makeTask(overrides?: Partial<ResolvedTask>): ResolvedTask {
+      return {
+        name: "take-notes",
+        version: "1.0.0",
+        description: "Take notes using MCP filesystem tools",
+        prompt: "Use the mcp__filesystem__write_file tool to create notes.",
+        ...overrides,
+      };
+    }
+
+    function makeRoleWithSkills(skills: ResolvedSkill[]): ResolvedRole {
+      return {
+        name: "@clawmasons/role-writer",
+        version: "1.0.0",
+        description: "A writer role.",
+        risk: "LOW",
+        permissions: {
+          "@clawmasons/app-filesystem": {
+            allow: ["read_file", "write_file", "list_directory"],
+            deny: [],
+          },
+        },
+        tasks: [makeTask()],
+        apps: [],
+        skills,
+      };
+    }
+
+    it("generates skill files at .agents/skills/{skillName}/SKILL.md", () => {
+      const skill = makeSkill();
+      const role = makeRoleWithSkills([skill]);
+      const agent = makeCodexAgent({ roles: [role] });
+
+      const result = codexAgentMaterializer.materializeWorkspace(
+        agent, "http://mcp-proxy:9090",
+      );
+
+      expect(result.has(".agents/skills/markdown-conventions/SKILL.md")).toBe(true);
+    });
+
+    it("copies skill content correctly", () => {
+      const skill = makeSkill();
+      const role = makeRoleWithSkills([skill]);
+      const agent = makeCodexAgent({ roles: [role] });
+
+      const result = codexAgentMaterializer.materializeWorkspace(
+        agent, "http://mcp-proxy:9090",
+      );
+
+      const content = result.get(".agents/skills/markdown-conventions/SKILL.md")!;
+      expect(content).toContain("markdown-conventions");
+      expect(content).toContain("Use kebab-case file names with date prefixes");
+    });
+
+    it("handles multiple skill artifacts", () => {
+      const skill = makeSkill({
+        artifacts: ["SKILL.md", "examples.md"],
+        contentMap: new Map([
+          ["SKILL.md", "---\nname: markdown-conventions\n---\n\nMain skill content."],
+          ["examples.md", "# Examples\n\nSome examples here."],
+        ]),
+      });
+      const role = makeRoleWithSkills([skill]);
+      const agent = makeCodexAgent({ roles: [role] });
+
+      const result = codexAgentMaterializer.materializeWorkspace(
+        agent, "http://mcp-proxy:9090",
+      );
+
+      expect(result.has(".agents/skills/markdown-conventions/SKILL.md")).toBe(true);
+      expect(result.has(".agents/skills/markdown-conventions/examples.md")).toBe(true);
+      expect(result.get(".agents/skills/markdown-conventions/examples.md")).toContain("Some examples here.");
+    });
+
+    it("handles multiple skills from different roles", () => {
+      const skill1 = makeSkill();
+      const skill2 = makeSkill({
+        name: "code-style",
+        description: "Code style conventions",
+        contentMap: new Map([
+          ["SKILL.md", "---\nname: code-style\n---\n\nFollow consistent code style."],
+        ]),
+      });
+      const role1 = makeRoleWithSkills([skill1]);
+      const role2 = makeRoleWithSkills([skill2]);
+      const agent = makeCodexAgent({ roles: [role1, role2] });
+
+      const result = codexAgentMaterializer.materializeWorkspace(
+        agent, "http://mcp-proxy:9090",
+      );
+
+      expect(result.has(".agents/skills/markdown-conventions/SKILL.md")).toBe(true);
+      expect(result.has(".agents/skills/code-style/SKILL.md")).toBe(true);
+    });
+
+    it("does not generate skill files when skills have no contentMap", () => {
+      const skill = makeSkill({ contentMap: undefined });
+      const role = makeRoleWithSkills([skill]);
+      const agent = makeCodexAgent({ roles: [role] });
+
+      const result = codexAgentMaterializer.materializeWorkspace(
+        agent, "http://mcp-proxy:9090",
+      );
+
+      const skillFiles = [...result.keys()].filter(k => k.startsWith(".agents/skills/"));
+      expect(skillFiles).toHaveLength(0);
+    });
+
+    it("does not generate skill files when no skills exist", () => {
+      const agent = makeCodexAgent(); // minimal role has no skills
+
+      const result = codexAgentMaterializer.materializeWorkspace(
+        agent, "http://mcp-proxy:9090",
+      );
+
+      const skillFiles = [...result.keys()].filter(k => k.startsWith(".agents/skills/"));
+      expect(skillFiles).toHaveLength(0);
+    });
+  });
+
+  describe("AGENTS.md generation", () => {
+    function makeTask(overrides?: Partial<ResolvedTask>): ResolvedTask {
+      return {
+        name: "take-notes",
+        version: "1.0.0",
+        description: "Take notes using MCP filesystem tools",
+        prompt: "Use the mcp__filesystem__write_file tool to create notes.",
+        ...overrides,
+      };
+    }
+
+    function makeFullRole(): ResolvedRole {
+      return {
+        name: "@clawmasons/role-writer",
+        version: "1.0.0",
+        description: "A writer role.",
+        risk: "LOW",
+        permissions: {
+          "@clawmasons/app-filesystem": {
+            allow: ["read_file", "write_file", "list_directory"],
+            deny: [],
+          },
+        },
+        tasks: [makeTask()],
+        apps: [],
+        skills: [makeSkill()],
+      };
+    }
+
+    it("contains the role name", () => {
+      const agent = makeCodexAgent({ roles: [makeFullRole()] });
+      const md = generateAgentsMd(agent);
+
+      expect(md).toContain("# Agent Instructions");
+      expect(md).toContain("role: writer");
+    });
+
+    it("contains task references as /prompts:<taskName>", () => {
+      const agent = makeCodexAgent({ roles: [makeFullRole()] });
+      const md = generateAgentsMd(agent);
+
+      expect(md).toContain("## Available Tasks");
+      expect(md).toContain("/prompts:take-notes");
+    });
+
+    it("contains skill references pointing to .agents/skills/", () => {
+      const agent = makeCodexAgent({ roles: [makeFullRole()] });
+      const md = generateAgentsMd(agent);
+
+      expect(md).toContain("## Available Skills");
+      expect(md).toContain("markdown-conventions");
+      expect(md).toContain(".agents/skills/markdown-conventions/");
+    });
+
+    it("contains MCP tools with rewritten names", () => {
+      const agent = makeCodexAgent({ roles: [makeFullRole()] });
+      const md = generateAgentsMd(agent);
+
+      expect(md).toContain("## MCP Tools");
+      expect(md).toContain("- filesystem_read_file");
+      expect(md).toContain("- filesystem_write_file");
+      expect(md).toContain("- filesystem_list_directory");
+    });
+
+    it("contains usage constraints", () => {
+      const agent = makeCodexAgent({ roles: [makeFullRole()] });
+      const md = generateAgentsMd(agent);
+
+      expect(md).toContain("Only use tools from this list.");
+    });
+
+    it("is included in materializeWorkspace output", () => {
+      const agent = makeCodexAgent({ roles: [makeFullRole()] });
+      const result = codexAgentMaterializer.materializeWorkspace(
+        agent, "http://mcp-proxy:9090",
+      );
+
+      expect(result.has("AGENTS.md")).toBe(true);
+      const md = result.get("AGENTS.md")!;
+      expect(md).toContain("# Agent Instructions");
+      expect(md).toContain("role: writer");
+      expect(md).toContain("/prompts:take-notes");
+      expect(md).toContain(".agents/skills/markdown-conventions/");
+    });
+
+    it("omits tasks section when no tasks exist", () => {
+      const agent = makeCodexAgent();
+      const md = generateAgentsMd(agent);
+
+      expect(md).not.toContain("## Available Tasks");
+    });
+
+    it("omits skills section when no skills exist", () => {
+      const agent = makeCodexAgent();
+      const md = generateAgentsMd(agent);
+
+      expect(md).not.toContain("## Available Skills");
+    });
+
+    it("omits tools section when no permissions exist", () => {
+      const agent = makeCodexAgent();
+      const md = generateAgentsMd(agent);
+
+      expect(md).not.toContain("## MCP Tools");
+    });
+  });
+
+  describe("agent-launch.json", () => {
+    function makeFullRole(): ResolvedRole {
+      return {
+        name: "@clawmasons/role-writer",
+        version: "1.0.0",
+        description: "A writer role.",
+        risk: "LOW",
+        permissions: {},
+        tasks: [],
+        apps: [],
+        skills: [],
+      };
+    }
+
+    it("is generated in materializeWorkspace output", () => {
+      const agent = makeCodexAgent({ roles: [makeFullRole()] });
+      const result = codexAgentMaterializer.materializeWorkspace(
+        agent, "http://mcp-proxy:9090",
+      );
+
+      expect(result.has("agent-launch.json")).toBe(true);
+    });
+
+    it("contains valid JSON with command and credentials", () => {
+      const agent = makeCodexAgent({ roles: [makeFullRole()] });
+      const result = codexAgentMaterializer.materializeWorkspace(
+        agent, "http://mcp-proxy:9090",
+      );
+
+      const launchJson = JSON.parse(result.get("agent-launch.json")!);
+      expect(launchJson).toHaveProperty("command");
+      expect(launchJson).toHaveProperty("credentials");
+      expect(Array.isArray(launchJson.credentials)).toBe(true);
+    });
+
+    it("uses the agent package command name", () => {
+      const agent = makeCodexAgent({ roles: [makeFullRole()] });
+      const result = codexAgentMaterializer.materializeWorkspace(
+        agent, "http://mcp-proxy:9090",
+      );
+
+      const launchJson = JSON.parse(result.get("agent-launch.json")!);
+      // Command comes from the AgentPackage (codex-agent name since no runtime.command set)
+      expect(launchJson.command).toBe("codex-agent");
     });
   });
 });
