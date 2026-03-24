@@ -16,7 +16,7 @@ export default tseslint.config(
     ignores: ["dist/", "node_modules/", "*.config.*"],
   },
   {
-    files: ["packages/*/tests/**/*.ts"],
+    files: ["packages/*/tests/**/*.ts", "packages/agents/*/tests/**/*.ts"],
     rules: {
       "@typescript-eslint/no-non-null-assertion": "off",
     },
