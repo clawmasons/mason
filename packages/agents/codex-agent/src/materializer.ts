@@ -2,8 +2,8 @@ import { CLI_NAME_LOWERCASE, convertMcpFormat, getAppShortName } from "@clawmaso
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import type { RuntimeMaterializer, MaterializationResult } from "@clawmasons/agent-sdk";
-import { collectAllTasks, collectAllSkills } from "@clawmasons/agent-sdk";
+import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage } from "@clawmasons/agent-sdk";
+import { collectAllTasks, collectAllSkills, materializeSkills, generateAgentLaunchJson } from "@clawmasons/agent-sdk";
 import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from "@clawmasons/shared";
 import { stringify as tomlStringify } from "smol-toml";
 
@@ -140,6 +140,76 @@ export function generatePromptFiles(
   return result;
 }
 
+/**
+ * Generate a workspace-level `AGENTS.md` containing role instructions,
+ * task references, skill references, and MCP tool list.
+ */
+export function generateAgentsMd(agent: ResolvedAgent): string {
+  const lines: string[] = [];
+  const role = agent.roles[0];
+  const roleName = role ? getAppShortName(role.name) : "unknown";
+
+  lines.push("# Agent Instructions");
+  lines.push("");
+  lines.push(`You are operating as a mason agent with the role: ${roleName}.`);
+  lines.push("");
+
+  // Available tasks as /prompts:<taskName> references
+  const allTasks = collectAllTasks(agent.roles);
+  if (allTasks.length > 0) {
+    lines.push("## Available Tasks");
+    lines.push("The following tasks are available as custom prompts:");
+    for (const [task] of allTasks) {
+      const desc = task.description ?? task.name;
+      lines.push(`- /prompts:${task.name} — ${desc}`);
+    }
+    lines.push("");
+  }
+
+  // Available skills pointing to .agents/skills/
+  const allSkills = collectAllSkills(agent.roles);
+  if (allSkills.size > 0) {
+    lines.push("## Available Skills");
+    for (const [skillName, skill] of allSkills) {
+      const shortName = getAppShortName(skillName);
+      const desc = skill.description ? `: ${skill.description}` : "";
+      lines.push(`- ${shortName}${desc} — See .agents/skills/${shortName}/`);
+    }
+    lines.push("");
+  }
+
+  // MCP tool list with rewritten names
+  const toolLines: string[] = [];
+  for (const r of agent.roles) {
+    for (const [appName, perms] of Object.entries(r.permissions)) {
+      const serverName = getAppShortName(appName);
+      for (const tool of perms.allow) {
+        const rewritten = MCP_NAME_TEMPLATE
+          .replace("${server}", serverName)
+          .replace("${tool}", tool);
+        toolLines.push(`- ${rewritten}`);
+      }
+    }
+  }
+  // Deduplicate tool lines
+  const uniqueTools = [...new Set(toolLines)];
+  if (uniqueTools.length > 0) {
+    lines.push("## MCP Tools");
+    lines.push("Tools are provided via the mason MCP server. Available tools:");
+    for (const tl of uniqueTools) lines.push(tl);
+    lines.push("");
+    lines.push("Only use tools from this list.");
+  }
+
+  return lines.join("\n");
+}
+
+/** Reference to the parent AgentPackage — set after construction. */
+let _agentPkg: AgentPackage;
+
+/** Codex skill config: skills live at `.agents/skills/` */
+const CODEX_SKILL_CONFIG = { projectFolder: ".agents/skills" };
+
 export const codexAgentMaterializer: RuntimeMaterializer = {
   name: "codex-agent",
 
@@ -165,6 +235,8 @@ export const codexAgentMaterializer: RuntimeMaterializer = {
   materializeWorkspace(
     agent: ResolvedAgent,
     proxyEndpoint: string,
+    _proxyToken?: string,
+    options?: MaterializeOptions,
   ): MaterializationResult {
     const result: MaterializationResult = new Map();
     const proxyType = agent.proxy?.type ?? "sse";
@@ -176,6 +248,40 @@ export const codexAgentMaterializer: RuntimeMaterializer = {
     const promptFiles = generatePromptFiles(agent);
     for (const [p, c] of promptFiles) result.set(p, c);
 
+    // .agents/skills/{skillName}/ — skill conversion
+    const allSkills = collectAllSkills(agent.roles);
+    const skillFiles = materializeSkills(
+      [...allSkills.values()],
+      CODEX_SKILL_CONFIG,
+      _agentPkg?.mcpNameTemplate,
+    );
+    for (const [p, c] of skillFiles) result.set(p, c);
+
+    // AGENTS.md — role instructions
+    result.set("AGENTS.md", generateAgentsMd(agent));
+
+    // agent-launch.json — tells agent-entry how to bootstrap this agent
+    result.set(
+      "agent-launch.json",
+      generateAgentLaunchJson(
+        _agentPkg,
+        agent.credentials,
+        options?.acpMode,
+        undefined,
+        options?.agentArgs,
+        options?.initialPrompt,
+        options?.printMode,
+      ),
+    );
+
     return result;
   },
 };
+
+/**
+ * Set the parent AgentPackage reference (called during package initialization).
+ * @internal
+ */
+export function _setAgentPackage(pkg: AgentPackage): void {
+  _agentPkg = pkg;
+}
