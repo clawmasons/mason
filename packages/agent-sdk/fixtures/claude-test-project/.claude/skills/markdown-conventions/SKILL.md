@@ -1,3 +1,7 @@
+---
+name: markdown-conventions
+description: Conventions to be used when creating markdown
+---
 # Markdown Conventions
 
 ## File Naming

@@ -101,6 +101,7 @@ RUN npm install -g @mariozechner/pi-coding-agent
 
   printMode: {
     jsonStreamArgs: ["--mode", "json"],
+    buildPromptArgs: (prompt) => ["-p", prompt],
     parseJsonStreamFinalResult(line: string): string | null {
       const event = JSON.parse(line);
       if (event.type === "agent_end" && Array.isArray(event.messages)) {

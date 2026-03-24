@@ -15,10 +15,11 @@ import { createAgentRegistry, getAgent, getRegisteredAgentNames, readTask, readS
 // Built-in agent packages
 import claudeCodeAgent from "@clawmasons/claude-code-agent";
 import piCodingAgent from "@clawmasons/pi-coding-agent";
+import codexAgent from "@clawmasons/codex-agent";
 import { default as mcpAgent } from "@clawmasons/mcp-agent/agent-package";
 
 /** Built-in agent packages list. */
-export const BUILTIN_AGENTS: AgentPackage[] = [claudeCodeAgent, piCodingAgent, mcpAgent];
+export const BUILTIN_AGENTS: AgentPackage[] = [claudeCodeAgent, piCodingAgent, codexAgent, mcpAgent];
 
 /** Default proxy endpoint used when none is provided. */
 const DEFAULT_PROXY_ENDPOINT = "http://mcp-proxy:9090";

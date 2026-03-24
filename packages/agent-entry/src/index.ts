@@ -328,6 +328,8 @@ export async function launchRuntime(
   // Add credentials to child env only
   Object.assign(childEnv, credentialEnv);
 
+  log(`[agent-entry] Launching: ${command} ${args.join(" ")}`);
+
   return new Promise<number>((resolve, reject) => {
     const child = spawn(command, args, {
       env: childEnv,

@@ -1,7 +1,7 @@
 {
-  "name": "@clawmasons/agent-sdk",
+  "name": "@clawmasons/codex-agent",
   "version": "0.1.6",
-  "description": "SDK for building Mason agent packages",
+  "description": "Codex Agent package for Mason",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -9,10 +9,6 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    },
-    "./testing": {
-      "import": "./dist/testing/index.js",
-      "types": "./dist/testing/index.d.ts"
     }
   },
   "scripts": {
@@ -20,15 +16,12 @@
     "typecheck": "tsc --noEmit"
   },
   "files": [
-    "dist",
-    "fixtures"
+    "dist"
   ],
   "license": "MIT",
   "dependencies": {
+    "@clawmasons/agent-sdk": "^0.1.6",
     "@clawmasons/shared": "^0.1.6",
-    "js-yaml": "^4.1.1"
-  },
-  "devDependencies": {
-    "@types/js-yaml": "^4.0.9"
+    "smol-toml": "^1.3.1"
   }
 }

@@ -28,7 +28,12 @@ mason claude
 
 You can also run projects with other agents using the claude config
 ```bash
-mason pi --source claude
+mason codex --source claude
+```
+
+Or vice versa if your project was setup with codex
+```bash
+mason claude --source codex
 ```
 
 
