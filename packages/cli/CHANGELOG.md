@@ -1,5 +1,19 @@
 # @clawmasons/mason
 
+## 0.1.6
+
+### Patch Changes
+
+- Patch bump all packages
+- Updated dependencies
+  - @clawmasons/shared@0.1.6
+  - @clawmasons/agent-sdk@0.1.6
+  - @clawmasons/proxy@0.1.6
+  - @clawmasons/claude-code-agent@0.1.6
+  - @clawmasons/pi-coding-agent@0.1.6
+  - @clawmasons/mcp-agent@0.1.6
+  - @clawmasons/codex-agent@0.1.6
+
 ## 0.1.5
 
 ### Patch Changes

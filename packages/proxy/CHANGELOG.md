@@ -1,5 +1,13 @@
 # @clawmasons/proxy
 
+## 0.1.6
+
+### Patch Changes
+
+- Patch bump all packages
+- Updated dependencies
+  - @clawmasons/shared@0.1.6
+
 ## 0.1.5
 
 ### Patch Changes

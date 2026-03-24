@@ -1,6 +1,6 @@
 {
   "name": "@clawmasons/agent-sdk",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "SDK for building Mason agent packages",
   "type": "module",
   "main": "./dist/index.js",
@@ -25,7 +25,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@clawmasons/shared": "^0.1.5",
+    "@clawmasons/shared": "^0.1.6",
     "js-yaml": "^4.1.1"
   },
   "devDependencies": {
