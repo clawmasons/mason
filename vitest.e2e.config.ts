@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["packages/*/tests/e2e/**/*.test.ts"],
+    include: ["packages/*/tests/e2e/**/*.test.ts", "packages/agents/*/tests/e2e/**/*.test.ts"],
     testTimeout: 60_000,
     fileParallelism: false,
     pool: "forks",
