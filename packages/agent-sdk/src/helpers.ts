@@ -154,10 +154,13 @@ export function generateAgentLaunchJson(
     args = [...(args ?? []), ...agentArgs];
   }
 
-  // Append initial prompt (print mode uses json stream args + -p flag; otherwise bare positional)
+  // Append initial prompt (print mode uses json stream args + buildPromptArgs; otherwise bare positional)
   if (initialPrompt && !acpMode) {
     if (printMode && agentPkg.printMode) {
-      args = [...(args ?? []), ...agentPkg.printMode.jsonStreamArgs, "-p", initialPrompt];
+      const promptArgs = agentPkg.printMode.buildPromptArgs
+        ? agentPkg.printMode.buildPromptArgs(initialPrompt)
+        : ["-p", initialPrompt];
+      args = [...(args ?? []), ...agentPkg.printMode.jsonStreamArgs, ...promptArgs];
     } else {
       args = [...(args ?? []), initialPrompt];
     }

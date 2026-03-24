@@ -41,6 +41,7 @@ RUN npm install -g @anthropic-ai/claude-code
 
   printMode: {
     jsonStreamArgs: ["--output-format", "stream-json", "--verbose"],
+    buildPromptArgs: (prompt) => ["-p", prompt],
     parseJsonStreamFinalResult(line: string): string | null {
       const event = JSON.parse(line);
       if (event.type === "result") {
