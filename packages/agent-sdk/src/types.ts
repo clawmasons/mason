@@ -206,6 +206,11 @@ export interface AgentPackage {
     /** Args to append to agent command to enable JSON streaming output. */
     jsonStreamArgs: string[];
     /**
+     * Build the CLI args that pass the initial prompt to the agent.
+     * Defaults to `["-p", prompt]` when not defined.
+     */
+    buildPromptArgs?: (prompt: string) => string[];
+    /**
      * Parse a line from the JSON stream. Return the final result text when found, or null to keep reading.
      * Called with try/catch — exceptions are logged and treated as null.
      */

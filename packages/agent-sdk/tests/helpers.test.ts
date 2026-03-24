@@ -472,6 +472,44 @@ describe("generateAgentLaunchJson", () => {
     const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, "sys", ["--extra"], "go", true));
     expect(config.args).toEqual(["--effort", "max", "--append-system-prompt", "sys", "--extra", "--output-format", "stream-json", "-p", "go"]);
   });
+
+  it("uses buildPromptArgs callback when defined in printMode", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--flag"] },
+      printMode: {
+        jsonStreamArgs: ["--output-format", "stream-json"],
+        buildPromptArgs: (prompt) => ["--prompt", prompt],
+        parseJsonStreamFinalResult: () => null,
+      },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, "hello world", true));
+    expect(config.args).toEqual(["--flag", "--output-format", "stream-json", "--prompt", "hello world"]);
+  });
+
+  it("uses buildPromptArgs for positional prompt (no flag)", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "codex", args: ["exec"] },
+      printMode: {
+        jsonStreamArgs: ["--json"],
+        buildPromptArgs: (prompt) => [prompt],
+        parseJsonStreamFinalResult: () => null,
+      },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, "do this task", true));
+    expect(config.args).toEqual(["exec", "--json", "do this task"]);
+  });
+
+  it("falls back to ['-p', prompt] when buildPromptArgs is not defined", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd" },
+      printMode: {
+        jsonStreamArgs: ["--stream"],
+        parseJsonStreamFinalResult: () => null,
+      },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, "test prompt", true));
+    expect(config.args).toEqual(["--stream", "-p", "test prompt"]);
+  });
 });
 
 // ── readSkills ────────────────────────────────────────────────────────────────
