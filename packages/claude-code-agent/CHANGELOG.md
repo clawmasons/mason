@@ -1,5 +1,16 @@
 # @clawmasons/claude-code-agent
 
+## 0.1.5
+
+### Patch Changes
+
+- Patch bump all packages
+- Patch bump all packages
+- Updated dependencies
+- Updated dependencies
+  - @clawmasons/shared@0.1.5
+  - @clawmasons/agent-sdk@0.1.5
+
 ## 0.1.4
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@clawmasons/pi-coding-agent",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Pi Coding Agent package for Mason",
   "type": "module",
   "main": "./dist/index.js",
@@ -20,7 +20,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@clawmasons/agent-sdk": "^0.1.4",
-    "@clawmasons/shared": "^0.1.4"
+    "@clawmasons/agent-sdk": "^0.1.5",
+    "@clawmasons/shared": "^0.1.5"
   }
 }

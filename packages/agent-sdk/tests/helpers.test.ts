@@ -12,7 +12,9 @@ import {
   generateAgentLaunchJson,
   readSkills,
   materializeSkills,
+  materializeTasks,
 } from "../src/helpers.js";
+import type { AgentTaskConfig } from "../src/types.js";
 import type { AgentPackage } from "../src/types.js";
 
 // ── Test Fixtures ─────────────────────────────────────────────────────────────
@@ -630,5 +632,77 @@ describe("readSkills + materializeSkills round-trip", () => {
     expect(readBack[0].contentMap?.get("templates/default.md")).toBe("Template content");
 
     fs.rmSync(tmp, { recursive: true, force: true });
+  });
+});
+
+// ── MCP Name Rewriting in materializeTasks ─────────────────────────────────
+
+describe("materializeTasks with mcpNameTemplate", () => {
+  const taskConfig: AgentTaskConfig = {
+    projectFolder: ".claude/commands",
+    nameFormat: "{scopePath}/{taskName}.md",
+    scopeFormat: "path",
+    supportedFields: [],
+    prompt: "markdown-body",
+  };
+
+  it("rewrites mcp tool names when template is provided", () => {
+    const tasks: ResolvedTask[] = [{
+      name: "take-notes",
+      scope: "",
+      version: "1.0.0",
+      prompt: "Use mcp__filesystem__read_file to read files",
+    }];
+    const result = materializeTasks(tasks, taskConfig, "mcp__mason__${server}_${tool}");
+    expect(result.get(".claude/commands/take-notes.md")).toBe(
+      "Use mcp__mason__filesystem_read_file to read files",
+    );
+  });
+
+  it("does not rewrite when no template is provided", () => {
+    const tasks: ResolvedTask[] = [{
+      name: "take-notes",
+      scope: "",
+      version: "1.0.0",
+      prompt: "Use mcp__filesystem__read_file to read files",
+    }];
+    const result = materializeTasks(tasks, taskConfig);
+    expect(result.get(".claude/commands/take-notes.md")).toBe(
+      "Use mcp__filesystem__read_file to read files",
+    );
+  });
+});
+
+// ── MCP Name Rewriting in materializeSkills ────────────────────────────────
+
+describe("materializeSkills with mcpNameTemplate", () => {
+  const skillConfig: AgentSkillConfig = { projectFolder: ".claude/skills" };
+
+  it("rewrites mcp tool names in skill content", () => {
+    const skill: ResolvedSkill = {
+      name: "labeling",
+      version: "1.0.0",
+      description: "test",
+      artifacts: ["SKILL.md"],
+      contentMap: new Map([["SKILL.md", "Use mcp__filesystem__write_file to save"]]),
+    };
+    const result = materializeSkills([skill], skillConfig, "mcp__mason__${server}_${tool}");
+    expect(result.get(".claude/skills/labeling/SKILL.md")).toBe(
+      "Use mcp__mason__filesystem_write_file to save",
+    );
+  });
+
+  it("does not rewrite when no template is provided", () => {
+    const skill: ResolvedSkill = {
+      name: "labeling",
+      version: "1.0.0",
+      description: "test",
+      artifacts: ["SKILL.md"],
+      contentMap: new Map([["SKILL.md", "Use mcp__filesystem__write_file"]]),
+    };
+    const result = materializeSkills([skill], skillConfig);
+    expect(result.get(".claude/skills/labeling/SKILL.md")).toBe(
+      "Use mcp__filesystem__write_file",
+    );
   });
 });

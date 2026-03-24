@@ -8,7 +8,7 @@
 
 import * as path from "node:path";
 import type { Role, ResolvedAgent } from "@clawmasons/shared";
-import { adaptRoleToResolvedAgent, getDialectByDirectory, registerAgentDialect } from "@clawmasons/shared";
+import { adaptRoleToResolvedAgent, getDialect, getDialectByDirectory, registerAgentDialect } from "@clawmasons/shared";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage, AgentRegistry, AgentTaskConfig, AgentSkillConfig } from "@clawmasons/agent-sdk";
 import { createAgentRegistry, getAgent, getRegisteredAgentNames, readTask, readSkills } from "@clawmasons/agent-sdk";
 
@@ -136,6 +136,12 @@ export function getAllRegisteredNames(): string[] {
  * Strips leading dot, looks up dialect by directory, then gets the agent package.
  */
 function resolveSourceDialect(source: string): AgentPackage | undefined {
+  // Try exact dialect registry key first (e.g., "claude-code-agent")
+  const exactDialect = getDialect(source);
+  if (exactDialect) {
+    return getAgentFromRegistry(exactDialect.name);
+  }
+  // Fall back to directory-based lookup (e.g., ".claude" or "claude")
   const dir = source.startsWith(".") ? source.slice(1) : source;
   const dialect = getDialectByDirectory(dir);
   if (!dialect) return undefined;

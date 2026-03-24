@@ -1542,7 +1542,8 @@ async function runAgentPrintMode(
 
     let finalResult: string | null = null;
     const runArgs = ["run", "--rm", "--service-ports", "--build", "-T", agentServiceName];
-    const { code: agentCode } = await execComposeRunWithStreamCapture(composeFile, runArgs, (line) => {
+    fileLogger.log(`[print] Docker command: docker compose -f ${composeFile} ${runArgs.join(" ")}`);
+    const { code: agentCode, stderr: composeStderr } = await execComposeRunWithStreamCapture(composeFile, runArgs, (line) => {
       fileLogger.log(`[stream] ${line}`);
       if (parseFinalResult && finalResult === null) {
         const trimmed = line.trimStart();
@@ -1555,6 +1556,13 @@ async function runAgentPrintMode(
         }
       }
     });
+
+    // Log agent container stderr (includes agent-entry output)
+    if (composeStderr) {
+      for (const line of composeStderr.split("\n")) {
+        if (line.trim()) fileLogger.log(`[stderr] ${line}`);
+      }
+    }
 
     // 9. Tear down
     console.log(`[print] Agent exited (code ${agentCode}). Tearing down...`);

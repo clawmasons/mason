@@ -194,6 +194,13 @@ export interface AgentPackage {
    */
   validate?: (agent: ResolvedAgent) => AgentValidationResult;
 
+  /**
+   * MCP tool name template for this agent runtime.
+   * Used to rewrite `mcp__{server}__{tool}` references in task/skill files during materialization.
+   * Supports `${server}` and `${tool}` placeholders. Defaults to `${server}_${tool}`.
+   */
+  mcpNameTemplate?: string;
+
   /** Print mode configuration for non-interactive prompt execution with JSON streaming. */
   printMode?: {
     /** Args to append to agent command to enable JSON streaming output. */

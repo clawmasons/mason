@@ -1,5 +1,5 @@
 import type { ResolvedAgent } from "@clawmasons/shared";
-import { getAppShortName, CLI_NAME_LOWERCASE } from "@clawmasons/shared";
+import { getAppShortName, CLI_NAME_LOWERCASE, convertMcpFormat } from "@clawmasons/shared";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage } from "@clawmasons/agent-sdk";
 import {
   collectAllSkills,
@@ -110,7 +110,10 @@ function generateExtensionIndexTs(
     const taskShortName = getAppShortName(task.name);
     const commandName = task.scope ? `${task.scope}-${taskShortName}` : taskShortName;
     const description = `${task.name}@${task.version}`;
-    const prompt = task.prompt ?? "[no prompt defined]";
+    const rawPrompt = task.prompt ?? "[no prompt defined]";
+    const prompt = _agentPkg.mcpNameTemplate
+      ? convertMcpFormat(rawPrompt, _agentPkg.mcpNameTemplate)
+      : rawPrompt;
 
     const safeName = commandName.replace(/"/g, '\\"');
     const safeDesc = description.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -262,7 +265,7 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
     // Skills — copy actual SKILL.md + companions via materializeSkills
     if (_agentPkg.skills) {
       const allSkills = collectAllSkills(agent.roles);
-      const skillFiles = materializeSkills([...allSkills.values()], _agentPkg.skills);
+      const skillFiles = materializeSkills([...allSkills.values()], _agentPkg.skills, _agentPkg.mcpNameTemplate);
       for (const [p, c] of skillFiles) result.set(p, c);
     }
 
@@ -275,7 +278,7 @@ export const piCodingAgentMaterializer: RuntimeMaterializer = {
     // .pi/prompts/ — task markdown files
     if (_agentPkg.tasks) {
       const allTasks = collectAllTasks(agent.roles);
-      const taskFiles = materializeTasks(allTasks.map(([t]) => t), _agentPkg.tasks);
+      const taskFiles = materializeTasks(allTasks.map(([t]) => t), _agentPkg.tasks, _agentPkg.mcpNameTemplate);
       for (const [p, c] of taskFiles) result.set(p, c);
     }
 

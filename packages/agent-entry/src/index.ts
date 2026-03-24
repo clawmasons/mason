@@ -21,6 +21,33 @@ import { initializeMcpSession, callTool } from "./mcp-client.js";
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
+const LOG_FILE = "/logs/agent-entry.log";
+
+// ── File Logger ────────────────────────────────────────────────────────
+
+let _logFd: number | null = null;
+
+/**
+ * Log a message to both stderr and /logs/agent-entry.log (if writable).
+ */
+function log(msg: string): void {
+  const line = `${new Date().toISOString()} ${msg}\n`;
+  process.stderr.write(line);
+  if (_logFd === null) {
+    try {
+      _logFd = fs.openSync(LOG_FILE, "a");
+    } catch {
+      _logFd = -1; // mark as unavailable
+    }
+  }
+  if (_logFd > 0) {
+    try {
+      fs.writeSync(_logFd, line);
+    } catch {
+      // best-effort
+    }
+  }
+}
 
 // ── agent-launch.json Schema ──────────────────────────────────────────
 
@@ -90,7 +117,7 @@ export function loadLaunchConfig(): AgentLaunchConfig | null {
         }
       }
 
-      console.error(`[agent-entry] Loaded config from ${configPath}`);
+      log(`[agent-entry] Loaded config from ${configPath}`);
       return config;
     } catch (err) {
       if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT") {
@@ -260,7 +287,7 @@ export function installCredentials(
       const dir = path.dirname(config.path);
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(config.path, value, { mode: 0o600 });
-      console.error(`[agent-entry] Wrote credential to ${config.path}`);
+      log(`[agent-entry] Wrote credential to ${config.path}`);
     }
   }
 
@@ -331,11 +358,11 @@ export function mergeHomeBuild(): void {
   try {
     // cp -rn: recursive, no-clobber (don't overwrite existing files)
     execSync(`cp -rn ${backupDir}/. /home/mason/`, { stdio: "pipe" });
-    console.error("[agent-entry] Merged build-time home files");
+    log("[agent-entry] Merged build-time home files");
   } catch {
     // cp -rn may exit non-zero on some systems when skipping existing files
     // This is expected behavior, not an error
-    console.error("[agent-entry] Merged build-time home files (some skipped)");
+    log("[agent-entry] Merged build-time home files (some skipped)");
   }
 }
 
@@ -346,9 +373,9 @@ export async function bootstrap(): Promise<never> {
   const verbose = process.env.AGENT_ENTRY_VERBOSE === "1";
 
   if (verbose) {
-    console.error("[agent-entry] Verbose mode enabled");
-    console.error(`[agent-entry] argv: ${JSON.stringify(process.argv)}`);
-    console.error(`[agent-entry] cwd: ${process.cwd()}`);
+    log("[agent-entry] Verbose mode enabled");
+    log(`[agent-entry] argv: ${JSON.stringify(process.argv)}`);
+    log(`[agent-entry] cwd: ${process.cwd()}`);
   }
 
   // 0. Merge build-time home files before anything else
@@ -357,14 +384,14 @@ export async function bootstrap(): Promise<never> {
   // 1. Read configuration from environment
   const proxyToken = process.env.MCP_PROXY_TOKEN;
   if (!proxyToken) {
-    console.error("[agent-entry] MCP_PROXY_TOKEN not set");
+    log("[agent-entry] MCP_PROXY_TOKEN not set");
     process.exit(1);
   }
 
   const proxyUrl = process.env.MCP_PROXY_URL ?? "http://proxy:3000";
 
   if (verbose) {
-    console.error(`[agent-entry] Proxy URL: ${proxyUrl}`);
+    log(`[agent-entry] Proxy URL: ${proxyUrl}`);
   }
 
   // 2. Load agent-launch.json or fall back to env vars
@@ -380,7 +407,7 @@ export async function bootstrap(): Promise<never> {
     args = launchConfig.args ?? [];
   } else {
     // Legacy env var fallback
-    console.error("[agent-entry] No agent-launch.json found, falling back to env vars");
+    log("[agent-entry] No agent-launch.json found, falling back to env vars");
 
     const credentialsJson = process.env.AGENT_CREDENTIALS ?? "[]";
     let credentialKeys: string[];
@@ -388,7 +415,7 @@ export async function bootstrap(): Promise<never> {
       credentialKeys = JSON.parse(credentialsJson) as string[];
       if (!Array.isArray(credentialKeys)) throw new Error("not an array");
     } catch {
-      console.error("[agent-entry] AGENT_CREDENTIALS must be a JSON array of strings");
+      log("[agent-entry] AGENT_CREDENTIALS must be a JSON array of strings");
       process.exit(1);
     }
 
@@ -397,7 +424,7 @@ export async function bootstrap(): Promise<never> {
 
     const runtimeCmd = process.env.AGENT_RUNTIME_CMD;
     if (!runtimeCmd) {
-      console.error("[agent-entry] AGENT_RUNTIME_CMD not set");
+      log("[agent-entry] AGENT_RUNTIME_CMD not set");
       process.exit(1);
     }
 
@@ -409,7 +436,7 @@ export async function bootstrap(): Promise<never> {
   // Allow runtime command override (e.g. --bash flag sets AGENT_COMMAND_OVERRIDE=bash)
   const commandOverride = process.env.AGENT_COMMAND_OVERRIDE;
   if (commandOverride) {
-    console.error(`[agent-entry] Command override: ${commandOverride}`);
+    log(`[agent-entry] Command override: ${commandOverride}`);
     command = commandOverride;
     args = [];
   }
@@ -417,36 +444,36 @@ export async function bootstrap(): Promise<never> {
   const credentialKeys = credentialConfigs.map((c) => c.key);
 
   if (verbose) {
-    console.error(`[agent-entry] Command: ${command} ${args.join(" ")}`);
-    console.error(`[agent-entry] Credentials: ${credentialKeys.length > 0 ? credentialKeys.join(", ") : "none"}`);
+    log(`[agent-entry] Command: ${command} ${args.join(" ")}`);
+    log(`[agent-entry] Credentials: ${credentialKeys.length > 0 ? credentialKeys.join(", ") : "none"}`);
   }
 
   try {
     // 3. Connect to proxy
-    console.error("[agent-entry] Connecting to proxy...");
+    log("[agent-entry] Connecting to proxy...");
     const { sessionToken } = await connectToProxy(proxyUrl, proxyToken);
-    console.error("[agent-entry] Connected. Session established.");
+    log("[agent-entry] Connected. Session established.");
 
     // 4. Request credentials
     let credentialEnv: Record<string, string> = {};
     if (credentialKeys.length > 0) {
-      console.error(`[agent-entry] Requesting ${credentialKeys.length} credential(s)...`);
+      log(`[agent-entry] Requesting ${credentialKeys.length} credential(s)...`);
       const credentialValues = await requestCredentials(proxyUrl, proxyToken, sessionToken, credentialKeys);
-      console.error("[agent-entry] All credentials received.");
+      log("[agent-entry] All credentials received.");
 
       // 5. Install credentials (write files, build env vars)
       credentialEnv = installCredentials(credentialConfigs, credentialValues);
     } else {
-      console.error("[agent-entry] No credentials requested.");
+      log("[agent-entry] No credentials requested.");
     }
 
     // 6. Launch runtime
-    console.error(`[agent-entry] Launching runtime: ${command} ${args.join(" ")}`);
+    log(`[agent-entry] Launching runtime: ${command} ${args.join(" ")}`);
     const exitCode = await launchRuntime(command, args, credentialEnv);
     process.exit(exitCode);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[agent-entry] Fatal: ${message}`);
+    log(`[agent-entry] Fatal: ${message}`);
     process.exit(1);
   }
 }
@@ -469,7 +496,7 @@ function sleep(ms: number): Promise<void> {
 export async function credFetch(): Promise<never> {
   const proxyToken = process.env.MCP_PROXY_TOKEN;
   if (!proxyToken) {
-    console.error("[agent-entry cred-fetch] MCP_PROXY_TOKEN is not set");
+    log("[agent-entry cred-fetch] MCP_PROXY_TOKEN is not set");
     process.exit(1);
   }
 
@@ -481,7 +508,7 @@ export async function credFetch(): Promise<never> {
     credentialKeys = JSON.parse(credentialsJson) as string[];
     if (!Array.isArray(credentialKeys)) throw new Error("not an array");
   } catch {
-    console.error("[agent-entry cred-fetch] AGENT_CREDENTIALS must be a JSON array of strings");
+    log("[agent-entry cred-fetch] AGENT_CREDENTIALS must be a JSON array of strings");
     process.exit(1);
   }
 
@@ -500,7 +527,7 @@ export async function credFetch(): Promise<never> {
     process.exit(0);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[agent-entry cred-fetch] Fatal: ${message}`);
+    log(`[agent-entry cred-fetch] Fatal: ${message}`);
     process.exit(1);
   }
 }

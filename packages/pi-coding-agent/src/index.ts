@@ -33,6 +33,7 @@ RUN npm install -g @mariozechner/pi-coding-agent
   skills: {
     projectFolder: "skills",
   },
+  mcpNameTemplate: "${server}_${tool}",
 
   configSchema: {
     groups: [

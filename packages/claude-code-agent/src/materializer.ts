@@ -249,14 +249,14 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     // .claude/commands/ — task markdown files
     if (_agentPkg.tasks) {
       const allTasks = collectAllTasks(agent.roles);
-      const taskFiles = materializeTasks(allTasks.map(([t]) => t), _agentPkg.tasks);
+      const taskFiles = materializeTasks(allTasks.map(([t]) => t), _agentPkg.tasks, _agentPkg.mcpNameTemplate);
       for (const [p, c] of taskFiles) result.set(p, c);
     }
 
     // Skills — copy actual SKILL.md + companions via materializeSkills
     if (_agentPkg.skills) {
       const allSkills = collectAllSkills(agent.roles);
-      const skillFiles = materializeSkills([...allSkills.values()], _agentPkg.skills);
+      const skillFiles = materializeSkills([...allSkills.values()], _agentPkg.skills, _agentPkg.mcpNameTemplate);
       for (const [p, c] of skillFiles) result.set(p, c);
     }
 
@@ -299,14 +299,14 @@ export const claudeCodeMaterializer: RuntimeMaterializer = {
     // .claude/commands/ — task markdown files
     if (_agentPkg.tasks) {
       const allTasks = collectAllTasks(agent.roles);
-      const taskFiles = materializeTasks(allTasks.map(([t]) => t), _agentPkg.tasks);
+      const taskFiles = materializeTasks(allTasks.map(([t]) => t), _agentPkg.tasks, _agentPkg.mcpNameTemplate);
       for (const [p, c] of taskFiles) result.set(p, c);
     }
 
     // Skills — copy actual SKILL.md + companions via materializeSkills
     if (_agentPkg.skills) {
       const allSkills = collectAllSkills(agent.roles);
-      const skillFiles = materializeSkills([...allSkills.values()], _agentPkg.skills);
+      const skillFiles = materializeSkills([...allSkills.values()], _agentPkg.skills, _agentPkg.mcpNameTemplate);
       for (const [p, c] of skillFiles) result.set(p, c);
     }
 

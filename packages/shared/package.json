@@ -1,6 +1,6 @@
 {
   "name": "@clawmasons/shared",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Shared types, schemas, and utilities for mason command line",
   "type": "module",
   "main": "./dist/index.js",

@@ -281,7 +281,7 @@ describe("credFetch", () => {
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((_code?: number | string) => {
       throw new Error(`process.exit(${_code})`);
     }) as typeof process.exit);
-    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 
     await expect(credFetch()).rejects.toThrow("process.exit(1)");
     expect(exitSpy).toHaveBeenCalledWith(1);
