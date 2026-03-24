@@ -94,15 +94,16 @@ describe("materializer registry", () => {
   });
 
   describe("getRegisteredAgentTypes", () => {
-    it("includes all three built-in agent types", () => {
+    it("includes all four built-in agent types", () => {
       const types = getRegisteredAgentTypes();
       expect(types).toContain("claude-code-agent");
       expect(types).toContain("pi-coding-agent");
+      expect(types).toContain("codex-agent");
       expect(types).toContain("mcp-agent");
     });
 
-    it("returns exactly three types", () => {
-      expect(getRegisteredAgentTypes()).toHaveLength(3);
+    it("returns exactly four types", () => {
+      expect(getRegisteredAgentTypes()).toHaveLength(4);
     });
   });
 });
