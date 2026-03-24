@@ -1,5 +1,5 @@
 import type { ResolvedAgent } from "@clawmasons/shared";
-import { getAppShortName, CLI_NAME_LOWERCASE } from "@clawmasons/shared";
+import { getAppShortName, CLI_NAME_LOWERCASE, convertMcpFormat } from "@clawmasons/shared";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage } from "@clawmasons/agent-sdk";
 import {
   collectAllSkills,
@@ -110,7 +110,10 @@ function generateExtensionIndexTs(
     const taskShortName = getAppShortName(task.name);
     const commandName = task.scope ? `${task.scope}-${taskShortName}` : taskShortName;
     const description = `${task.name}@${task.version}`;
-    const prompt = task.prompt ?? "[no prompt defined]";
+    const rawPrompt = task.prompt ?? "[no prompt defined]";
+    const prompt = _agentPkg.mcpNameTemplate
+      ? convertMcpFormat(rawPrompt, _agentPkg.mcpNameTemplate)
+      : rawPrompt;
 
     const safeName = commandName.replace(/"/g, '\\"');
     const safeDesc = description.replace(/\\/g, "\\\\").replace(/"/g, '\\"');

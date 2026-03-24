@@ -94,6 +94,7 @@ describe("pi-coding-agent: print mode via CLI", () => {
     fs.writeFileSync(configPath, JSON.stringify({
       agents: {
         "pi-coding-agent": {
+          package: "@clawmasons/pi-coding-agent",
           config: {
             llm: {
               provider: "openrouter",
@@ -113,7 +114,7 @@ describe("pi-coding-agent: print mode via CLI", () => {
     if (!canRun()) return;
 
     const { proc, stdout, stderr, exitCode } = await runMasonPrint(
-      ["run", "--role", "writer", "--agent", "pi", "--source", "claude", "-p", "what is 2+2 equal?  Just give the answer."],
+      ["run", "--role", "writer", "--agent", "pi", "--build", "--source", "claude", "-p", "what is 2+2 equal?  Just give the answer."],
       workspaceDir,
     );
     lastProc = proc;
@@ -138,7 +139,7 @@ describe("pi-coding-agent: print mode via CLI", () => {
     const { proc, stderr, exitCode } = await runMasonPrint(
       [
         "run", "--role", "writer", "--agent", "pi", "--source", "claude",
-        "-p", "/take-notes write a file test-file.md with the contents 'test-passed'",
+        "-p", "take-notes with tool fileystem_write_file notes/test-file.md with the contents 'test-passed'",
       ],
       workspaceDir,
     );
