@@ -692,8 +692,8 @@ describe("codexAgentMaterializer", () => {
       );
 
       const launchJson = JSON.parse(result.get("agent-launch.json")!);
-      // Command comes from the AgentPackage (codex-agent name since no runtime.command set)
-      expect(launchJson.command).toBe("codex-agent");
+      // Command comes from the AgentPackage runtime.command
+      expect(launchJson.command).toBe("codex");
     });
   });
 });
