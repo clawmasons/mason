@@ -3,7 +3,7 @@ import type { ResolvedAgent } from "@clawmasons/shared";
 import { codexAgentMaterializer, _setAgentPackage } from "./materializer.js";
 
 export { codexAgentMaterializer } from "./materializer.js";
-export { generateConfigToml, generatePromptFile, generatePromptFiles, generateAgentsMd } from "./materializer.js";
+export { generateConfigToml, generateAgentsMd } from "./materializer.js";
 
 const codexAgent: AgentPackage = {
   name: "codex-agent",
@@ -15,17 +15,26 @@ const codexAgent: AgentPackage = {
 
   dockerfile: {
     installSteps: "RUN npm install -g @openai/codex",
+    aptPackages: ["ca-certificates", "bubblewrap"],
   },
 
   runtime: {
     command: "codex",
-    args: ["exec", "--full-auto"],
+    args: ["exec", "--full-auto", "--skip-git-repo-check"],
     credentials: [{ key: "OPENAI_API_KEY", type: "env" }],
     supportsAppendSystemPrompt: false,
   },
 
-  tasks: undefined,
-  skills: undefined,
+  tasks: {
+    projectFolder: ".codex/prompts",
+    nameFormat: "{taskName}.md",
+    scopeFormat: "kebab-case-prefix",
+    supportedFields: ["description"],
+    prompt: "markdown-body",
+  },
+  skills: {
+    projectFolder: ".agents/skills",
+  },
 
   mcpNameTemplate: "${server}_${tool}",
 
@@ -33,11 +42,9 @@ const codexAgent: AgentPackage = {
     jsonStreamArgs: ["--json"],
     buildPromptArgs: (prompt) => [prompt],
     parseJsonStreamFinalResult(line: string): string | null {
-      // TODO: Refine once actual `codex exec --json` NDJSON output is captured during E2E testing (CHANGE 7).
-      // Best-guess: look for a message event with role=assistant containing the final response.
       const event = JSON.parse(line);
-      if (event.type === "message" && event.role === "assistant") {
-        return event.content ?? "";
+      if (event.type === "item.completed" && event.item?.type === "agent_message") {
+        return event.item.text ?? "";
       }
       return null;
     },

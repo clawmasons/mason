@@ -1,10 +1,10 @@
-import { CLI_NAME_LOWERCASE, convertMcpFormat, getAppShortName } from "@clawmasons/shared";
+import { CLI_NAME_LOWERCASE, getAppShortName } from "@clawmasons/shared";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage } from "@clawmasons/agent-sdk";
-import { collectAllTasks, collectAllSkills, materializeSkills, generateAgentLaunchJson } from "@clawmasons/agent-sdk";
-import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from "@clawmasons/shared";
+import { collectAllTasks, collectAllSkills, materializeTasks, materializeSkills, generateAgentLaunchJson } from "@clawmasons/agent-sdk";
+import type { ResolvedAgent } from "@clawmasons/shared";
 import { stringify as tomlStringify } from "smol-toml";
 
 /**
@@ -33,112 +33,6 @@ export function generateConfigToml(
 
 /** The mcpNameTemplate for Codex: `${server}_${tool}` */
 const MCP_NAME_TEMPLATE = "${server}_${tool}";
-
-/**
- * Generate a single Codex custom prompt markdown file from a mason task.
- *
- * Output format:
- * ```markdown
- * ---
- * description: "task description or name"
- * ---
- *
- * ## Role Context
- * You are operating as role: <roleName>
- *
- * ## Available MCP Tools
- * The following tools are available via the mason MCP server:
- * - mason_filesystem_read_file
- * ...
- *
- * ## Required Skills
- * See .agents/skills/<skillName>/ for ...
- *
- * ## Task
- * <prompt body with rewritten MCP tool refs>
- * ```
- */
-export function generatePromptFile(
-  task: ResolvedTask,
-  owningRoles: ResolvedRole[],
-  allSkills: Map<string, ResolvedSkill>,
-): string {
-  const lines: string[] = [];
-
-  // YAML frontmatter
-  const description = task.description ?? task.displayName ?? task.name;
-  lines.push("---");
-  lines.push(`description: ${JSON.stringify(description)}`);
-  lines.push("---");
-  lines.push("");
-
-  // Role context — use the first owning role
-  const role = owningRoles[0];
-  if (role) {
-    const roleName = getAppShortName(role.name);
-    lines.push("## Role Context");
-    lines.push(`You are operating as role: ${roleName}`);
-    lines.push("");
-
-    // Available MCP tools from role permissions
-    const toolLines: string[] = [];
-    for (const [appName, perms] of Object.entries(role.permissions)) {
-      const serverName = getAppShortName(appName);
-      for (const tool of perms.allow) {
-        // Apply the mcpNameTemplate: server_tool
-        const rewritten = MCP_NAME_TEMPLATE
-          .replace("${server}", serverName)
-          .replace("${tool}", tool);
-        toolLines.push(`- ${rewritten}`);
-      }
-    }
-    if (toolLines.length > 0) {
-      lines.push("## Available MCP Tools");
-      lines.push("The following tools are available via the mason MCP server:");
-      for (const tl of toolLines) lines.push(tl);
-      lines.push("");
-    }
-  }
-
-  // Skill references
-  const skillEntries: string[] = [];
-  for (const [skillName] of allSkills) {
-    const shortName = getAppShortName(skillName);
-    skillEntries.push(`See .agents/skills/${shortName}/ for ${skillName} rules.`);
-  }
-  if (skillEntries.length > 0) {
-    lines.push("## Required Skills");
-    for (const entry of skillEntries) lines.push(entry);
-    lines.push("");
-  }
-
-  // Task prompt body with MCP tool refs rewritten
-  lines.push("## Task");
-  const promptBody = task.prompt ?? "";
-  const rewrittenBody = convertMcpFormat(promptBody, MCP_NAME_TEMPLATE);
-  lines.push(rewrittenBody);
-
-  return lines.join("\n");
-}
-
-/**
- * Generate `.codex/prompts/{taskName}.md` entries for all tasks.
- */
-export function generatePromptFiles(
-  agent: ResolvedAgent,
-): MaterializationResult {
-  const result: MaterializationResult = new Map();
-  const allTasks = collectAllTasks(agent.roles);
-  const allSkills = collectAllSkills(agent.roles);
-
-  for (const [task, owningRoles] of allTasks) {
-    const fileName = `${task.name}.md`;
-    const filePath = `.codex/prompts/${fileName}`;
-    result.set(filePath, generatePromptFile(task, owningRoles, allSkills));
-  }
-
-  return result;
-}
 
 /**
  * Generate a workspace-level `AGENTS.md` containing role instructions,
@@ -207,9 +101,6 @@ export function generateAgentsMd(agent: ResolvedAgent): string {
 /** Reference to the parent AgentPackage — set after construction. */
 let _agentPkg: AgentPackage;
 
-/** Codex skill config: skills live at `.agents/skills/` */
-const CODEX_SKILL_CONFIG = { projectFolder: ".agents/skills" };
-
 export const codexAgentMaterializer: RuntimeMaterializer = {
   name: "codex-agent",
 
@@ -244,18 +135,34 @@ export const codexAgentMaterializer: RuntimeMaterializer = {
     // .codex/config.toml — MCP server configuration (project-scoped)
     result.set(".codex/config.toml", generateConfigToml(proxyEndpoint, proxyType));
 
-    // .codex/prompts/*.md — task conversion to Codex custom prompts
-    const promptFiles = generatePromptFiles(agent);
-    for (const [p, c] of promptFiles) result.set(p, c);
+    // .codex/prompts/*.md — task conversion via SDK helper
+    if (_agentPkg?.tasks) {
+      const allTasks = collectAllTasks(agent.roles);
+      const taskFiles = materializeTasks(
+        allTasks.map(([t]) => t),
+        _agentPkg.tasks,
+        _agentPkg.mcpNameTemplate,
+      );
+      for (const [p, c] of taskFiles) result.set(p, c);
+    }
 
-    // .agents/skills/{skillName}/ — skill conversion
-    const allSkills = collectAllSkills(agent.roles);
-    const skillFiles = materializeSkills(
-      [...allSkills.values()],
-      CODEX_SKILL_CONFIG,
-      _agentPkg?.mcpNameTemplate,
-    );
-    for (const [p, c] of skillFiles) result.set(p, c);
+    // .agents/skills/{skillName}/ — skill conversion via SDK helper
+    if (_agentPkg?.skills) {
+      const allSkills = collectAllSkills(agent.roles);
+      const skillFiles = materializeSkills(
+        [...allSkills.values()],
+        _agentPkg.skills,
+        _agentPkg.mcpNameTemplate,
+      );
+      for (const [p, c] of skillFiles) {
+        // Codex requires YAML frontmatter in SKILL.md files
+        if (p.endsWith("SKILL.md") && !c.trimStart().startsWith("---")) {
+          result.set(p, `---\n---\n${c}`);
+        } else {
+          result.set(p, c);
+        }
+      }
+    }
 
     // AGENTS.md — role instructions
     result.set("AGENTS.md", generateAgentsMd(agent));

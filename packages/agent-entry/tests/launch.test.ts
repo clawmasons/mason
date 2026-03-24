@@ -68,9 +68,9 @@ describe("launchRuntime", () => {
     expect(exitCode).toBe(0);
   });
 
-  it("rejects when command not found", async () => {
-    await expect(
-      launchRuntime("nonexistent-command-xyz-123", [], {}),
-    ).rejects.toThrow("Failed to launch runtime");
+  it("returns exit code 127 when command not found", async () => {
+    // With shell: true, the shell handles "command not found" and exits 127
+    const exitCode = await launchRuntime("nonexistent-command-xyz-123", [], {});
+    expect(exitCode).toBe(127);
   });
 });

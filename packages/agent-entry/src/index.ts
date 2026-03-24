@@ -303,6 +303,12 @@ export function installCredentials(
  *
  * @returns The child process exit code
  */
+/** Shell-escape a single argument (POSIX single-quote wrapping). */
+function shellEscape(arg: string): string {
+  if (/^[a-zA-Z0-9_\-=./:@]+$/.test(arg)) return arg;
+  return `'${arg.replace(/'/g, "'\\''")}'`;
+}
+
 export async function launchRuntime(
   command: string,
   args: string[],
@@ -328,10 +334,16 @@ export async function launchRuntime(
   // Add credentials to child env only
   Object.assign(childEnv, credentialEnv);
 
+  // Use shell mode with proper quoting to ensure args with spaces
+  // (e.g. prompts) are preserved through intermediate wrapper scripts.
+  const shellCmd = [command, ...args.map(shellEscape)].join(" ");
+  log(`[agent-entry] Shell command: ${shellCmd}`);
+
   return new Promise<number>((resolve, reject) => {
-    const child = spawn(command, args, {
+    const child = spawn(shellCmd, [], {
       env: childEnv,
       stdio: "inherit",
+      shell: true,
     });
 
     child.on("error", (err) => {

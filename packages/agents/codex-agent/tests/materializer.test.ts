@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { codexAgentMaterializer, generateConfigToml, generatePromptFile, generatePromptFiles, generateAgentsMd } from "@clawmasons/codex-agent";
+import { codexAgentMaterializer, generateConfigToml, generateAgentsMd } from "@clawmasons/codex-agent";
 import { parse as tomlParse } from "smol-toml";
 import type { ResolvedAgent, ResolvedRole, ResolvedTask, ResolvedSkill } from "@clawmasons/shared";
 
@@ -254,134 +254,6 @@ describe("codexAgentMaterializer", () => {
       };
     }
 
-    describe("generatePromptFile", () => {
-      it("generates YAML frontmatter with description", () => {
-        const task = makeTask({ description: "Take notes using MCP filesystem tools" });
-        const role = makeRoleWithTask(task);
-        const skills = new Map<string, ResolvedSkill>([["markdown-conventions", makeSkill()]]);
-
-        const content = generatePromptFile(task, [role], skills);
-
-        expect(content).toContain("---");
-        expect(content).toContain('description: "Take notes using MCP filesystem tools"');
-      });
-
-      it("uses task name as description fallback when description is missing", () => {
-        const task = makeTask({ description: undefined });
-        const role = makeRoleWithTask(task);
-
-        const content = generatePromptFile(task, [role], new Map());
-
-        expect(content).toContain('description: "take-notes"');
-      });
-
-      it("includes role context with role name", () => {
-        const task = makeTask();
-        const role = makeRoleWithTask(task);
-
-        const content = generatePromptFile(task, [role], new Map());
-
-        expect(content).toContain("## Role Context");
-        expect(content).toContain("You are operating as role: writer");
-      });
-
-      it("includes available MCP tools with rewritten names", () => {
-        const task = makeTask();
-        const role = makeRoleWithTask(task);
-
-        const content = generatePromptFile(task, [role], new Map());
-
-        expect(content).toContain("## Available MCP Tools");
-        expect(content).toContain("- filesystem_read_file");
-        expect(content).toContain("- filesystem_write_file");
-        expect(content).toContain("- filesystem_list_directory");
-      });
-
-      it("includes skill references pointing to .agents/skills/ paths", () => {
-        const task = makeTask();
-        const role = makeRoleWithTask(task);
-        const skills = new Map<string, ResolvedSkill>([["markdown-conventions", makeSkill()]]);
-
-        const content = generatePromptFile(task, [role], skills);
-
-        expect(content).toContain("## Required Skills");
-        expect(content).toContain("See .agents/skills/markdown-conventions/");
-      });
-
-      it("rewrites MCP tool references in prompt body", () => {
-        const task = makeTask({
-          prompt: "Use mcp__filesystem__write_file to write and mcp__filesystem__read_file to read.",
-        });
-        const role = makeRoleWithTask(task);
-
-        const content = generatePromptFile(task, [role], new Map());
-
-        expect(content).toContain("## Task");
-        expect(content).toContain("filesystem_write_file");
-        expect(content).toContain("filesystem_read_file");
-        expect(content).not.toContain("mcp__filesystem__write_file");
-        expect(content).not.toContain("mcp__filesystem__read_file");
-      });
-
-      it("omits tools section when role has no permissions", () => {
-        const task = makeTask();
-        const role = makeRoleWithTask(task, [], {});
-
-        const content = generatePromptFile(task, [role], new Map());
-
-        expect(content).not.toContain("## Available MCP Tools");
-      });
-
-      it("omits skills section when no skills exist", () => {
-        const task = makeTask();
-        const role = makeRoleWithTask(task, []);
-
-        const content = generatePromptFile(task, [role], new Map());
-
-        expect(content).not.toContain("## Required Skills");
-      });
-    });
-
-    describe("generatePromptFiles", () => {
-      it("generates prompt file entries at .codex/prompts/{taskName}.md", () => {
-        const task = makeTask();
-        const role = makeRoleWithTask(task);
-        const agent = makeCodexAgent({ roles: [role] });
-
-        const result = generatePromptFiles(agent);
-
-        expect(result.has(".codex/prompts/take-notes.md")).toBe(true);
-      });
-
-      it("generates one file per task", () => {
-        const task1 = makeTask({ name: "take-notes" });
-        const task2 = makeTask({ name: "summarize", description: "Summarize notes" });
-        const role: ResolvedRole = {
-          ...makeRoleWithTask(),
-          tasks: [task1, task2],
-        };
-        const agent = makeCodexAgent({ roles: [role] });
-
-        const result = generatePromptFiles(agent);
-
-        expect(result.has(".codex/prompts/take-notes.md")).toBe(true);
-        expect(result.has(".codex/prompts/summarize.md")).toBe(true);
-        expect(result.size).toBe(2);
-      });
-
-      it("deduplicates tasks across multiple roles", () => {
-        const task = makeTask();
-        const role1 = makeRoleWithTask(task);
-        const role2 = makeRoleWithTask(task);
-        const agent = makeCodexAgent({ roles: [role1, role2] });
-
-        const result = generatePromptFiles(agent);
-
-        expect(result.size).toBe(1);
-        expect(result.has(".codex/prompts/take-notes.md")).toBe(true);
-      });
-    });
-
     describe("materializeWorkspace with tasks", () => {
       it("includes prompt files in workspace output", () => {
         const task = makeTask();
@@ -406,7 +278,7 @@ describe("codexAgentMaterializer", () => {
 
         const content = result.get(".codex/prompts/take-notes.md")!;
         expect(content).toContain("---");
-        expect(content).toContain('description: "Take notes using MCP filesystem tools"');
+        expect(content).toContain("description: Take notes using MCP filesystem tools");
       });
 
       it("does not generate prompt files when no tasks exist", () => {
