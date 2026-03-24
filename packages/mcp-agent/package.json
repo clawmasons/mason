@@ -1,6 +1,6 @@
 {
   "name": "@clawmasons/mcp-agent",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "General-purpose MCP agent with REPL and ACP modes for testing and debugging the mason proxy pipeline",
   "type": "module",
   "main": "./dist/index.js",
@@ -29,8 +29,8 @@
   "license": "MIT",
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.16.0",
-    "@clawmasons/agent-sdk": "^0.1.4",
-    "@clawmasons/shared": "^0.1.4"
+    "@clawmasons/agent-sdk": "^0.1.5",
+    "@clawmasons/shared": "^0.1.5"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
