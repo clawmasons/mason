@@ -1,12 +1,8 @@
-import type { AgentPackage, RuntimeMaterializer, MaterializationResult } from "@clawmasons/agent-sdk";
+import type { AgentPackage } from "@clawmasons/agent-sdk";
+import { codexAgentMaterializer } from "./materializer.js";
 
-const codexAgentMaterializer: RuntimeMaterializer = {
-  name: "codex-agent",
-
-  materializeWorkspace(): MaterializationResult {
-    return new Map<string, string>();
-  },
-};
+export { codexAgentMaterializer } from "./materializer.js";
+export { generateConfigToml } from "./materializer.js";
 
 const codexAgent: AgentPackage = {
   name: "codex-agent",
