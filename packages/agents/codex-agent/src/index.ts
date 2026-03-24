@@ -20,7 +20,6 @@ const codexAgent: AgentPackage = {
 
   runtime: {
     command: "codex",
-    args: ["exec", "--full-auto", "--skip-git-repo-check"],
     credentials: [{ key: "OPENAI_API_KEY", type: "env" }],
     supportsAppendSystemPrompt: false,
   },
@@ -39,7 +38,7 @@ const codexAgent: AgentPackage = {
   mcpNameTemplate: "${server}_${tool}",
 
   printMode: {
-    jsonStreamArgs: ["--json"],
+    jsonStreamArgs: ["exec", "--dangerously-bypass-approvals-and-sandbox", "--skip-git-repo-check", "--json"],
     buildPromptArgs: (prompt) => [prompt],
     parseJsonStreamFinalResult(line: string): string | null {
       const event = JSON.parse(line);

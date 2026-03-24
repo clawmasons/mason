@@ -120,7 +120,7 @@ describe("codex-agent: print mode via CLI with --source claude", () => {
     const { proc, stderr, exitCode } = await runMasonPrint(
       [
         "run", "--role", "writer", "--agent", "codex", "--source", "claude", "--build",
-        "-p", "use the take-notes task to write a file called test-file.md in the notes directory with the contents 'test-passed'. Use the mason_write_file tool.",
+        "-p", "take-notes with tool fileystem_write_file notes/test-file.md with the contents 'test-passed'",
       ],
       workspaceDir,
     );

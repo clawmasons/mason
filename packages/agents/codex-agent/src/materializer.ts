@@ -20,6 +20,7 @@ export function generateConfigToml(
   const pathSuffix = proxyType === "sse" ? "/sse" : "/mcp";
 
   const config = {
+    ...(proxyType === "streamable-http" ? { experimental_use_rmcp_client: true } : {}),
     mcp_servers: {
       [CLI_NAME_LOWERCASE]: {
         url: `${proxyEndpoint}${pathSuffix}`,
@@ -113,14 +114,18 @@ export const codexAgentMaterializer: RuntimeMaterializer = {
    */
   materializeHome(projectDir: string, homePath: string): void {
     const hostHome = os.homedir();
+    const codexDir = path.join(homePath, ".codex");
+    fs.mkdirSync(codexDir, { recursive: true });
 
     // Copy ~/.codex/auth.json if it exists on the host
     const hostAuthJson = path.join(hostHome, ".codex", "auth.json");
     if (fs.existsSync(hostAuthJson)) {
-      const codexDir = path.join(homePath, ".codex");
-      fs.mkdirSync(codexDir, { recursive: true });
       fs.copyFileSync(hostAuthJson, path.join(codexDir, "auth.json"));
     }
+
+    // Write trusted project config so codex doesn't prompt for approval
+    const configContent = `[projects."/home/mason/workspace/project"]\ntrust_level = "trusted"\n`;
+    fs.writeFileSync(path.join(codexDir, "config.toml"), configContent);
   },
 
   materializeWorkspace(
@@ -128,6 +133,7 @@ export const codexAgentMaterializer: RuntimeMaterializer = {
     proxyEndpoint: string,
     _proxyToken?: string,
     options?: MaterializeOptions,
+    existingHomePath?: string,
   ): MaterializationResult {
     const result: MaterializationResult = new Map();
     const proxyType = agent.proxy?.type ?? "sse";
@@ -136,14 +142,27 @@ export const codexAgentMaterializer: RuntimeMaterializer = {
     result.set(".codex/config.toml", generateConfigToml(proxyEndpoint, proxyType));
 
     // .codex/prompts/*.md — task conversion via SDK helper
+    // Written to home directory so Codex finds them at ~/.codex/prompts/
     if (_agentPkg?.tasks) {
       const allTasks = collectAllTasks(agent.roles);
+      const tasksWithDefaults = allTasks.map(([t]) => ({
+        ...t,
+        description: t.description || t.name,
+      }));
       const taskFiles = materializeTasks(
-        allTasks.map(([t]) => t),
+        tasksWithDefaults,
         _agentPkg.tasks,
         _agentPkg.mcpNameTemplate,
       );
-      for (const [p, c] of taskFiles) result.set(p, c);
+      if (existingHomePath) {
+        for (const [p, c] of taskFiles) {
+          const fullPath = path.join(existingHomePath, p);
+          fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+          fs.writeFileSync(fullPath, c);
+        }
+      } else {
+        for (const [p, c] of taskFiles) result.set(p, c);
+      }
     }
 
     // .agents/skills/{skillName}/ — skill conversion via SDK helper
@@ -154,14 +173,7 @@ export const codexAgentMaterializer: RuntimeMaterializer = {
         _agentPkg.skills,
         _agentPkg.mcpNameTemplate,
       );
-      for (const [p, c] of skillFiles) {
-        // Codex requires YAML frontmatter in SKILL.md files
-        if (p.endsWith("SKILL.md") && !c.trimStart().startsWith("---")) {
-          result.set(p, `---\n---\n${c}`);
-        } else {
-          result.set(p, c);
-        }
-      }
+      for (const [p, c] of skillFiles) result.set(p, c);
     }
 
     // AGENTS.md — role instructions

@@ -79,6 +79,20 @@ describe("codexAgentMaterializer", () => {
       expect(parsed.mcp_servers.mason.url).toBe("http://mcp-proxy:9090/mcp");
     });
 
+    it("includes experimental_use_rmcp_client for streamable-http", () => {
+      const toml = generateConfigToml("http://mcp-proxy:9090", "streamable-http");
+      const parsed = tomlParse(toml) as Record<string, unknown>;
+
+      expect(parsed.experimental_use_rmcp_client).toBe(true);
+    });
+
+    it("omits experimental_use_rmcp_client for SSE", () => {
+      const toml = generateConfigToml("http://mcp-proxy:9090", "sse");
+      const parsed = tomlParse(toml) as Record<string, unknown>;
+
+      expect(parsed.experimental_use_rmcp_client).toBeUndefined();
+    });
+
     it("sets bearer_token_env_var to MCP_PROXY_TOKEN", () => {
       const toml = generateConfigToml("http://mcp-proxy:9090", "sse");
       const parsed = tomlParse(toml) as Record<string, Record<string, Record<string, string>>>;
@@ -255,7 +269,70 @@ describe("codexAgentMaterializer", () => {
     }
 
     describe("materializeWorkspace with tasks", () => {
-      it("includes prompt files in workspace output", () => {
+      let homeDir: string;
+
+      beforeEach(() => {
+        homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-task-test-"));
+      });
+
+      afterEach(() => {
+        fs.rmSync(homeDir, { recursive: true, force: true });
+      });
+
+      it("writes prompt files to home directory when existingHomePath is provided", () => {
+        const task = makeTask();
+        const role = makeRoleWithTask(task);
+        const agent = makeCodexAgent({ roles: [role] });
+
+        codexAgentMaterializer.materializeWorkspace(
+          agent, "http://mcp-proxy:9090", undefined, undefined, homeDir,
+        );
+
+        expect(fs.existsSync(path.join(homeDir, ".codex/prompts/take-notes.md"))).toBe(true);
+      });
+
+      it("prompt file has YAML frontmatter with description", () => {
+        const task = makeTask({ description: "Take notes using MCP filesystem tools" });
+        const role = makeRoleWithTask(task);
+        const agent = makeCodexAgent({ roles: [role] });
+
+        codexAgentMaterializer.materializeWorkspace(
+          agent, "http://mcp-proxy:9090", undefined, undefined, homeDir,
+        );
+
+        const content = fs.readFileSync(path.join(homeDir, ".codex/prompts/take-notes.md"), "utf-8");
+        expect(content).toContain("---");
+        expect(content).toContain("description: Take notes using MCP filesystem tools");
+      });
+
+      it("defaults description to task name when description is absent", () => {
+        const task = makeTask({ description: undefined });
+        const role = makeRoleWithTask(task);
+        const agent = makeCodexAgent({ roles: [role] });
+
+        codexAgentMaterializer.materializeWorkspace(
+          agent, "http://mcp-proxy:9090", undefined, undefined, homeDir,
+        );
+
+        const content = fs.readFileSync(path.join(homeDir, ".codex/prompts/take-notes.md"), "utf-8");
+        expect(content).toContain("---");
+        expect(content).toContain("description: take-notes");
+      });
+
+      it("does not include prompt files in workspace result when home path is provided", () => {
+        const task = makeTask();
+        const role = makeRoleWithTask(task);
+        const agent = makeCodexAgent({ roles: [role] });
+
+        const result = codexAgentMaterializer.materializeWorkspace(
+          agent, "http://mcp-proxy:9090", undefined, undefined, homeDir,
+        );
+
+        const promptFiles = [...result.keys()].filter(k => k.startsWith(".codex/prompts/"));
+        expect(promptFiles).toHaveLength(0);
+      });
+
+      it("falls back to workspace result when no home path is provided", () => {
         const task = makeTask();
         const role = makeRoleWithTask(task);
         const agent = makeCodexAgent({ roles: [role] });
@@ -267,29 +344,15 @@ describe("codexAgentMaterializer", () => {
         expect(result.has(".codex/prompts/take-notes.md")).toBe(true);
       });
 
-      it("prompt file has YAML frontmatter with description", () => {
-        const task = makeTask({ description: "Take notes using MCP filesystem tools" });
-        const role = makeRoleWithTask(task);
-        const agent = makeCodexAgent({ roles: [role] });
-
-        const result = codexAgentMaterializer.materializeWorkspace(
-          agent, "http://mcp-proxy:9090",
-        );
-
-        const content = result.get(".codex/prompts/take-notes.md")!;
-        expect(content).toContain("---");
-        expect(content).toContain("description: Take notes using MCP filesystem tools");
-      });
-
       it("does not generate prompt files when no tasks exist", () => {
         const agent = makeCodexAgent(); // minimal role has no tasks
 
-        const result = codexAgentMaterializer.materializeWorkspace(
-          agent, "http://mcp-proxy:9090",
+        codexAgentMaterializer.materializeWorkspace(
+          agent, "http://mcp-proxy:9090", undefined, undefined, homeDir,
         );
 
-        const promptFiles = [...result.keys()].filter(k => k.startsWith(".codex/prompts/"));
-        expect(promptFiles).toHaveLength(0);
+        const promptsDir = path.join(homeDir, ".codex/prompts");
+        expect(fs.existsSync(promptsDir)).toBe(false);
       });
     });
   });
