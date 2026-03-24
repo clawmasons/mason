@@ -22,7 +22,8 @@
       "@clawmasons/mcp-agent": ["./packages/mcp-agent/src/index.ts"],
       "@clawmasons/mcp-agent/agent-package": ["./packages/mcp-agent/src/agent-package.ts"],
       "@clawmasons/pi-coding-agent": ["./packages/pi-coding-agent/src/index.ts"],
-      "@clawmasons/claude-code-agent": ["./packages/claude-code-agent/src/index.ts"]
+      "@clawmasons/claude-code-agent": ["./packages/claude-code-agent/src/index.ts"],
+      "@clawmasons/codex-agent": ["./packages/agents/codex-agent/src/index.ts"]
     }
   },
   "include": [
@@ -41,6 +42,8 @@
     "packages/pi-coding-agent/src/**/*",
     "packages/pi-coding-agent/tests/**/*",
     "packages/claude-code-agent/src/**/*",
-    "packages/claude-code-agent/tests/**/*"
+    "packages/claude-code-agent/tests/**/*",
+    "packages/agents/codex-agent/src/**/*",
+    "packages/agents/codex-agent/tests/**/*"
   ]
 }

@@ -18,6 +18,7 @@
   "license": "MIT",
   "workspaces": [
     "packages/*",
+    "packages/agents/*",
     "!packages/placeholders"
   ],
   "devDependencies": {
