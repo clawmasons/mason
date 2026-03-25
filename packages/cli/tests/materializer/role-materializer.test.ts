@@ -1,6 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Role } from "@clawmasons/shared";
-import { adaptRoleToResolvedAgent } from "@clawmasons/shared";
 import {
   materializeForAgent,
   getMaterializer,
@@ -8,14 +7,18 @@ import {
   MaterializerError,
   registerAgents,
 } from "../../src/materializer/role-materializer.js";
-import claudeCodeAgent, { claudeCodeMaterializer } from "@clawmasons/claude-code-agent";
 import { mcpAgentMaterializer } from "@clawmasons/mcp-agent/agent-package";
-import piCodingAgent, { piCodingAgentMaterializer } from "@clawmasons/pi-coding-agent";
-import codexAgent from "@clawmasons/codex-agent";
+import {
+  mockClaudeCodeAgent,
+  mockClaudeCodeMaterializer,
+  mockPiCodingAgent,
+  mockPiCodingAgentMaterializer,
+  mockCodexAgent,
+} from "../helpers/mock-agent-packages.js";
 
-// Register non-built-in agents for test purposes (they still exist in the monorepo).
+// Register mock agent packages for test purposes (real packages moved to mason-extensions).
 beforeAll(() => {
-  registerAgents([claudeCodeAgent, piCodingAgent, codexAgent]);
+  registerAgents([mockClaudeCodeAgent, mockPiCodingAgent, mockCodexAgent]);
 });
 
 // ---------------------------------------------------------------------------
@@ -84,11 +87,11 @@ function makeTestRole(): Role {
 describe("materializer registry", () => {
   describe("getMaterializer", () => {
     it("returns claude-code-agent materializer for 'claude-code-agent'", () => {
-      expect(getMaterializer("claude-code-agent")).toBe(claudeCodeMaterializer);
+      expect(getMaterializer("claude-code-agent")).toBe(mockClaudeCodeMaterializer);
     });
 
     it("returns pi-coding-agent materializer for 'pi-coding-agent'", () => {
-      expect(getMaterializer("pi-coding-agent")).toBe(piCodingAgentMaterializer);
+      expect(getMaterializer("pi-coding-agent")).toBe(mockPiCodingAgentMaterializer);
     });
 
     it("returns mcp-agent materializer for 'mcp-agent'", () => {
@@ -120,168 +123,13 @@ describe("materializer registry", () => {
 // ---------------------------------------------------------------------------
 
 describe("materializeForAgent", () => {
-  describe("Claude Code materialization from Role", () => {
-    it("produces .claude.json with mcpServers", () => {
+  describe("delegates to registered materializer", () => {
+    it("calls the materializer and returns its result", () => {
       const role = makeTestRole();
       const result = materializeForAgent(role, "claude-code-agent");
 
-      expect(result.has(".claude.json")).toBe(true);
-      const mcp = JSON.parse(result.get(".claude.json")!);
-      expect(mcp.mcpServers.mason).toBeDefined();
-      expect(mcp.mcpServers.mason.url).toContain("mcp-proxy:9090");
-    });
-
-    it("produces .claude/settings.json with permissions", () => {
-      const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code-agent");
-
-      expect(result.has(".claude/settings.json")).toBe(true);
-      const settings = JSON.parse(result.get(".claude/settings.json")!);
-      expect(settings.permissions.allow).toEqual(["mcp__mason__*"]);
-    });
-
-    it("produces .claude/commands/ for each task", () => {
-      const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code-agent");
-
-      expect(result.has(".claude/commands/define-change.md")).toBe(true);
-      expect(result.has(".claude/commands/review-change.md")).toBe(true);
-    });
-
-    it("skips skills without source content (no contentMap)", () => {
-      const role = makeTestRole();
-      // Source path doesn't exist on disk, so resolveSkillContent can't populate contentMap
-      const result = materializeForAgent(role, "claude-code-agent");
-
-      // No skill files when source directory is missing
-      const skillKeys = [...result.keys()].filter((k) => k.includes("skills/"));
-      expect(skillKeys).toHaveLength(0);
-    });
-
-    it("uses default proxy endpoint when none provided", () => {
-      const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code-agent");
-
-      const mcp = JSON.parse(result.get(".claude.json")!);
-      expect(mcp.mcpServers.mason.url).toContain("http://mcp-proxy:9090");
-    });
-
-    it("uses custom proxy endpoint when provided", () => {
-      const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code-agent", "http://custom-proxy:8080");
-
-      const mcp = JSON.parse(result.get(".claude.json")!);
-      expect(mcp.mcpServers.mason.url).toContain("http://custom-proxy:8080");
-    });
-
-    it("includes proxy token when provided", () => {
-      const role = makeTestRole();
-      const token = "test-token-123";
-      const result = materializeForAgent(role, "claude-code-agent", undefined, token);
-
-      const mcp = JSON.parse(result.get(".claude.json")!);
-      expect(mcp.mcpServers.mason.headers.Authorization).toBe("Bearer test-token-123");
-    });
-
-    it("supports ACP mode (uses ACP command in agent-launch.json, no .mason/acp.json)", () => {
-      const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code-agent", undefined, undefined, { acpMode: true });
-
-      expect(result.has(".mason/acp.json")).toBe(false);
-      const launchConfig = JSON.parse(result.get("agent-launch.json")!);
-      expect(launchConfig.command).toBe("claude-agent-acp");
-    });
-
-    it("includes agent-config credentials in agent-launch.json", () => {
-      const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code-agent", undefined, undefined, {
-        agentConfigCredentials: ["MY_PROJECT_KEY"],
-      });
-
-      const launchConfig = JSON.parse(result.get("agent-launch.json")!);
-      const cred = launchConfig.credentials.find((c: { key: string }) => c.key === "MY_PROJECT_KEY");
-      expect(cred).toBeDefined();
-      expect(cred.type).toBe("env");
-    });
-
-    it("deduplicates agent-config credentials already declared in role governance", () => {
-      const role = makeTestRole();
-      role.governance.credentials = ["SHARED_KEY"];
-      const result = materializeForAgent(role, "claude-code-agent", undefined, undefined, {
-        agentConfigCredentials: ["SHARED_KEY"],
-      });
-
-      const launchConfig = JSON.parse(result.get("agent-launch.json")!);
-      const matches = launchConfig.credentials.filter((c: { key: string }) => c.key === "SHARED_KEY");
-      expect(matches).toHaveLength(1);
-    });
-
-    it("deduplicates agent-config credentials already declared in SDK runtime.credentials", () => {
-      const role = makeTestRole();
-      const result = materializeForAgent(role, "claude-code-agent", undefined, undefined, {
-        agentConfigCredentials: ["CLAUDE_CODE_OAUTH_TOKEN"],
-      });
-
-      const launchConfig = JSON.parse(result.get("agent-launch.json")!);
-      const matches = launchConfig.credentials.filter((c: { key: string }) => c.key === "CLAUDE_CODE_OAUTH_TOKEN");
-      expect(matches).toHaveLength(1);
-    });
-  });
-
-  describe("Cross-agent materialization (Claude role -> Codex output)", () => {
-    it("produces Codex materializer output for a Claude-dialect role", () => {
-      // The role was authored in .claude/ (claude-code-agent dialect) but we
-      // materialize it for pi-coding-agent (which has a dialect-agnostic
-      // materializer). This proves cross-agent materialization works.
-      const role = makeTestRole();
-      // Use claude-code-agent as target since it's a registered dialect.
-      // Cross-agent means the role's source dialect differs from the target.
-      // Change the source dialect to codex to prove it still materializes for claude-code-agent.
-      role.source.agentDialect = "codex";
-
-      const result = materializeForAgent(role, "claude-code-agent");
-
-      // Claude Code materializer output
-      expect(result.has(".claude.json")).toBe(true);
-      expect(result.has(".claude/settings.json")).toBe(true);
-    });
-
-    it("same role produces different output for different agent types", () => {
-      const role = makeTestRole();
-
-      const claudeResult = materializeForAgent(role, "claude-code-agent");
-      // Codex is a registered dialect but has no dedicated materializer yet,
-      // so we compare claude-code-agent vs aider (if materializer existed).
-      // For now, just verify claude-code-agent produces the expected files.
-      expect(claudeResult.has(".claude/settings.json")).toBe(true);
-      expect(claudeResult.has(".claude/commands/define-change.md")).toBe(true);
-    });
-  });
-
-  describe("Equivalence: Role pipeline vs ResolvedAgent pipeline", () => {
-    it("produces same output via both paths", () => {
-      const role = makeTestRole();
-      const proxyEndpoint = "http://mcp-proxy:9090";
-
-      // New path: materializeForAgent
-      const newResult = materializeForAgent(role, "claude-code-agent", proxyEndpoint);
-
-      // Old path: manually adapt + materialize
-      const resolvedAgent = adaptRoleToResolvedAgent(role, "claude-code-agent");
-      const oldResult = claudeCodeMaterializer.materializeWorkspace(
-        resolvedAgent,
-        proxyEndpoint,
-      );
-
-      // Same keys
-      const newKeys = [...newResult.keys()].sort();
-      const oldKeys = [...oldResult.keys()].sort();
-      expect(newKeys).toEqual(oldKeys);
-
-      // Same content for each key
-      for (const key of newKeys) {
-        expect(newResult.get(key)).toEqual(oldResult.get(key));
-      }
+      // Mock materializer returns an empty Map; the important thing is no error
+      expect(result).toBeInstanceOf(Map);
     });
   });
 
@@ -309,48 +157,6 @@ describe("materializeForAgent", () => {
         expect(msg).toContain("mcp-agent");
         expect(msg).toContain("pi-coding-agent");
       }
-    });
-  });
-
-  describe("Minimal role (no tasks, no apps, no skills)", () => {
-    it("produces valid output for a minimal role", () => {
-      const minimalRole: Role = {
-        metadata: {
-          name: "minimal-role",
-          description: "A minimal role with no dependencies",
-        },
-        instructions: "You are a simple assistant.",
-        tasks: [],
-        apps: [],
-        skills: [],
-        sources: [],
-        container: {
-          packages: { apt: [], npm: [], pip: [] },
-          ignore: { paths: [] },
-          mounts: [],
-        },
-        governance: {
-          risk: "LOW",
-          credentials: [],
-        },
-        type: "project" as const,
-        resources: [],
-        source: {
-          type: "local",
-          agentDialect: "claude-code-agent",
-          path: "/tmp/minimal",
-        },
-      };
-
-      const result = materializeForAgent(minimalRole, "claude-code-agent");
-
-      expect(result.has(".claude.json")).toBe(true);
-      expect(result.has(".claude/settings.json")).toBe(true);
-
-      // No commands or skills
-      const keys = [...result.keys()];
-      expect(keys.filter((k) => k.startsWith(".claude/commands/"))).toHaveLength(0);
-      expect(keys.filter((k) => k.startsWith(".claude/skills/"))).toHaveLength(0);
     });
   });
 });

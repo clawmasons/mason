@@ -10,31 +10,30 @@ import { describe, it, expect } from "vitest";
 import { validateAgent } from "../../src/validator/validate.js";
 import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
 import type { AgentPackage, AgentRegistry, AgentValidationResult } from "@clawmasons/agent-sdk";
-import piCodingAgent from "@clawmasons/pi-coding-agent";
-import claudeCodeAgent from "@clawmasons/claude-code-agent";
+import { mockPiCodingAgent, mockClaudeCodeAgent } from "../helpers/mock-agent-packages.js";
 
 // ── Registry Setup ───────────────────────────────────────────────────
 
-function createRealRegistry(): AgentRegistry {
+function createTestRegistry(): AgentRegistry {
   const registry: AgentRegistry = new Map();
   // Register by canonical name
-  registry.set("pi-coding-agent", piCodingAgent);
-  registry.set("claude-code-agent", claudeCodeAgent);
+  registry.set("pi-coding-agent", mockPiCodingAgent);
+  registry.set("claude-code-agent", mockClaudeCodeAgent);
   // Register by alias
-  if (piCodingAgent.aliases) {
-    for (const alias of piCodingAgent.aliases) {
-      registry.set(alias, piCodingAgent);
+  if (mockPiCodingAgent.aliases) {
+    for (const alias of mockPiCodingAgent.aliases) {
+      registry.set(alias, mockPiCodingAgent);
     }
   }
-  if (claudeCodeAgent.aliases) {
-    for (const alias of claudeCodeAgent.aliases) {
-      registry.set(alias, claudeCodeAgent);
+  if (mockClaudeCodeAgent.aliases) {
+    for (const alias of mockClaudeCodeAgent.aliases) {
+      registry.set(alias, mockClaudeCodeAgent);
     }
   }
   return registry;
 }
 
-const realRegistry = createRealRegistry();
+const testRegistry = createTestRegistry();
 
 // ── Test Helpers ─────────────────────────────────────────────────────
 
@@ -92,7 +91,7 @@ describe("delegated validation integration", () => {
         // no llm
       });
 
-      const result = validateAgent(agent, realRegistry);
+      const result = validateAgent(agent, testRegistry);
 
       expect(result.valid).toBe(false);
       const llmErrors = result.errors.filter(e => e.category === "llm-config");
@@ -107,7 +106,7 @@ describe("delegated validation integration", () => {
         llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" },
       });
 
-      const result = validateAgent(agent, realRegistry);
+      const result = validateAgent(agent, testRegistry);
 
       const llmErrors = result.errors.filter(e => e.category === "llm-config");
       expect(llmErrors).toHaveLength(0);
@@ -121,7 +120,7 @@ describe("delegated validation integration", () => {
         llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" },
       });
 
-      const result = validateAgent(agent, realRegistry);
+      const result = validateAgent(agent, testRegistry);
 
       expect(result.valid).toBe(true);
       expect(result.warnings).toHaveLength(1);
@@ -136,7 +135,7 @@ describe("delegated validation integration", () => {
         // no llm — default behavior
       });
 
-      const result = validateAgent(agent, realRegistry);
+      const result = validateAgent(agent, testRegistry);
 
       expect(result.valid).toBe(true);
       expect(result.warnings).toHaveLength(0);
@@ -150,7 +149,7 @@ describe("delegated validation integration", () => {
         // no llm
       });
 
-      const result = validateAgent(agent, realRegistry);
+      const result = validateAgent(agent, testRegistry);
 
       expect(result.valid).toBe(false);
       const llmErrors = result.errors.filter(e => e.category === "llm-config");
@@ -166,7 +165,7 @@ describe("delegated validation integration", () => {
         llm: { provider: "openrouter", model: "anthropic/claude-sonnet-4" },
       });
 
-      const result = validateAgent(agent, realRegistry);
+      const result = validateAgent(agent, testRegistry);
 
       expect(result.valid).toBe(true);
       const llmErrors = result.errors.filter(e => e.category === "llm-config");
@@ -229,7 +228,7 @@ describe("delegated validation integration", () => {
         runtimes: ["pi"], // alias, not canonical "pi-coding-agent"
       });
 
-      const result = validateAgent(agent, realRegistry);
+      const result = validateAgent(agent, testRegistry);
 
       // Pi's validate should still run (registry maps "pi" -> piCodingAgent)
       const llmErrors = result.errors.filter(e => e.category === "llm-config");
