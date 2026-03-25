@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { Role } from "@clawmasons/shared";
 import { adaptRoleToResolvedAgent } from "@clawmasons/shared";
 import {
@@ -6,10 +6,17 @@ import {
   getMaterializer,
   getRegisteredAgentTypes,
   MaterializerError,
+  registerAgents,
 } from "../../src/materializer/role-materializer.js";
-import { claudeCodeMaterializer } from "@clawmasons/claude-code-agent";
+import claudeCodeAgent, { claudeCodeMaterializer } from "@clawmasons/claude-code-agent";
 import { mcpAgentMaterializer } from "@clawmasons/mcp-agent/agent-package";
-import { piCodingAgentMaterializer } from "@clawmasons/pi-coding-agent";
+import piCodingAgent, { piCodingAgentMaterializer } from "@clawmasons/pi-coding-agent";
+import codexAgent from "@clawmasons/codex-agent";
+
+// Register non-built-in agents for test purposes (they still exist in the monorepo).
+beforeAll(() => {
+  registerAgents([claudeCodeAgent, piCodingAgent, codexAgent]);
+});
 
 // ---------------------------------------------------------------------------
 // Test fixture: a representative Role

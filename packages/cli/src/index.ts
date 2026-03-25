@@ -39,8 +39,6 @@ export {
 } from "./validator/index.js";
 
 export {
-  claudeCodeMaterializer,
-  piCodingAgentMaterializer,
   mcpAgentMaterializer,
   PROVIDER_ENV_VARS,
   ACP_RUNTIME_COMMANDS,
@@ -49,7 +47,4 @@ export {
   type MaterializeOptions,
 } from "./materializer/index.js";
 
-// Re-export agent packages for consumers
-export { default as claudeCodeAgent } from "@clawmasons/claude-code-agent";
-export { default as piCodingAgentPkg } from "@clawmasons/pi-coding-agent";
 export type { AgentPackage } from "@clawmasons/agent-sdk";

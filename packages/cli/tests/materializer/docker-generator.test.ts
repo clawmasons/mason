@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import * as path from "node:path";
 import type { Role } from "@clawmasons/shared";
 import {
@@ -9,6 +9,13 @@ import {
   generateSessionComposeYml,
   createSessionDirectory,
 } from "../../src/materializer/docker-generator.js";
+import { registerAgents } from "../../src/materializer/role-materializer.js";
+import claudeCodeAgent from "@clawmasons/claude-code-agent";
+
+// Register claude-code-agent for tests (no longer a CLI built-in).
+beforeAll(() => {
+  registerAgents([claudeCodeAgent]);
+});
 
 // ---------------------------------------------------------------------------
 // Test fixture
