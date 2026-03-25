@@ -95,6 +95,17 @@ export {
   RoleDiscoveryError,
 } from "./role/index.js";
 
+// Session storage
+export {
+  type Session,
+  uuidv7,
+  createSession,
+  readSession,
+  updateSession,
+  listSessions,
+  closeSession,
+} from "./session/index.js";
+
 // MCP name rewriting
 export { convertMcpFormat } from "./mcp-name-rewriter.js";
 
