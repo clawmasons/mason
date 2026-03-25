@@ -153,7 +153,7 @@ Delete agent and role directories from mason, update root `package.json` workspa
 
 **Testable Output:** Mason monorepo compiles, lints, and passes all unit tests with no agent/role packages present.
 
-**Not Implemented Yet**
+**Implemented**
 
 ---
 

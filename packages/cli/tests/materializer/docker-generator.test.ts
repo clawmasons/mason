@@ -10,11 +10,11 @@ import {
   createSessionDirectory,
 } from "../../src/materializer/docker-generator.js";
 import { registerAgents } from "../../src/materializer/role-materializer.js";
-import claudeCodeAgent from "@clawmasons/claude-code-agent";
+import { mockClaudeCodeAgent } from "../helpers/mock-agent-packages.js";
 
-// Register claude-code-agent for tests (no longer a CLI built-in).
+// Register mock claude-code-agent for tests (real package moved to mason-extensions).
 beforeAll(() => {
-  registerAgents([claudeCodeAgent]);
+  registerAgents([mockClaudeCodeAgent]);
 });
 
 // ---------------------------------------------------------------------------

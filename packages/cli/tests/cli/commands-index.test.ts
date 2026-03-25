@@ -22,12 +22,11 @@ vi.mock("../../src/materializer/role-materializer.js", async (importOriginal) =>
 
 import { registerCommands } from "../../src/cli/commands/index.js";
 import { registerAgents } from "../../src/materializer/role-materializer.js";
-import claudeCodeAgent from "@clawmasons/claude-code-agent";
-import piCodingAgent from "@clawmasons/pi-coding-agent";
+import { mockClaudeCodeAgent, mockPiCodingAgent } from "../helpers/mock-agent-packages.js";
 
-// Register non-built-in agents so isKnownAgentType recognizes them.
+// Register mock agent packages so isKnownAgentType recognizes them (real packages moved to mason-extensions).
 beforeAll(() => {
-  registerAgents([claudeCodeAgent, piCodingAgent]);
+  registerAgents([mockClaudeCodeAgent, mockPiCodingAgent]);
 });
 
 describe("installAgentTypeShorthand", () => {

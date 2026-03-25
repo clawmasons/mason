@@ -13,7 +13,7 @@ import type { AgentConfigSchema, ConfigField, ConfigOption } from "@clawmasons/a
 import { getAgentConfig, saveAgentConfig } from "@clawmasons/agent-sdk";
 import { resolveConfig } from "../../src/config/resolve-config.js";
 import { promptConfig, ConfigResolutionError, type PromptFn } from "../../src/config/prompt-config.js";
-import piCodingAgent from "@clawmasons/pi-coding-agent";
+import { mockPiCodingAgent } from "../helpers/mock-agent-packages.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -38,7 +38,7 @@ function createMockPromptFn(answers: Record<string, string>): PromptFn {
 }
 
 // Use the real Pi agent's config schema
-const piSchema = piCodingAgent.configSchema!;
+const piSchema = mockPiCodingAgent.configSchema!;
 
 // ── Tests ────────────────────────────────────────────────────────────
 
@@ -232,7 +232,7 @@ describe("config resolution + storage pipeline", () => {
       expect(result.missing).toHaveLength(0);
 
       // Call credentialsFn with the resolved flat map
-      const creds = piCodingAgent.credentialsFn!(result.resolved);
+      const creds = mockPiCodingAgent.credentialsFn!(result.resolved);
 
       expect(creds).toHaveLength(1);
       expect(creds[0].key).toBe("OPENROUTER_API_KEY");
@@ -246,12 +246,12 @@ describe("config resolution + storage pipeline", () => {
 
   it("credentialsFn returns provider-specific key for different providers", () => {
     // OpenAI provider
-    const openaiCreds = piCodingAgent.credentialsFn!({ "llm.provider": "openai", "llm.model": "gpt-4o" });
+    const openaiCreds = mockPiCodingAgent.credentialsFn!({ "llm.provider": "openai", "llm.model": "gpt-4o" });
     expect(openaiCreds[0].key).toBe("OPENAI_API_KEY");
     expect(openaiCreds[0].obtainUrl).toBeUndefined();
 
     // Together provider
-    const togetherCreds = piCodingAgent.credentialsFn!({ "llm.provider": "together", "llm.model": "some-model" });
+    const togetherCreds = mockPiCodingAgent.credentialsFn!({ "llm.provider": "together", "llm.model": "some-model" });
     expect(togetherCreds[0].key).toBe("TOGETHER_API_KEY");
   });
 

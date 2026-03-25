@@ -21,8 +21,6 @@
     { "path": "../proxy" },
 
     { "path": "../agent-sdk" },
-    { "path": "../mcp-agent" },
-    { "path": "../claude-code-agent" },
-    { "path": "../pi-coding-agent" }
+    { "path": "../mcp-agent" }
   ]
 }

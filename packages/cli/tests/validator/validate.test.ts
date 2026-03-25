@@ -2,15 +2,14 @@ import { describe, it, expect } from "vitest";
 import { validateAgent } from "../../src/validator/validate.js";
 import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
 import type { AgentPackage, AgentRegistry } from "@clawmasons/agent-sdk";
-import piCodingAgent from "@clawmasons/pi-coding-agent";
-import claudeCodeAgent from "@clawmasons/claude-code-agent";
+import { mockPiCodingAgent, mockClaudeCodeAgent } from "../helpers/mock-agent-packages.js";
 
 // --- Mock agent registry ---
 
 function createMockRegistry(): AgentRegistry {
   const registry: AgentRegistry = new Map();
-  registry.set("pi-coding-agent", piCodingAgent);
-  registry.set("claude-code-agent", claudeCodeAgent);
+  registry.set("pi-coding-agent", mockPiCodingAgent);
+  registry.set("claude-code-agent", mockClaudeCodeAgent);
   return registry;
 }
 

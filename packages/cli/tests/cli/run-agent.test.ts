@@ -46,13 +46,11 @@ import {
   generateVolumeMasks,
 } from "../../src/materializer/docker-generator.js";
 import type { Role, ResolvedAgent } from "@clawmasons/shared";
-import claudeCodeAgent from "@clawmasons/claude-code-agent";
-import piCodingAgent from "@clawmasons/pi-coding-agent";
-import codexAgent from "@clawmasons/codex-agent";
+import { mockClaudeCodeAgent, mockPiCodingAgent, mockCodexAgent } from "../helpers/mock-agent-packages.js";
 
-// Register non-built-in agents for test purposes (they still exist in the monorepo).
+// Register mock agent packages for test purposes (real packages moved to mason-extensions).
 beforeAll(() => {
-  registerAgents([claudeCodeAgent, piCodingAgent, codexAgent]);
+  registerAgents([mockClaudeCodeAgent, mockPiCodingAgent, mockCodexAgent]);
 });
 
 // ── Command Registration ────────────────────────────────────────────────
