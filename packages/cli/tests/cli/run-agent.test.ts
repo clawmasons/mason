@@ -1,4 +1,4 @@
-import { type MockInstance, describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { type MockInstance, describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -40,11 +40,18 @@ import {
   inferAgentType,
   ensureDockerBuild,
 } from "../../src/cli/commands/run-agent.js";
+import { registerAgents } from "../../src/materializer/role-materializer.js";
 import {
   generateSessionComposeYml,
   generateVolumeMasks,
 } from "../../src/materializer/docker-generator.js";
 import type { Role, ResolvedAgent } from "@clawmasons/shared";
+import { mockClaudeCodeAgent, mockPiCodingAgent, mockCodexAgent } from "../helpers/mock-agent-packages.js";
+
+// Register mock agent packages for test purposes (real packages moved to mason-extensions).
+beforeAll(() => {
+  registerAgents([mockClaudeCodeAgent, mockPiCodingAgent, mockCodexAgent]);
+});
 
 // ── Command Registration ────────────────────────────────────────────────
 
@@ -220,10 +227,11 @@ describe("buildDefaultMasonConfig", () => {
   it("generates config with entries for all built-in agents", () => {
     const config = JSON.parse(buildDefaultMasonConfig()) as { agents: Record<string, { package: string }> };
     expect(config.agents).toBeDefined();
-    // Uses first alias as key, @clawmasons/<name> as package
-    expect(config.agents["claude"]?.package).toBe("@clawmasons/claude-code-agent");
-    expect(config.agents["pi"]?.package).toBe("@clawmasons/pi-coding-agent");
+    // Only mcp-agent is a built-in now; others are auto-installed
     expect(config.agents["mcp"]?.package).toBe("@clawmasons/mcp-agent");
+    // Removed agents should not appear
+    expect(config.agents["claude"]).toBeUndefined();
+    expect(config.agents["pi"]).toBeUndefined();
   });
 
   it("returns valid JSON string", () => {
@@ -574,10 +582,10 @@ describe("ensureMasonConfig", () => {
     const content = JSON.parse(fs.readFileSync(configPath, "utf-8")) as Record<string, unknown>;
     const agents = content.agents as Record<string, { package: string }>;
     expect(agents).toBeDefined();
-    // Derived from AgentPackage: first alias as key, @clawmasons/<name> as package
-    expect(agents["claude"]?.package).toBe("@clawmasons/claude-code-agent");
-    expect(agents["pi"]?.package).toBe("@clawmasons/pi-coding-agent");
+    // Only mcp-agent is a built-in now; others are auto-installed
     expect(agents["mcp"]?.package).toBe("@clawmasons/mcp-agent");
+    expect(agents["claude"]).toBeUndefined();
+    expect(agents["pi"]).toBeUndefined();
   });
 
   it("creates .mason directory if it does not exist", () => {

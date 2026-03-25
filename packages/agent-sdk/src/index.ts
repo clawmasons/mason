@@ -41,6 +41,7 @@ export type { LaunchCredentialConfig } from "./helpers.js";
 // Discovery
 export {
   createAgentRegistry,
+  discoverInstalledAgents,
   loadConfigAgents,
   loadConfigAgentEntry,
   readConfigAgentNames,
@@ -51,6 +52,11 @@ export {
   getAgentConfig,
   saveAgentConfig,
   readDefaultAgent,
+  resolveAgentPackageName,
+  ensureMasonPackageJson,
+  autoInstallAgent,
+  syncExtensionVersions,
+  resolveAgentWithAutoInstall,
 } from "./discovery.js";
 export type { AgentRegistry, AgentEntryConfig, AliasEntryConfig, DevContainerCustomizations, DevContainerVscodeCustomizations } from "./discovery.js";
 export { DEFAULT_DEV_CONTAINER_CUSTOMIZATIONS } from "./discovery.js";

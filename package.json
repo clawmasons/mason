@@ -5,11 +5,12 @@
   "description": "Mason — npm-native packaging, governance, and runtime portability for AI agents",
   "type": "module",
   "scripts": {
-    "build": "tsc -b packages/shared packages/proxy && npm run build --workspace=packages/agent-sdk && npm run build --workspace=packages/mcp-agent && npm run build:types --workspace=packages/mcp-agent && npm run build --workspace=packages/agent-entry && npm run build --workspace=packages/claude-code-agent && npm run build --workspace=packages/pi-coding-agent && npm run build --workspace=packages/agents/codex-agent && tsc -b packages/cli && npm run build:proxy --workspace=packages/cli",
+    "build": "tsc -b packages/shared packages/proxy && npm run build --workspace=packages/agent-sdk && npm run build --workspace=packages/mcp-agent && npm run build:types --workspace=packages/mcp-agent && npm run build --workspace=packages/agent-entry && tsc -b packages/cli && npm run build:proxy --workspace=packages/cli",
     "test": "vitest run",
     "test:e2e": "npx vitest run --config vitest.e2e.config.ts",
+    "test:extensions": "npx vitest run --config vitest.extensions.config.ts",
     "test:watch": "vitest",
-    "lint": "eslint packages/*/src/ packages/*/tests/ packages/agents/*/src/ packages/agents/*/tests/",
+    "lint": "eslint packages/*/src/ packages/*/tests/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo",
     "release": "./scripts/bump-and-publish-all.sh",
@@ -18,7 +19,6 @@
   "license": "MIT",
   "workspaces": [
     "packages/*",
-    "packages/agents/*",
     "!packages/placeholders"
   ],
   "devDependencies": {

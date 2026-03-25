@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import * as path from "node:path";
 import type { Role } from "@clawmasons/shared";
 import {
@@ -9,6 +9,13 @@ import {
   generateSessionComposeYml,
   createSessionDirectory,
 } from "../../src/materializer/docker-generator.js";
+import { registerAgents } from "../../src/materializer/role-materializer.js";
+import { mockClaudeCodeAgent } from "../helpers/mock-agent-packages.js";
+
+// Register mock claude-code-agent for tests (real package moved to mason-extensions).
+beforeAll(() => {
+  registerAgents([mockClaudeCodeAgent]);
+});
 
 // ---------------------------------------------------------------------------
 // Test fixture

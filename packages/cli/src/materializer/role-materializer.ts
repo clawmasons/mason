@@ -10,16 +10,13 @@ import * as path from "node:path";
 import type { Role, ResolvedAgent } from "@clawmasons/shared";
 import { adaptRoleToResolvedAgent, getDialect, getDialectByDirectory, registerAgentDialect } from "@clawmasons/shared";
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage, AgentRegistry, AgentTaskConfig, AgentSkillConfig } from "@clawmasons/agent-sdk";
-import { createAgentRegistry, getAgent, getRegisteredAgentNames, readTask, readSkills } from "@clawmasons/agent-sdk";
+import { createAgentRegistry, getAgent, getRegisteredAgentNames, readTask, readSkills, resolveAgentWithAutoInstall } from "@clawmasons/agent-sdk";
 
-// Built-in agent packages
-import claudeCodeAgent from "@clawmasons/claude-code-agent";
-import piCodingAgent from "@clawmasons/pi-coding-agent";
-import codexAgent from "@clawmasons/codex-agent";
+// Built-in agent packages — only mcp-agent is bundled; others are auto-installed.
 import { default as mcpAgent } from "@clawmasons/mcp-agent/agent-package";
 
 /** Built-in agent packages list. */
-export const BUILTIN_AGENTS: AgentPackage[] = [claudeCodeAgent, piCodingAgent, codexAgent, mcpAgent];
+export const BUILTIN_AGENTS: AgentPackage[] = [mcpAgent];
 
 /** Default proxy endpoint used when none is provided. */
 const DEFAULT_PROXY_ENDPOINT = "http://mcp-proxy:9090";
@@ -39,6 +36,8 @@ export class MaterializerError extends Error {
 // ---------------------------------------------------------------------------
 
 let _registry: AgentRegistry | null = null;
+let _projectDir: string | undefined;
+let _cliVersion: string | undefined;
 
 /**
  * Get the agent registry, initializing it with built-in agents if needed.
@@ -69,16 +68,12 @@ function getRegistry(): AgentRegistry {
 }
 
 /**
- * Initialize the registry with config-declared agents from a project directory.
- * Call this at CLI startup before any materialization.
+ * Register dialect information for a newly-installed agent so that
+ * dialect lookups work without restarting the process.
  */
-export async function initRegistry(projectDir?: string): Promise<void> {
-  _registry = await createAgentRegistry(BUILTIN_AGENTS, projectDir);
-
-  // Dynamic dialect self-registration from agent packages.
-  // Deduplicate: registry may have aliases pointing to the same agent.
+function registerAgentDialects(agents: Iterable<AgentPackage>): void {
   const seen = new Set<string>();
-  for (const agent of _registry.values()) {
+  for (const agent of agents) {
     if (agent.dialect && !seen.has(agent.name)) {
       seen.add(agent.name);
       registerAgentDialect({
@@ -93,10 +88,71 @@ export async function initRegistry(projectDir?: string): Promise<void> {
 }
 
 /**
+ * Initialize the registry with config-declared agents from a project directory.
+ * Call this at CLI startup before any materialization.
+ */
+export async function initRegistry(projectDir?: string, cliVersion?: string): Promise<void> {
+  _projectDir = projectDir;
+  _cliVersion = cliVersion;
+  _registry = await createAgentRegistry(BUILTIN_AGENTS, projectDir);
+
+  // Dynamic dialect self-registration from agent packages.
+  // Deduplicate: registry may have aliases pointing to the same agent.
+  registerAgentDialects(_registry.values());
+}
+
+/**
+ * Register additional agent packages into the registry at runtime.
+ *
+ * Primarily intended for tests and dynamic agent loading scenarios
+ * where agents are not part of the built-in set but need to be
+ * available via the registry.
+ */
+export function registerAgents(agents: AgentPackage[]): void {
+  const registry = getRegistry();
+  for (const agent of agents) {
+    registry.set(agent.name, agent);
+    if (agent.aliases) {
+      for (const alias of agent.aliases) {
+        registry.set(alias, agent);
+      }
+    }
+  }
+  registerAgentDialects(agents);
+}
+
+/**
  * Look up an AgentPackage by agent type name or alias.
  */
 export function getAgentFromRegistry(agentType: string): AgentPackage | undefined {
   return getAgent(getRegistry(), agentType);
+}
+
+/**
+ * Look up an AgentPackage by name, falling back to auto-install if not found.
+ *
+ * When the agent is not in the registry and a project directory + CLI version
+ * are available (set during `initRegistry`), this attempts to resolve the
+ * agent name to an npm package, install it into `.mason/node_modules/`,
+ * re-discover installed agents, and return the newly available package.
+ *
+ * @returns The AgentPackage, or undefined if resolution and auto-install both fail.
+ */
+export async function getAgentFromRegistryWithAutoInstall(agentType: string): Promise<AgentPackage | undefined> {
+  const existing = getAgent(getRegistry(), agentType);
+  if (existing) return existing;
+
+  // Attempt auto-install if we have the necessary context
+  if (_projectDir && _cliVersion) {
+    const installed = await resolveAgentWithAutoInstall(_projectDir, agentType, _cliVersion, getRegistry());
+    if (installed) {
+      // Register dialects for the newly discovered agent
+      registerAgentDialects([installed]);
+      return installed;
+    }
+  }
+
+  return undefined;
 }
 
 /**

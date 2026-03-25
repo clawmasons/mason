@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 
 // Mock agent-sdk config readers before importing the module under test
 vi.mock("@clawmasons/agent-sdk", async (importOriginal) => {
@@ -21,6 +21,13 @@ vi.mock("../../src/materializer/role-materializer.js", async (importOriginal) =>
 });
 
 import { registerCommands } from "../../src/cli/commands/index.js";
+import { registerAgents } from "../../src/materializer/role-materializer.js";
+import { mockClaudeCodeAgent, mockPiCodingAgent } from "../helpers/mock-agent-packages.js";
+
+// Register mock agent packages so isKnownAgentType recognizes them (real packages moved to mason-extensions).
+beforeAll(() => {
+  registerAgents([mockClaudeCodeAgent, mockPiCodingAgent]);
+});
 
 describe("installAgentTypeShorthand", () => {
   let program: Command;

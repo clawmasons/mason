@@ -36,8 +36,6 @@ PACKAGES=(
   "@clawmasons/shared"
   "@clawmasons/agent-sdk"
   "@clawmasons/proxy"
-  "@clawmasons/claude-code-agent"
-  "@clawmasons/pi-coding-agent"
   "@clawmasons/mcp-agent"
   "@clawmasons/agent-entry"
   "@clawmasons/mason"

@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { execSync } from "node:child_process";
 import type { AgentPackage } from "./types.js";
 
 /**
@@ -380,6 +381,106 @@ function isValidAgentPackage(value: unknown): value is AgentPackage {
 }
 
 /**
+ * Discover agent packages installed in `.mason/node_modules/@clawmasons/`.
+ *
+ * Scans for directories whose `package.json` declares `mason.type: "agent"`.
+ * For each qualifying package, dynamically imports the entrypoint specified by
+ * `mason.entrypoint` (defaulting to `./dist/index.js`) and validates that the
+ * default export is a valid `AgentPackage`.
+ *
+ * Packages that fail to load are skipped with a warning — this function never throws.
+ *
+ * @param projectDir - Absolute path to the project root
+ * @returns Array of discovered AgentPackage objects
+ */
+export async function discoverInstalledAgents(projectDir: string): Promise<AgentPackage[]> {
+  const scopeDir = path.join(projectDir, ".mason", "node_modules", "@clawmasons");
+
+  if (!fs.existsSync(scopeDir)) {
+    return [];
+  }
+
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(scopeDir);
+  } catch {
+    return [];
+  }
+
+  const agents: AgentPackage[] = [];
+
+  for (const entry of entries) {
+    const pkgDir = path.join(scopeDir, entry);
+
+    // Skip non-directories
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(pkgDir);
+    } catch {
+      continue;
+    }
+    if (!stat.isDirectory()) continue;
+
+    // Read package.json
+    const pkgJsonPath = path.join(pkgDir, "package.json");
+    if (!fs.existsSync(pkgJsonPath)) continue;
+
+    let pkgJson: Record<string, unknown>;
+    try {
+      const raw = fs.readFileSync(pkgJsonPath, "utf-8");
+      pkgJson = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      console.warn(`[agent-sdk] Failed to parse package.json in ${pkgDir}`);
+      continue;
+    }
+
+    // Check mason.type === "agent"
+    const masonField = pkgJson.mason;
+    if (!masonField || typeof masonField !== "object") continue;
+    const masonObj = masonField as Record<string, unknown>;
+    if (masonObj.type !== "agent") continue;
+
+    // Resolve entrypoint
+    const entrypoint = typeof masonObj.entrypoint === "string"
+      ? masonObj.entrypoint
+      : "./dist/index.js";
+    const entrypointPath = path.resolve(pkgDir, entrypoint);
+
+    // Dynamic import
+    try {
+      const mod = await import(entrypointPath) as { default?: unknown };
+      // Handle CJS interop: when importing a CJS module that sets
+      // `exports.default = ...`, Node wraps module.exports as `mod.default`,
+      // so the actual value ends up at `mod.default.default`.
+      let agentPkg = mod.default;
+      if (
+        agentPkg &&
+        typeof agentPkg === "object" &&
+        "default" in agentPkg &&
+        !isValidAgentPackage(agentPkg)
+      ) {
+        agentPkg = (agentPkg as Record<string, unknown>).default;
+      }
+
+      if (!isValidAgentPackage(agentPkg)) {
+        console.warn(
+          `[agent-sdk] Package "@clawmasons/${entry}" does not export a valid AgentPackage (missing name or materializer)`,
+        );
+        continue;
+      }
+
+      agents.push(agentPkg);
+    } catch (err) {
+      console.warn(
+        `[agent-sdk] Failed to load agent from "@clawmasons/${entry}": ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  return agents;
+}
+
+/**
  * Load third-party agent packages declared in .mason/config.json.
  *
  * @param projectDir - Absolute path to the project root
@@ -483,8 +584,17 @@ export async function createAgentRegistry(
     registerAgent(registry, agent);
   }
 
-  // Phase 2: Load and register config-declared agents (can override built-ins)
   if (projectDir) {
+    // Phase 2: Discover installed agents from .mason/node_modules/
+    // Discovered agents do NOT override built-ins.
+    const discoveredAgents = await discoverInstalledAgents(projectDir);
+    for (const agent of discoveredAgents) {
+      if (!registry.has(agent.name)) {
+        registerAgent(registry, agent);
+      }
+    }
+
+    // Phase 3: Load and register config-declared agents (can override everything)
     const configAgents = await loadConfigAgents(projectDir);
     for (const agent of configAgents) {
       registerAgent(registry, agent);
@@ -632,4 +742,172 @@ export function readConfigAliasNames(projectDir: string): string[] {
   const config = readMasonConfig(projectDir);
   if (!config?.aliases || typeof config.aliases !== "object") return [];
   return Object.keys(config.aliases);
+}
+
+// ── Agent Name Resolution & Auto-Install ──────────────────────────────
+
+/**
+ * Map of short agent names / aliases to their full npm package names.
+ */
+const AGENT_SHORT_NAMES: Record<string, string> = {
+  "claude": "@clawmasons/claude-code-agent",
+  "claude-code": "@clawmasons/claude-code-agent",
+  "pi": "@clawmasons/pi-coding-agent",
+  "pi-coding": "@clawmasons/pi-coding-agent",
+  "codex": "@clawmasons/codex-agent",
+};
+
+/**
+ * Resolve a user-supplied agent name to its npm package name.
+ *
+ * - Known short names (e.g., "claude", "pi", "codex") map to `@clawmasons/*` packages.
+ * - Scoped package names (e.g., `@mycompany/custom-agent`) are returned as-is.
+ * - Unknown unscoped names return null.
+ *
+ * @param agentName - The agent name as provided by the user
+ * @returns The npm package name, or null if the name cannot be resolved
+ */
+export function resolveAgentPackageName(agentName: string): string | null {
+  // Check short name map first
+  const mapped = AGENT_SHORT_NAMES[agentName];
+  if (mapped) return mapped;
+
+  // Scoped npm package name — use as-is
+  if (agentName.startsWith("@") && agentName.includes("/")) {
+    return agentName;
+  }
+
+  return null;
+}
+
+/**
+ * Ensure `.mason/package.json` exists in the given project directory.
+ *
+ * Creates the file with a minimal `{ name, private, dependencies }` skeleton
+ * when it doesn't exist. No-op if the file is already present.
+ *
+ * @param projectDir - Absolute path to the project root
+ */
+export function ensureMasonPackageJson(projectDir: string): void {
+  const masonDir = path.join(projectDir, ".mason");
+  const pkgJsonPath = path.join(masonDir, "package.json");
+
+  if (fs.existsSync(pkgJsonPath)) return;
+
+  fs.mkdirSync(masonDir, { recursive: true });
+  const skeleton = {
+    name: "mason-extensions",
+    private: true,
+    dependencies: {} as Record<string, string>,
+  };
+  fs.writeFileSync(pkgJsonPath, JSON.stringify(skeleton, null, 2) + "\n", "utf-8");
+}
+
+/**
+ * Auto-install an agent package into `.mason/node_modules/`.
+ *
+ * Writes (or updates) the dependency in `.mason/package.json` with a tilde-pinned
+ * version matching the CLI version, then runs `npm update` to install it.
+ *
+ * @param projectDir  - Absolute path to the project root
+ * @param packageName - Full npm package name (e.g., `@clawmasons/claude-code-agent`)
+ * @param cliVersion  - The current CLI version string (e.g., "0.1.6")
+ */
+export function autoInstallAgent(projectDir: string, packageName: string, cliVersion: string): void {
+  ensureMasonPackageJson(projectDir);
+
+  const pkgJsonPath = path.join(projectDir, ".mason", "package.json");
+  const raw = fs.readFileSync(pkgJsonPath, "utf-8");
+  const pkgJson = JSON.parse(raw) as Record<string, unknown>;
+
+  if (!pkgJson.dependencies || typeof pkgJson.dependencies !== "object") {
+    pkgJson.dependencies = {};
+  }
+  const deps = pkgJson.dependencies as Record<string, string>;
+  deps[packageName] = `~${cliVersion}`;
+
+  fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2) + "\n", "utf-8");
+
+  const masonDir = path.join(projectDir, ".mason");
+  execSync("npm update", { cwd: masonDir, stdio: "inherit" });
+}
+
+/**
+ * Synchronize all extension dependency versions in `.mason/package.json`
+ * to match the current CLI version (tilde-pinned).
+ *
+ * Rewrites every dependency to `~{cliVersion}` and runs `npm update`.
+ * No-op if `.mason/package.json` doesn't exist or has no dependencies.
+ *
+ * @param projectDir - Absolute path to the project root
+ * @param cliVersion - The current CLI version string (e.g., "0.1.6")
+ */
+export function syncExtensionVersions(projectDir: string, cliVersion: string): void {
+  const pkgJsonPath = path.join(projectDir, ".mason", "package.json");
+  if (!fs.existsSync(pkgJsonPath)) return;
+
+  const raw = fs.readFileSync(pkgJsonPath, "utf-8");
+  const pkgJson = JSON.parse(raw) as Record<string, unknown>;
+
+  if (!pkgJson.dependencies || typeof pkgJson.dependencies !== "object") return;
+
+  const deps = pkgJson.dependencies as Record<string, string>;
+  const depNames = Object.keys(deps);
+  if (depNames.length === 0) return;
+
+  for (const name of depNames) {
+    deps[name] = `~${cliVersion}`;
+  }
+
+  fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2) + "\n", "utf-8");
+
+  const masonDir = path.join(projectDir, ".mason");
+  execSync("npm update", { cwd: masonDir, stdio: "inherit" });
+}
+
+/**
+ * High-level agent resolution with auto-install fallback.
+ *
+ * 1. If the agent is already in the registry, return it immediately.
+ * 2. Otherwise, resolve the name to an npm package, auto-install it,
+ *    re-discover installed agents, and return the newly available agent (or null).
+ *
+ * @param projectDir  - Absolute path to the project root
+ * @param agentName   - The agent name as provided by the user
+ * @param cliVersion  - The current CLI version string
+ * @param registry    - The existing agent registry
+ * @returns The resolved AgentPackage, or null if resolution/install failed
+ */
+export async function resolveAgentWithAutoInstall(
+  projectDir: string,
+  agentName: string,
+  cliVersion: string,
+  registry: AgentRegistry,
+): Promise<AgentPackage | null> {
+  // Already in registry — return immediately
+  const existing = registry.get(agentName);
+  if (existing) return existing;
+
+  // Resolve short name to package name
+  const packageName = resolveAgentPackageName(agentName);
+  if (!packageName) return null;
+
+  // Auto-install the package
+  try {
+    autoInstallAgent(projectDir, packageName, cliVersion);
+  } catch (err) {
+    console.warn(
+      `[agent-sdk] Failed to auto-install "${packageName}": ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return null;
+  }
+
+  // Re-discover installed agents
+  const discovered = await discoverInstalledAgents(projectDir);
+  for (const agent of discovered) {
+    registerAgent(registry, agent);
+  }
+
+  // Try to find the agent again
+  return registry.get(agentName) ?? null;
 }

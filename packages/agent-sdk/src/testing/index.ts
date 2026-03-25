@@ -439,3 +439,27 @@ export function testFileContents(workspaceDir: string, relPath: string, expected
     );
   }
 }
+
+/**
+ * Symlink a locally-built agent package into a workspace's .mason/node_modules/
+ * so the CLI's discovery phase finds it without npm install.
+ *
+ * Reads the agent's package.json to determine the scoped name, then creates
+ * a symlink at `<workspaceDir>/.mason/node_modules/@scope/name` pointing to
+ * the agent's package root.
+ */
+export function installLocalAgent(workspaceDir: string, agentPackageDir: string): void {
+  const pkgJsonPath = path.join(agentPackageDir, "package.json");
+  const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
+  const pkgName: string = pkgJson.name;
+  const parts = pkgName.split("/");
+  if (parts.length !== 2) {
+    throw new Error(`Expected scoped package name (e.g. @scope/name), got "${pkgName}"`);
+  }
+  const scopeDir = path.join(workspaceDir, ".mason", "node_modules", parts[0]);
+  fs.mkdirSync(scopeDir, { recursive: true });
+  const targetDir = path.join(scopeDir, parts[1]);
+  if (!fs.existsSync(targetDir)) {
+    fs.symlinkSync(path.resolve(agentPackageDir), targetDir, "dir");
+  }
+}
