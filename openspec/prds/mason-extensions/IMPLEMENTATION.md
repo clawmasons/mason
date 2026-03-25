@@ -173,7 +173,7 @@ Create a publish script that replaces `file:` references with version-pinned npm
 
 **Testable Output:** `npm pack` on each agent produces a tarball where `package.json` has version-pinned npm dependencies, not `file:` paths.
 
-**Not Implemented Yet**
+**Implemented** (in mason-extensions repo)
 
 ---
 
