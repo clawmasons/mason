@@ -111,7 +111,7 @@ Move `claude-code-agent`, `pi-coding-agent`, and `codex-agent` source code from 
 
 **Testable Output:** All agent packages build and pass tests from `mason-extensions/`.
 
-**Not Implemented Yet**
+**Implemented** (in mason-extensions repo)
 
 ---
 
