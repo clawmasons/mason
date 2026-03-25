@@ -205,8 +205,8 @@ export function execComposeCommand(
       : spawn("docker", baseArgs, { stdio: ["ignore", "ignore", "pipe"] });
 
     if (showOutput && opts?.logger) {
-      child.stdout?.on("data", (chunk: Buffer) => { opts.logger!.log(chunk.toString().trimEnd()); });
-      child.stderr?.on("data", (chunk: Buffer) => { opts.logger!.error(chunk.toString().trimEnd()); });
+      child.stdout?.on("data", (chunk: Buffer) => { opts.logger?.log(chunk.toString().trimEnd()); });
+      child.stderr?.on("data", (chunk: Buffer) => { opts.logger?.error(chunk.toString().trimEnd()); });
     }
 
     let stderr = "";
