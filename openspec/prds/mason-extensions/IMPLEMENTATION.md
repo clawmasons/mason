@@ -89,7 +89,7 @@ Create the `mason-extensions` monorepo at `../mason-extensions` with workspace c
 
 **Testable Output:** `mason-extensions/` exists, `npm install` resolves all dependencies, `npm run build` compiles successfully.
 
-**Not Implemented Yet**
+**Implemented** (in mason-extensions repo)
 
 ---
 
