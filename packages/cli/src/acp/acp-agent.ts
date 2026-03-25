@@ -8,6 +8,14 @@ import {
   type PromptRequest,
   type PromptResponse,
   type CancelNotification,
+  type ListSessionsRequest,
+  type ListSessionsResponse,
+  type LoadSessionRequest,
+  type LoadSessionResponse,
+  type CloseSessionRequest,
+  type CloseSessionResponse,
+  type SetSessionConfigOptionRequest,
+  type SetSessionConfigOptionResponse,
   type ContentBlock,
   type ClientCapabilities,
   type Implementation,
@@ -18,7 +26,14 @@ import {
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createSession, readSession, updateSession } from "@clawmasons/shared";
+import {
+  createSession,
+  readSession,
+  updateSession,
+  listSessions as listSessionsFromStore,
+  closeSession as closeSessionFromStore,
+  resolveRole,
+} from "@clawmasons/shared";
 import { discoverForCwd } from "./discovery-cache.js";
 import { executePrompt } from "./prompt-executor.js";
 
@@ -44,6 +59,54 @@ const sessions = new Map<string, SessionState>();
 /** Expose sessions map for testing. */
 export function getSessionState(sessionId: string): SessionState | undefined {
   return sessions.get(sessionId);
+}
+
+/** Clear all in-memory session state. Used by tests to reset between runs. */
+export function clearSessionStates(): void {
+  sessions.clear();
+}
+
+// ---------------------------------------------------------------------------
+// Config options builder (shared by newSession, loadSession, setConfigOption)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the `configOptions` array for an ACP session response.
+ * Reused by `newSession`, `loadSession`, and `setConfigOption`.
+ */
+export function buildConfigOptions(
+  discovery: { roles: { metadata: { name: string }; source: { type: string; packageName?: string } }[]; agentNames: string[] },
+  currentRole: string,
+  currentAgent: string,
+): SessionConfigOption[] {
+  return [
+    {
+      id: "role",
+      name: "Role",
+      type: "select" as const,
+      category: "role",
+      currentValue: currentRole,
+      options: discovery.roles.map((r) => ({
+        value: r.metadata.name,
+        name: r.metadata.name,
+        description:
+          r.source.type === "package"
+            ? `(packaged: ${r.source.packageName ?? "unknown"})`
+            : "(local)",
+      })),
+    },
+    {
+      id: "agent",
+      name: "Agent",
+      type: "select" as const,
+      category: "model",
+      currentValue: currentAgent,
+      options: discovery.agentNames.map((name) => ({
+        value: name,
+        name,
+      })),
+    },
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -97,8 +160,8 @@ export function extractTextFromPrompt(prompt: ContentBlock[]): string {
  * Creates the mason ACP agent handler.
  *
  * Implements the `Agent` interface from `@agentclientprotocol/sdk`.
- * Handlers for initialize, newSession, prompt, and cancel are fully
- * implemented. Remaining handlers are stubs for future changes.
+ * All session lifecycle handlers are implemented: initialize, newSession,
+ * prompt, cancel, listSessions, loadSession, closeSession, and setConfigOption.
  */
 export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
   return {
@@ -141,7 +204,7 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
 
       // Discover roles and agents for this project directory
       const discovery = await discoverForCwd(cwd);
-      const { roles, agentNames, defaultRole, defaultAgent } = discovery;
+      const { defaultRole, defaultAgent } = discovery;
 
       // Persist session to disk
       const session = await createSession(cwd, defaultAgent, defaultRole.metadata.name);
@@ -155,34 +218,7 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
       });
 
       // Build configOptions
-      const configOptions: SessionConfigOption[] = [
-        {
-          id: "role",
-          name: "Role",
-          type: "select" as const,
-          category: "role",
-          currentValue: defaultRole.metadata.name,
-          options: roles.map((r) => ({
-            value: r.metadata.name,
-            name: r.metadata.name,
-            description:
-              r.source.type === "package"
-                ? `(packaged: ${r.source.packageName ?? "unknown"})`
-                : "(local)",
-          })),
-        },
-        {
-          id: "agent",
-          name: "Agent",
-          type: "select" as const,
-          category: "model",
-          currentValue: defaultAgent,
-          options: agentNames.map((name) => ({
-            value: name,
-            name,
-          })),
-        },
-      ];
+      const configOptions = buildConfigOptions(discovery, defaultRole.metadata.name, defaultAgent);
 
       const response: NewSessionResponse = {
         sessionId: session.sessionId,
@@ -291,6 +327,125 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
         session.abortController.abort();
       }
       // Notification — no response expected
+    },
+
+    async listSessions(params: ListSessionsRequest): Promise<ListSessionsResponse> {
+      const { cwd } = params;
+
+      if (!cwd) {
+        // Without a cwd we don't know which .mason/sessions/ to scan
+        return { sessions: [], nextCursor: null };
+      }
+
+      const stored = await listSessionsFromStore(cwd);
+      const sessionInfos = stored.map((s) => ({
+        sessionId: s.sessionId,
+        cwd: s.cwd,
+        title: s.firstPrompt,
+        updatedAt: s.lastUpdated,
+      }));
+
+      return { sessions: sessionInfos, nextCursor: null };
+    },
+
+    async loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse> {
+      const { sessionId, cwd } = params;
+
+      const meta = await readSession(cwd, sessionId);
+      if (!meta) {
+        throw RequestError.invalidParams(`Session not found: ${sessionId}`);
+      }
+
+      // Run discovery so we can build configOptions
+      const discovery = await discoverForCwd(cwd);
+
+      // Populate in-memory state
+      sessions.set(sessionId, {
+        sessionId,
+        cwd,
+        role: meta.role,
+        agent: meta.agent,
+      });
+
+      const configOptions = buildConfigOptions(discovery, meta.role, meta.agent);
+
+      // History replay is deferred to P1 — no session/update notifications sent
+      return { configOptions };
+    },
+
+    async unstable_closeSession(params: CloseSessionRequest): Promise<CloseSessionResponse> {
+      const { sessionId } = params;
+
+      // Look up in-memory state to get cwd
+      const session = sessions.get(sessionId);
+      if (!session) {
+        throw RequestError.invalidParams(`Session not found: ${sessionId}`);
+      }
+
+      // Persist closed state
+      await closeSessionFromStore(session.cwd, sessionId);
+
+      // Remove from in-memory state
+      sessions.delete(sessionId);
+
+      return {};
+    },
+
+    async setSessionConfigOption(params: SetSessionConfigOptionRequest): Promise<SetSessionConfigOptionResponse> {
+      const { sessionId, configId, value } = params;
+
+      const session = sessions.get(sessionId);
+      if (!session) {
+        throw RequestError.invalidParams(`Session not found: ${sessionId}`);
+      }
+
+      const stringValue = String(value);
+
+      if (configId === "agent") {
+        session.agent = stringValue;
+        await updateSession(session.cwd, sessionId, { agent: stringValue });
+      } else if (configId === "role") {
+        session.role = stringValue;
+        await updateSession(session.cwd, sessionId, { role: stringValue });
+
+        // Resolve the new role and send notifications
+        const resolvedRole = await resolveRole(stringValue, session.cwd);
+        const availableCommands = (resolvedRole.tasks ?? []).map((task) => ({
+          name: task.name,
+          description: task.ref ?? task.name,
+          input: { hint: "command arguments" },
+        }));
+
+        // Send available_commands_update
+        void conn.sessionUpdate({
+          sessionId,
+          update: {
+            sessionUpdate: "available_commands_update" as const,
+            availableCommands,
+          },
+        });
+
+        // Send config_option_update after building updated options
+        const discovery = await discoverForCwd(session.cwd);
+        const configOptions = buildConfigOptions(discovery, session.role, session.agent);
+
+        void conn.sessionUpdate({
+          sessionId,
+          update: {
+            sessionUpdate: "config_option_update" as const,
+            configOptions,
+          },
+        });
+
+        return { configOptions };
+      } else {
+        throw RequestError.invalidParams(`Unknown configId: ${configId}`);
+      }
+
+      // For non-role changes, just return updated configOptions
+      const discovery = await discoverForCwd(session.cwd);
+      const configOptions = buildConfigOptions(discovery, session.role, session.agent);
+      return { configOptions };
     },
 
     async authenticate() {
