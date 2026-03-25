@@ -1,7 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+
+vi.mock("node:child_process", () => ({
+  execSync: vi.fn(() => Buffer.from("")),
+}));
+
+import { execSync } from "node:child_process";
 import {
   createAgentRegistry,
   discoverInstalledAgents,
@@ -12,8 +18,16 @@ import {
   loadConfigAliasEntry,
   readConfigAgentNames,
   readConfigAliasNames,
+  resolveAgentPackageName,
+  ensureMasonPackageJson,
+  autoInstallAgent,
+  syncExtensionVersions,
+  resolveAgentWithAutoInstall,
 } from "../src/discovery.js";
+import type { AgentRegistry } from "../src/discovery.js";
 import type { AgentPackage } from "../src/types.js";
+
+const mockExecSync = vi.mocked(execSync);
 
 function makeMockAgent(name: string, aliases?: string[]): AgentPackage {
   return {
@@ -988,5 +1002,277 @@ describe("createAgentRegistry with discovered agents", () => {
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+});
+
+// ── resolveAgentPackageName ──────────────────────────────────────────
+
+describe("resolveAgentPackageName", () => {
+  it("resolves 'claude' to @clawmasons/claude-code-agent", () => {
+    expect(resolveAgentPackageName("claude")).toBe("@clawmasons/claude-code-agent");
+  });
+
+  it("resolves 'claude-code' to @clawmasons/claude-code-agent", () => {
+    expect(resolveAgentPackageName("claude-code")).toBe("@clawmasons/claude-code-agent");
+  });
+
+  it("resolves 'pi' to @clawmasons/pi-coding-agent", () => {
+    expect(resolveAgentPackageName("pi")).toBe("@clawmasons/pi-coding-agent");
+  });
+
+  it("resolves 'pi-coding' to @clawmasons/pi-coding-agent", () => {
+    expect(resolveAgentPackageName("pi-coding")).toBe("@clawmasons/pi-coding-agent");
+  });
+
+  it("resolves 'codex' to @clawmasons/codex-agent", () => {
+    expect(resolveAgentPackageName("codex")).toBe("@clawmasons/codex-agent");
+  });
+
+  it("passes through scoped package names as-is", () => {
+    expect(resolveAgentPackageName("@mycompany/custom-agent")).toBe("@mycompany/custom-agent");
+  });
+
+  it("returns null for unknown unscoped names", () => {
+    expect(resolveAgentPackageName("unknown-agent")).toBeNull();
+  });
+
+  it("returns null for empty string", () => {
+    expect(resolveAgentPackageName("")).toBeNull();
+  });
+});
+
+// ── ensureMasonPackageJson ───────────────────────────────────────────
+
+describe("ensureMasonPackageJson", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("creates .mason/package.json when it does not exist", () => {
+    ensureMasonPackageJson(tmpDir);
+
+    const pkgJsonPath = path.join(tmpDir, ".mason", "package.json");
+    expect(fs.existsSync(pkgJsonPath)).toBe(true);
+
+    const content = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
+    expect(content.name).toBe("mason-extensions");
+    expect(content.private).toBe(true);
+    expect(content.dependencies).toEqual({});
+  });
+
+  it("does not overwrite existing .mason/package.json", () => {
+    const masonDir = path.join(tmpDir, ".mason");
+    fs.mkdirSync(masonDir, { recursive: true });
+    const pkgJsonPath = path.join(masonDir, "package.json");
+    const existing = { name: "existing", private: true, dependencies: { "some-pkg": "^1.0.0" } };
+    fs.writeFileSync(pkgJsonPath, JSON.stringify(existing), "utf-8");
+
+    ensureMasonPackageJson(tmpDir);
+
+    const content = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
+    expect(content.name).toBe("existing");
+    expect(content.dependencies["some-pkg"]).toBe("^1.0.0");
+  });
+});
+
+// ── autoInstallAgent ─────────────────────────────────────────────────
+
+describe("autoInstallAgent", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-test-"));
+    mockExecSync.mockClear();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("creates package.json and writes tilde-pinned dependency", () => {
+    autoInstallAgent(tmpDir, "@clawmasons/claude-code-agent", "0.1.6");
+
+    const pkgJsonPath = path.join(tmpDir, ".mason", "package.json");
+    const content = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
+    expect(content.dependencies["@clawmasons/claude-code-agent"]).toBe("~0.1.6");
+  });
+
+  it("calls npm update with correct cwd", () => {
+    autoInstallAgent(tmpDir, "@clawmasons/codex-agent", "0.2.0");
+
+    expect(mockExecSync).toHaveBeenCalledWith(
+      "npm update",
+      expect.objectContaining({ cwd: path.join(tmpDir, ".mason") }),
+    );
+  });
+
+  it("adds to existing dependencies without removing others", () => {
+    const masonDir = path.join(tmpDir, ".mason");
+    fs.mkdirSync(masonDir, { recursive: true });
+    const existing = {
+      name: "mason-extensions",
+      private: true,
+      dependencies: { "@clawmasons/pi-coding-agent": "~0.1.5" },
+    };
+    fs.writeFileSync(path.join(masonDir, "package.json"), JSON.stringify(existing), "utf-8");
+
+    autoInstallAgent(tmpDir, "@clawmasons/claude-code-agent", "0.1.6");
+
+    const content = JSON.parse(fs.readFileSync(path.join(masonDir, "package.json"), "utf-8"));
+    expect(content.dependencies["@clawmasons/pi-coding-agent"]).toBe("~0.1.5");
+    expect(content.dependencies["@clawmasons/claude-code-agent"]).toBe("~0.1.6");
+  });
+});
+
+// ── syncExtensionVersions ────────────────────────────────────────────
+
+describe("syncExtensionVersions", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-test-"));
+    mockExecSync.mockClear();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("rewrites all dependencies to the new version", () => {
+    const masonDir = path.join(tmpDir, ".mason");
+    fs.mkdirSync(masonDir, { recursive: true });
+    const existing = {
+      name: "mason-extensions",
+      private: true,
+      dependencies: {
+        "@clawmasons/claude-code-agent": "~0.1.5",
+        "@clawmasons/pi-coding-agent": "~0.1.4",
+      },
+    };
+    fs.writeFileSync(path.join(masonDir, "package.json"), JSON.stringify(existing), "utf-8");
+
+    syncExtensionVersions(tmpDir, "0.2.0");
+
+    const content = JSON.parse(fs.readFileSync(path.join(masonDir, "package.json"), "utf-8"));
+    expect(content.dependencies["@clawmasons/claude-code-agent"]).toBe("~0.2.0");
+    expect(content.dependencies["@clawmasons/pi-coding-agent"]).toBe("~0.2.0");
+  });
+
+  it("calls npm update after rewriting", () => {
+    const masonDir = path.join(tmpDir, ".mason");
+    fs.mkdirSync(masonDir, { recursive: true });
+    const existing = {
+      name: "mason-extensions",
+      private: true,
+      dependencies: { "@clawmasons/codex-agent": "~0.1.0" },
+    };
+    fs.writeFileSync(path.join(masonDir, "package.json"), JSON.stringify(existing), "utf-8");
+
+    syncExtensionVersions(tmpDir, "0.3.0");
+
+    expect(mockExecSync).toHaveBeenCalledWith(
+      "npm update",
+      expect.objectContaining({ cwd: masonDir }),
+    );
+  });
+
+  it("is a no-op when .mason/package.json does not exist", () => {
+    syncExtensionVersions(tmpDir, "0.2.0");
+
+    expect(mockExecSync).not.toHaveBeenCalled();
+  });
+
+  it("is a no-op when dependencies object is empty", () => {
+    const masonDir = path.join(tmpDir, ".mason");
+    fs.mkdirSync(masonDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(masonDir, "package.json"),
+      JSON.stringify({ name: "mason-extensions", private: true, dependencies: {} }),
+      "utf-8",
+    );
+
+    syncExtensionVersions(tmpDir, "0.2.0");
+
+    expect(mockExecSync).not.toHaveBeenCalled();
+  });
+});
+
+// ── resolveAgentWithAutoInstall ──────────────────────────────────────
+
+describe("resolveAgentWithAutoInstall", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-test-"));
+    mockExecSync.mockClear();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns existing agent from registry without installing", async () => {
+    const agent = makeMockAgent("claude-code-agent", ["claude"]);
+    const registry: AgentRegistry = new Map();
+    registry.set("claude-code-agent", agent);
+    registry.set("claude", agent);
+
+    const result = await resolveAgentWithAutoInstall(tmpDir, "claude", "0.1.6", registry);
+
+    expect(result).toBe(agent);
+    expect(mockExecSync).not.toHaveBeenCalled();
+  });
+
+  it("returns null for unknown unscoped names", async () => {
+    const registry: AgentRegistry = new Map();
+
+    const result = await resolveAgentWithAutoInstall(tmpDir, "unknown-agent", "0.1.6", registry);
+
+    expect(result).toBeNull();
+    expect(mockExecSync).not.toHaveBeenCalled();
+  });
+
+  it("writes dependency and calls npm update for resolvable agent", async () => {
+    const registry: AgentRegistry = new Map();
+
+    // The agent won't be discovered after install (no real package), so result is null,
+    // but we can verify the install was attempted
+    const result = await resolveAgentWithAutoInstall(tmpDir, "claude", "0.1.6", registry);
+
+    expect(result).toBeNull(); // no real package to discover
+    expect(mockExecSync).toHaveBeenCalledWith(
+      "npm update",
+      expect.objectContaining({ cwd: path.join(tmpDir, ".mason") }),
+    );
+
+    // Verify the dependency was written
+    const pkgJson = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, ".mason", "package.json"), "utf-8"),
+    );
+    expect(pkgJson.dependencies["@clawmasons/claude-code-agent"]).toBe("~0.1.6");
+  });
+
+  it("returns null and warns when npm install fails", async () => {
+    mockExecSync.mockImplementation(() => {
+      throw new Error("npm failed");
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const registry: AgentRegistry = new Map();
+    const result = await resolveAgentWithAutoInstall(tmpDir, "pi", "0.1.6", registry);
+
+    expect(result).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to auto-install"),
+    );
+
+    warnSpy.mockRestore();
+    mockExecSync.mockImplementation(() => Buffer.from(""));
   });
 });
