@@ -27,7 +27,7 @@ Delete the entire Docker-bridging ACP implementation, associated tests, and the 
 
 **Testable output:** `npx tsc --noEmit` passes, `npx eslint src/ tests/` clean, `npx vitest run packages/cli/tests/` passes, `npx vitest run packages/mcp-agent/tests/` passes. The `--acp` flag is no longer recognized by `mason run --help`.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-25-remove-old-acp-code/proposal.md) | [design](../../changes/archive/2026-03-25-remove-old-acp-code/design.md) | [tasks](../../changes/archive/2026-03-25-remove-old-acp-code/tasks.md)
 
 ---
 

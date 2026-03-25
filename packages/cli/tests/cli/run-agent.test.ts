@@ -78,12 +78,12 @@ describe("CLI run command", () => {
     }
   });
 
-  it("run command has --acp option", () => {
+  it("run command does not have --acp option (removed)", () => {
     const cmd = program.commands.find((c) => c.name() === "run");
     expect(cmd).toBeDefined();
     if (cmd) {
       const acpOpt = cmd.options.find((o) => o.long === "--acp");
-      expect(acpOpt).toBeDefined();
+      expect(acpOpt).toBeUndefined();
     }
   });
 
@@ -1156,7 +1156,7 @@ describe("runAgent", () => {
       throw new Error("Docker Compose v2 is required");
     };
 
-    await runAgent(projectDir, "claude-code-agent", "writer", deps, { acp: true });
+    await runAgent(projectDir, "claude-code-agent", "writer", deps);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     const errorOutput = errorSpy.mock.calls.flat().join("\n");

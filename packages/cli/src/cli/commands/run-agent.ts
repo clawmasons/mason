@@ -3,21 +3,18 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Readable, Writable } from "node:stream";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { checkDockerCompose } from "./docker-utils.js";
 import { quickAutoCleanup } from "./doctor.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedApp, Role, AppConfig, TaskRef, SkillRef } from "@clawmasons/shared";
-import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect } from "@clawmasons/shared";
+import { resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect } from "@clawmasons/shared";
 import { getAgentFromRegistry, getAgentFromRegistryWithAutoInstall, initRegistry, getAllRegisteredNames, BUILTIN_AGENTS, materializeForAgent } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig, readDefaultAgent, resolveAgentPackageName } from "@clawmasons/agent-sdk";
 import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.js";
-import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
-import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
 import { HostProxy } from "@clawmasons/proxy";
-import { createFileLogger, type AcpLogger } from "../../acp/logger.js";
+import { createFileLogger, type FileLogger } from "../../utils/file-logger.js";
 import { generateRoleDockerBuildDir, createSessionDirectory, getHostIds } from "../../materializer/docker-generator.js";
 import { ensureProxyDependencies, synthesizeRolePackages } from "../../materializer/proxy-dependencies.js";
 
@@ -185,7 +182,7 @@ export function displayCredentials(
 export function execComposeCommand(
   composeFile: string,
   args: string[],
-  opts?: { interactive?: boolean; verbose?: boolean; timeoutMs?: number; logger?: AcpLogger },
+  opts?: { interactive?: boolean; verbose?: boolean; timeoutMs?: number; logger?: FileLogger },
 ): Promise<number> {
   const baseArgs = ["compose", "-f", composeFile, ...args];
   const showOutput = opts?.interactive || opts?.verbose;
@@ -501,11 +498,10 @@ export async function ensureDockerBuild(
 
 // ── Help Text ─────────────────────────────────────────────────────────
 
-export const RUN_ACP_AGENT_HELP_EPILOG = `
+export const RUN_AGENT_HELP_EPILOG = `
 Command Syntax:
   mason run --role <name>                    # infers agent from role dialect
   mason run --role <name> --agent claude     # explicit agent (renamed from --agent-type)
-  mason run --role <name> --acp              # ACP mode
   mason claude --role <name>                 # shorthand (config-declared or built-in agent)
 
   --agent <name>   Agent name from .mason/config.json or built-in alias.
@@ -513,17 +509,10 @@ Command Syntax:
   --home <path>    Bind-mount <path> over /home/mason/ in the agent container.
                    Overrides the "home" property in .mason/config.json.
   --terminal       Force terminal (interactive) mode, overriding config mode.
-  --acp            Start in ACP mode (overrides config mode).
   --bash           Launch bash shell (overrides config mode).
 
 Agent Types (built-in):
   claude (claude-code-agent), pi (pi-coding-agent), mcp (mcp-agent)
-
-Session Behavior:
-  When an ACP client sends session/new with a "cwd" field, the agent
-  container mounts that directory as /home/mason/workspace/project.
-  Each session/new starts a fresh agent container; the proxy stays running.
-  The credential service runs in-process on the host.
 
 Side Effects:
   - Creates .mason/ in the project for docker builds and session state
@@ -576,7 +565,7 @@ export interface RunAgentDeps {
   execComposeFn?: (
     composeFile: string,
     args: string[],
-    opts?: { interactive?: boolean; verbose?: boolean; logger?: AcpLogger },
+    opts?: { interactive?: boolean; verbose?: boolean; logger?: FileLogger },
   ) => Promise<number>;
   /** Override session ID generation (for testing). */
   generateSessionIdFn?: () => string;
@@ -588,10 +577,6 @@ export interface RunAgentDeps {
   resolveRoleFn?: (roleName: string, projectDir: string) => Promise<Role>;
   /** Override agent adaptation (for testing). */
   adaptRoleFn?: (roleType: Role, agentType: string) => ResolvedAgent;
-  /** Override AcpSession construction (for testing, ACP mode). */
-  createSessionFn?: (config: AcpSessionConfig, sessionDeps?: AcpSessionDeps) => AcpSession;
-  /** Override AcpSdkBridge construction (for testing, ACP mode). */
-  createBridgeFn?: (config: AcpSdkBridgeConfig) => AcpSdkBridge;
   /** Override fs.mkdirSync (for testing). */
   mkdirSyncFn?: (dirPath: string, options?: { recursive?: boolean }) => void;
   /** Override fs.existsSync (for testing). */
@@ -607,16 +592,13 @@ export interface RunAgentDeps {
   }) => Promise<{ stop: () => Promise<void> }>;
   /** Override proxy health check (for testing). */
   waitForProxyHealthFn?: (url: string, timeoutMs: number) => Promise<void>;
-  /** Override logger creation (for testing, ACP mode). */
-  createLoggerFn?: (logDir: string) => AcpLogger;
+  /** Override logger creation (for testing). */
+  createLoggerFn?: (logDir: string) => FileLogger;
   /** Override home path (for testing). */
   homeOverride?: string;
   /** Override registry initialization (for testing). */
   initRegistryFn?: (projectDir: string, cliVersion?: string) => Promise<void>;
 }
-
-// ── Backward-compat aliases ───────────────────────────────────────────
-export type RunAcpAgentDeps = RunAgentDeps;
 
 // ── Command Registration ──────────────────────────────────────────────
 
@@ -799,7 +781,6 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     positionalAgent: string | undefined,
     positionalPrompt: string | undefined,
     options: {
-      acp?: boolean;
       bash?: boolean;
       terminal?: boolean;
       build?: boolean;
@@ -859,15 +840,8 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     // Derive effective role: override (for configure) > --role flag > config role > project role
     const role = overrideRole ?? options.role ?? configEntry?.role;
 
-    if (options.bash && options.acp) {
-      console.error("\n  --bash and --acp are mutually exclusive.\n");
-      process.exit(1);
-      return;
-    }
-
     if (isPrintMode) {
       const conflicts = [
-        options.acp && "--acp",
         options.bash && "--bash",
         options.devContainer && "--dev-container",
         options.proxyOnly && "--proxy-only",
@@ -880,12 +854,9 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     }
 
     // Derive effective mode: explicit flags > config mode > terminal (default)
-    const effectiveAcp =
-      options.acp ||
-      (!options.bash && !options.terminal && configEntry?.mode === "acp");
     const effectiveBash =
       options.bash ||
-      (!options.acp && !options.terminal && configEntry?.mode === "bash");
+      (!options.terminal && configEntry?.mode === "bash");
 
     // Resolve agent type from effective agent name (after alias resolution).
     // Uses async resolution with auto-install fallback for agents not in registry.
@@ -996,18 +967,6 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
 
     if (options.proxyOnly) {
       await runProxyOnly(projectDir, resolvedAgentType, effectiveRoleName, parseInt(options.proxyPort, 10), undefined, preResolvedRole);
-    } else if (effectiveAcp) {
-      await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
-        acp: true,
-        proxyPort: parseInt(options.proxyPort, 10),
-        homeOverride,
-        agentConfigCredentials: effectiveCredentials.length > 0 ? effectiveCredentials : undefined,
-        agentArgs,
-        sourceOverride,
-        preResolvedRole,
-        llmConfig,
-        // initialPrompt intentionally omitted for ACP mode
-      });
     } else if (options.devContainer) {
       await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
         devContainer: true,
@@ -1061,7 +1020,6 @@ export function registerRunCommand(program: Command): void {
     .description("Run a role on the specified agent runtime")
     .argument("[agent]", "Agent name from config or built-in type (e.g., claude, pi, mcp)")
     .argument("[prompt]", "Initial prompt passed to the agent as the first message")
-    .option("--acp", "Start in ACP mode for editor integration")
     .option("--bash", "Launch bash shell instead of the agent (for debugging)")
     .option("--terminal", "Force terminal (interactive) mode, overriding config mode")
     .option("--build", "Force rebuild Docker images before running")
@@ -1077,7 +1035,7 @@ export function registerRunCommand(program: Command): void {
       new Option("--source <name>", "Agent source directory to scan (repeatable). Overrides role sources.")
         .argParser((value: string, previous: string[] | undefined) => [...(previous ?? []), value]),
     )
-    .addHelpText("after", RUN_ACP_AGENT_HELP_EPILOG)
+    .addHelpText("after", RUN_AGENT_HELP_EPILOG)
     .action(createRunAction());
 }
 
@@ -1090,7 +1048,6 @@ export function registerConfigureCommand(program: Command): void {
     .description("Configure a project for mason (alias for run with the configure-project role)")
     .argument("[agent]", "Agent name from config or built-in type (e.g., claude, pi, mcp)")
     .argument("[prompt]", "Initial prompt (defaults to \"create and implement role plan\")")
-    .option("--acp", "Start in ACP mode for editor integration")
     .option("--bash", "Launch bash shell instead of the agent (for debugging)")
     .option("--terminal", "Force terminal (interactive) mode, overriding config mode")
     .option("--build", "Force rebuild Docker images before running")
@@ -1111,7 +1068,6 @@ export async function runAgent(
   role: string,
   deps?: RunAgentDeps,
   acpOptions?: {
-    acp?: boolean;
     proxyPort?: number;
     bash?: boolean;
     build?: boolean;
@@ -1150,7 +1106,6 @@ export async function runAgent(
     console.warn(`  Warning: auto-cleanup failed: ${(cleanupErr as Error).message}`);
   }
 
-  const isAcpMode = acpOptions?.acp === true;
   const isDevContainerMode = acpOptions?.devContainer === true;
   const proxyPort = acpOptions?.proxyPort ?? 3000;
   const bashMode = acpOptions?.bash === true;
@@ -1164,9 +1119,7 @@ export async function runAgent(
   const llmConfig = acpOptions?.llmConfig;
   const isPrintMode = acpOptions?.printMode === true;
 
-  if (isAcpMode) {
-    return runAgentAcpMode(projectDir, agent, role, proxyPort, deps, homeOverride, agentConfigCredentials, agentArgs, sourceOverride, preResolvedRole, llmConfig);
-  } else if (isPrintMode) {
+  if (isPrintMode) {
     const verbose = acpOptions?.verbose === true;
     return runAgentPrintMode(projectDir, agent, role, proxyPort, deps, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole, llmConfig);
   } else if (isDevContainerMode) {
@@ -1958,239 +1911,6 @@ export async function runProxyOnly(
 
   } finally {
     console.log = origLog;
-  }
-}
-
-// ── ACP Mode ──────────────────────────────────────────────────────────
-
-async function runAgentAcpMode(
-  projectDir: string,
-  agentOverride: string | undefined,
-  role: string,
-  proxyPort: number,
-  deps?: RunAgentDeps,
-  homeOverride?: string,
-  agentConfigCredentials?: string[],
-  agentArgs?: string[],
-  sourceOverride?: string[],
-  preResolvedRole?: Role,
-  llmConfig?: { provider: string; model: string },
-  // initialPrompt is intentionally omitted: ACP mode does not forward initial prompts
-): Promise<void> {
-  const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
-  const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
-  const createSession = deps?.createSessionFn ?? ((config: AcpSessionConfig, sessionDeps?: AcpSessionDeps) => new AcpSession(config, sessionDeps));
-  const createBridge = deps?.createBridgeFn ?? ((config: AcpSdkBridgeConfig) => new AcpSdkBridge(config));
-  const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
-  const mkdirSync = deps?.mkdirSyncFn ?? fs.mkdirSync;
-
-  // ── Protect stdout from console pollution ────────────────────────────
-  const origLog = console.log.bind(console);
-  const origError = console.error.bind(console);
-  const earlyBuffer: unknown[][] = [];
-  if (!deps?.createLoggerFn) {
-    const noop = (...args: unknown[]) => { earlyBuffer.push(args); };
-    console.log = noop;
-    console.error = noop;
-  }
-
-  let logger: AcpLogger | null = null;
-
-  let session: AcpSession | null = null;
-  let bridge: AcpSdkBridge | null = null;
-  let hostProxyHandle: { stop: () => Promise<void> } | null = null;
-  let shuttingDown = false;
-
-  // Graceful shutdown handler
-  const shutdown = async () => {
-    shuttingDown = true;
-    process.exitCode = 0;
-    console.log = origLog;
-    console.error = origError;
-    const log = logger ?? { log: origError, error: origError, close: () => {} };
-    log.log("\n[mason agent --acp] Shutting down...");
-    try {
-      if (bridge) await bridge.stop();
-    } catch { /* best-effort */ }
-    try {
-      if (hostProxyHandle) await hostProxyHandle.stop();
-    } catch { /* best-effort */ }
-    try { log.close(); } catch { /* best-effort */ }
-    try {
-      if (session) await session.stop();
-    } catch { /* best-effort */ }
-    process.exit(0);
-  };
-
-  const onSignal = () => void shutdown();
-  process.on("SIGINT", onSignal);
-  process.on("SIGTERM", onSignal);
-
-  try {
-    // ── Step 1: Resolve role from project directory (skip if pre-resolved) ──
-    const roleType = preResolvedRole ?? await resolveRoleFn(role, projectDir);
-
-    // ── Step 1b: Apply --source override if provided ─────────────────
-    if (sourceOverride?.length) {
-      roleType.sources = sourceOverride;
-    }
-
-    const roleName = getAppShortName(roleType.metadata.name);
-
-    // ── Step 2: Infer or override agent type ─────────────────────────
-    const agentType = agentOverride ?? inferAgentType(roleType, readDefaultAgent(projectDir));
-
-    // ── Step 3: Ensure docker build artifacts ────────────────────────
-    const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
-      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, agentConfigCredentials, agentArgs, llmConfig },
-    );
-
-    // ── Step 3b: Always refresh agent-launch.json (live-mounted) ────
-    refreshAgentLaunchJson(roleType, agentType, dockerBuildDir, {
-      agentConfigCredentials, agentArgs, llmConfig,
-    });
-
-    // ── Create file logger in session-local logs ─────────────────────
-    const sessionLogsDir = path.join(projectDir, ".mason", "logs");
-    mkdirSync(sessionLogsDir, { recursive: true });
-    const makeLogger = deps?.createLoggerFn ?? createFileLogger;
-    logger = makeLogger(sessionLogsDir);
-
-    // Flush buffered early output to the file logger.
-    for (const args of earlyBuffer) { logger.log(...args); }
-    earlyBuffer.length = 0;
-
-    if (!deps?.createLoggerFn) {
-      const fileLogger = logger;
-      console.log = (...args: unknown[]) => fileLogger.log(...args);
-      console.error = (...args: unknown[]) => fileLogger.error(...args);
-    }
-
-    // Ensure .mason is in project's .gitignore
-    ensureGitignore(projectDir, ".mason");
-
-    // ── Step 4: Resolve agent from role ──────────────────────────────
-    logger.log(`[mason run --acp] Resolving role "${role}" for agent type "${agentType}"...`);
-    const resolvedAgent = adaptRoleFn(roleType, agentType);
-    if (llmConfig) resolvedAgent.llm = llmConfig;
-    mergeAgentConfigCredentials(resolvedAgent, agentConfigCredentials);
-
-    // ── Step 5: Compute tool filters ─────────────────────────────────
-    const toolFilters = computeToolFilters(resolvedAgent);
-    const toolCount = Object.keys(toolFilters).length;
-
-    // ── Step 5b: Collect env credentials ─────────────────────────────
-    const envCredentials = collectEnvCredentials(resolvedAgent);
-    const envCredCount = Object.keys(envCredentials).length;
-
-    logger.log(`[mason agent --acp] Agent: ${resolvedAgent.name}`);
-    logger.log(`[mason agent --acp] Role: ${roleName}`);
-    logger.log(`[mason agent --acp] Source: ${roleType.sources.length > 0 ? roleType.sources.join(", ") : "(none)"}`);
-    logger.log(`[mason agent --acp] Tool filters: ${toolCount} app(s)`);
-    if (envCredCount > 0) {
-      logger.log(`[mason agent --acp] Env credentials: ${envCredCount} key(s) from process.env`);
-    }
-
-    // ── Step 6: Create session and start infrastructure ──────────────
-    const runtime = resolvedAgent.runtimes[0] ?? "node";
-    const agentPkg = getAgentFromRegistry(runtime);
-    const acpRuntimeCmd = agentPkg?.acp?.command;
-    const acpCommand = acpRuntimeCmd
-      ? [...acpRuntimeCmd.split(" ").slice(1)]
-      : undefined;
-
-    const sdkCredKeys = agentPkg?.runtime?.credentials?.map((c) => c.key) ?? [];
-    const declaredCredentialKeys = new Set<string>([...sdkCredKeys, ...(agentConfigCredentials ?? []), ...resolvedAgent.credentials]);
-    for (const agentRole of resolvedAgent.roles) {
-      for (const app of agentRole.apps) {
-        for (const key of app.credentials) {
-          declaredCredentialKeys.add(key);
-        }
-      }
-    }
-
-    // dtg: investigate whay the credential keys are being passed here, would expect them to be 
-    //.     accessed via the credential service only
-    session = createSession({
-      projectDir,
-      agent: resolvedAgent.slug,
-      role: roleName,
-      proxyPort,
-      acpCommand,
-      credentialKeys: [...declaredCredentialKeys],
-      dockerBuildDir,
-      dockerDir,
-    }, { logger });
-
-    logger.log("[mason agent --acp] Starting infrastructure (proxy)...");
-    const infraInfo = await session.startInfrastructure();
-    logger.log(`[mason agent --acp] Infrastructure started (${infraInfo.sessionId})`);
-
-    // ── Step 6b: Start host proxy in-process ──────────────────────────
-    logger.log("[mason agent --acp] Starting host proxy (in-process)...");
-    const startHostProxy = deps?.startHostProxyFn ?? defaultStartHostProxy;
-    const hostAppsAcp = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
-
-    hostProxyHandle = await startHostProxy({
-      proxyPort,
-      relayToken: infraInfo.relayToken,
-      envCredentials,
-      hostApps: hostAppsAcp.length > 0 ? hostAppsAcp : undefined,
-    });
-    logger.log("[mason agent --acp] Host proxy connected to Docker proxy.");
-
-    // ── Step 7: Create and start ACP SDK bridge ──────────────────────
-    const logRef = logger;
-    const sessionRef = session;
-
-    bridge = createBridge({
-      onSessionNew: async (cwd: string) => {
-        logRef.log(`[mason agent --acp] session/new received — cwd: "${cwd}"`);
-
-        const masonDir = path.join(cwd, ".mason");
-        mkdirSync(masonDir, { recursive: true });
-
-        ensureGitignore(cwd, ".mason");
-
-        logRef.log("[mason agent --acp] Starting agent container...");
-        const { child } = await sessionRef.startAgentProcess(cwd);
-        logRef.log("[mason agent --acp] Agent process started.");
-
-        return child;
-      },
-      logger,
-    });
-
-    // Start bridge with editor-facing streams (process stdin/stdout)
-    const editorInput = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
-    const editorOutput = Writable.toWeb(process.stdout) as WritableStream<Uint8Array>;
-    bridge.start(editorInput, editorOutput);
-
-    logger.log(
-      `\n[mason agent --acp] Ready -- stdio transport active\n` +
-      `  Agent:      ${resolvedAgent.name}\n` +
-      `  Role:       ${roleName}\n` +
-      `  Source:     ${roleType.sources.length > 0 ? roleType.sources.join(", ") : "(none)"}\n` +
-      `  Proxy port: ${proxyPort}\n` +
-      `  Mode:       deferred (agent starts on session/new)\n`,
-    );
-
-    // Keep process alive until the editor disconnects.
-    await bridge.closed;
-
-  } catch (error) {
-    if (shuttingDown) return;
-
-    console.log = origLog;
-    console.error = origError;
-    const message = error instanceof Error ? error.message : String(error);
-    const log = logger ?? { log: origError, error: origError, close: () => {} };
-    log.error(`\n[mason agent --acp] Failed: ${message}\n`);
-
-    try { if (bridge) await bridge.stop(); } catch { /* best-effort */ }
-    try { if (session) await session.stop(); } catch { /* best-effort */ }
-    try { log.close(); } catch { /* best-effort */ }
-    process.exit(1);
   }
 }
 
