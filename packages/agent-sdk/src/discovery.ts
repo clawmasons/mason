@@ -380,6 +380,106 @@ function isValidAgentPackage(value: unknown): value is AgentPackage {
 }
 
 /**
+ * Discover agent packages installed in `.mason/node_modules/@clawmasons/`.
+ *
+ * Scans for directories whose `package.json` declares `mason.type: "agent"`.
+ * For each qualifying package, dynamically imports the entrypoint specified by
+ * `mason.entrypoint` (defaulting to `./dist/index.js`) and validates that the
+ * default export is a valid `AgentPackage`.
+ *
+ * Packages that fail to load are skipped with a warning — this function never throws.
+ *
+ * @param projectDir - Absolute path to the project root
+ * @returns Array of discovered AgentPackage objects
+ */
+export async function discoverInstalledAgents(projectDir: string): Promise<AgentPackage[]> {
+  const scopeDir = path.join(projectDir, ".mason", "node_modules", "@clawmasons");
+
+  if (!fs.existsSync(scopeDir)) {
+    return [];
+  }
+
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(scopeDir);
+  } catch {
+    return [];
+  }
+
+  const agents: AgentPackage[] = [];
+
+  for (const entry of entries) {
+    const pkgDir = path.join(scopeDir, entry);
+
+    // Skip non-directories
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(pkgDir);
+    } catch {
+      continue;
+    }
+    if (!stat.isDirectory()) continue;
+
+    // Read package.json
+    const pkgJsonPath = path.join(pkgDir, "package.json");
+    if (!fs.existsSync(pkgJsonPath)) continue;
+
+    let pkgJson: Record<string, unknown>;
+    try {
+      const raw = fs.readFileSync(pkgJsonPath, "utf-8");
+      pkgJson = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      console.warn(`[agent-sdk] Failed to parse package.json in ${pkgDir}`);
+      continue;
+    }
+
+    // Check mason.type === "agent"
+    const masonField = pkgJson.mason;
+    if (!masonField || typeof masonField !== "object") continue;
+    const masonObj = masonField as Record<string, unknown>;
+    if (masonObj.type !== "agent") continue;
+
+    // Resolve entrypoint
+    const entrypoint = typeof masonObj.entrypoint === "string"
+      ? masonObj.entrypoint
+      : "./dist/index.js";
+    const entrypointPath = path.resolve(pkgDir, entrypoint);
+
+    // Dynamic import
+    try {
+      const mod = await import(entrypointPath) as { default?: unknown };
+      // Handle CJS interop: when importing a CJS module that sets
+      // `exports.default = ...`, Node wraps module.exports as `mod.default`,
+      // so the actual value ends up at `mod.default.default`.
+      let agentPkg = mod.default;
+      if (
+        agentPkg &&
+        typeof agentPkg === "object" &&
+        "default" in agentPkg &&
+        !isValidAgentPackage(agentPkg)
+      ) {
+        agentPkg = (agentPkg as Record<string, unknown>).default;
+      }
+
+      if (!isValidAgentPackage(agentPkg)) {
+        console.warn(
+          `[agent-sdk] Package "@clawmasons/${entry}" does not export a valid AgentPackage (missing name or materializer)`,
+        );
+        continue;
+      }
+
+      agents.push(agentPkg);
+    } catch (err) {
+      console.warn(
+        `[agent-sdk] Failed to load agent from "@clawmasons/${entry}": ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  return agents;
+}
+
+/**
  * Load third-party agent packages declared in .mason/config.json.
  *
  * @param projectDir - Absolute path to the project root
@@ -483,8 +583,17 @@ export async function createAgentRegistry(
     registerAgent(registry, agent);
   }
 
-  // Phase 2: Load and register config-declared agents (can override built-ins)
   if (projectDir) {
+    // Phase 2: Discover installed agents from .mason/node_modules/
+    // Discovered agents do NOT override built-ins.
+    const discoveredAgents = await discoverInstalledAgents(projectDir);
+    for (const agent of discoveredAgents) {
+      if (!registry.has(agent.name)) {
+        registerAgent(registry, agent);
+      }
+    }
+
+    // Phase 3: Load and register config-declared agents (can override everything)
     const configAgents = await loadConfigAgents(projectDir);
     for (const agent of configAgents) {
       registerAgent(registry, agent);

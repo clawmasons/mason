@@ -4,6 +4,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import {
   createAgentRegistry,
+  discoverInstalledAgents,
   getAgent,
   getRegisteredAgentNames,
   loadConfigAgents,
@@ -675,6 +676,315 @@ describe("readConfigAliasNames", () => {
     try {
       const names = readConfigAliasNames(tmpDir);
       expect(names).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ── Discovery Tests ───────────────────────────────────────────────────
+
+describe("discoverInstalledAgents", () => {
+  function makeTmpDir(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), "agent-sdk-discover-test-"));
+  }
+
+  /**
+   * Create a fake agent package in .mason/node_modules/@clawmasons/<name>/
+   * with a package.json and a JS entrypoint that exports a mock AgentPackage.
+   */
+  function createFakeAgentPackage(
+    projectDir: string,
+    pkgName: string,
+    opts: {
+      masonType?: string;
+      entrypoint?: string;
+      agentName?: string;
+      aliases?: string[];
+      validExport?: boolean;
+      noPackageJson?: boolean;
+      badJson?: boolean;
+      noEntrypoint?: boolean;
+    } = {},
+  ): void {
+    const pkgDir = path.join(projectDir, ".mason", "node_modules", "@clawmasons", pkgName);
+    fs.mkdirSync(pkgDir, { recursive: true });
+
+    if (opts.noPackageJson) return;
+
+    if (opts.badJson) {
+      fs.writeFileSync(path.join(pkgDir, "package.json"), "not-valid-json{{{");
+      return;
+    }
+
+    const masonField: Record<string, unknown> = {};
+    if (opts.masonType !== undefined) {
+      masonField.type = opts.masonType;
+    }
+    if (opts.entrypoint !== undefined) {
+      masonField.entrypoint = opts.entrypoint;
+    }
+
+    const pkgJson: Record<string, unknown> = {
+      name: `@clawmasons/${pkgName}`,
+      version: "1.0.0",
+    };
+    if (Object.keys(masonField).length > 0 || opts.masonType !== undefined) {
+      pkgJson.mason = masonField;
+    }
+
+    fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify(pkgJson));
+
+    if (opts.noEntrypoint) return;
+
+    // Create the entrypoint JS file
+    const entrypointRel = opts.entrypoint ?? "./dist/index.js";
+    const entrypointAbs = path.resolve(pkgDir, entrypointRel);
+    fs.mkdirSync(path.dirname(entrypointAbs), { recursive: true });
+
+    const agentName = opts.agentName ?? pkgName;
+    const validExport = opts.validExport !== false;
+
+    if (validExport) {
+      const aliasesStr = opts.aliases ? JSON.stringify(opts.aliases) : "undefined";
+      fs.writeFileSync(
+        entrypointAbs,
+        `module.exports.default = {
+  name: ${JSON.stringify(agentName)},
+  aliases: ${aliasesStr},
+  materializer: {
+    name: ${JSON.stringify(agentName)},
+    materializeWorkspace: function() { return new Map(); },
+  },
+};`,
+      );
+    } else {
+      // Export something that is NOT a valid AgentPackage
+      fs.writeFileSync(entrypointAbs, `module.exports.default = { notAnAgent: true };`);
+    }
+  }
+
+  it("discovers packages with mason.type === 'agent'", async () => {
+    const tmpDir = makeTmpDir();
+    try {
+      createFakeAgentPackage(tmpDir, "my-agent", { masonType: "agent" });
+
+      const agents = await discoverInstalledAgents(tmpDir);
+      expect(agents).toHaveLength(1);
+      expect(agents[0]!.name).toBe("my-agent");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("ignores packages without the mason field", async () => {
+    const tmpDir = makeTmpDir();
+    try {
+      // No mason field at all
+      createFakeAgentPackage(tmpDir, "regular-pkg", {});
+
+      const agents = await discoverInstalledAgents(tmpDir);
+      expect(agents).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("ignores packages with mason.type !== 'agent'", async () => {
+    const tmpDir = makeTmpDir();
+    try {
+      createFakeAgentPackage(tmpDir, "tool-pkg", { masonType: "tool" });
+
+      const agents = await discoverInstalledAgents(tmpDir);
+      expect(agents).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips invalid agent packages (bad exports) with a warning", async () => {
+    const tmpDir = makeTmpDir();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      createFakeAgentPackage(tmpDir, "bad-agent", { masonType: "agent", validExport: false });
+
+      const agents = await discoverInstalledAgents(tmpDir);
+      expect(agents).toEqual([]);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("does not export a valid AgentPackage"),
+      );
+    } finally {
+      vi.restoreAllMocks();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("warns when entrypoint cannot be loaded", async () => {
+    const tmpDir = makeTmpDir();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      createFakeAgentPackage(tmpDir, "broken-agent", { masonType: "agent", noEntrypoint: true });
+
+      const agents = await discoverInstalledAgents(tmpDir);
+      expect(agents).toEqual([]);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to load agent"),
+      );
+    } finally {
+      vi.restoreAllMocks();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("uses custom entrypoint from mason.entrypoint", async () => {
+    const tmpDir = makeTmpDir();
+    try {
+      createFakeAgentPackage(tmpDir, "custom-entry-agent", {
+        masonType: "agent",
+        entrypoint: "./lib/main.js",
+        agentName: "custom-entry-agent",
+      });
+
+      const agents = await discoverInstalledAgents(tmpDir);
+      expect(agents).toHaveLength(1);
+      expect(agents[0]!.name).toBe("custom-entry-agent");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns empty array when .mason/node_modules/@clawmasons/ does not exist", async () => {
+    const tmpDir = makeTmpDir();
+    try {
+      const agents = await discoverInstalledAgents(tmpDir);
+      expect(agents).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips directories with bad package.json", async () => {
+    const tmpDir = makeTmpDir();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      createFakeAgentPackage(tmpDir, "bad-json-pkg", { masonType: "agent", badJson: true });
+
+      const agents = await discoverInstalledAgents(tmpDir);
+      expect(agents).toEqual([]);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to parse package.json"),
+      );
+    } finally {
+      vi.restoreAllMocks();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips directories without package.json", async () => {
+    const tmpDir = makeTmpDir();
+    try {
+      createFakeAgentPackage(tmpDir, "no-pkg-json", { masonType: "agent", noPackageJson: true });
+
+      const agents = await discoverInstalledAgents(tmpDir);
+      expect(agents).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("discovers multiple valid agents and skips invalid ones", async () => {
+    const tmpDir = makeTmpDir();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      createFakeAgentPackage(tmpDir, "good-agent-a", { masonType: "agent", agentName: "good-agent-a" });
+      createFakeAgentPackage(tmpDir, "good-agent-b", { masonType: "agent", agentName: "good-agent-b" });
+      createFakeAgentPackage(tmpDir, "not-an-agent", { masonType: "tool" });
+      createFakeAgentPackage(tmpDir, "bad-export", { masonType: "agent", validExport: false });
+
+      const agents = await discoverInstalledAgents(tmpDir);
+      expect(agents).toHaveLength(2);
+      const names = agents.map((a) => a.name).sort();
+      expect(names).toEqual(["good-agent-a", "good-agent-b"]);
+    } finally {
+      vi.restoreAllMocks();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("createAgentRegistry with discovered agents", () => {
+  function makeTmpDir(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), "agent-sdk-registry-discover-test-"));
+  }
+
+  function createFakeAgentPackage(
+    projectDir: string,
+    pkgName: string,
+    agentName: string,
+  ): void {
+    const pkgDir = path.join(projectDir, ".mason", "node_modules", "@clawmasons", pkgName);
+    fs.mkdirSync(pkgDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(pkgDir, "package.json"),
+      JSON.stringify({
+        name: `@clawmasons/${pkgName}`,
+        version: "1.0.0",
+        mason: { type: "agent" },
+      }),
+    );
+
+    const distDir = path.join(pkgDir, "dist");
+    fs.mkdirSync(distDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(distDir, "index.js"),
+      `module.exports.default = {
+  name: ${JSON.stringify(agentName)},
+  materializer: {
+    name: ${JSON.stringify(agentName)},
+    materializeWorkspace: function() { return new Map(); },
+  },
+};`,
+    );
+  }
+
+  it("discovered agents are registered in the registry", async () => {
+    const tmpDir = makeTmpDir();
+    try {
+      createFakeAgentPackage(tmpDir, "discovered-agent", "discovered-agent");
+
+      const registry = await createAgentRegistry([], tmpDir);
+      expect(registry.has("discovered-agent")).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("built-in agents take priority over discovered agents", async () => {
+    const tmpDir = makeTmpDir();
+    try {
+      createFakeAgentPackage(tmpDir, "my-agent", "my-agent");
+
+      const builtin = makeMockAgent("my-agent");
+      const registry = await createAgentRegistry([builtin], tmpDir);
+
+      // The registry entry should be the built-in, not the discovered one
+      expect(registry.get("my-agent")).toBe(builtin);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("discovered agents coexist with built-in agents", async () => {
+    const tmpDir = makeTmpDir();
+    try {
+      createFakeAgentPackage(tmpDir, "ext-agent", "ext-agent");
+
+      const builtin = makeMockAgent("builtin-agent");
+      const registry = await createAgentRegistry([builtin], tmpDir);
+
+      expect(registry.has("builtin-agent")).toBe(true);
+      expect(registry.has("ext-agent")).toBe(true);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
