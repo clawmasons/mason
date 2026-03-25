@@ -41,6 +41,7 @@ export type { LaunchCredentialConfig } from "./helpers.js";
 // Discovery
 export {
   createAgentRegistry,
+  discoverInstalledAgents,
   loadConfigAgents,
   loadConfigAgentEntry,
   readConfigAgentNames,
