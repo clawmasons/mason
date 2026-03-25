@@ -233,4 +233,4 @@ Full protocol lifecycle integration test and codebase cleanup.
 
 **Testable output:** All 8 integration test scenarios pass. `npx tsc --noEmit` clean. `npx eslint src/ tests/` clean. `npx vitest run packages/cli/tests/` passes. No remaining references to old ACP code.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-25-integration-testing-cleanup/proposal.md) | [design](../../changes/archive/2026-03-25-integration-testing-cleanup/design.md) | [tasks](../../changes/archive/2026-03-25-integration-testing-cleanup/tasks.md)

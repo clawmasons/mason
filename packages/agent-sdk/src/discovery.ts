@@ -61,7 +61,7 @@ export interface AgentEntryConfig {
    * @deprecated Move to an `aliases` entry. Will be removed in a future version.
    * Default startup mode (overridable by CLI flags).
    */
-  mode?: "terminal" | "acp" | "bash";
+  mode?: "terminal" | "bash";
   /**
    * @deprecated Move to an `aliases` entry. Will be removed in a future version.
    * Default role name to use when --role is not supplied.
@@ -93,7 +93,7 @@ export interface AliasEntryConfig {
   /** Key in the agents registry */
   agent: string;
   /** Default startup mode (overridable by CLI flags) */
-  mode?: "terminal" | "acp" | "bash";
+  mode?: "terminal" | "bash";
   /** Default role name to use when --role is not supplied */
   role?: string;
   /** Host path to bind-mount over /home/mason/ in the agent container */
@@ -115,7 +115,7 @@ interface MasonConfig {
   defaultAgent?: string;
 }
 
-const VALID_MODES = new Set<string>(["terminal", "acp", "bash"]);
+const VALID_MODES = new Set<string>(["terminal", "bash"]);
 
 /**
  * Parse and validate a raw config entry. Returns null if the entry is invalid (missing package).
@@ -151,10 +151,10 @@ function parseEntryConfig(name: string, raw: unknown): AgentEntryConfig | null {
 
   if (obj.mode !== undefined) {
     if (typeof obj.mode === "string" && VALID_MODES.has(obj.mode)) {
-      entry.mode = obj.mode as "terminal" | "acp" | "bash"; // deprecated
+      entry.mode = obj.mode as "terminal" | "bash"; // deprecated
     } else {
       console.warn(
-        `[agent-sdk] Agent "${name}" has invalid mode "${String(obj.mode)}" (expected terminal, acp, or bash). Defaulting to terminal.`,
+        `[agent-sdk] Agent "${name}" has invalid mode "${String(obj.mode)}" (expected terminal or bash). Defaulting to terminal.`,
       );
       entry.mode = "terminal"; // deprecated
     }
@@ -656,10 +656,10 @@ function parseAliasEntryConfig(
 
   if (obj.mode !== undefined) {
     if (typeof obj.mode === "string" && VALID_MODES.has(obj.mode)) {
-      entry.mode = obj.mode as "terminal" | "acp" | "bash";
+      entry.mode = obj.mode as "terminal" | "bash";
     } else {
       console.warn(
-        `[agent-sdk] Alias "${name}" has invalid mode "${String(obj.mode)}" (expected terminal, acp, or bash). Defaulting to terminal.`,
+        `[agent-sdk] Alias "${name}" has invalid mode "${String(obj.mode)}" (expected terminal or bash). Defaulting to terminal.`,
       );
       entry.mode = "terminal";
     }
