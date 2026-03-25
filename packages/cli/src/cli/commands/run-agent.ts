@@ -837,6 +837,9 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
       ensureMasonConfig(projectDir);
     }
 
+    // Initialize agent registry early so agent type resolution can discover installed agents
+    await initRegistry(projectDir, getCliVersion());
+
     // Alias resolution: check aliases first (alias takes precedence over agent name)
     const aliasEntry = agentInput ? loadConfigAliasEntry(projectDir, agentInput) : undefined;
     if (aliasEntry) {
