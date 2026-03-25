@@ -158,7 +158,7 @@ describe("session/new handler", () => {
     expect(Array.isArray(configOptions)).toBe(true);
 
     const roleConfig = configOptions!.find(
-      (opt) => "id" in opt && opt.id === "role",
+      (opt: Record<string, unknown>) => "id" in opt && opt.id === "role",
     );
     expect(roleConfig).toBeDefined();
     expect(roleConfig).toMatchObject({
@@ -184,7 +184,7 @@ describe("session/new handler", () => {
 
     const configOptions = response.configOptions;
     const agentConfig = configOptions!.find(
-      (opt) => "id" in opt && opt.id === "agent",
+      (opt: Record<string, unknown>) => "id" in opt && opt.id === "agent",
     );
     expect(agentConfig).toBeDefined();
     expect(agentConfig).toMatchObject({

@@ -5,6 +5,10 @@ import {
   type InitializeResponse,
   type NewSessionRequest,
   type NewSessionResponse,
+  type PromptRequest,
+  type PromptResponse,
+  type CancelNotification,
+  type ContentBlock,
   type ClientCapabilities,
   type Implementation,
   type SessionConfigOption,
@@ -14,8 +18,9 @@ import {
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createSession } from "@clawmasons/shared";
+import { createSession, readSession, updateSession } from "@clawmasons/shared";
 import { discoverForCwd } from "./discovery-cache.js";
+import { executePrompt } from "./prompt-executor.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(__dirname, "..", "..", "package.json");
@@ -69,6 +74,22 @@ export function getClientInfo(): Implementation | null | undefined {
 }
 
 // ---------------------------------------------------------------------------
+// Text extraction helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract text content from an ACP `ContentBlock[]` prompt.
+ * Concatenates all `TextContent` blocks, separated by newlines.
+ * Non-text blocks (images, resources, etc.) are silently skipped.
+ */
+export function extractTextFromPrompt(prompt: ContentBlock[]): string {
+  return prompt
+    .filter((block): block is ContentBlock & { type: "text" } => block.type === "text")
+    .map((block) => block.text)
+    .join("\n");
+}
+
+// ---------------------------------------------------------------------------
 // Agent factory
 // ---------------------------------------------------------------------------
 
@@ -76,8 +97,8 @@ export function getClientInfo(): Implementation | null | undefined {
  * Creates the mason ACP agent handler.
  *
  * Implements the `Agent` interface from `@agentclientprotocol/sdk`.
- * The `initialize` and `newSession` handlers are fully implemented;
- * remaining handlers are stubs for future changes.
+ * Handlers for initialize, newSession, prompt, and cancel are fully
+ * implemented. Remaining handlers are stubs for future changes.
  */
 export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
   return {
@@ -187,12 +208,89 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
       return response;
     },
 
-    async prompt() {
-      throw RequestError.methodNotFound("session/prompt");
+    async prompt(params: PromptRequest): Promise<PromptResponse> {
+      const { sessionId, prompt: contentBlocks } = params;
+
+      // 1. Look up session state
+      const session = sessions.get(sessionId);
+      if (!session) {
+        throw RequestError.invalidParams(`Session not found: ${sessionId}`);
+      }
+
+      // 2. Extract text from ContentBlock[]
+      const text = extractTextFromPrompt(contentBlocks);
+
+      // 3. Create AbortController for cancellation support
+      const abortController = new AbortController();
+      session.abortController = abortController;
+
+      try {
+        // 4. Execute prompt via subprocess
+        const result = await executePrompt({
+          agent: session.agent,
+          role: session.role,
+          text,
+          cwd: session.cwd,
+          signal: abortController.signal,
+        });
+
+        if (result.cancelled) {
+          return { stopReason: "cancelled" };
+        }
+
+        // 5. Send agent_message_chunk with the result
+        await conn.sessionUpdate({
+          sessionId,
+          update: {
+            sessionUpdate: "agent_message_chunk" as const,
+            content: { type: "text" as const, text: result.output },
+          },
+        });
+
+        // 6. Update meta.json (firstPrompt on first prompt, lastUpdated always)
+        const now = new Date().toISOString();
+        const updates: Record<string, unknown> = { lastUpdated: now };
+        // Only set firstPrompt on the very first prompt
+        const sessionMeta = await readSession(session.cwd, sessionId);
+        if (sessionMeta && !sessionMeta.firstPrompt) {
+          updates.firstPrompt = text;
+        }
+        await updateSession(session.cwd, sessionId, updates);
+
+        // 7. Send session_info_update
+        const title = (updates.firstPrompt as string) ?? sessionMeta?.firstPrompt ?? text;
+        await conn.sessionUpdate({
+          sessionId,
+          update: {
+            sessionUpdate: "session_info_update" as const,
+            title: title.slice(0, 100),
+            updatedAt: now,
+          },
+        });
+
+        // 8. Return end_turn
+        return { stopReason: "end_turn" };
+      } catch (error) {
+        // If cancelled via abort, return cancelled stop reason
+        if (abortController.signal.aborted) {
+          return { stopReason: "cancelled" };
+        }
+        throw RequestError.internalError(
+          error instanceof Error ? error.message : String(error),
+        );
+      } finally {
+        // 9. Cleanup abort controller
+        session.abortController = undefined;
+      }
     },
 
-    async cancel() {
-      // Notification — no response expected. Stub for now.
+    async cancel(params: CancelNotification): Promise<void> {
+      const { sessionId } = params;
+      const session = sessions.get(sessionId);
+      if (session?.abortController) {
+        session.abortController.abort();
+      }
+      // Notification — no response expected
     },
 
     async authenticate() {
