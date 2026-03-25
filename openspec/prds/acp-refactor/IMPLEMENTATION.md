@@ -202,7 +202,7 @@ Implement the remaining session management handlers: list, load, close, and set_
 
 **Testable output:** Unit tests verify: `listSessions` returns correct `SessionInfo` objects and respects `cwd` filter, `loadSession` restores state, `closeSession` persists `closed: true` and excludes from list, `setConfigOption` for role triggers `available_commands_update`, `setConfigOption` for agent updates state.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-25-session-lifecycle-handlers/proposal.md) | [design](../../changes/archive/2026-03-25-session-lifecycle-handlers/design.md) | [tasks](../../changes/archive/2026-03-25-session-lifecycle-handlers/tasks.md)
 
 ---
 
