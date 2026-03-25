@@ -102,7 +102,7 @@ Register the `mason acp` command and implement the `initialize` handler — the 
 
 **Testable output:** Unit test creates in-memory stream pair, constructs connection, sends `initialize`, verifies response capabilities and agentInfo. Manual test: pipe initialize JSON-RPC to `mason acp`, verify valid response on stdout.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-25-mason-acp-command/proposal.md) | [design](../../changes/archive/2026-03-25-mason-acp-command/design.md) | [tasks](../../changes/archive/2026-03-25-mason-acp-command/tasks.md)
 
 ---
 

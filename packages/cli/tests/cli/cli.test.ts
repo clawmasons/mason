@@ -35,9 +35,9 @@ describe("CLI entry point", () => {
     expect(agentCmd).toBeUndefined();
   });
 
-  it("does not have a separate top-level acp command", () => {
+  it("has a top-level acp command", () => {
     const acpCmd = program.commands.find((cmd) => cmd.name() === "acp");
-    expect(acpCmd).toBeUndefined();
+    expect(acpCmd).toBeDefined();
   });
 
   it("has workspace commands registered at top level", () => {

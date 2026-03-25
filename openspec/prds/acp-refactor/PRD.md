@@ -563,4 +563,4 @@ The following ACP protocol features are **advertised but not implemented** in th
 | Q2 | Should closed sessions be deleted or just filtered from `session/list`? | Engineering | No |
 | Q3 | What is the maximum number of sessions to retain before auto-cleanup? | Engineering | No |
 | Q4 | Should `mcpServers` from `session/new` params be forwarded to `run-agent` invocations? | Engineering | No |
-| Q5 | The SDK types use `mcp` for the capabilities field name — confirm whether the wire format uses `mcp` or `mcpCapabilities` and align accordingly. | Engineering | Yes |
+| Q5 | The SDK types use `mcp` for the capabilities field name — confirm whether the wire format uses `mcp` or `mcpCapabilities` and align accordingly. | Engineering | Yes — **Resolved:** SDK v0.16.x uses `mcpCapabilities` for the field name. Also, session close capability uses `stop` not `close` in `sessionCapabilities`. |
