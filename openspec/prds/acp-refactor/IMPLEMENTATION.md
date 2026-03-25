@@ -66,7 +66,7 @@ Create a general-purpose session persistence layer for managing `{cwd}/.mason/se
 
 **Testable output:** Unit tests using temp directories that verify: create writes correct `meta.json`, read returns matching data, update persists changes, list returns only non-closed sessions, close marks session and list excludes it. UUID v7 IDs are time-ordered.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-25-session-storage-module/proposal.md) | [design](../../changes/archive/2026-03-25-session-storage-module/design.md) | [tasks](../../changes/archive/2026-03-25-session-storage-module/tasks.md)
 
 ---
 
