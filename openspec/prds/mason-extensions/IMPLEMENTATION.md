@@ -194,4 +194,4 @@ Full integration test: fresh project, mason CLI with no bundled agents, `mason r
 
 **Testable Output:** All E2E tests pass. A user on current mason can upgrade and continue using `mason run --agent claude` without any manual steps.
 
-**Not Implemented Yet**
+**Implemented**

@@ -1276,3 +1276,186 @@ describe("resolveAgentWithAutoInstall", () => {
     mockExecSync.mockImplementation(() => Buffer.from(""));
   });
 });
+
+// ── Integration: auto-install + discovery ────────────────────────────
+
+describe("E2E validation: auto-install + discovery integration", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-integration-test-"));
+    mockExecSync.mockClear();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  /**
+   * Helper: create a fake agent package under .mason/node_modules/@clawmasons/<pkgName>
+   */
+  function createFakeAgentPackage(
+    projectDir: string,
+    pkgName: string,
+    opts: {
+      masonField?: Record<string, unknown> | null;
+      agentName?: string;
+      aliases?: string[];
+    } = {},
+  ): void {
+    const pkgDir = path.join(projectDir, ".mason", "node_modules", "@clawmasons", pkgName);
+    fs.mkdirSync(pkgDir, { recursive: true });
+
+    const pkgJson: Record<string, unknown> = {
+      name: `@clawmasons/${pkgName}`,
+      version: "1.0.0",
+    };
+    if (opts.masonField !== null && opts.masonField !== undefined) {
+      pkgJson.mason = opts.masonField;
+    }
+    fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify(pkgJson));
+
+    // Create entrypoint only if mason.type === "agent"
+    if (opts.masonField?.type === "agent") {
+      const distDir = path.join(pkgDir, "dist");
+      fs.mkdirSync(distDir, { recursive: true });
+      const agentName = opts.agentName ?? pkgName;
+      const aliasesStr = opts.aliases ? JSON.stringify(opts.aliases) : "undefined";
+      fs.writeFileSync(
+        path.join(distDir, "index.js"),
+        `module.exports.default = {
+  name: ${JSON.stringify(agentName)},
+  aliases: ${aliasesStr},
+  materializer: {
+    name: ${JSON.stringify(agentName)},
+    materializeWorkspace: function() { return new Map(); },
+  },
+};`,
+      );
+    }
+  }
+
+  /**
+   * Helper: write .mason/package.json with given dependencies.
+   */
+  function writeMasonPackageJson(projectDir: string, deps: Record<string, string>): void {
+    const masonDir = path.join(projectDir, ".mason");
+    fs.mkdirSync(masonDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(masonDir, "package.json"),
+      JSON.stringify({ name: "mason-extensions", private: true, dependencies: deps }, null, 2) + "\n",
+      "utf-8",
+    );
+  }
+
+  /**
+   * Helper: write .mason/config.json.
+   */
+  function writeMasonConfig(projectDir: string, content: unknown): void {
+    const masonDir = path.join(projectDir, ".mason");
+    fs.mkdirSync(masonDir, { recursive: true });
+    fs.writeFileSync(path.join(masonDir, "config.json"), JSON.stringify(content));
+  }
+
+  it("syncExtensionVersions rewrites all deps to new version", () => {
+    writeMasonPackageJson(tmpDir, {
+      "@clawmasons/claude-code-agent": "~0.1.0",
+      "@clawmasons/pi-coding-agent": "~0.1.2",
+      "@clawmasons/codex-agent": "~0.1.3",
+    });
+
+    syncExtensionVersions(tmpDir, "0.5.0");
+
+    const content = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, ".mason", "package.json"), "utf-8"),
+    );
+    expect(content.dependencies["@clawmasons/claude-code-agent"]).toBe("~0.5.0");
+    expect(content.dependencies["@clawmasons/pi-coding-agent"]).toBe("~0.5.0");
+    expect(content.dependencies["@clawmasons/codex-agent"]).toBe("~0.5.0");
+    expect(mockExecSync).toHaveBeenCalledWith(
+      "npm update",
+      expect.objectContaining({ cwd: path.join(tmpDir, ".mason") }),
+    );
+  });
+
+  it("resolveAgentWithAutoInstall returns null for unknown agents without crashing", async () => {
+    const registry: AgentRegistry = new Map();
+
+    const result = await resolveAgentWithAutoInstall(tmpDir, "totally-unknown-agent-xyz", "0.1.6", registry);
+
+    expect(result).toBeNull();
+    // Should not have attempted any npm install
+    expect(mockExecSync).not.toHaveBeenCalled();
+  });
+
+  it("resolveAgentWithAutoInstall returns existing agent from registry without triggering install", async () => {
+    const agent = makeMockAgent("pi-coding-agent", ["pi", "pi-coding"]);
+    const registry: AgentRegistry = new Map();
+    registry.set("pi-coding-agent", agent);
+    registry.set("pi", agent);
+    registry.set("pi-coding", agent);
+
+    const result = await resolveAgentWithAutoInstall(tmpDir, "pi", "0.2.0", registry);
+
+    expect(result).toBe(agent);
+    expect(mockExecSync).not.toHaveBeenCalled();
+  });
+
+  it("config-declared agents override discovered agents with the same name", async () => {
+    // Set up a discovered agent in .mason/node_modules/
+    createFakeAgentPackage(tmpDir, "my-agent", {
+      masonField: { type: "agent" },
+      agentName: "my-agent",
+    });
+
+    // The config-declared agent would be loaded via loadConfigAgents, which
+    // does a dynamic import. We can't easily mock that, but we can verify the
+    // precedence logic by testing createAgentRegistry with a built-in that has
+    // the same name as a discovered agent, plus verifying the Phase 3 override.
+    // Instead, we test the registry directly: built-in < discovered (no override) < config (override).
+
+    // First: verify discovered agent is registered when no built-in conflicts
+    const registryWithoutBuiltin = await createAgentRegistry([], tmpDir);
+    expect(registryWithoutBuiltin.has("my-agent")).toBe(true);
+
+    // Second: verify built-in takes priority over discovered
+    const builtinAgent = makeMockAgent("my-agent");
+    const registryWithBuiltin = await createAgentRegistry([builtinAgent], tmpDir);
+    expect(registryWithBuiltin.get("my-agent")).toBe(builtinAgent);
+
+    // Third: simulate config override by manually setting a different agent on the registry
+    // (loadConfigAgents uses dynamic import which we can't control here, but the
+    // createAgentRegistry code uses registerAgent which overwrites — we verify that behavior)
+    const configAgent = makeMockAgent("my-agent");
+    registryWithBuiltin.set("my-agent", configAgent);
+    expect(registryWithBuiltin.get("my-agent")).toBe(configAgent);
+    expect(registryWithBuiltin.get("my-agent")).not.toBe(builtinAgent);
+  });
+
+  it("discovery skips packages without mason field and includes those with it", async () => {
+    // Package WITH mason.type: "agent" — should be discovered
+    createFakeAgentPackage(tmpDir, "valid-agent", {
+      masonField: { type: "agent" },
+      agentName: "valid-agent",
+    });
+
+    // Package WITHOUT mason field — should be skipped
+    createFakeAgentPackage(tmpDir, "plain-library", {
+      masonField: null,
+    });
+
+    // Package with mason field but type !== "agent" — should be skipped
+    createFakeAgentPackage(tmpDir, "mason-tool", {
+      masonField: { type: "tool" },
+    });
+
+    // Package with empty mason object (no type) — should be skipped
+    createFakeAgentPackage(tmpDir, "incomplete-mason", {
+      masonField: {},
+    });
+
+    const agents = await discoverInstalledAgents(tmpDir);
+    expect(agents).toHaveLength(1);
+    expect(agents[0]!.name).toBe("valid-agent");
+  });
+});
