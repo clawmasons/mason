@@ -1,5 +1,3 @@
-export { claudeCodeMaterializer } from "@clawmasons/claude-code-agent";
-export { piCodingAgentMaterializer } from "@clawmasons/pi-coding-agent";
 export { mcpAgentMaterializer } from "@clawmasons/mcp-agent/agent-package";
 export { PROVIDER_ENV_VARS, ACP_RUNTIME_COMMANDS } from "./common.js";
 export {

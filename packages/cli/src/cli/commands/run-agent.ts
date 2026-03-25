@@ -5,12 +5,13 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { Readable, Writable } from "node:stream";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { checkDockerCompose } from "./docker-utils.js";
 import { quickAutoCleanup } from "./doctor.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedApp, Role, AppConfig, TaskRef, SkillRef } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect } from "@clawmasons/shared";
-import { getAgentFromRegistry, initRegistry, getAllRegisteredNames, BUILTIN_AGENTS, materializeForAgent } from "../../materializer/role-materializer.js";
+import { getAgentFromRegistry, getAgentFromRegistryWithAutoInstall, initRegistry, getAllRegisteredNames, BUILTIN_AGENTS, materializeForAgent } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig, readDefaultAgent } from "@clawmasons/agent-sdk";
 import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
@@ -22,6 +23,20 @@ import { ensureProxyDependencies, synthesizeRolePackages } from "../../materiali
 
 // ── Local type alias (mirrors DevContainerCustomizations from agent-sdk) ──────
 type DevContainerCustomizations = { vscode?: { extensions?: string[]; settings?: Record<string, unknown> } };
+
+// ── CLI Version ───────────────────────────────────────────────────────
+
+/** Read the CLI package version lazily (cached after first call). */
+let _cliVersion: string | undefined;
+function getCliVersion(): string {
+  if (!_cliVersion) {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const pkgPath = path.join(__dirname, "../../../package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8")) as { version: string };
+    _cliVersion = pkg.version;
+  }
+  return _cliVersion;
+}
 
 // ── Role-based Agent Resolution ───────────────────────────────────────
 
@@ -78,6 +93,17 @@ export function generateSessionId(): string {
  */
 export function resolveAgentType(input: string): string | undefined {
   const agentPkg = getAgentFromRegistry(input);
+  return agentPkg?.name;
+}
+
+/**
+ * Resolve agent type with auto-install fallback.
+ *
+ * Tries the synchronous registry first. If not found, attempts to
+ * auto-install the agent package and re-discover it.
+ */
+export async function resolveAgentTypeWithAutoInstall(input: string): Promise<string | undefined> {
+  const agentPkg = await getAgentFromRegistryWithAutoInstall(input);
   return agentPkg?.name;
 }
 
@@ -583,7 +609,7 @@ export interface RunAgentDeps {
   /** Override home path (for testing). */
   homeOverride?: string;
   /** Override registry initialization (for testing). */
-  initRegistryFn?: (projectDir: string) => Promise<void>;
+  initRegistryFn?: (projectDir: string, cliVersion?: string) => Promise<void>;
 }
 
 // ── Backward-compat aliases ───────────────────────────────────────────
@@ -855,10 +881,11 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
       options.bash ||
       (!options.acp && !options.terminal && configEntry?.mode === "bash");
 
-    // Resolve agent type from effective agent name (after alias resolution)
+    // Resolve agent type from effective agent name (after alias resolution).
+    // Uses async resolution with auto-install fallback for agents not in registry.
     let resolvedAgentType: string | undefined;
     if (effectiveAgentInput) {
-      resolvedAgentType = resolveAgentType(effectiveAgentInput);
+      resolvedAgentType = await resolveAgentTypeWithAutoInstall(effectiveAgentInput);
       if (!resolvedAgentType) {
         const known = getKnownAgentTypeNames().join(", ");
         console.error(`\n  Unknown agent "${effectiveAgentInput}".\n  Available agents: ${known}\n`);
@@ -1097,7 +1124,7 @@ export async function runAgent(
 ): Promise<void> {
   // Initialize agent registry with config-declared agents from .mason/config.json
   const initRegistryFn = deps?.initRegistryFn ?? initRegistry;
-  await initRegistryFn(projectDir);
+  await initRegistryFn(projectDir, getCliVersion());
 
   // Pre-flight: check Docker Compose is available before any mode-specific work
   const checkDocker = deps?.checkDockerComposeFn ?? checkDockerCompose;
