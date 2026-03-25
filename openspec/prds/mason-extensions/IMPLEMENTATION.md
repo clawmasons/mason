@@ -131,7 +131,7 @@ Move `mason-roles` roles and skills from mason to `mason-extensions/roles/` and 
 
 **Testable Output:** Roles package successfully from `mason-extensions/` using the mason CLI.
 
-**Not Implemented Yet**
+**Implemented** (in mason-extensions repo)
 
 ---
 
