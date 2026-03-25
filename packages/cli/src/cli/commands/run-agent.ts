@@ -12,7 +12,7 @@ import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedApp, Role, AppConfig, TaskRef, SkillRef } from "@clawmasons/shared";
 import { computeToolFilters, resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect } from "@clawmasons/shared";
 import { getAgentFromRegistry, getAgentFromRegistryWithAutoInstall, initRegistry, getAllRegisteredNames, BUILTIN_AGENTS, materializeForAgent } from "../../materializer/role-materializer.js";
-import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig, readDefaultAgent } from "@clawmasons/agent-sdk";
+import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig, readDefaultAgent, resolveAgentPackageName } from "@clawmasons/agent-sdk";
 import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.js";
 import { AcpSession, type AcpSessionConfig, type AcpSessionDeps } from "../../acp/session.js";
 import { AcpSdkBridge, type AcpSdkBridgeConfig } from "../../acp/bridge.js";
@@ -111,7 +111,10 @@ export async function resolveAgentTypeWithAutoInstall(input: string): Promise<st
  * Check whether a string matches a known agent type (including aliases).
  */
 export function isKnownAgentType(input: string): boolean {
-  return resolveAgentType(input) !== undefined;
+  // Check the synchronous registry first (built-ins + discovered)
+  if (resolveAgentType(input) !== undefined) return true;
+  // Also check if the name can be resolved to an installable package
+  return resolveAgentPackageName(input) !== null;
 }
 
 /**

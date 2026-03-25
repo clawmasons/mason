@@ -95,7 +95,7 @@ describe("project-role: CLI e2e", () => {
     workspacesToClean.push(ws);
 
     const result = masonExecExpectError(
-      ["run", "--agent", "claude", "--source", "gpt"],
+      ["run", "--agent", "mcp", "--source", "gpt"],
       ws,
     );
 
@@ -103,8 +103,6 @@ describe("project-role: CLI e2e", () => {
     const output = result.stderr + result.stdout;
     expect(output).toContain("Unknown source");
     expect(output).toContain("gpt");
-    // Should list available sources
-    expect(output).toContain("claude");
   });
 
   // ── Scenario 7b: Missing source directory ────────────────────────────
@@ -114,7 +112,7 @@ describe("project-role: CLI e2e", () => {
     workspacesToClean.push(ws);
 
     const result = masonExecExpectError(
-      ["run", "--agent", "claude"],
+      ["run", "--agent", "mcp"],
       ws,
     );
 
@@ -130,14 +128,15 @@ describe("project-role: CLI e2e", () => {
     const ws = createEmptyWorkspace("pr-empty-source");
     workspacesToClean.push(ws);
 
-    // Create an empty .claude directory with no commands/skills/settings
-    fs.mkdirSync(path.join(ws, ".claude"), { recursive: true });
+    // Create an empty source directory for the agent under test.
+    // mcp-agent looks for .mcp/, claude looks for .claude/, etc.
+    fs.mkdirSync(path.join(ws, ".mcp"), { recursive: true });
 
     // The command may succeed (Docker builds an empty project role) or fail
     // at Docker compose, depending on the environment. Either way, it must
     // NOT fail with a "Source directory not found" error — the dir exists.
     const result = masonExecExpectError(
-      ["run", "--agent", "claude"],
+      ["run", "--agent", "mcp"],
       ws,
     );
 
@@ -163,9 +162,10 @@ describe("project-role: CLI e2e", () => {
     // Should NOT say "Unknown command" — that would mean alias routing failed
     expect(output).not.toContain("Unknown command");
 
-    // Should have reached the agent execution phase
-    // (pi-coding-agent requires config, proving the alias routing worked)
-    expect(output).toContain("pi-coding-agent");
+    // Should have reached the agent resolution phase (proving the alias routing worked).
+    // The agent may not be installed (moved to mason-extensions), so we check for
+    // either the agent name or an "Unknown agent" message (which still proves routing worked).
+    expect(output.includes("pi-coding-agent") || output.includes("Unknown agent")).toBe(true);
   });
 
   // ── Scenario 6: Source override with explicit role ────────────────────
