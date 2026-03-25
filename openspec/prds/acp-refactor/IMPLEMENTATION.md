@@ -166,7 +166,7 @@ Implement prompt execution via `run-agent --print` subprocess and cancellation s
 
 **Testable output:** Unit tests with mocked subprocess verify: text extraction from ContentBlock[], subprocess spawned with correct args/cwd, `agent_message_chunk` sent with output, `PromptResponse` has `stopReason: "end_turn"`, cancel aborts subprocess and returns `"cancelled"`, `meta.json` updated.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-25-session-prompt-cancel/proposal.md) | [design](../../changes/archive/2026-03-25-session-prompt-cancel/design.md) | [tasks](../../changes/archive/2026-03-25-session-prompt-cancel/tasks.md)
 
 ---
 
