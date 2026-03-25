@@ -134,7 +134,7 @@ Implement session creation with role/agent discovery driven by the provided `cwd
 
 **Testable output:** Unit tests with mocked discovery verify: session created with UUID, `configOptions` contain role and agent selects with correct structure, `available_commands_update` sent with role tasks, `meta.json` written. Verify discovery is called with correct `cwd`.
 
-**Not Implemented Yet**
+**Implemented** — [proposal](../../changes/archive/2026-03-25-session-new-handler/proposal.md) | [design](../../changes/archive/2026-03-25-session-new-handler/design.md) | [tasks](../../changes/archive/2026-03-25-session-new-handler/tasks.md)
 
 ---
 
