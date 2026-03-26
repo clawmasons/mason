@@ -159,3 +159,4 @@ tmp
 packages/mason-roles/roles/**/build
 .codex
 .pi
+.mason

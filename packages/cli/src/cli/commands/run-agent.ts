@@ -1527,18 +1527,23 @@ async function runAgentPrintMode(
     const parseFinalResult = agentPkg?.printMode?.parseJsonStreamFinalResult;
 
     let finalResult: string | null = null;
+    let previousLine: string | undefined;
     const runArgs = ["run", "--rm", "--service-ports", "--build", "-T", agentServiceName];
     fileLogger.log(`[print] Docker command: docker compose -f ${composeFile} ${runArgs.join(" ")}`);
     const { code: agentCode, stderr: composeStderr } = await execComposeRunWithStreamCapture(composeFile, runArgs, (line) => {
       fileLogger.log(`[stream] ${line}`);
-      if (parseFinalResult && finalResult === null) {
+      if (parseFinalResult) {
         const trimmed = line.trimStart();
         if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
           try {
-            finalResult = parseFinalResult(line);
+            const result = parseFinalResult(line, previousLine);
+            if (result !== null) {
+              finalResult = result;
+            }
           } catch (err) {
             fileLogger.error(`[stream] parse error: ${err instanceof Error ? err.message : String(err)}`);
           }
+          previousLine = line;
         }
       }
     });

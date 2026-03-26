@@ -213,7 +213,9 @@ export interface AgentPackage {
     /**
      * Parse a line from the JSON stream. Return the final result text when found, or null to keep reading.
      * Called with try/catch — exceptions are logged and treated as null.
+     * @param line - The current JSON stream line
+     * @param previousLine - The previous JSON-looking line from the stream (if any)
      */
-    parseJsonStreamFinalResult(line: string): string | null;
+    parseJsonStreamFinalResult(line: string, previousLine?: string): string | null;
   };
 }
