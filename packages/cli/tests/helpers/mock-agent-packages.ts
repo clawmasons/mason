@@ -194,6 +194,37 @@ export const mockPiCodingAgent: AgentPackage = {
     command: "pi",
     credentials: [],
   },
+  jsonMode: {
+    jsonStreamArgs: ["--mode", "json"],
+    buildPromptArgs: (prompt: string) => ["-p", prompt],
+    parseJsonStreamAsACP(line: string): AcpSessionUpdate | null {
+      const event = JSON.parse(line);
+      if (event.type === "assistant_message" && Array.isArray(event.content)) {
+        const text = event.content
+          .filter((b: { type: string }) => b.type === "text")
+          .map((b: { text: string }) => b.text)
+          .join("\n");
+        return text ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text } } : null;
+      }
+      if (event.type === "tool_call") {
+        return { sessionUpdate: "tool_call", toolCall: { toolCallId: event.id, title: event.name, kind: "other", status: "in_progress" } };
+      }
+      if (event.type === "tool_result") {
+        return { sessionUpdate: "tool_call_update", toolCall: { toolCallId: event.id, status: "completed", content: [{ type: "content", content: { type: "text", text: JSON.stringify(event.content) } }] } };
+      }
+      if (event.type === "agent_end" && Array.isArray(event.messages)) {
+        const lastAssistant = [...event.messages].reverse().find((m: { role: string }) => m.role === "assistant");
+        if (lastAssistant?.content) {
+          const text = lastAssistant.content
+            .filter((b: { type: string }) => b.type === "text")
+            .map((b: { text: string }) => b.text)
+            .join("\n");
+          return text ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text } } : null;
+        }
+      }
+      return null;
+    },
+  },
   configSchema: mockPiCodingAgentConfigSchema,
   credentialsFn: (config: Record<string, string>): AgentCredentialRequirement[] => {
     const provider = config["llm.provider"];
