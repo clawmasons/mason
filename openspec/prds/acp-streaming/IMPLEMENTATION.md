@@ -24,7 +24,7 @@ Add the shared `AcpSessionUpdate` discriminated union type and the `jsonMode` pr
 
 **Testable output:** `npx tsc --noEmit` passes. Unit tests verify that objects conforming to each `AcpSessionUpdate` variant are accepted, and that `jsonMode.parseJsonStreamAsACP` has the correct signature.
 
-**Not Implemented Yet**
+**Implemented** — PR #238
 
 ---
 
@@ -45,7 +45,7 @@ Add `jsonMode` to the Claude Code agent package with a parser that maps Claude's
 
 **Testable output:** Unit tests pass. Given real Claude stream-json lines as input, `parseJsonStreamAsACP` returns correctly typed `AcpSessionUpdate` objects.
 
-**Not Implemented Yet**
+**Implemented** — PR #239
 
 ---
 
@@ -66,7 +66,7 @@ Add `jsonMode` to the Codex agent package with a parser that maps Codex's `exec 
 
 **Testable output:** Unit tests pass. Codex NDJSON fixture lines produce correct `AcpSessionUpdate` objects including `plan` entries with correct status mapping.
 
-**Not Implemented Yet**
+**Implemented** — PR #240
 
 ---
 
@@ -87,7 +87,7 @@ Add `jsonMode` to the Pi Coding Agent package with a parser that maps Pi's `--mo
 
 **Testable output:** Unit tests pass. Pi JSON fixture lines produce correct `AcpSessionUpdate` objects.
 
-**Not Implemented Yet**
+**Implemented** — PR #241
 
 ---
 
@@ -107,7 +107,7 @@ Extend `generateAgentLaunchJson()` in agent-sdk to support `jsonMode` materializ
 
 **Testable output:** Unit tests pass. Given an agent with `jsonMode`, `generateAgentLaunchJson({ jsonMode: true, initialPrompt: "fix the bug" })` produces a launch JSON with the correct streaming args and prompt args.
 
-**Not Implemented Yet**
+**Implemented** — PR #242
 
 ---
 
@@ -128,7 +128,7 @@ Add the `--json` flag to `mason run` that executes the agent in JSON streaming m
 
 **Testable output:** `mason run --json` streams NDJSON to stdout. Each line parses as a valid `AcpSessionUpdate`. Malformed agent lines are skipped (logged to stderr). Process exits cleanly.
 
-**Not Implemented Yet**
+**Implemented** — PR #243
 
 ---
 
@@ -149,4 +149,4 @@ Update the ACP prompt executor to use `--json` mode and stream each parsed line 
 
 **Testable output:** ACP prompt execution streams updates to the editor. Each `AcpSessionUpdate` line from `mason run --json` becomes a `conn.sessionUpdate()` call. Editor sees real-time agent activity. `end_turn` is sent after process exit.
 
-**Not Implemented Yet**
+**Implemented** — PR #244
