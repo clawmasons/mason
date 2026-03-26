@@ -16,13 +16,13 @@ export interface FileLogger {
 }
 
 /**
- * Create a file-appending logger that writes to `{logDir}/session.log`.
+ * Create a file-appending logger that writes to `{logDir}/{filename}`.
  * Creates the directory if it doesn't exist.
  */
-export function createFileLogger(logDir: string): FileLogger {
+export function createFileLogger(logDir: string, filename = "session.log"): FileLogger {
   fs.mkdirSync(logDir, { recursive: true });
 
-  const logPath = path.join(logDir, "session.log");
+  const logPath = path.join(logDir, filename);
   const stream = fs.createWriteStream(logPath, { flags: "a" });
 
   function write(level: string, args: unknown[]): void {

@@ -36,6 +36,7 @@ import {
 } from "@clawmasons/shared";
 import { discoverForCwd } from "./discovery-cache.js";
 import { executePrompt } from "./prompt-executor.js";
+import { initAcpLogger, acpLog, acpError } from "./acp-logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(__dirname, "..", "..", "package.json");
@@ -170,6 +171,8 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
       storedClientCapabilities = params.clientCapabilities ?? undefined;
       storedClientInfo = params.clientInfo ?? undefined;
 
+      acpLog("initialize", { clientInfo: storedClientInfo, capabilities: storedClientCapabilities });
+
       return {
         protocolVersion: PROTOCOL_VERSION,
         agentCapabilities: {
@@ -202,9 +205,19 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
         throw RequestError.invalidParams("cwd is required for session/new");
       }
 
+      // Initialize file logger now that we have a cwd
+      initAcpLogger(cwd);
+      acpLog("session/new", { cwd });
+
       // Discover roles and agents for this project directory
       const discovery = await discoverForCwd(cwd);
       const { defaultRole, defaultAgent } = discovery;
+      acpLog("session/new discovery", {
+        roles: discovery.roles.map((r) => r.metadata.name),
+        agents: discovery.agentNames,
+        defaultRole: defaultRole.metadata.name,
+        defaultAgent,
+      });
 
       // Persist session to disk
       const session = await createSession(cwd, defaultAgent, defaultRole.metadata.name);
@@ -216,6 +229,7 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
         role: defaultRole.metadata.name,
         agent: defaultAgent,
       });
+      acpLog("session/new created", { sessionId: session.sessionId, role: defaultRole.metadata.name, agent: defaultAgent });
 
       // Build configOptions
       const configOptions = buildConfigOptions(discovery, defaultRole.metadata.name, defaultAgent);
@@ -250,11 +264,13 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
       // 1. Look up session state
       const session = sessions.get(sessionId);
       if (!session) {
+        acpError("prompt: session not found", { sessionId });
         throw RequestError.invalidParams(`Session not found: ${sessionId}`);
       }
 
       // 2. Extract text from ContentBlock[]
       const text = extractTextFromPrompt(contentBlocks);
+      acpLog("prompt", { sessionId, agent: session.agent, role: session.role, textLength: text.length, text: text.slice(0, 200) });
 
       // 3. Create AbortController for cancellation support
       const abortController = new AbortController();
@@ -271,8 +287,10 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
         });
 
         if (result.cancelled) {
+          acpLog("prompt cancelled", { sessionId });
           return { stopReason: "cancelled" };
         }
+        acpLog("prompt completed", { sessionId, outputLength: result.output.length });
 
         // 5. Send agent_message_chunk with the result
         await conn.sessionUpdate({
@@ -309,8 +327,10 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
       } catch (error) {
         // If cancelled via abort, return cancelled stop reason
         if (abortController.signal.aborted) {
+          acpLog("prompt aborted", { sessionId });
           return { stopReason: "cancelled" };
         }
+        acpError("prompt error", { sessionId, error: error instanceof Error ? error.message : String(error) });
         throw RequestError.internalError(
           error instanceof Error ? error.message : String(error),
         );
@@ -322,6 +342,7 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
 
     async cancel(params: CancelNotification): Promise<void> {
       const { sessionId } = params;
+      acpLog("cancel", { sessionId });
       const session = sessions.get(sessionId);
       if (session?.abortController) {
         session.abortController.abort();
@@ -331,6 +352,7 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
 
     async listSessions(params: ListSessionsRequest): Promise<ListSessionsResponse> {
       const { cwd } = params;
+      acpLog("listSessions", { cwd });
 
       if (!cwd) {
         // Without a cwd we don't know which .mason/sessions/ to scan
@@ -350,9 +372,14 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
 
     async loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse> {
       const { sessionId, cwd } = params;
+      acpLog("loadSession", { sessionId, cwd });
+
+      // Ensure logger is initialized if this is the first handler with a cwd
+      initAcpLogger(cwd);
 
       const meta = await readSession(cwd, sessionId);
       if (!meta) {
+        acpError("loadSession: session not found", { sessionId, cwd });
         throw RequestError.invalidParams(`Session not found: ${sessionId}`);
       }
 
@@ -375,10 +402,12 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
 
     async unstable_closeSession(params: CloseSessionRequest): Promise<CloseSessionResponse> {
       const { sessionId } = params;
+      acpLog("closeSession", { sessionId });
 
       // Look up in-memory state to get cwd
       const session = sessions.get(sessionId);
       if (!session) {
+        acpError("closeSession: session not found", { sessionId });
         throw RequestError.invalidParams(`Session not found: ${sessionId}`);
       }
 
@@ -393,9 +422,11 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
 
     async setSessionConfigOption(params: SetSessionConfigOptionRequest): Promise<SetSessionConfigOptionResponse> {
       const { sessionId, configId, value } = params;
+      acpLog("setSessionConfigOption", { sessionId, configId, value });
 
       const session = sessions.get(sessionId);
       if (!session) {
+        acpError("setSessionConfigOption: session not found", { sessionId });
         throw RequestError.invalidParams(`Session not found: ${sessionId}`);
       }
 

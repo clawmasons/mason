@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execSync } from "node:child_process";
+import { createRequire } from "node:module";
 import type { AgentPackage } from "./types.js";
 
 /**
@@ -499,7 +500,18 @@ export async function loadConfigAgents(projectDir: string): Promise<AgentPackage
     if (!entry) continue;
 
     try {
-      const mod = await import(entry.package) as { default?: unknown };
+      // Resolve from projectDir/.mason/node_modules/ so the import
+      // respects the project's installed/symlinked packages
+      const masonRequire = createRequire(
+        path.join(projectDir, ".mason", "node_modules", "_resolver.cjs"),
+      );
+      let resolvedPath: string;
+      try {
+        resolvedPath = masonRequire.resolve(entry.package);
+      } catch {
+        resolvedPath = entry.package;
+      }
+      const mod = await import(resolvedPath) as { default?: unknown };
       const agentPkg = mod.default;
 
       if (!isValidAgentPackage(agentPkg)) {
