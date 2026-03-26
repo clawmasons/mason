@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execSync } from "node:child_process";
+import { createRequire } from "node:module";
 import type { AgentPackage } from "./types.js";
 
 /**
@@ -61,7 +62,7 @@ export interface AgentEntryConfig {
    * @deprecated Move to an `aliases` entry. Will be removed in a future version.
    * Default startup mode (overridable by CLI flags).
    */
-  mode?: "terminal" | "acp" | "bash";
+  mode?: "terminal" | "bash";
   /**
    * @deprecated Move to an `aliases` entry. Will be removed in a future version.
    * Default role name to use when --role is not supplied.
@@ -93,7 +94,7 @@ export interface AliasEntryConfig {
   /** Key in the agents registry */
   agent: string;
   /** Default startup mode (overridable by CLI flags) */
-  mode?: "terminal" | "acp" | "bash";
+  mode?: "terminal" | "bash";
   /** Default role name to use when --role is not supplied */
   role?: string;
   /** Host path to bind-mount over /home/mason/ in the agent container */
@@ -115,7 +116,7 @@ interface MasonConfig {
   defaultAgent?: string;
 }
 
-const VALID_MODES = new Set<string>(["terminal", "acp", "bash"]);
+const VALID_MODES = new Set<string>(["terminal", "bash"]);
 
 /**
  * Parse and validate a raw config entry. Returns null if the entry is invalid (missing package).
@@ -151,10 +152,10 @@ function parseEntryConfig(name: string, raw: unknown): AgentEntryConfig | null {
 
   if (obj.mode !== undefined) {
     if (typeof obj.mode === "string" && VALID_MODES.has(obj.mode)) {
-      entry.mode = obj.mode as "terminal" | "acp" | "bash"; // deprecated
+      entry.mode = obj.mode as "terminal" | "bash"; // deprecated
     } else {
       console.warn(
-        `[agent-sdk] Agent "${name}" has invalid mode "${String(obj.mode)}" (expected terminal, acp, or bash). Defaulting to terminal.`,
+        `[agent-sdk] Agent "${name}" has invalid mode "${String(obj.mode)}" (expected terminal or bash). Defaulting to terminal.`,
       );
       entry.mode = "terminal"; // deprecated
     }
@@ -499,7 +500,18 @@ export async function loadConfigAgents(projectDir: string): Promise<AgentPackage
     if (!entry) continue;
 
     try {
-      const mod = await import(entry.package) as { default?: unknown };
+      // Resolve from projectDir/.mason/node_modules/ so the import
+      // respects the project's installed/symlinked packages
+      const masonRequire = createRequire(
+        path.join(projectDir, ".mason", "node_modules", "_resolver.cjs"),
+      );
+      let resolvedPath: string;
+      try {
+        resolvedPath = masonRequire.resolve(entry.package);
+      } catch {
+        resolvedPath = entry.package;
+      }
+      const mod = await import(resolvedPath) as { default?: unknown };
       const agentPkg = mod.default;
 
       if (!isValidAgentPackage(agentPkg)) {
@@ -656,10 +668,10 @@ function parseAliasEntryConfig(
 
   if (obj.mode !== undefined) {
     if (typeof obj.mode === "string" && VALID_MODES.has(obj.mode)) {
-      entry.mode = obj.mode as "terminal" | "acp" | "bash";
+      entry.mode = obj.mode as "terminal" | "bash";
     } else {
       console.warn(
-        `[agent-sdk] Alias "${name}" has invalid mode "${String(obj.mode)}" (expected terminal, acp, or bash). Defaulting to terminal.`,
+        `[agent-sdk] Alias "${name}" has invalid mode "${String(obj.mode)}" (expected terminal or bash). Defaulting to terminal.`,
       );
       entry.mode = "terminal";
     }

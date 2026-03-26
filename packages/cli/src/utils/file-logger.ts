@@ -2,27 +2,27 @@
  * File-based session logger.
  *
  * Writes timestamped log lines to `{logDir}/session.log`.
- * Used by ACP mode and print mode so that diagnostic
+ * Used by print mode (and future modes) so that diagnostic
  * output never pollutes stdout.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-export interface AcpLogger {
+export interface FileLogger {
   log(...args: unknown[]): void;
   error(...args: unknown[]): void;
   close(): void;
 }
 
 /**
- * Create a file-appending logger that writes to `{logDir}/session.log`.
+ * Create a file-appending logger that writes to `{logDir}/{filename}`.
  * Creates the directory if it doesn't exist.
  */
-export function createFileLogger(logDir: string): AcpLogger {
+export function createFileLogger(logDir: string, filename = "session.log"): FileLogger {
   fs.mkdirSync(logDir, { recursive: true });
 
-  const logPath = path.join(logDir, "session.log");
+  const logPath = path.join(logDir, filename);
   const stream = fs.createWriteStream(logPath, { flags: "a" });
 
   function write(level: string, args: unknown[]): void {

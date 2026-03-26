@@ -7,6 +7,7 @@ import { registerProxyCommand } from "./proxy.js";
 import { registerRunCommand, registerConfigureCommand, isKnownAgentType, getKnownAgentTypeNames } from "./run-agent.js";
 import { registerValidateCommand } from "./validate.js";
 import { registerDoctorCommand } from "./doctor.js";
+import { registerAcpCommand } from "../../acp/acp-command.js";
 import { readConfigAgentNames, readConfigAliasNames } from "@clawmasons/agent-sdk";
 
 /**
@@ -29,6 +30,7 @@ export function registerCommands(program: Command): void {
   registerBuildCommand(program);
   registerProxyCommand(program);
   registerDoctorCommand(program);
+  registerAcpCommand(program);
 
   // Read config-declared agent and alias names synchronously so shorthand
   // detection can recognise them before program.parse() fires.

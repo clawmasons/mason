@@ -35,9 +35,9 @@ describe("CLI entry point", () => {
     expect(agentCmd).toBeUndefined();
   });
 
-  it("does not have a separate top-level acp command (consolidated into run --acp)", () => {
+  it("has a top-level acp command", () => {
     const acpCmd = program.commands.find((cmd) => cmd.name() === "acp");
-    expect(acpCmd).toBeUndefined();
+    expect(acpCmd).toBeDefined();
   });
 
   it("has workspace commands registered at top level", () => {
@@ -80,12 +80,12 @@ describe("CLI entry point", () => {
     }
   });
 
-  it("run command has --acp option", () => {
+  it("run command does not have --acp option (removed)", () => {
     const runCmd = program.commands.find((cmd) => cmd.name() === "run");
     expect(runCmd).toBeDefined();
     if (runCmd) {
       const acpOption = runCmd.options.find((opt) => opt.long === "--acp");
-      expect(acpOption).toBeDefined();
+      expect(acpOption).toBeUndefined();
     }
   });
 

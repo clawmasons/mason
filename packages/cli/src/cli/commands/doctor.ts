@@ -201,8 +201,13 @@ function findOrphanedSessions(
   for (const sessionId of entries) {
     const sessionDir = path.join(sessionsDir, sessionId);
     const composePath = path.join(sessionDir, "docker-compose.yaml");
-    if (!exists(composePath)) {
+    const metaPath = path.join(sessionDir, "meta.json");
+    if (!exists(composePath) && !exists(metaPath)) {
       orphaned.push(sessionId);
+      continue;
+    }
+    // Sessions with meta.json but no compose file are ACP-managed — skip them
+    if (!exists(composePath)) {
       continue;
     }
 
