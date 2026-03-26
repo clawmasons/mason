@@ -242,4 +242,64 @@ export const mockCodexAgent: AgentPackage = {
     apps: "mcp_servers",
     skills: "skills",
   },
+  jsonMode: {
+    jsonStreamArgs: ["exec", "--dangerously-bypass-approvals-and-sandbox", "--skip-git-repo-check", "--json"],
+    buildPromptArgs: (prompt: string) => [prompt],
+    parseJsonStreamAsACP(line: string): AcpSessionUpdate | null {
+      const event = JSON.parse(line);
+
+      // item.completed + agent_message → agent_message_chunk
+      if (event.type === "item.completed" && event.item?.type === "agent_message") {
+        return { sessionUpdate: "agent_message_chunk", content: { type: "text", text: event.item.text } };
+      }
+
+      // item.completed + reasoning → agent_thought_chunk
+      if (event.type === "item.completed" && event.item?.type === "reasoning") {
+        return { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: event.item.text } };
+      }
+
+      // item.started + command_execution → tool_call (in_progress)
+      if (event.type === "item.started" && event.item?.type === "command_execution") {
+        return { sessionUpdate: "tool_call", toolCall: { toolCallId: event.item.id, title: event.item.command, kind: "command_execution", status: "in_progress" } };
+      }
+
+      // item.completed + command_execution → tool_call_update (completed)
+      if (event.type === "item.completed" && event.item?.type === "command_execution") {
+        return { sessionUpdate: "tool_call_update", toolCall: { toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text: event.item.aggregated_output ?? "" } }] } };
+      }
+
+      // item.completed + file_change → tool_call_update
+      if (event.type === "item.completed" && event.item?.type === "file_change") {
+        const changes = event.item.changes?.map((c: { path: string; kind: string }) => `${c.kind}: ${c.path}`).join(", ") ?? "";
+        return { sessionUpdate: "tool_call_update", toolCall: { toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text: changes } }] } };
+      }
+
+      // item.started + mcp_tool_call → tool_call (in_progress)
+      if (event.type === "item.started" && event.item?.type === "mcp_tool_call") {
+        return { sessionUpdate: "tool_call", toolCall: { toolCallId: event.item.id, title: `${event.item.server}:${event.item.tool}`, kind: "other", status: "in_progress" } };
+      }
+
+      // item.completed + mcp_tool_call → tool_call_update (completed)
+      if (event.type === "item.completed" && event.item?.type === "mcp_tool_call") {
+        const text = event.item.result?.content ? JSON.stringify(event.item.result.content) : "";
+        return { sessionUpdate: "tool_call_update", toolCall: { toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text } }] } };
+      }
+
+      // todo_list → plan (both item.started and item.updated)
+      if ((event.type === "item.started" || event.type === "item.updated") && event.item?.type === "todo_list") {
+        const entries = event.item.items.map((i: { text: string; completed: boolean }, idx: number) => {
+          let status: "pending" | "in_progress" | "completed" = "pending";
+          if (i.completed) {
+            status = "completed";
+          } else if (idx === event.item.items.findIndex((x: { completed: boolean }) => !x.completed)) {
+            status = "in_progress";
+          }
+          return { content: i.text, priority: "medium" as const, status };
+        });
+        return { sessionUpdate: "plan", entries };
+      }
+
+      return null;
+    },
+  },
 };
