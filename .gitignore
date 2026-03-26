@@ -157,7 +157,5 @@ tmp
 .mason/sessions
 
 packages/mason-roles/roles/**/build
-.mason
 .codex
 .pi
-.claude
