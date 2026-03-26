@@ -90,14 +90,15 @@ Each line emitted by `--json` mode is a JSON object conforming to ACP session up
 ```
 
 #### `tool_call` — Agent invokes a tool
+Per ACP protocol, tool calls use a `toolCall` object with `toolCallId`, `title`, `kind`, and `status`:
 ```json
-{"sessionUpdate": "tool_call", "id": "call_123", "name": "read_file", "input": {"path": "src/index.ts"}}
+{"sessionUpdate": "tool_call", "toolCall": {"toolCallId": "toolu_abc123", "title": "Read src/index.ts", "kind": "other", "status": "in_progress"}}
 ```
 
-#### `tool_result` — Result of a tool invocation
+#### `tool_call_update` — Tool call status change or result
+Used to report tool completion with content:
 ```json
-{"sessionUpdate": "tool_result", "id": "call_123", "content": [{"type": "text", "text": "file contents..."}]}
-```
+{"sessionUpdate": "tool_call_update", "toolCall": {"toolCallId": "toolu_abc123", "status": "completed", "content": [{"type": "content", "content": {"type": "text", "text": "file contents..."}}]}}
 
 #### `agent_thought_chunk` — Agent reasoning/thinking block
 ```json
@@ -105,13 +106,15 @@ Each line emitted by `--json` mode is a JSON object conforming to ACP session up
 ```
 
 #### `plan` — Execution plan with prioritized entries
+Per ACP protocol, plan entries have `content` (string), `priority` (high/medium/low), and `status` (pending/in_progress/completed). Each update replaces the entire plan:
 ```json
-{"sessionUpdate": "plan", "entries": [{"id": "1", "title": "Read config files", "priority": 1, "status": "completed"}, {"id": "2", "title": "Update schema types", "priority": 2, "status": "in_progress"}, {"id": "3", "title": "Add unit tests", "priority": 3, "status": "pending"}]}
+{"sessionUpdate": "plan", "entries": [{"content": "Read config files", "priority": "high", "status": "completed"}, {"content": "Update schema types", "priority": "high", "status": "in_progress"}, {"content": "Add unit tests", "priority": "medium", "status": "pending"}]}
 ```
 
 #### `current_mode_update` — Agent mode change
+Per ACP protocol, uses `modeId` referencing a mode from the session's `availableModes`:
 ```json
-{"sessionUpdate": "current_mode_update", "mode": "planning", "message": "Switching to planning mode to design the approach"}
+{"sessionUpdate": "current_mode_update", "modeId": "planning"}
 ```
 
 When consumed by the ACP prompt executor, each update is wrapped in the full ACP JSON-RPC envelope for `session/update`:
@@ -177,12 +180,7 @@ jsonMode?: {
 When `--json` is active, `run-agent` follows the same Docker lifecycle as print mode (compose build, proxy start, host proxy, compose run) but instead of collecting a final result, it writes each parsed ACP session update as a JSON line to stdout immediately.
 
 **REQ-5: Claude Code Agent `jsonMode`**
-Claude's JSON stream uses `--output-format stream-json --verbose`. The parser maps:
-- `type: "assistant"` events with text content → `agent_message_chunk`
-- `type: "tool_use"` events → `tool_call`
-- `type: "tool_result"` events → `tool_result`
-- `type: "thinking"` events → `agent_thought_chunk`
-- `type: "result"` → final `agent_message_chunk` (captures the summary)
+Claude's JSON stream uses `--output-format stream-json --verbose`. The parser maps `assistant` messages (text blocks → `agent_message_chunk`, tool_use blocks → `tool_call`, tool_result → `tool_call_update`) and `result` → final `agent_message_chunk`. Claude does not emit plan, mode, or thinking events in this format. See section 7.1 for full mapping table.
 
 ```typescript
 jsonMode: {
@@ -190,36 +188,52 @@ jsonMode: {
   buildPromptArgs: (prompt) => ["-p", prompt],
   parseJsonStreamAsACP(line: string): AcpSessionUpdate | null {
     const event = JSON.parse(line);
-    // Map claude stream-json events to ACP session updates
-    // (implementation details per claude's stream-json schema)
+    if (event.type === "assistant" && event.message?.content) {
+      for (const block of event.message.content) {
+        if (block.type === "text") return { sessionUpdate: "agent_message_chunk", content: { type: "text", text: block.text } };
+        if (block.type === "tool_use") return { sessionUpdate: "tool_call", toolCall: { toolCallId: block.id, title: block.name, kind: "other", status: "in_progress" } };
+      }
+    }
+    if (event.type === "result" && event.result) {
+      return { sessionUpdate: "agent_message_chunk", content: { type: "text", text: event.result } };
+    }
+    return null;
   },
 }
 ```
 
 **REQ-6: Codex Agent `jsonMode`**
-Codex streams NDJSON via `exec --json`. The parser maps:
-- `type: "item.completed"` with `item.type: "agent_message"` → `agent_message_chunk`
-- `type: "item.completed"` with `item.type: "tool_call"` → `tool_call`
-- `type: "item.completed"` with `item.type: "tool_result"` → `tool_result`
-- `type: "turn.completed"` → signals end of stream (no ACP update needed)
+Codex streams NDJSON via `exec --json`. The parser maps `item.started`/`item.completed` events for item types: `agent_message` → `agent_message_chunk`, `reasoning` → `agent_thought_chunk`, `command_execution`/`mcp_tool_call` → `tool_call`/`tool_call_update`, `file_change` → `tool_call_update`, `todo_list` → `plan`. See section 7.2 for full mapping table.
 
 ```typescript
 jsonMode: {
   jsonStreamArgs: ["exec", "--dangerously-bypass-approvals-and-sandbox", "--skip-git-repo-check", "--json"],
   buildPromptArgs: (prompt) => [prompt],
-  parseJsonStreamAsACP(line: string, previousLine?: string): AcpSessionUpdate | null {
+  parseJsonStreamAsACP(line: string): AcpSessionUpdate | null {
     const event = JSON.parse(line);
-    // Map codex NDJSON events to ACP session updates
+    if (event.type === "item.completed" && event.item?.type === "agent_message") {
+      return { sessionUpdate: "agent_message_chunk", content: { type: "text", text: event.item.text } };
+    }
+    if (event.type === "item.completed" && event.item?.type === "reasoning") {
+      return { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: event.item.text } };
+    }
+    if (event.type === "item.started" && event.item?.type === "command_execution") {
+      return { sessionUpdate: "tool_call", toolCall: { toolCallId: event.item.id, title: event.item.command, kind: "command_execution", status: "in_progress" } };
+    }
+    if (event.type === "item.completed" && event.item?.type === "command_execution") {
+      return { sessionUpdate: "tool_call_update", toolCall: { toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text: event.item.aggregated_output ?? "" } }] } };
+    }
+    if ((event.type === "item.started" || event.type === "item.updated") && event.item?.type === "todo_list") {
+      return { sessionUpdate: "plan", entries: event.item.items.map((i: { text: string; completed: boolean }) => ({ content: i.text, priority: "medium" as const, status: i.completed ? "completed" as const : "pending" as const })) };
+    }
+    // Additional mappings for mcp_tool_call, file_change — see section 7.2
+    return null;
   },
 }
 ```
 
 **REQ-7: Pi Coding Agent `jsonMode`**
-Pi streams JSON via `--mode json`. The parser maps:
-- `type: "assistant_message"` events → `agent_message_chunk`
-- `type: "tool_call"` events → `tool_call`
-- `type: "tool_result"` events → `tool_result`
-- `type: "agent_end"` → final summary as `agent_message_chunk`
+Pi streams JSON via `--mode json`. The parser maps `assistant_message` → `agent_message_chunk`, `tool_call` → `tool_call`, `tool_result` → `tool_call_update`, `agent_end` → final `agent_message_chunk`. Pi does not emit plan, mode, or thinking events. See section 7.3 for full mapping table.
 
 ```typescript
 jsonMode: {
@@ -227,7 +241,24 @@ jsonMode: {
   buildPromptArgs: (prompt) => ["-p", prompt],
   parseJsonStreamAsACP(line: string): AcpSessionUpdate | null {
     const event = JSON.parse(line);
-    // Map pi JSON events to ACP session updates
+    if (event.type === "assistant_message" && Array.isArray(event.content)) {
+      const text = event.content.filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("\n");
+      return text ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text } } : null;
+    }
+    if (event.type === "tool_call") {
+      return { sessionUpdate: "tool_call", toolCall: { toolCallId: event.id, title: event.name, kind: "other", status: "in_progress" } };
+    }
+    if (event.type === "tool_result") {
+      return { sessionUpdate: "tool_call_update", toolCall: { toolCallId: event.id, status: "completed", content: [{ type: "content", content: { type: "text", text: JSON.stringify(event.content) } }] } };
+    }
+    if (event.type === "agent_end" && Array.isArray(event.messages)) {
+      const lastAssistant = [...event.messages].reverse().find((m: { role: string }) => m.role === "assistant");
+      if (lastAssistant?.content) {
+        const text = lastAssistant.content.filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("\n");
+        return text ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text } } : null;
+      }
+    }
+    return null;
   },
 }
 ```
@@ -243,13 +274,21 @@ The ACP prompt executor (`prompt-executor.ts`) is updated to:
 A shared TypeScript type `AcpSessionUpdate` is defined (in `agent-sdk`) representing the union of supported session update objects. This type is used by `parseJsonStreamAsACP` return values and by the ACP consumer.
 
 ```typescript
+interface ToolCallInfo {
+  toolCallId: string;
+  title?: string;
+  kind?: string;       // "other" | "command_execution" | "file_change" | etc.
+  status: "in_progress" | "completed";
+  content?: Array<{ type: "content"; content: { type: "text"; text: string } }>;
+}
+
 type AcpSessionUpdate =
   | { sessionUpdate: "agent_message_chunk"; content: { type: "text"; text: string } }
-  | { sessionUpdate: "tool_call"; id: string; name: string; input: Record<string, unknown> }
-  | { sessionUpdate: "tool_result"; id: string; content: Array<{ type: "text"; text: string }> }
+  | { sessionUpdate: "tool_call"; toolCall: ToolCallInfo }
+  | { sessionUpdate: "tool_call_update"; toolCall: ToolCallInfo }
   | { sessionUpdate: "agent_thought_chunk"; content: { type: "text"; text: string } }
-  | { sessionUpdate: "plan"; entries: Array<{ id: string; title: string; priority: number; status: "pending" | "in_progress" | "completed" }> }
-  | { sessionUpdate: "current_mode_update"; mode: string; message?: string };
+  | { sessionUpdate: "plan"; entries: Array<{ content: string; priority: "high" | "medium" | "low"; status: "pending" | "in_progress" | "completed" }> }
+  | { sessionUpdate: "current_mode_update"; modeId: string };
 ```
 
 ### P1 — Should-Have
@@ -275,49 +314,59 @@ Agents may optionally emit progress events for long-running operations:
 
 ## 7. Agent JSON Stream Formats
 
-This section documents the proprietary JSON format each agent produces and how it maps to ACP session updates. This serves as a reference for implementing `parseJsonStreamAsACP` per agent.
+This section documents the proprietary JSON format each agent produces and the concrete mapping to ACP session updates. Each subsection shows actual agent output and the corresponding ACP update.
 
 ### 7.1 Claude Code (`--output-format stream-json --verbose`)
 
-Claude emits newline-delimited JSON objects. Key event types:
+Claude emits newline-delimited JSON with top-level types: `system`, `assistant`, `stream_event`, and `result`. When `--include-partial-messages` is added, `stream_event` lines carry raw Claude API streaming events (content_block_start, content_block_delta, etc.). Without it, only complete `assistant` and `result` messages are emitted.
 
-| Claude Event | ACP Session Update |
-|---|---|
-| `{"type": "assistant", "message": {"content": [{"type": "text", "text": "..."}]}}` | `agent_message_chunk` |
-| `{"type": "tool_use", "tool": {"name": "...", "id": "...", "input": {...}}}` | `tool_call` |
-| `{"type": "tool_result", "tool": {"id": "...", "output": "..."}}` | `tool_result` |
-| `{"type": "thinking", "thinking": {"text": "..."}}` | `agent_thought_chunk` |
-| `{"type": "result", "result": "..."}` | `agent_message_chunk` (final) |
-| Events containing plan/todo list data | `plan` |
-| Events indicating mode changes (e.g., plan mode, code mode) | `current_mode_update` |
+For this PRD we use **complete message mode** (no `--include-partial-messages`):
 
-> **Note:** The exact field paths in Claude's stream-json format should be verified against the latest Claude Code CLI documentation during implementation. Not all agents emit plan or mode events — parsers should map them when the agent's native format includes equivalent data.
+| Claude Event | ACP Session Update | Notes |
+|---|---|---|
+| `{"type": "assistant", "message": {"content": [{"type": "text", "text": "..."}]}}` | `agent_message_chunk` | Extract each `text` block from `message.content[]` |
+| `{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "toolu_...", "name": "Read", "input": {"file_path": "..."}}]}}` | `tool_call` | Extract `tool_use` blocks; map `id` → `toolCallId`, `name` → `title`, set `status: "in_progress"` |
+| `{"type": "assistant", "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_...", "content": "..."}]}}` | `tool_call_update` | Map to `status: "completed"` with content |
+| `{"type": "result", "result": "..."}` | `agent_message_chunk` | Final summary text |
+
+**Plan & mode:** Claude Code does not emit discrete plan or mode-change events in its stream-json format. These ACP update types are **not emitted** by the Claude parser.
+
+**Thinking:** Claude Code's `--output-format stream-json` does not emit thinking blocks (thinking requires `--include-partial-messages` with `thinking_delta` events). If a future Claude update adds thinking to complete messages, the parser should map them to `agent_thought_chunk`.
 
 ### 7.2 Codex (`exec --json`)
 
-Codex emits NDJSON with an event-driven model:
+Codex emits NDJSON with lifecycle events (`thread.started`, `turn.started`, `turn.completed`, `turn.failed`) and item events (`item.started`, `item.updated`, `item.completed`). Item types include: `agent_message`, `reasoning`, `command_execution`, `file_change`, `mcp_tool_call`, `web_search`, `todo_list`, and `error`.
 
-| Codex Event | ACP Session Update |
-|---|---|
-| `{"type": "item.completed", "item": {"type": "agent_message", "text": "..."}}` | `agent_message_chunk` |
-| `{"type": "item.completed", "item": {"type": "tool_call", "name": "...", "id": "...", "arguments": "..."}}` | `tool_call` |
-| `{"type": "item.completed", "item": {"type": "tool_result", "id": "...", "output": "..."}}` | `tool_result` |
-| `{"type": "turn.completed"}` | *(end of stream — no ACP update)* |
+| Codex Event | ACP Session Update | Notes |
+|---|---|---|
+| `{"type": "item.completed", "item": {"id": "item_3", "type": "agent_message", "text": "Done. I updated the docs."}}` | `agent_message_chunk` | Map `item.text` → `content.text` |
+| `{"type": "item.completed", "item": {"id": "item_0", "type": "reasoning", "text": "**Scanning docs...**"}}` | `agent_thought_chunk` | Map `item.text` → `content.text` |
+| `{"type": "item.started", "item": {"id": "item_1", "type": "command_execution", "command": "bash -lc ls", "status": "in_progress"}}` | `tool_call` | Map `item.id` → `toolCallId`, `item.command` → `title`, `kind: "command_execution"`, `status: "in_progress"` |
+| `{"type": "item.completed", "item": {"id": "item_1", "type": "command_execution", "command": "bash -lc ls", "aggregated_output": "docs\nsrc\n", "exit_code": 0, "status": "completed"}}` | `tool_call_update` | Map `aggregated_output` → content, `status: "completed"` |
+| `{"type": "item.completed", "item": {"id": "item_4", "type": "file_change", "changes": [{"path": "docs/foo.md", "kind": "add"}], "status": "completed"}}` | `tool_call_update` | Map `changes` array to content text summary, `kind: "file_change"` |
+| `{"type": "item.started", "item": {"id": "item_5", "type": "mcp_tool_call", "server": "docs", "tool": "search", "arguments": {"q": "exec"}, "status": "in_progress"}}` | `tool_call` | Map `server/tool` → `title` (e.g. "docs:search"), `kind: "other"` |
+| `{"type": "item.completed", "item": {"id": "item_5", "type": "mcp_tool_call", "result": {"content": [...]}, "status": "completed"}}` | `tool_call_update` | Map `result.content` → content |
+| `{"type": "item.started", "item": {"id": "item_8", "type": "todo_list", "items": [{"text": "Scan docs", "completed": false}]}}` | `plan` | Map `items[]` → `entries[]`: `text` → `content`, `completed: false` → `status: "pending"`, all `priority: "medium"` |
+| `{"type": "item.updated", "item": {"id": "item_8", "type": "todo_list", "items": [{"text": "Scan docs", "completed": true}, {"text": "Write code", "completed": false}]}}` | `plan` | Re-emit full plan. Map `completed: true` → `status: "completed"`, `completed: false` → `status: "in_progress"` for the first incomplete item, `"pending"` for the rest |
+| `{"type": "turn.completed", "usage": {...}}` | *(skip)* | End of stream signal |
+| `{"type": "turn.failed", "error": {"message": "..."}}` | *(skip — handled by REQ-11)* | |
 
-> **Note:** Codex's exact NDJSON schema should be verified against `codex exec --json` output during implementation.
+**Mode:** Codex does not emit mode-change events. `current_mode_update` is **not emitted** by the Codex parser.
 
 ### 7.3 Pi Coding Agent (`--mode json`)
 
-Pi emits JSON events for each step of its agent loop:
+Pi emits JSON events for each step of its agent loop. The exact event schema is defined in the pi-coding-agent source.
 
-| Pi Event | ACP Session Update |
-|---|---|
-| `{"type": "assistant_message", "content": [{"type": "text", "text": "..."}]}` | `agent_message_chunk` |
-| `{"type": "tool_call", "name": "...", "id": "...", "input": {...}}` | `tool_call` |
-| `{"type": "tool_result", "id": "...", "content": [...]}` | `tool_result` |
-| `{"type": "agent_end", "messages": [...]}` | `agent_message_chunk` (final summary) |
+| Pi Event | ACP Session Update | Notes |
+|---|---|---|
+| `{"type": "assistant_message", "content": [{"type": "text", "text": "..."}]}` | `agent_message_chunk` | Extract text blocks from `content[]` |
+| `{"type": "tool_call", "name": "...", "id": "...", "input": {...}}` | `tool_call` | Map `id` → `toolCallId`, `name` → `title`, `kind: "other"` |
+| `{"type": "tool_result", "id": "...", "content": [...]}` | `tool_call_update` | Map `id` → `toolCallId`, `status: "completed"`, content from `content[]` |
+| `{"type": "agent_end", "messages": [...]}` | `agent_message_chunk` | Extract last assistant message's text blocks as final summary |
 
-> **Note:** Pi's JSON event schema should be verified against the pi-coding-agent source during implementation.
+**Plan, mode, thinking:** Pi does not emit plan, mode-change, or thinking events. These ACP update types are **not emitted** by the Pi parser.
+
+> **Note:** Pi's JSON event schema should be verified against the pi-coding-agent source during implementation. If Pi adds plan or thinking events in the future, the parser should be updated to map them.
 
 ---
 
