@@ -42,6 +42,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(__dirname, "..", "..", "package.json");
 const { version: CLI_VERSION } = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version: string };
 
+/** The ACP SDK's SessionUpdate type, extracted from conn.sessionUpdate(). */
+type AcpSessionUpdate = Parameters<AgentSideConnection["sessionUpdate"]>[0]["update"];
+
 // ---------------------------------------------------------------------------
 // In-memory session state (runtime data not persisted to meta.json)
 // ---------------------------------------------------------------------------
@@ -288,7 +291,7 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
             // Forward each parsed NDJSON line as a session update to the editor
             void conn.sessionUpdate({
               sessionId,
-              update: update as Parameters<typeof conn.sessionUpdate>[0]["update"],
+              update: update as AcpSessionUpdate,
             });
           },
         });

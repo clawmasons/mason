@@ -1,32 +1,70 @@
 import { describe, expect, it } from "vitest";
-import type { AcpSessionUpdate, ToolCallInfo, AgentPackage } from "../src/types.js";
+import type { AcpSessionUpdate, AcpToolCallFields, AcpToolCallUpdateFields, ToolKind, ToolCallStatus, AgentPackage } from "../src/types.js";
 
-// ── ToolCallInfo ─────────────────────────────────────────────────────────────
+// ── ToolKind & ToolCallStatus ───────────────────────────────────────────────
 
-describe("ToolCallInfo", () => {
-  it("accepts a minimal tool call (in_progress, no optional fields)", () => {
-    const info: ToolCallInfo = {
+describe("ToolKind", () => {
+  it("accepts all valid ACP tool kinds", () => {
+    const kinds: ToolKind[] = ["read", "edit", "delete", "move", "search", "execute", "think", "fetch", "switch_mode", "other"];
+    expect(kinds).toHaveLength(10);
+  });
+});
+
+describe("ToolCallStatus", () => {
+  it("accepts all valid ACP tool call statuses", () => {
+    const statuses: ToolCallStatus[] = ["pending", "in_progress", "completed", "failed"];
+    expect(statuses).toHaveLength(4);
+  });
+});
+
+// ── AcpToolCallFields ───────────────────────────────────────────────────────
+
+describe("AcpToolCallFields", () => {
+  it("accepts a minimal tool call (title required)", () => {
+    const fields: AcpToolCallFields = {
       toolCallId: "toolu_abc123",
-      status: "in_progress",
+      title: "Read file",
     };
-    expect(info.toolCallId).toBe("toolu_abc123");
-    expect(info.status).toBe("in_progress");
-    expect(info.title).toBeUndefined();
-    expect(info.kind).toBeUndefined();
-    expect(info.content).toBeUndefined();
+    expect(fields.toolCallId).toBe("toolu_abc123");
+    expect(fields.title).toBe("Read file");
+    expect(fields.kind).toBeUndefined();
+    expect(fields.status).toBeUndefined();
+    expect(fields.content).toBeUndefined();
   });
 
-  it("accepts a completed tool call with all optional fields", () => {
-    const info: ToolCallInfo = {
+  it("accepts a tool call with all fields", () => {
+    const fields: AcpToolCallFields = {
       toolCallId: "toolu_xyz",
       title: "Read src/index.ts",
-      kind: "other",
-      status: "completed",
+      kind: "read",
+      status: "in_progress",
       content: [{ type: "content", content: { type: "text", text: "file contents" } }],
     };
-    expect(info.status).toBe("completed");
-    expect(info.content).toHaveLength(1);
-    expect(info.content![0].content.text).toBe("file contents");
+    expect(fields.kind).toBe("read");
+    expect(fields.status).toBe("in_progress");
+    expect(fields.content).toHaveLength(1);
+  });
+});
+
+// ── AcpToolCallUpdateFields ─────────────────────────────────────────────────
+
+describe("AcpToolCallUpdateFields", () => {
+  it("accepts a minimal update (only toolCallId required)", () => {
+    const fields: AcpToolCallUpdateFields = {
+      toolCallId: "tc_1",
+    };
+    expect(fields.toolCallId).toBe("tc_1");
+    expect(fields.title).toBeUndefined();
+  });
+
+  it("accepts a completed update with content", () => {
+    const fields: AcpToolCallUpdateFields = {
+      toolCallId: "tc_1",
+      status: "completed",
+      content: [{ type: "content", content: { type: "text", text: "result" } }],
+    };
+    expect(fields.status).toBe("completed");
+    expect(fields.content).toHaveLength(1);
   });
 });
 
@@ -41,34 +79,31 @@ describe("AcpSessionUpdate", () => {
     expect(update.sessionUpdate).toBe("agent_message_chunk");
   });
 
-  it("tool_call variant", () => {
+  it("tool_call variant (flat structure)", () => {
     const update: AcpSessionUpdate = {
       sessionUpdate: "tool_call",
-      toolCall: {
-        toolCallId: "tc_1",
-        title: "Read file",
-        kind: "other",
-        status: "in_progress",
-      },
+      toolCallId: "tc_1",
+      title: "Read file",
+      kind: "other",
+      status: "in_progress",
     };
     expect(update.sessionUpdate).toBe("tool_call");
     if (update.sessionUpdate === "tool_call") {
-      expect(update.toolCall.toolCallId).toBe("tc_1");
+      expect(update.toolCallId).toBe("tc_1");
+      expect(update.title).toBe("Read file");
     }
   });
 
-  it("tool_call_update variant with content", () => {
+  it("tool_call_update variant with content (flat structure)", () => {
     const update: AcpSessionUpdate = {
       sessionUpdate: "tool_call_update",
-      toolCall: {
-        toolCallId: "tc_1",
-        status: "completed",
-        content: [{ type: "content", content: { type: "text", text: "result" } }],
-      },
+      toolCallId: "tc_1",
+      status: "completed",
+      content: [{ type: "content", content: { type: "text", text: "result" } }],
     };
     expect(update.sessionUpdate).toBe("tool_call_update");
     if (update.sessionUpdate === "tool_call_update") {
-      expect(update.toolCall.status).toBe("completed");
+      expect(update.status).toBe("completed");
     }
   });
 
@@ -111,7 +146,7 @@ describe("AcpSessionUpdate", () => {
   it("discriminated union narrows correctly via switch", () => {
     const updates: AcpSessionUpdate[] = [
       { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "hi" } },
-      { sessionUpdate: "tool_call", toolCall: { toolCallId: "t1", status: "in_progress" } },
+      { sessionUpdate: "tool_call", toolCallId: "t1", title: "Read", status: "in_progress" },
       { sessionUpdate: "plan", entries: [] },
       { sessionUpdate: "current_mode_update", modeId: "coding" },
     ];
@@ -122,7 +157,7 @@ describe("AcpSessionUpdate", () => {
           expect(update.content.text).toBe("hi");
           break;
         case "tool_call":
-          expect(update.toolCall.toolCallId).toBe("t1");
+          expect(update.toolCallId).toBe("t1");
           break;
         case "plan":
           expect(update.entries).toHaveLength(0);

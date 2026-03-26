@@ -17,6 +17,7 @@ import { HostProxy } from "@clawmasons/proxy";
 import { createFileLogger, type FileLogger } from "../../utils/file-logger.js";
 import { generateRoleDockerBuildDir, createSessionDirectory, getHostIds } from "../../materializer/docker-generator.js";
 import { ensureProxyDependencies, synthesizeRolePackages } from "../../materializer/proxy-dependencies.js";
+import { validateSessionUpdate as validateAcpUpdate } from "../../acp/validate-session-update.js";
 
 // ── Local type alias (mirrors DevContainerCustomizations from agent-sdk) ──────
 type DevContainerCustomizations = { vscode?: { extensions?: string[]; settings?: Record<string, unknown> } };
@@ -1580,6 +1581,10 @@ async function runAgentJsonMode(
           try {
             const result = parseJsonStreamAsACP(line, previousLine);
             if (result !== null) {
+              const validation = validateAcpUpdate(result);
+              if (!validation.valid) {
+                fileLogger.error(`[stream] ACP validation error: ${validation.errors?.join("; ")}`);
+              }
               process.stdout.write(JSON.stringify(result) + "\n");
             }
           } catch (err) {

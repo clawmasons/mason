@@ -74,7 +74,7 @@ export const mockClaudeCodeAgent: AgentPackage = {
             return { sessionUpdate: "agent_message_chunk", content: { type: "text", text: block.text } };
           }
           if (block.type === "tool_use") {
-            return { sessionUpdate: "tool_call", toolCall: { toolCallId: block.id, title: block.name, kind: "other", status: "in_progress" } };
+            return { sessionUpdate: "tool_call", toolCallId: block.id, title: block.name, kind: "other", status: "in_progress" };
           }
         }
       }
@@ -207,10 +207,10 @@ export const mockPiCodingAgent: AgentPackage = {
         return text ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text } } : null;
       }
       if (event.type === "tool_call") {
-        return { sessionUpdate: "tool_call", toolCall: { toolCallId: event.id, title: event.name, kind: "other", status: "in_progress" } };
+        return { sessionUpdate: "tool_call", toolCallId: event.id, title: event.name, kind: "other", status: "in_progress" };
       }
       if (event.type === "tool_result") {
-        return { sessionUpdate: "tool_call_update", toolCall: { toolCallId: event.id, status: "completed", content: [{ type: "content", content: { type: "text", text: JSON.stringify(event.content) } }] } };
+        return { sessionUpdate: "tool_call_update", toolCallId: event.id, status: "completed", content: [{ type: "content", content: { type: "text", text: JSON.stringify(event.content) } }] };
       }
       if (event.type === "agent_end" && Array.isArray(event.messages)) {
         const lastAssistant = [...event.messages].reverse().find((m: { role: string }) => m.role === "assistant");
@@ -291,29 +291,29 @@ export const mockCodexAgent: AgentPackage = {
 
       // item.started + command_execution → tool_call (in_progress)
       if (event.type === "item.started" && event.item?.type === "command_execution") {
-        return { sessionUpdate: "tool_call", toolCall: { toolCallId: event.item.id, title: event.item.command, kind: "command_execution", status: "in_progress" } };
+        return { sessionUpdate: "tool_call", toolCallId: event.item.id, title: event.item.command, kind: "execute", status: "in_progress" };
       }
 
       // item.completed + command_execution → tool_call_update (completed)
       if (event.type === "item.completed" && event.item?.type === "command_execution") {
-        return { sessionUpdate: "tool_call_update", toolCall: { toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text: event.item.aggregated_output ?? "" } }] } };
+        return { sessionUpdate: "tool_call_update", toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text: event.item.aggregated_output ?? "" } }] };
       }
 
       // item.completed + file_change → tool_call_update
       if (event.type === "item.completed" && event.item?.type === "file_change") {
         const changes = event.item.changes?.map((c: { path: string; kind: string }) => `${c.kind}: ${c.path}`).join(", ") ?? "";
-        return { sessionUpdate: "tool_call_update", toolCall: { toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text: changes } }] } };
+        return { sessionUpdate: "tool_call_update", toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text: changes } }] };
       }
 
       // item.started + mcp_tool_call → tool_call (in_progress)
       if (event.type === "item.started" && event.item?.type === "mcp_tool_call") {
-        return { sessionUpdate: "tool_call", toolCall: { toolCallId: event.item.id, title: `${event.item.server}:${event.item.tool}`, kind: "other", status: "in_progress" } };
+        return { sessionUpdate: "tool_call", toolCallId: event.item.id, title: `${event.item.server}:${event.item.tool}`, kind: "other", status: "in_progress" };
       }
 
       // item.completed + mcp_tool_call → tool_call_update (completed)
       if (event.type === "item.completed" && event.item?.type === "mcp_tool_call") {
         const text = event.item.result?.content ? JSON.stringify(event.item.result.content) : "";
-        return { sessionUpdate: "tool_call_update", toolCall: { toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text } }] } };
+        return { sessionUpdate: "tool_call_update", toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text } }] };
       }
 
       // todo_list → plan (both item.started and item.updated)

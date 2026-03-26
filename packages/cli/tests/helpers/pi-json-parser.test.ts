@@ -47,12 +47,10 @@ describe("Pi Coding Agent jsonMode parser", () => {
     });
     expect(parse(line)).toEqual({
       sessionUpdate: "tool_call",
-      toolCall: {
-        toolCallId: "tc-1",
-        title: "read_file",
-        kind: "other",
-        status: "in_progress",
-      },
+      toolCallId: "tc-1",
+      title: "read_file",
+      kind: "other",
+      status: "in_progress",
     });
   });
 
@@ -66,16 +64,14 @@ describe("Pi Coding Agent jsonMode parser", () => {
     });
     expect(parse(line)).toEqual({
       sessionUpdate: "tool_call_update",
-      toolCall: {
-        toolCallId: "tc-1",
-        status: "completed",
-        content: [
-          {
-            type: "content",
-            content: { type: "text", text: JSON.stringify(content) },
-          },
-        ],
-      },
+      toolCallId: "tc-1",
+      status: "completed",
+      content: [
+        {
+          type: "content",
+          content: { type: "text", text: JSON.stringify(content) },
+        },
+      ],
     });
   });
 

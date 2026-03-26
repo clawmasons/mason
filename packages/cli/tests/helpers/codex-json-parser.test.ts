@@ -46,12 +46,10 @@ describe("Codex Agent jsonMode parser", () => {
 
     expect(result).toEqual({
       sessionUpdate: "tool_call",
-      toolCall: {
-        toolCallId: "cmd_001",
-        title: "npm test",
-        kind: "command_execution",
-        status: "in_progress",
-      },
+      toolCallId: "cmd_001",
+      title: "npm test",
+      kind: "execute",
+      status: "in_progress",
     } satisfies AcpSessionUpdate);
   });
 
@@ -67,11 +65,9 @@ describe("Codex Agent jsonMode parser", () => {
 
     expect(result).toEqual({
       sessionUpdate: "tool_call_update",
-      toolCall: {
-        toolCallId: "cmd_001",
-        status: "completed",
-        content: [{ type: "content", content: { type: "text", text: "All 42 tests passed." } }],
-      },
+      toolCallId: "cmd_001",
+      status: "completed",
+      content: [{ type: "content", content: { type: "text", text: "All 42 tests passed." } }],
     } satisfies AcpSessionUpdate);
   });
 
@@ -86,11 +82,9 @@ describe("Codex Agent jsonMode parser", () => {
 
     expect(result).toEqual({
       sessionUpdate: "tool_call_update",
-      toolCall: {
-        toolCallId: "cmd_002",
-        status: "completed",
-        content: [{ type: "content", content: { type: "text", text: "" } }],
-      },
+      toolCallId: "cmd_002",
+      status: "completed",
+      content: [{ type: "content", content: { type: "text", text: "" } }],
     });
   });
 
@@ -108,11 +102,9 @@ describe("Codex Agent jsonMode parser", () => {
 
     expect(result).toEqual({
       sessionUpdate: "tool_call_update",
-      toolCall: {
-        toolCallId: "fc_001",
-        status: "completed",
-        content: [{ type: "content", content: { type: "text", text: "modified: src/index.ts, created: src/utils.ts" } }],
-      },
+      toolCallId: "fc_001",
+      status: "completed",
+      content: [{ type: "content", content: { type: "text", text: "modified: src/index.ts, created: src/utils.ts" } }],
     } satisfies AcpSessionUpdate);
   });
 
@@ -128,12 +120,10 @@ describe("Codex Agent jsonMode parser", () => {
 
     expect(result).toEqual({
       sessionUpdate: "tool_call",
-      toolCall: {
-        toolCallId: "mcp_001",
-        title: "mason:search_files",
-        kind: "other",
-        status: "in_progress",
-      },
+      toolCallId: "mcp_001",
+      title: "mason:search_files",
+      kind: "other",
+      status: "in_progress",
     } satisfies AcpSessionUpdate);
   });
 
@@ -151,11 +141,9 @@ describe("Codex Agent jsonMode parser", () => {
 
     expect(result).toEqual({
       sessionUpdate: "tool_call_update",
-      toolCall: {
-        toolCallId: "mcp_001",
-        status: "completed",
-        content: [{ type: "content", content: { type: "text", text: JSON.stringify(resultContent) } }],
-      },
+      toolCallId: "mcp_001",
+      status: "completed",
+      content: [{ type: "content", content: { type: "text", text: JSON.stringify(resultContent) } }],
     } satisfies AcpSessionUpdate);
   });
 
@@ -172,11 +160,9 @@ describe("Codex Agent jsonMode parser", () => {
 
     expect(result).toEqual({
       sessionUpdate: "tool_call_update",
-      toolCall: {
-        toolCallId: "mcp_002",
-        status: "completed",
-        content: [{ type: "content", content: { type: "text", text: "" } }],
-      },
+      toolCallId: "mcp_002",
+      status: "completed",
+      content: [{ type: "content", content: { type: "text", text: "" } }],
     });
   });
 

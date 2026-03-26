@@ -41,12 +41,10 @@ describe("Claude Code Agent jsonMode parser", () => {
 
     expect(result).toEqual({
       sessionUpdate: "tool_call",
-      toolCall: {
-        toolCallId: "toolu_abc123",
-        title: "Read",
-        kind: "other",
-        status: "in_progress",
-      },
+      toolCallId: "toolu_abc123",
+      title: "Read",
+      kind: "other",
+      status: "in_progress",
     } satisfies AcpSessionUpdate);
   });
 
@@ -101,12 +99,10 @@ describe("Claude Code Agent jsonMode parser", () => {
 
     expect(result).toEqual({
       sessionUpdate: "tool_call",
-      toolCall: {
-        toolCallId: "toolu_first",
-        title: "Write",
-        kind: "other",
-        status: "in_progress",
-      },
+      toolCallId: "toolu_first",
+      title: "Write",
+      kind: "other",
+      status: "in_progress",
     });
   });
 
