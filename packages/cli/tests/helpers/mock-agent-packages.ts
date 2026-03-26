@@ -17,6 +17,7 @@ import type {
   AgentValidationResult,
   AgentConfigSchema,
   AgentCredentialRequirement,
+  AcpSessionUpdate,
 } from "@clawmasons/agent-sdk";
 import type { ResolvedAgent } from "@clawmasons/shared";
 
@@ -61,6 +62,27 @@ export const mockClaudeCodeAgent: AgentPackage = {
   },
   dockerfile: {
     installSteps: "RUN npm install -g @anthropic-ai/claude-code",
+  },
+  jsonMode: {
+    jsonStreamArgs: ["--output-format", "stream-json", "--verbose"],
+    buildPromptArgs: (prompt: string) => ["-p", prompt],
+    parseJsonStreamAsACP(line: string): AcpSessionUpdate | null {
+      const event = JSON.parse(line);
+      if (event.type === "assistant" && event.message?.content) {
+        for (const block of event.message.content) {
+          if (block.type === "text") {
+            return { sessionUpdate: "agent_message_chunk", content: { type: "text", text: block.text } };
+          }
+          if (block.type === "tool_use") {
+            return { sessionUpdate: "tool_call", toolCall: { toolCallId: block.id, title: block.name, kind: "other", status: "in_progress" } };
+          }
+        }
+      }
+      if (event.type === "result" && event.result) {
+        return { sessionUpdate: "agent_message_chunk", content: { type: "text", text: event.result } };
+      }
+      return null;
+    },
   },
   validate: (agent: ResolvedAgent): AgentValidationResult => {
     const errors: AgentValidationResult["errors"] = [];
