@@ -29,10 +29,10 @@ vi.mock("../../src/acp/discovery-cache.js", () => ({
 // ---------------------------------------------------------------------------
 // Mock prompt-executor to avoid spawning real subprocesses
 // ---------------------------------------------------------------------------
-const mockExecutePrompt = vi.fn();
+const mockExecutePromptStreaming = vi.fn();
 
 vi.mock("../../src/acp/prompt-executor.js", () => ({
-  executePrompt: (...args: unknown[]) => mockExecutePrompt(...args),
+  executePromptStreaming: (...args: unknown[]) => mockExecutePromptStreaming(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -169,20 +169,25 @@ describe("session/prompt handler", () => {
       defaultAgent: "claude-code-agent",
     });
 
-    // Default mock: executePrompt returns agent output
-    mockExecutePrompt.mockResolvedValue({
-      output: "Hello! I can help with that.",
-      cancelled: false,
-    });
+    // Default mock: executePromptStreaming calls onSessionUpdate and returns
+    mockExecutePromptStreaming.mockImplementation(
+      (opts: { onSessionUpdate: (update: Record<string, unknown>) => void }) => {
+        opts.onSessionUpdate({
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "Hello! I can help with that." },
+        });
+        return Promise.resolve({ cancelled: false });
+      },
+    );
   });
 
   afterEach(async () => {
     mockDiscoverForCwd.mockReset();
-    mockExecutePrompt.mockReset();
+    mockExecutePromptStreaming.mockReset();
     await rm(tempDir, { recursive: true, force: true }).catch(() => {});
   });
 
-  it("calls executePrompt with correct arguments", async () => {
+  it("calls executePromptStreaming with correct arguments", async () => {
     const sessionId = await initAndCreateSession(clientConn, tempDir);
 
     await clientConn.prompt({
@@ -190,16 +195,17 @@ describe("session/prompt handler", () => {
       prompt: [{ type: "text", text: "help me refactor" }],
     });
 
-    expect(mockExecutePrompt).toHaveBeenCalledWith(
+    expect(mockExecutePromptStreaming).toHaveBeenCalledWith(
       expect.objectContaining({
         agent: "claude-code-agent",
         role: "project",
         text: "help me refactor",
         cwd: tempDir,
+        onSessionUpdate: expect.any(Function),
       }),
     );
     // Verify signal is an AbortSignal
-    const callArgs = mockExecutePrompt.mock.calls[0][0];
+    const callArgs = mockExecutePromptStreaming.mock.calls[0][0];
     expect(callArgs.signal).toBeInstanceOf(AbortSignal);
   });
 
@@ -324,7 +330,7 @@ describe("session/prompt handler", () => {
       ],
     });
 
-    expect(mockExecutePrompt).toHaveBeenCalledWith(
+    expect(mockExecutePromptStreaming).toHaveBeenCalledWith(
       expect.objectContaining({
         text: "first part\nsecond part",
       }),
@@ -357,20 +363,20 @@ describe("session/cancel handler", () => {
 
   afterEach(async () => {
     mockDiscoverForCwd.mockReset();
-    mockExecutePrompt.mockReset();
+    mockExecutePromptStreaming.mockReset();
     await rm(tempDir, { recursive: true, force: true }).catch(() => {});
   });
 
   it("returns stopReason cancelled when cancel is called during prompt", async () => {
     const sessionId = await initAndCreateSession(clientConn, tempDir);
 
-    // Mock executePrompt to be slow and check signal
-    mockExecutePrompt.mockImplementation(
+    // Mock executePromptStreaming to be slow and check signal
+    mockExecutePromptStreaming.mockImplementation(
       (opts: { signal?: AbortSignal }) =>
-        new Promise<{ output: string; cancelled: boolean }>((resolve) => {
+        new Promise<{ cancelled: boolean }>((resolve) => {
           const checkSignal = () => {
             if (opts.signal?.aborted) {
-              resolve({ output: "", cancelled: true });
+              resolve({ cancelled: true });
               return;
             }
             setTimeout(checkSignal, 10);

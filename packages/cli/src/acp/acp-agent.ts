@@ -35,7 +35,7 @@ import {
   resolveRole,
 } from "@clawmasons/shared";
 import { discoverForCwd } from "./discovery-cache.js";
-import { executePrompt } from "./prompt-executor.js";
+import { executePromptStreaming } from "./prompt-executor.js";
 import { initAcpLogger, acpLog, acpError } from "./acp-logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -277,29 +277,27 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
       session.abortController = abortController;
 
       try {
-        // 4. Execute prompt via subprocess
-        const result = await executePrompt({
+        // 4. Execute prompt via subprocess (streaming mode)
+        const result = await executePromptStreaming({
           agent: session.agent,
           role: session.role,
           text,
           cwd: session.cwd,
           signal: abortController.signal,
+          onSessionUpdate: (update) => {
+            // Forward each parsed NDJSON line as a session update to the editor
+            void conn.sessionUpdate({
+              sessionId,
+              update: update as Parameters<typeof conn.sessionUpdate>[0]["update"],
+            });
+          },
         });
 
         if (result.cancelled) {
           acpLog("prompt cancelled", { sessionId });
           return { stopReason: "cancelled" };
         }
-        acpLog("prompt completed", { sessionId, outputLength: result.output.length });
-
-        // 5. Send agent_message_chunk with the result
-        await conn.sessionUpdate({
-          sessionId,
-          update: {
-            sessionUpdate: "agent_message_chunk" as const,
-            content: { type: "text" as const, text: result.output },
-          },
-        });
+        acpLog("prompt completed", { sessionId });
 
         // 6. Update meta.json (firstPrompt on first prompt, lastUpdated always)
         const now = new Date().toISOString();
