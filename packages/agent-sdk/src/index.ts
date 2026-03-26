@@ -2,6 +2,8 @@
 export type {
   AgentPackage,
   AgentTaskConfig,
+  AcpSessionUpdate,
+  ToolCallInfo,
   DockerfileConfig,
   AcpConfig,
   RuntimeConfig,
