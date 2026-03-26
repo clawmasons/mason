@@ -212,6 +212,8 @@ export interface GenerateBuildDirOptions {
   llmConfig?: { provider: string; model: string };
   /** When true, enable print mode args in agent-launch.json. */
   printMode?: boolean;
+  /** When true, enable JSON streaming mode args in agent-launch.json. */
+  jsonMode?: boolean;
 }
 
 export interface BuildDirResult {
@@ -298,13 +300,14 @@ export function generateRoleDockerBuildDir(
   // - project role: everything else → {agentDir}/build/workspace/project/  (per-file overlay mounts)
   // - supervisor role: everything else → {agentDir}/home/         (merged into home mount at /home/mason/)
   const proxyEp = proxyEndpoint ?? `http://proxy-${roleName}:9090`;
-  const materializeOpts = (opts.agentConfigCredentials?.length || opts.agentArgs?.length || opts.initialPrompt || opts.llmConfig || opts.printMode)
+  const materializeOpts = (opts.agentConfigCredentials?.length || opts.agentArgs?.length || opts.initialPrompt || opts.llmConfig || opts.printMode || opts.jsonMode)
     ? {
         ...(opts.agentConfigCredentials?.length ? { agentConfigCredentials: opts.agentConfigCredentials } : {}),
         ...(opts.agentArgs?.length ? { agentArgs: opts.agentArgs } : {}),
         ...(opts.initialPrompt ? { initialPrompt: opts.initialPrompt } : {}),
         ...(opts.llmConfig ? { llmConfig: opts.llmConfig } : {}),
         ...(opts.printMode ? { printMode: opts.printMode } : {}),
+        ...(opts.jsonMode ? { jsonMode: opts.jsonMode } : {}),
       }
     : undefined;
   const workspaceDir = path.join(agentDir, "workspace");
