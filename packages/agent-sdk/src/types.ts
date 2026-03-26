@@ -88,6 +88,36 @@ export interface RuntimeMaterializer {
 // Re-export AgentTaskConfig from shared (canonical definition lives in @clawmasons/shared)
 export type { AgentTaskConfig } from "@clawmasons/shared";
 
+// ── ACP Session Update Types ──
+
+/**
+ * Tool call information for ACP session updates.
+ * Used in `tool_call` and `tool_call_update` session updates.
+ */
+export interface ToolCallInfo {
+  toolCallId: string;
+  title?: string;
+  /** Tool kind (e.g., "other", "command_execution", "file_change"). */
+  kind?: string;
+  status: "in_progress" | "completed";
+  content?: Array<{ type: "content"; content: { type: "text"; text: string } }>;
+}
+
+/**
+ * Discriminated union of ACP session update types.
+ * Each variant is identified by its `sessionUpdate` field.
+ *
+ * Used as the return type of `jsonMode.parseJsonStreamAsACP` and by the ACP
+ * prompt executor when forwarding updates to the editor.
+ */
+export type AcpSessionUpdate =
+  | { sessionUpdate: "agent_message_chunk"; content: { type: "text"; text: string } }
+  | { sessionUpdate: "tool_call"; toolCall: ToolCallInfo }
+  | { sessionUpdate: "tool_call_update"; toolCall: ToolCallInfo }
+  | { sessionUpdate: "agent_thought_chunk"; content: { type: "text"; text: string } }
+  | { sessionUpdate: "plan"; entries: Array<{ content: string; priority: "high" | "medium" | "low"; status: "pending" | "in_progress" | "completed" }> }
+  | { sessionUpdate: "current_mode_update"; modeId: string };
+
 // ── Agent Package Types ──
 
 /**
@@ -200,6 +230,27 @@ export interface AgentPackage {
    * Supports `${server}` and `${tool}` placeholders. Defaults to `${server}_${tool}`.
    */
   mcpNameTemplate?: string;
+
+  /** JSON streaming mode configuration for ACP session update streaming. */
+  jsonMode?: {
+    /** Args to append to agent command to enable JSON streaming output. */
+    jsonStreamArgs: string[];
+    /**
+     * Build the CLI args that pass the initial prompt to the agent.
+     * Defaults to `["-p", prompt]` when not defined.
+     */
+    buildPromptArgs?: (prompt: string) => string[];
+    /**
+     * Parse a line from the agent's JSON stream and convert it to an ACP session update.
+     * Return an ACP session update object when the line maps to one, or null to skip.
+     * Called with try/catch — exceptions are logged and the line is skipped.
+     *
+     * @param line - The current JSON stream line from the agent
+     * @param previousLine - The previous JSON-parseable line (if any)
+     * @returns An ACP session update object, or null if the line should be skipped
+     */
+    parseJsonStreamAsACP(line: string, previousLine?: string): AcpSessionUpdate | null;
+  };
 
   /** Print mode configuration for non-interactive prompt execution with JSON streaming. */
   printMode?: {
