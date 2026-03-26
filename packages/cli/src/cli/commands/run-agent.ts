@@ -422,7 +422,7 @@ export async function ensureDockerBuild(
   roleType: Role,
   agentType: string,
   projectDir: string,
-  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations; agentConfigCredentials?: string[]; agentArgs?: string[]; initialPrompt?: string; llmConfig?: { provider: string; model: string }; printMode?: boolean },
+  deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations; agentConfigCredentials?: string[]; agentArgs?: string[]; initialPrompt?: string; llmConfig?: { provider: string; model: string }; printMode?: boolean; jsonMode?: boolean },
 ): Promise<{ dockerBuildDir: string; dockerDir: string }> {
   const existsSync = deps?.existsSyncFn ?? fs.existsSync;
   const roleName = getAppShortName(roleType.metadata.name);
@@ -476,6 +476,7 @@ export async function ensureDockerBuild(
       initialPrompt: deps?.initialPrompt,
       llmConfig: deps?.llmConfig,
       printMode: deps?.printMode,
+      jsonMode: deps?.jsonMode,
     });
 
     // Populate shared proxy dependencies
@@ -793,6 +794,7 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
       source?: string[];
       proxyPort: string;
       print?: string;
+      json?: string;
     },
   ) => {
     // Disambiguate positional args:
@@ -809,8 +811,9 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     }
 
     const agentInput = agentPositional ?? options.agent;
-    const initialPrompt = options.print ?? promptPositional ?? overridePrompt;
+    const initialPrompt = options.print ?? options.json ?? promptPositional ?? overridePrompt;
     const isPrintMode = !!options.print;
+    const isJsonMode = !!options.json;
     const projectDir = process.cwd();
 
     // Auto-init .mason/config.json when an agent name is provided
@@ -840,6 +843,12 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     // Derive effective role: override (for configure) > --role flag > config role > project role
     const role = overrideRole ?? options.role ?? configEntry?.role;
 
+    if (isPrintMode && isJsonMode) {
+      console.error(`\n  -p/--print and --json are mutually exclusive.\n`);
+      process.exit(1);
+      return;
+    }
+
     if (isPrintMode) {
       const conflicts = [
         options.bash && "--bash",
@@ -848,6 +857,19 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
       ].filter(Boolean);
       if (conflicts.length > 0) {
         console.error(`\n  -p/--print is mutually exclusive with ${conflicts.join(", ")}.\n`);
+        process.exit(1);
+        return;
+      }
+    }
+
+    if (isJsonMode) {
+      const conflicts = [
+        options.bash && "--bash",
+        options.devContainer && "--dev-container",
+        options.proxyOnly && "--proxy-only",
+      ].filter(Boolean);
+      if (conflicts.length > 0) {
+        console.error(`\n  --json is mutually exclusive with ${conflicts.join(", ")}.\n`);
         process.exit(1);
         return;
       }
@@ -996,6 +1018,20 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         initialPrompt,
         llmConfig,
       });
+    } else if (isJsonMode) {
+      await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
+        jsonMode: true,
+        proxyPort: parseInt(options.proxyPort, 10),
+        build: options.build,
+        verbose: options.verbose,
+        homeOverride,
+        agentConfigCredentials: effectiveCredentials.length > 0 ? effectiveCredentials : undefined,
+        agentArgs,
+        sourceOverride,
+        preResolvedRole,
+        initialPrompt,
+        llmConfig,
+      });
     } else {
       await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
         proxyPort: parseInt(options.proxyPort, 10),
@@ -1031,6 +1067,7 @@ export function registerRunCommand(program: Command): void {
     .option("--verbose", "Show Docker build and compose output")
     .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
     .option("-p, --print <prompt>", "Run in print mode: execute prompt non-interactively, output response only")
+    .option("--json <prompt>", "Run in JSON streaming mode: emit newline-delimited ACP session update objects")
     .addOption(
       new Option("--source <name>", "Agent source directory to scan (repeatable). Overrides role sources.")
         .argParser((value: string, previous: string[] | undefined) => [...(previous ?? []), value]),
@@ -1082,6 +1119,7 @@ export async function runAgent(
     preResolvedRole?: Role;
     llmConfig?: { provider: string; model: string };
     printMode?: boolean;
+    jsonMode?: boolean;
   },
 ): Promise<void> {
   // Initialize agent registry with config-declared agents from .mason/config.json
@@ -1118,8 +1156,12 @@ export async function runAgent(
   const preResolvedRole = acpOptions?.preResolvedRole;
   const llmConfig = acpOptions?.llmConfig;
   const isPrintMode = acpOptions?.printMode === true;
+  const isJsonMode = acpOptions?.jsonMode === true;
 
-  if (isPrintMode) {
+  if (isJsonMode) {
+    const verbose = acpOptions?.verbose === true;
+    return runAgentJsonMode(projectDir, agent, role, proxyPort, deps, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole, llmConfig);
+  } else if (isPrintMode) {
     const verbose = acpOptions?.verbose === true;
     return runAgentPrintMode(projectDir, agent, role, proxyPort, deps, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole, llmConfig);
   } else if (isDevContainerMode) {
@@ -1197,6 +1239,7 @@ function refreshAgentLaunchJson(
     initialPrompt?: string;
     llmConfig?: { provider: string; model: string };
     printMode?: boolean;
+    jsonMode?: boolean;
   },
 ): void {
   try {
@@ -1387,6 +1430,195 @@ async function runAgentInteractiveMode(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\n  agent failed: ${message}\n`);
+    process.exit(1);
+  }
+}
+
+// ── JSON Streaming Mode ───────────────────────────────────────────────
+
+async function runAgentJsonMode(
+  projectDir: string,
+  agentOverride: string | undefined,
+  role: string,
+  proxyPort: number,
+  deps?: RunAgentDeps,
+  buildMode?: boolean,
+  verbose?: boolean,
+  homeOverride?: string,
+  agentConfigCredentials?: string[],
+  agentArgs?: string[],
+  initialPrompt?: string,
+  sourceOverride?: string[],
+  preResolvedRole?: Role,
+  llmConfig?: { provider: string; model: string },
+): Promise<void> {
+  const execCompose = deps?.execComposeFn ?? execComposeCommand;
+  const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
+  const startHostProxy = deps?.startHostProxyFn ?? defaultStartHostProxy;
+  const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
+  const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
+
+  // Early log suppression: buffer console output until file logger is ready
+  const origLog = console.log.bind(console);
+  const origError = console.error.bind(console);
+  const earlyBuffer: unknown[][] = [];
+  console.log = (...args: unknown[]) => { earlyBuffer.push(args); };
+  console.error = (...args: unknown[]) => { earlyBuffer.push(args); };
+
+  let logger: { log(...args: unknown[]): void; error(...args: unknown[]): void; close(): void } | null = null;
+
+  try {
+    // 1. Resolve role
+    const roleType = preResolvedRole ?? await resolveRoleFn(role, projectDir);
+    if (sourceOverride?.length) {
+      roleType.sources = sourceOverride;
+    }
+
+    const roleName = getAppShortName(roleType.metadata.name);
+    const agentType = agentOverride ?? inferAgentType(roleType, readDefaultAgent(projectDir));
+
+    console.log(`[json] Agent: ${agentType}`);
+    console.log(`[json] Role: ${roleName} (${roleType.type})`);
+
+    // 2. Ensure docker build artifacts (with jsonMode so json stream args land in agent-launch.json)
+    const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
+      roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs, initialPrompt, llmConfig, jsonMode: true },
+    );
+
+    // 2b. Always refresh agent-launch.json (live-mounted, not baked into image)
+    refreshAgentLaunchJson(roleType, agentType, dockerBuildDir, {
+      agentConfigCredentials, agentArgs, initialPrompt, llmConfig, jsonMode: true,
+    });
+
+    // 3. Create file logger and flush early buffer
+    const sessionLogsDir = path.join(projectDir, ".mason", "logs");
+    fs.mkdirSync(sessionLogsDir, { recursive: true });
+    logger = createFileLogger(sessionLogsDir);
+
+    for (const args of earlyBuffer) { logger.log(...args); }
+    earlyBuffer.length = 0;
+    const fileLogger = logger;
+    console.log = (...args: unknown[]) => fileLogger.log(...args);
+    console.error = (...args: unknown[]) => fileLogger.error(...args);
+
+    // 4. Ensure .mason is in .gitignore
+    ensureGitignore(projectDir, ".mason");
+    await quickAutoCleanup(projectDir);
+
+    // 5. Create session directory
+    const { uid, gid } = getHostIds();
+    const declaredCredentialKeys = collectDeclaredCredentialKeys(agentType, agentConfigCredentials, roleType);
+    const sessionIdOverride = (deps?.generateSessionIdFn ?? generateSessionId)();
+    const session = createSessionDirectory({
+      projectDir,
+      dockerBuildDir,
+      dockerDir,
+      role: roleType,
+      agentType,
+      agentName: roleName,
+      proxyPort,
+      roleMounts: roleType.container?.mounts,
+      credentialKeys: declaredCredentialKeys,
+      hostUid: uid,
+      hostGid: gid,
+      homeOverride,
+      verbose,
+      sessionId: sessionIdOverride,
+      agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
+    });
+
+    const { sessionId, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
+    console.log(`[json] Session: ${sessionId}`);
+
+    // 6. Build and start proxy
+    const buildArgs = ["build"];
+    if (buildMode) buildArgs.push("--no-cache");
+    buildArgs.push(proxyServiceName);
+    const buildCode = await execCompose(composeFile, buildArgs, { verbose, logger: fileLogger });
+    if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+
+    const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose, logger: fileLogger, timeoutMs: 30_000 });
+    if (proxyCode !== 0) throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
+
+    await waitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
+    console.log(`[json] Proxy ready.`);
+
+    // 7. Start host proxy
+    const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
+    const resolvedAgent = adaptRoleFn(roleType, agentType);
+    if (llmConfig) resolvedAgent.llm = llmConfig;
+    mergeAgentConfigCredentials(resolvedAgent, agentConfigCredentials);
+    const envCredentials = collectEnvCredentials(resolvedAgent);
+    const hostApps = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
+
+    let hostProxyHandle: { stop: () => Promise<void> } | null = null;
+    try {
+      hostProxyHandle = await startHostProxy({
+        proxyPort,
+        relayToken,
+        envCredentials,
+        hostApps: hostApps.length > 0 ? hostApps : undefined,
+      });
+    } catch (err) {
+      throw new Error(`Failed to start host proxy: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // 8. Run agent with stream capture — emit ACP session updates as NDJSON
+    console.log(`[json] Starting agent (${agentServiceName})...`);
+
+    const agentPkg = getAgentFromRegistry(agentType);
+    const parseJsonStreamAsACP = agentPkg?.jsonMode?.parseJsonStreamAsACP;
+
+    let previousLine: string | undefined;
+    const runArgs = ["run", "--rm", "--service-ports", "--build", "-T", agentServiceName];
+    fileLogger.log(`[json] Docker command: docker compose -f ${composeFile} ${runArgs.join(" ")}`);
+    const { code: agentCode, stderr: composeStderr } = await execComposeRunWithStreamCapture(composeFile, runArgs, (line) => {
+      fileLogger.log(`[stream] ${line}`);
+      if (parseJsonStreamAsACP) {
+        const trimmed = line.trimStart();
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+          try {
+            const result = parseJsonStreamAsACP(line, previousLine);
+            if (result !== null) {
+              process.stdout.write(JSON.stringify(result) + "\n");
+            }
+          } catch (err) {
+            fileLogger.error(`[stream] parse error: ${err instanceof Error ? err.message : String(err)}`);
+          }
+          previousLine = line;
+        }
+      }
+    });
+
+    // Log agent container stderr (includes agent-entry output)
+    if (composeStderr) {
+      for (const line of composeStderr.split("\n")) {
+        if (line.trim()) fileLogger.log(`[stderr] ${line}`);
+      }
+    }
+
+    // 9. Tear down
+    console.log(`[json] Agent exited (code ${agentCode}). Tearing down...`);
+    try { if (hostProxyHandle) await hostProxyHandle.stop(); } catch { /* best-effort */ }
+    await execCompose(composeFile, ["down"], { verbose: false });
+
+    // 10. Restore console
+    console.log = origLog;
+    console.error = origError;
+    fileLogger.close();
+    logger = null;
+
+    if (agentCode !== 0) {
+      process.exit(agentCode);
+    }
+  } catch (error) {
+    // Restore console for error output
+    console.log = origLog;
+    console.error = origError;
+    if (logger) logger.close();
+
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`agent failed: ${message}`);
     process.exit(1);
   }
 }

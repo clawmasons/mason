@@ -29,6 +29,8 @@ export interface MaterializeOptions {
   llmConfig?: { provider: string; model: string };
   /** When true, enable print mode: append JSON stream args and -p flag in agent-launch.json. */
   printMode?: boolean;
+  /** When true, enable JSON streaming mode: append jsonMode.jsonStreamArgs and prompt args in agent-launch.json. */
+  jsonMode?: boolean;
 }
 
 /**
