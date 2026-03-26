@@ -5,9 +5,9 @@ import { fileURLToPath } from "node:url";
 import { run } from "../packages/cli/dist/cli/index.js";
 
 // Auto-link agents when CWD has a .mason/ directory (dev environments).
-// Resolves the monorepo root from this script's location, then symlinks:
-//   1. The built-in mcp-agent from packages/mcp-agent
-//   2. All agents from the sibling mason-extensions/agents/ repo
+// Resolves the monorepo root from this script's location, then symlinks
+// all agents from the sibling mason-extensions/agents/ repo.
+// (mcp-agent is a built-in registered in Phase 1 of discovery — no symlink needed.)
 const masonDir = path.join(process.cwd(), ".mason");
 if (fs.existsSync(masonDir)) {
   const monorepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -28,9 +28,6 @@ if (fs.existsSync(masonDir)) {
       // skip silently — agent may be missing package.json or be malformed
     }
   }
-
-  // Built-in monorepo agent
-  linkAgent(path.join(monorepoRoot, "packages", "mcp-agent"));
 
   // Sibling mason-extensions repo
   const extensionsDir = path.join(monorepoRoot, "..", "mason-extensions", "agents");
