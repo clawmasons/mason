@@ -7,7 +7,7 @@ description: How to create test workspaces, run agents, and write e2e tests.
 
 ## 1. Create a test workspace
 
-The `scripts/create-test-dir.ts` script creates a workspace from the `claude-test-project` fixture with all available agents symlinked in.
+The `scripts/create-test-dir.ts` script creates a workspace from the `claude-test-project` fixture.
 
 ```bash
 npx tsx scripts/create-test-dir.ts [output-dir]
@@ -15,9 +15,9 @@ npx tsx scripts/create-test-dir.ts [output-dir]
 
 **What it does:**
 - Copies the `packages/agent-sdk/fixtures/claude-test-project/` fixture via `copyFixtureWorkspace`
-- Symlinks `packages/mcp-agent` into the workspace's `.mason/node_modules/@clawmasons/`
-- Symlinks all installed agents found in `.mason/node_modules/@clawmasons/` (packages with `mason.type === "agent"` in their `package.json`)
 - If no output dir is given, creates a timestamped temp directory (`$TMPDIR/mason-e2e-test-dir-<timestamp>`)
+
+Agents are **auto-linked by `mason.js`** at runtime: when mason.js detects a `.mason/` directory in the workspace, it symlinks the built-in `mcp-agent` and all agents from the sibling `mason-extensions/agents/` repo. No manual linking is needed.
 
 **Workspace structure after creation:**
 
@@ -64,7 +64,6 @@ import {
   copyFixtureWorkspace,
   MASON_BIN,
   isDockerAvailable,
-  installLocalAgent,
   testIfProcessAndDockerStopped,
   stopProcessAndDocker,
   testSessionLogContains,
@@ -81,20 +80,12 @@ let lastProc: ChildProcess | null = null;
 beforeAll(() => {
   if (!canRun()) return;
 
-  // 1. Copy the shared fixture
+  // 1. Copy the shared fixture (agents are auto-linked by mason.js at runtime)
   workspaceDir = copyFixtureWorkspace("my-agent", {
     fixture: "claude-test-project",
   });
 
-  // 2. Symlink the agent under test
-  const agentDir = path.resolve(__dirname, "../..");
-  installLocalAgent(workspaceDir, agentDir);
-
-  // 3. (Optional) Install additional agents
-  // const otherAgent = path.resolve(__dirname, "../../../other-agent");
-  // installLocalAgent(workspaceDir, otherAgent);
-
-  // 4. (Optional) Create extra directories needed by MCP servers
+  // 2. (Optional) Create extra directories needed by MCP servers
   fs.mkdirSync(path.join(workspaceDir, "notes"), { recursive: true });
 }, 30_000);
 ```
@@ -205,7 +196,7 @@ it("my test", async () => {
 ## Key files
 
 - `scripts/create-test-dir.ts` — convenience script for manual test workspaces
-- `packages/agent-sdk/src/testing/index.ts` — test utilities (`copyFixtureWorkspace`, `installLocalAgent`, `masonExec`, `MASON_BIN`, etc.)
+- `packages/agent-sdk/src/testing/index.ts` — test utilities (`copyFixtureWorkspace`, `masonExec`, `MASON_BIN`, etc.)
 - `packages/agent-sdk/fixtures/claude-test-project/` — shared fixture
-- `mason-extensions/agents/claude-code-agent/tests/e2e/agent.test.ts` — canonical single-agent e2e pattern
-- `mason-extensions/agents/codex-agent/tests/e2e/agent.test.ts` — multi-agent install example
+- `mason-extensions/agents/claude-code-agent/tests/e2e/agent.test.ts` — canonical e2e pattern
+- `mason-extensions/agents/codex-agent/tests/e2e/agent.test.ts` — e2e pattern with --source flag
