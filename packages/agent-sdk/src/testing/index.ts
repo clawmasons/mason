@@ -6,7 +6,7 @@
  *
  * Dependency constraint: This module MUST NOT import from @clawmasons/cli,
  * @clawmasons/mcp-agent, or any agent implementation package. Only Node.js
- * built-ins are allowed.
+ * built-ins and @agentclientprotocol/sdk are allowed.
  */
 
 import * as fs from "node:fs";
@@ -531,4 +531,6 @@ export async function runMasonJson(
   }
   return { ...result, updates };
 }
+
+export { runMasonACP, type AcpResult } from "./acp-client.js";
 
