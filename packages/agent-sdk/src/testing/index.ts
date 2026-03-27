@@ -16,6 +16,7 @@ import { execFileSync, execSync, spawn, type ChildProcess } from "node:child_pro
 
 export type { ChildProcess };
 import { fileURLToPath } from "node:url";
+import type { AcpSessionUpdate } from "../types.js";
 
 // ── Path Constants ──────────────────────────────────────────────────────
 
@@ -492,5 +493,42 @@ export function runMasonPrint(
       resolve({ proc, stdout, stderr, exitCode: code });
     });
   });
+}
+
+/**
+ * Spawn mason in JSON mode and wait for it to exit.
+ * Returns the child process, captured output, and parsed NDJSON updates.
+ *
+ * Delegates to {@link runMasonPrint} for process spawning, then parses
+ * stdout as newline-delimited JSON into `AcpSessionUpdate[]`.
+ *
+ * @param args - CLI arguments to pass after `mason` (should include `--json <prompt>`)
+ * @param cwd - Working directory
+ * @param opts.timeout - Kill the process after this many ms (default: 300_000)
+ * @param opts.env - Extra environment variables merged onto `process.env`
+ */
+export async function runMasonJson(
+  args: string[],
+  cwd: string,
+  opts?: { timeout?: number; env?: Record<string, string> },
+): Promise<{
+  proc: ChildProcess;
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  updates: AcpSessionUpdate[];
+}> {
+  const result = await runMasonPrint(args, cwd, opts);
+  const updates: AcpSessionUpdate[] = [];
+  for (const line of result.stdout.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("{")) continue;
+    try {
+      updates.push(JSON.parse(trimmed) as AcpSessionUpdate);
+    } catch {
+      // skip non-JSON lines
+    }
+  }
+  return { ...result, updates };
 }
 
