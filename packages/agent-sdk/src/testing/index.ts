@@ -12,7 +12,9 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { execFileSync, execSync, type ChildProcess } from "node:child_process";
+import { execFileSync, execSync, spawn, type ChildProcess } from "node:child_process";
+
+export type { ChildProcess };
 import { fileURLToPath } from "node:url";
 
 // ── Path Constants ──────────────────────────────────────────────────────
@@ -438,5 +440,57 @@ export function testFileContents(workspaceDir: string, relPath: string, expected
       `File ${relPath} does not contain "${expected}".\nFile contents:\n${contents.slice(0, 2000)}`,
     );
   }
+}
+
+/**
+ * Spawn mason in print mode and wait for it to exit.
+ * Returns the child process (for pid inspection) and captured output.
+ *
+ * @param args - CLI arguments to pass after `mason`
+ * @param cwd - Working directory
+ * @param opts.timeout - Kill the process after this many ms (default: 300_000)
+ * @param opts.env - Extra environment variables merged onto `process.env`
+ */
+export function runMasonPrint(
+  args: string[],
+  cwd: string,
+  opts?: { timeout?: number; env?: Record<string, string> },
+): Promise<{ proc: ChildProcess; stdout: string; stderr: string; exitCode: number | null }> {
+  const timeoutMs = opts?.timeout ?? 300_000;
+
+  return new Promise((resolve) => {
+    const proc = spawn("node", [MASON_BIN, ...args], {
+      cwd,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        ...opts?.env,
+      },
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    if (proc.stdout) {
+      proc.stdout.on("data", (chunk: Buffer) => {
+        stdout += chunk.toString();
+      });
+    }
+    if (proc.stderr) {
+      proc.stderr.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString();
+      });
+    }
+
+    const timer = setTimeout(() => {
+      proc.kill("SIGKILL");
+      resolve({ proc, stdout, stderr, exitCode: null });
+    }, timeoutMs);
+
+    proc.on("exit", (code) => {
+      clearTimeout(timer);
+      resolve({ proc, stdout, stderr, exitCode: code });
+    });
+  });
 }
 

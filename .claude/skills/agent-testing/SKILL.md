@@ -59,15 +59,15 @@ Agent e2e tests follow a **setup / execute / assert / cleanup** pattern. The can
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { spawn, type ChildProcess } from "node:child_process";
 import {
   copyFixtureWorkspace,
-  MASON_BIN,
   isDockerAvailable,
+  runMasonPrint,
   testIfProcessAndDockerStopped,
   stopProcessAndDocker,
   testSessionLogContains,
   testFileContents,
+  type ChildProcess,
 } from "@clawmasons/agent-sdk/testing";
 ```
 
@@ -92,36 +92,7 @@ beforeAll(() => {
 
 ### Execute (spawn `mason run`)
 
-```ts
-function runMasonPrint(
-  args: string[],
-  cwd: string,
-  timeoutMs: number = 300_000,
-): Promise<{ proc: ChildProcess; stdout: string; stderr: string; exitCode: number | null }> {
-  return new Promise((resolve) => {
-    const proc = spawn("node", [MASON_BIN, ...args], {
-      cwd,
-      stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env },
-    });
-
-    let stdout = "";
-    let stderr = "";
-    proc.stdout!.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
-    proc.stderr!.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
-
-    const timer = setTimeout(() => {
-      proc.kill("SIGKILL");
-      resolve({ proc, stdout, stderr, exitCode: null });
-    }, timeoutMs);
-
-    proc.on("exit", (code) => {
-      clearTimeout(timer);
-      resolve({ proc, stdout, stderr, exitCode: code });
-    });
-  });
-}
-```
+`runMasonPrint` is imported from `@clawmasons/agent-sdk/testing`. It spawns mason, captures stdout/stderr, and kills the process on timeout (default 300s). Pass extra env vars via `opts.env`.
 
 ### Assert
 
@@ -130,6 +101,7 @@ it("executes a prompt", async () => {
   const { proc, stdout, exitCode } = await runMasonPrint(
     ["run", "--agent", "my-agent", "-p", "what is 2+2?"],
     workspaceDir,
+    { env: { TEST_TOKEN: "e2e-test-token" } },
   );
   lastProc = proc;
 
