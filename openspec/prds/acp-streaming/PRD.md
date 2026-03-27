@@ -90,15 +90,15 @@ Each line emitted by `--json` mode is a JSON object conforming to ACP session up
 ```
 
 #### `tool_call` — Agent invokes a tool
-Per ACP protocol, tool calls use a `toolCall` object with `toolCallId`, `title`, `kind`, and `status`:
+Per ACP protocol, tool call fields are flat on the session update object (not nested in a wrapper). Fields include `toolCallId`, `title`, `kind`, and `status`:
 ```json
-{"sessionUpdate": "tool_call", "toolCall": {"toolCallId": "toolu_abc123", "title": "Read src/index.ts", "kind": "other", "status": "in_progress"}}
+{"sessionUpdate": "tool_call", "toolCallId": "toolu_abc123", "title": "Read src/index.ts", "kind": "other", "status": "in_progress"}
 ```
 
 #### `tool_call_update` — Tool call status change or result
-Used to report tool completion with content:
+Used to report tool completion with content. Only `toolCallId` is required; other fields are optional/nullable:
 ```json
-{"sessionUpdate": "tool_call_update", "toolCall": {"toolCallId": "toolu_abc123", "status": "completed", "content": [{"type": "content", "content": {"type": "text", "text": "file contents..."}}]}}
+{"sessionUpdate": "tool_call_update", "toolCallId": "toolu_abc123", "status": "completed", "content": [{"type": "content", "content": {"type": "text", "text": "file contents..."}}]}
 
 #### `agent_thought_chunk` — Agent reasoning/thinking block
 ```json
@@ -191,7 +191,7 @@ jsonMode: {
     if (event.type === "assistant" && event.message?.content) {
       for (const block of event.message.content) {
         if (block.type === "text") return { sessionUpdate: "agent_message_chunk", content: { type: "text", text: block.text } };
-        if (block.type === "tool_use") return { sessionUpdate: "tool_call", toolCall: { toolCallId: block.id, title: block.name, kind: "other", status: "in_progress" } };
+        if (block.type === "tool_use") return { sessionUpdate: "tool_call", toolCallId: block.id, title: block.name, kind: "other", status: "in_progress" };
       }
     }
     if (event.type === "result" && event.result) {
@@ -218,10 +218,10 @@ jsonMode: {
       return { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: event.item.text } };
     }
     if (event.type === "item.started" && event.item?.type === "command_execution") {
-      return { sessionUpdate: "tool_call", toolCall: { toolCallId: event.item.id, title: event.item.command, kind: "command_execution", status: "in_progress" } };
+      return { sessionUpdate: "tool_call", toolCallId: event.item.id, title: event.item.command, kind: "execute", status: "in_progress" };
     }
     if (event.type === "item.completed" && event.item?.type === "command_execution") {
-      return { sessionUpdate: "tool_call_update", toolCall: { toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text: event.item.aggregated_output ?? "" } }] } };
+      return { sessionUpdate: "tool_call_update", toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text: event.item.aggregated_output ?? "" } }] };
     }
     if ((event.type === "item.started" || event.type === "item.updated") && event.item?.type === "todo_list") {
       return { sessionUpdate: "plan", entries: event.item.items.map((i: { text: string; completed: boolean }) => ({ content: i.text, priority: "medium" as const, status: i.completed ? "completed" as const : "pending" as const })) };
@@ -246,10 +246,10 @@ jsonMode: {
       return text ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text } } : null;
     }
     if (event.type === "tool_call") {
-      return { sessionUpdate: "tool_call", toolCall: { toolCallId: event.id, title: event.name, kind: "other", status: "in_progress" } };
+      return { sessionUpdate: "tool_call", toolCallId: event.id, title: event.name, kind: "other", status: "in_progress" };
     }
     if (event.type === "tool_result") {
-      return { sessionUpdate: "tool_call_update", toolCall: { toolCallId: event.id, status: "completed", content: [{ type: "content", content: { type: "text", text: JSON.stringify(event.content) } }] } };
+      return { sessionUpdate: "tool_call_update", toolCallId: event.id, status: "completed", content: [{ type: "content", content: { type: "text", text: JSON.stringify(event.content) } }] };
     }
     if (event.type === "agent_end" && Array.isArray(event.messages)) {
       const lastAssistant = [...event.messages].reverse().find((m: { role: string }) => m.role === "assistant");
@@ -270,22 +270,37 @@ The ACP prompt executor (`prompt-executor.ts`) is updated to:
 3. For each line, parse it as a JSON ACP session update and call `conn.sessionUpdate()` to forward it to the editor.
 4. After the process exits, send the `end_turn` stop reason as today.
 
-**REQ-9: AcpSessionUpdate type**
-A shared TypeScript type `AcpSessionUpdate` is defined (in `agent-sdk`) representing the union of supported session update objects. This type is used by `parseJsonStreamAsACP` return values and by the ACP consumer.
+**REQ-9: AcpSessionUpdate type with flat tool call fields**
+A shared TypeScript type `AcpSessionUpdate` is defined (in `agent-sdk`) representing the union of supported session update objects. Tool call fields are **flat** on the session update object (intersection types), matching the official ACP spec. The following supporting types are exported: `ToolKind`, `ToolCallStatus`, `ToolCallContent`, `AcpToolCallFields`, `AcpToolCallUpdateFields`. The legacy `ToolCallInfo` interface is deprecated. Runtime validation via `validateSessionUpdate()` (in the CLI package) uses `@agentclientprotocol/sdk` Zod schemas — lenient mode logs validation errors but still forwards the update.
 
 ```typescript
-interface ToolCallInfo {
+type ToolKind = "read" | "edit" | "delete" | "move" | "search" | "execute" | "think" | "fetch" | "switch_mode" | "other";
+type ToolCallStatus = "pending" | "in_progress" | "completed" | "failed";
+type ToolCallContent = { type: "content"; content: { type: "text"; text: string } };
+
+interface AcpToolCallFields {
   toolCallId: string;
-  title?: string;
-  kind?: string;       // "other" | "command_execution" | "file_change" | etc.
-  status: "in_progress" | "completed";
-  content?: Array<{ type: "content"; content: { type: "text"; text: string } }>;
+  title: string;
+  kind?: ToolKind;
+  status?: ToolCallStatus;
+  content?: Array<ToolCallContent>;
 }
+
+interface AcpToolCallUpdateFields {
+  toolCallId: string;
+  title?: string | null;
+  kind?: ToolKind | null;
+  status?: ToolCallStatus | null;
+  content?: Array<ToolCallContent> | null;
+}
+
+/** @deprecated Use AcpToolCallFields or AcpToolCallUpdateFields instead. */
+interface ToolCallInfo { /* ... legacy nested wrapper ... */ }
 
 type AcpSessionUpdate =
   | { sessionUpdate: "agent_message_chunk"; content: { type: "text"; text: string } }
-  | { sessionUpdate: "tool_call"; toolCall: ToolCallInfo }
-  | { sessionUpdate: "tool_call_update"; toolCall: ToolCallInfo }
+  | ({ sessionUpdate: "tool_call" } & AcpToolCallFields)
+  | ({ sessionUpdate: "tool_call_update" } & AcpToolCallUpdateFields)
   | { sessionUpdate: "agent_thought_chunk"; content: { type: "text"; text: string } }
   | { sessionUpdate: "plan"; entries: Array<{ content: string; priority: "high" | "medium" | "low"; status: "pending" | "in_progress" | "completed" }> }
   | { sessionUpdate: "current_mode_update"; modeId: string };
@@ -341,7 +356,7 @@ Codex emits NDJSON with lifecycle events (`thread.started`, `turn.started`, `tur
 |---|---|---|
 | `{"type": "item.completed", "item": {"id": "item_3", "type": "agent_message", "text": "Done. I updated the docs."}}` | `agent_message_chunk` | Map `item.text` → `content.text` |
 | `{"type": "item.completed", "item": {"id": "item_0", "type": "reasoning", "text": "**Scanning docs...**"}}` | `agent_thought_chunk` | Map `item.text` → `content.text` |
-| `{"type": "item.started", "item": {"id": "item_1", "type": "command_execution", "command": "bash -lc ls", "status": "in_progress"}}` | `tool_call` | Map `item.id` → `toolCallId`, `item.command` → `title`, `kind: "command_execution"`, `status: "in_progress"` |
+| `{"type": "item.started", "item": {"id": "item_1", "type": "command_execution", "command": "bash -lc ls", "status": "in_progress"}}` | `tool_call` | Map `item.id` → `toolCallId`, `item.command` → `title`, `kind: "execute"`, `status: "in_progress"` |
 | `{"type": "item.completed", "item": {"id": "item_1", "type": "command_execution", "command": "bash -lc ls", "aggregated_output": "docs\nsrc\n", "exit_code": 0, "status": "completed"}}` | `tool_call_update` | Map `aggregated_output` → content, `status: "completed"` |
 | `{"type": "item.completed", "item": {"id": "item_4", "type": "file_change", "changes": [{"path": "docs/foo.md", "kind": "add"}], "status": "completed"}}` | `tool_call_update` | Map `changes` array to content text summary, `kind: "file_change"` |
 | `{"type": "item.started", "item": {"id": "item_5", "type": "mcp_tool_call", "server": "docs", "tool": "search", "arguments": {"q": "exec"}, "status": "in_progress"}}` | `tool_call` | Map `server/tool` → `title` (e.g. "docs:search"), `kind: "other"` |
@@ -374,7 +389,9 @@ Pi emits JSON events for each step of its agent loop. The exact event schema is 
 
 ### 8.1 `AgentPackage` (agent-sdk)
 - New `jsonMode` property added to the `AgentPackage` interface.
-- New `AcpSessionUpdate` type exported from agent-sdk.
+- New `AcpSessionUpdate` type exported from agent-sdk with flat tool call fields (intersection types).
+- New supporting types exported: `AcpToolCallFields`, `AcpToolCallUpdateFields`, `ToolKind`, `ToolCallStatus`, `ToolCallContent`.
+- Deprecated: `ToolCallInfo` (still exported for backwards compatibility).
 
 ### 8.2 `run-agent.ts` (cli)
 - New `--json` flag on the `run` command.
@@ -401,6 +418,9 @@ Pi emits JSON events for each step of its agent loop. The exact event schema is 
 1. **ACP thinking type:** Use `agent_thought_chunk` as the session update type for thinking/reasoning blocks, following the ACP `session/update` envelope format.
 2. **Tool call streaming:** Emit `tool_call` and `tool_result` as separate events as they arrive from the agent. Do not wait for the result before emitting the call.
 3. **Codex approval bypass:** JSON mode uses the same `--dangerously-bypass-approvals-and-sandbox` flag as print mode. Interactive approval via ACP is a future phase.
+4. **Flat tool call fields:** Tool call fields (`toolCallId`, `title`, `kind`, `status`, `content`) are flat on the session update object, matching the official ACP spec. The earlier nested `toolCall` wrapper approach was replaced.
+5. **Runtime validation:** `validateSessionUpdate()` in the CLI validates each ACP session update against `@agentclientprotocol/sdk` Zod schemas. Validation is **lenient** — errors are logged but the update is still forwarded. This catches spec drift without breaking streaming.
+6. **Codex kind mapping:** Codex `command_execution` events map to `kind: "execute"` (an ACP `ToolKind` value), not `"command_execution"` (which is a Codex item type).
 
 ## 10. Open Questions
 

@@ -53,11 +53,40 @@ export class UpstreamManager {
 
     const connectPromises = this.configs.map(async (config) => {
       const transport = createTransport(config);
-      const client = new Client(
-        { name: "mason-upstream", version: "0.1.0" },
-      );
-      await client.connect(transport);
-      this.clients.set(config.name, client);
+
+      // Capture stderr for stdio transports to include in error messages
+      let stderrOutput = "";
+      if (transport instanceof StdioClientTransport && transport.stderr) {
+        transport.stderr.on("data", (chunk: Buffer) => {
+          stderrOutput += chunk.toString();
+          const lines = chunk.toString().trimEnd();
+          if (lines) {
+            console.error(`[upstream:${config.name}] ${lines}`);
+          }
+        });
+      }
+
+      try {
+        const client = new Client(
+          { name: "mason-upstream", version: "0.1.0" },
+        );
+        await client.connect(transport);
+        this.clients.set(config.name, client);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const detail =
+          config.app.transport === "stdio"
+            ? ` (command: ${config.app.command} ${(config.app.args ?? []).join(" ")})`
+            : config.app.url
+              ? ` (url: ${config.app.url})`
+              : "";
+        const stderrInfo = stderrOutput.trim()
+          ? `\nChild process stderr:\n${stderrOutput.trim()}`
+          : "";
+        throw new Error(
+          `Failed to connect to upstream "${config.name}"${detail}: ${message}${stderrInfo}`,
+        );
+      }
     });
 
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -201,6 +230,7 @@ export function createTransport(
             }
           : undefined,
         cwd: config.cwd,
+        stderr: "pipe",
       });
     }
     case "sse": {

@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import { Readable, Writable } from "node:stream";
 import { AgentSideConnection, ndJsonStream } from "@agentclientprotocol/sdk";
 import { createMasonAcpAgent } from "./acp-agent.js";
+import { closeAcpLogger } from "./acp-logger.js";
 
 /**
  * Register the `mason acp` command.
@@ -32,6 +33,10 @@ export function registerAcpCommand(program: Command): void {
       );
 
       // Keep the process alive until the connection closes
-      await connection.closed;
+      try {
+        await connection.closed;
+      } finally {
+        closeAcpLogger();
+      }
     });
 }

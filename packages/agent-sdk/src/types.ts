@@ -292,9 +292,9 @@ export interface AgentPackage {
      *
      * @param line - The current JSON stream line from the agent
      * @param previousLine - The previous JSON-parseable line (if any)
-     * @returns An ACP session update object, or null if the line should be skipped
+     * @returns An ACP session update, an array of updates (for multi-block events), or null to skip
      */
-    parseJsonStreamAsACP(line: string, previousLine?: string): AcpSessionUpdate | null;
+    parseJsonStreamAsACP(line: string, previousLine?: string): AcpSessionUpdate | AcpSessionUpdate[] | null;
   };
 
   /** Print mode configuration for non-interactive prompt execution with JSON streaming. */

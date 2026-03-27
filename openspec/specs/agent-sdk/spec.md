@@ -13,6 +13,7 @@ The system SHALL define an `AgentPackage` interface that all agent packages MUST
 - `dockerfile?: DockerfileConfig` — optional Dockerfile generation hooks
 - `acp?: AcpConfig` — optional ACP mode configuration
 - `runtime?: RuntimeConfig` — optional runtime command configuration
+- `jsonMode?: { jsonStreamArgs, buildPromptArgs?, parseJsonStreamAsACP }` — optional JSON streaming mode for ACP session update streaming
 
 #### Scenario: Agent package implements full interface
 - **WHEN** an agent package exports an `AgentPackage` object with `name` and `materializer`
@@ -91,7 +92,7 @@ Each agent package SHALL export its `AgentPackage` object as the default export 
 ### Requirement: SDK exports common helper functions
 
 The `@clawmasons/agent-sdk` package SHALL export the following helper functions for use by agent materializer implementations:
-- `generateAgentLaunchJson(agentPkg: AgentPackage, roleCredentials: string[], acpMode?: boolean, instructions?: string, agentArgs?: string[], initialPrompt?: string, printMode?: boolean): string`
+- `generateAgentLaunchJson(agentPkg: AgentPackage, roleCredentials: string[], acpMode?: boolean, instructions?: string, agentArgs?: string[], initialPrompt?: string, printMode?: boolean, jsonMode?: boolean): string`
 - `formatPermittedTools(permissions): string`
 - `collectAllTasks(roles: ResolvedRole[]): Array<[ResolvedTask, ResolvedRole[]]>`
 - `readTasks(config: AgentTaskConfig, projectDir: string): ResolvedTask[]`
@@ -365,3 +366,114 @@ The `@clawmasons/agent-sdk` package SHALL re-export the following types from `@c
 #### Scenario: Agent package imports types from SDK only
 - **WHEN** an agent package needs `ResolvedAgent`, `RuntimeMaterializer`, and `AgentTaskConfig`
 - **THEN** it SHALL be able to import all from `@clawmasons/agent-sdk` without a direct `@clawmasons/shared` dependency
+
+### Requirement: AcpSessionUpdate type with flat tool call fields
+
+The `@clawmasons/agent-sdk` package SHALL export an `AcpSessionUpdate` discriminated union type with tool call fields **flat** on the session update object (intersection types), matching the official ACP spec. The following supporting types SHALL be exported:
+
+- `ToolKind` — `"read" | "edit" | "delete" | "move" | "search" | "execute" | "think" | "fetch" | "switch_mode" | "other"`
+- `ToolCallStatus` — `"pending" | "in_progress" | "completed" | "failed"`
+- `ToolCallContent` — `{ type: "content"; content: { type: "text"; text: string } }`
+- `AcpToolCallFields` — fields for `tool_call` updates: `toolCallId` (required), `title` (required), `kind?`, `status?`, `content?`
+- `AcpToolCallUpdateFields` — fields for `tool_call_update` updates: `toolCallId` (required), all others optional/nullable
+
+The legacy `ToolCallInfo` interface SHALL be exported with a `@deprecated` annotation.
+
+#### Scenario: Flat tool call fields on session update
+- **WHEN** a parser returns `{ sessionUpdate: "tool_call", toolCallId: "abc", title: "Read file", kind: "read", status: "in_progress" }`
+- **THEN** it SHALL conform to `AcpSessionUpdate` (fields are flat, not nested in a `toolCall` wrapper)
+
+#### Scenario: Tool call update with nullable optional fields
+- **WHEN** a parser returns `{ sessionUpdate: "tool_call_update", toolCallId: "abc", status: "completed", content: [...] }`
+- **THEN** it SHALL conform to `AcpSessionUpdate` with only `toolCallId` required
+
+#### Scenario: ToolKind values match ACP spec
+- **WHEN** a parser sets `kind` on a tool call
+- **THEN** the value SHALL be one of the `ToolKind` union members (e.g., `"execute"` for command execution, `"other"` for generic tools)
+
+### Requirement: AgentPackage includes optional jsonMode config
+
+The `AgentPackage` interface SHALL include an optional `jsonMode` field with the following shape:
+
+- `jsonStreamArgs: string[]` — args appended to the agent command to enable JSON streaming output
+- `buildPromptArgs?: (prompt: string) => string[]` — builds CLI args for the initial prompt (defaults to `["-p", prompt]`)
+- `parseJsonStreamAsACP(line: string, previousLine?: string): AcpSessionUpdate | AcpSessionUpdate[] | null` — parses a JSON stream line into ACP session update(s), or returns null to skip
+
+The return type of `parseJsonStreamAsACP` SHALL be widened from `AcpSessionUpdate | null` to `AcpSessionUpdate | AcpSessionUpdate[] | null` to support agents that produce multiple ACP updates from a single JSON stream line (e.g., Claude assistant events with mixed text + tool_use blocks).
+
+When `jsonMode` is omitted, the agent does not support ACP JSON streaming mode.
+
+#### Scenario: Agent package declares jsonMode with array return
+- **WHEN** an agent package exports an `AgentPackage` with `jsonMode.parseJsonStreamAsACP` that returns an array of updates
+- **THEN** the agent registry SHALL accept it
+- **AND** the CLI caller SHALL handle the array by emitting each update as a separate NDJSON line
+
+#### Scenario: Agent package declares jsonMode with single return
+- **WHEN** an agent package exports an `AgentPackage` with `jsonMode.parseJsonStreamAsACP` that returns a single update
+- **THEN** the CLI caller SHALL emit it as a single NDJSON line (backward-compatible)
+
+#### Scenario: Agent package omits jsonMode
+- **WHEN** an agent package exports an `AgentPackage` without `jsonMode`
+- **THEN** the agent registry SHALL accept it
+- **AND** attempting to use `--json` with this agent SHALL produce an error indicating JSON mode is not supported
+
+### Requirement: CLI normalizes parseJsonStreamAsACP array results
+
+The CLI caller in `run-agent.ts` SHALL normalize the result of `parseJsonStreamAsACP`. When the result is an array, each element SHALL be emitted as a separate NDJSON line. When the result is a single object, it SHALL be emitted as a single NDJSON line. When the result is null, no output SHALL be emitted.
+
+The normalization SHALL use `Array.isArray()` to distinguish arrays from single objects.
+
+#### Scenario: Parser returns array of updates
+- **WHEN** `parseJsonStreamAsACP` returns `[update1, update2]`
+- **THEN** the CLI SHALL emit two NDJSON lines, one for each update
+
+#### Scenario: Parser returns single update
+- **WHEN** `parseJsonStreamAsACP` returns a single `AcpSessionUpdate` object
+- **THEN** the CLI SHALL emit one NDJSON line
+
+#### Scenario: Parser returns null
+- **WHEN** `parseJsonStreamAsACP` returns `null`
+- **THEN** the CLI SHALL emit no NDJSON output for that line
+
+### Requirement: MaterializeOptions includes jsonMode boolean
+
+The `MaterializeOptions` interface SHALL include an optional `jsonMode?: boolean` field. When `true`, materializers SHALL pass JSON mode to `generateAgentLaunchJson` so that JSON streaming args and prompt args are included in `agent-launch.json`.
+
+#### Scenario: jsonMode passed through materialization
+- **WHEN** a materializer is called with `options.jsonMode = true`
+- **THEN** it SHALL pass `jsonMode: true` to `generateAgentLaunchJson`
+- **AND** the resulting `agent-launch.json` SHALL include the agent's JSON streaming args and prompt args
+
+#### Scenario: jsonMode omitted defaults to false
+- **WHEN** a materializer is called without `jsonMode` in options
+- **THEN** it SHALL NOT add JSON streaming args to `agent-launch.json`
+
+### Requirement: generateAgentLaunchJson supports jsonMode parameter
+
+`generateAgentLaunchJson` SHALL accept an optional `jsonMode?: boolean` parameter (after `printMode`).
+
+When `jsonMode` is `true` and `acpMode` is `false`:
+1. The agent's `jsonMode.jsonStreamArgs` SHALL be appended to the args array
+2. The `initialPrompt` SHALL be passed through `jsonMode.buildPromptArgs` (defaulting to `["-p", prompt]`)
+
+The full args ordering in JSON mode SHALL be:
+1. Base `runtime.args` (e.g., `["--effort", "max"]`)
+2. `["--append-system-prompt", instructions]` when applicable
+3. `agentArgs` (alias-level overrides)
+4. JSON stream args (e.g., `["--output-format", "stream-json", "--verbose"]`)
+5. Prompt args from `buildPromptArgs` (e.g., `["-p", initialPrompt]`)
+
+#### Scenario: JSON mode emits json stream args and prompt args
+- **WHEN** `generateAgentLaunchJson` is called with `initialPrompt = "fix bug"`, `jsonMode = true`, and `acpMode = false`
+- **AND** the agent's `jsonMode.jsonStreamArgs` is `["--output-format", "stream-json", "--verbose"]`
+- **THEN** `args` SHALL include `["--output-format", "stream-json", "--verbose", "-p", "fix bug"]` after all other flags
+
+#### Scenario: Full arg ordering with all params in JSON mode
+- **WHEN** `generateAgentLaunchJson` is called with `instructions`, `agentArgs = ["--extra"]`, `initialPrompt = "go"`, and `jsonMode = true`
+- **AND** `supportsAppendSystemPrompt = true` and `acpMode = false`
+- **AND** `jsonStreamArgs = ["--output-format", "stream-json", "--verbose"]`
+- **THEN** `args` SHALL be `[...baseArgs, "--append-system-prompt", instructions, "--extra", "--output-format", "stream-json", "--verbose", "-p", "go"]`
+
+#### Scenario: jsonMode not applied in ACP mode
+- **WHEN** `acpMode = true` and `jsonMode = true`
+- **THEN** JSON streaming args SHALL NOT be appended to `args`

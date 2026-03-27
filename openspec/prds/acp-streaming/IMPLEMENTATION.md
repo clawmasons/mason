@@ -13,13 +13,13 @@ Add the shared `AcpSessionUpdate` discriminated union type and the `jsonMode` pr
 
 **PRD refs:** REQ-9 (AcpSessionUpdate type), REQ-2 (jsonMode on AgentPackage), REQ-3 (jsonMode independent of printMode)
 
-**Summary:** Define the `AcpSessionUpdate` type (union of `agent_message_chunk`, `tool_call`, `tool_call_update`, `agent_thought_chunk`, `plan`, `current_mode_update`) and the `ToolCallInfo` interface in `packages/agent-sdk/src/types.ts`. Add the optional `jsonMode` property to `AgentPackage` — structurally parallel to the existing `printMode` but with `parseJsonStreamAsACP` returning `AcpSessionUpdate | null` instead of extracting a final result string. Export the new types from the agent-sdk barrel.
+**Summary:** Define the `AcpSessionUpdate` type (union of `agent_message_chunk`, `tool_call`, `tool_call_update`, `agent_thought_chunk`, `plan`, `current_mode_update`) with flat tool call fields (intersection types matching the ACP spec) in `packages/agent-sdk/src/types.ts`. Define supporting types: `ToolKind`, `ToolCallStatus`, `ToolCallContent`, `AcpToolCallFields`, `AcpToolCallUpdateFields`. Deprecate the legacy `ToolCallInfo` interface (kept for backwards compatibility). Add the optional `jsonMode` property to `AgentPackage` — structurally parallel to the existing `printMode` but with `parseJsonStreamAsACP` returning `AcpSessionUpdate | null` instead of extracting a final result string. Export all new types from the agent-sdk barrel.
 
 **User Story:** As an agent package author, I want a well-typed `jsonMode` field on `AgentPackage` with a clear `AcpSessionUpdate` return type, so that I can implement my agent's JSON-to-ACP parser with compile-time safety.
 
 **Scope:**
-- Modify: `packages/agent-sdk/src/types.ts` — add `ToolCallInfo`, `AcpSessionUpdate`, `jsonMode` on `AgentPackage`
-- Modify: `packages/agent-sdk/src/index.ts` — export new types
+- Modify: `packages/agent-sdk/src/types.ts` — add `ToolKind`, `ToolCallStatus`, `ToolCallContent`, `AcpToolCallFields`, `AcpToolCallUpdateFields`, `AcpSessionUpdate` (flat intersection types), deprecated `ToolCallInfo`, `jsonMode` on `AgentPackage`
+- Modify: `packages/agent-sdk/src/index.ts` — export all new types (`AcpSessionUpdate`, `AcpToolCallFields`, `AcpToolCallUpdateFields`, `ToolKind`, `ToolCallStatus`, `ToolCallContent`, `ToolCallInfo`)
 - New test: `packages/agent-sdk/tests/acp-session-update.test.ts` — type validation tests (verify discriminated union works, parser signature matches)
 
 **Testable output:** `npx tsc --noEmit` passes. Unit tests verify that objects conforming to each `AcpSessionUpdate` variant are accepted, and that `jsonMode.parseJsonStreamAsACP` has the correct signature.
@@ -55,7 +55,7 @@ Add `jsonMode` to the Codex agent package with a parser that maps Codex's `exec 
 
 **PRD refs:** REQ-6 (Codex Agent jsonMode), PRD §7.2 (Codex JSON stream format)
 
-**Summary:** Implement `jsonMode` on the Codex agent package: `jsonStreamArgs: ["exec", "--dangerously-bypass-approvals-and-sandbox", "--skip-git-repo-check", "--json"]`, `buildPromptArgs: (prompt) => [prompt]`, and `parseJsonStreamAsACP` mapping: `item.completed` + `agent_message` → `agent_message_chunk`, `reasoning` → `agent_thought_chunk`, `command_execution` started/completed → `tool_call`/`tool_call_update`, `file_change` → `tool_call_update`, `mcp_tool_call` → `tool_call`/`tool_call_update`, `todo_list` → `plan`. Codex is the richest parser — it produces plan and thinking events that Claude and Pi do not.
+**Summary:** Implement `jsonMode` on the Codex agent package: `jsonStreamArgs: ["exec", "--dangerously-bypass-approvals-and-sandbox", "--skip-git-repo-check", "--json"]`, `buildPromptArgs: (prompt) => [prompt]`, and `parseJsonStreamAsACP` mapping: `item.completed` + `agent_message` → `agent_message_chunk`, `reasoning` → `agent_thought_chunk`, `command_execution` started/completed → `tool_call`/`tool_call_update`, `file_change` → `tool_call_update`, `mcp_tool_call` → `tool_call`/`tool_call_update`, `todo_list` → `plan`. Codex is the richest parser — it produces plan and thinking events that Claude and Pi do not. **Note:** Codex `command_execution` events map to `kind: "execute"` (an ACP `ToolKind` value), not `"command_execution"` (which is a Codex item type, not a valid ACP kind).
 
 **User Story:** As an editor user running a Codex-backed agent, I want to see Codex's reasoning, command executions, file changes, and todo list progress streamed in real time.
 
@@ -150,3 +150,35 @@ Update the ACP prompt executor to use `--json` mode and stream each parsed line 
 **Testable output:** ACP prompt execution streams updates to the editor. Each `AcpSessionUpdate` line from `mason run --json` becomes a `conn.sessionUpdate()` call. Editor sees real-time agent activity. `end_turn` is sent after process exit.
 
 **Implemented** — PR #244
+
+---
+
+### CHANGE 8: ACP Spec Compliance — Flat Tool Call Fields & Runtime Validation
+
+Align ACP session update types and parser output with the official ACP spec: flatten tool call fields, add proper ACP types, fix Codex kind values, and add runtime validation.
+
+**PRD refs:** REQ-9 (AcpSessionUpdate type), §7.2 (Codex mapping), §9 (Resolved Decisions)
+
+**Summary:** This change brings the implementation into compliance with the official ACP spec as defined by `@agentclientprotocol/sdk`:
+
+1. **Flat tool call fields:** Replace the nested `toolCall` wrapper with intersection types (`{ sessionUpdate: "tool_call" } & AcpToolCallFields`). Fields like `toolCallId`, `title`, `kind`, `status`, and `content` are now flat on the session update object.
+2. **New supporting types:** Add `ToolKind` (union of ACP tool kinds), `ToolCallStatus`, `ToolCallContent`, `AcpToolCallFields` (for `tool_call`), `AcpToolCallUpdateFields` (for `tool_call_update` — only `toolCallId` required, others nullable).
+3. **Codex kind alignment:** Codex `command_execution` events now map to `kind: "execute"` (a valid ACP `ToolKind`), not `"command_execution"` (which was a Codex item type).
+4. **Runtime validation:** New `validateSessionUpdate()` function uses `@agentclientprotocol/sdk` Zod schemas to validate each session update at runtime. Validation is lenient — errors are logged to stderr but the update is still forwarded.
+5. **Deprecated `ToolCallInfo`:** The legacy nested wrapper interface is deprecated but still exported for backwards compatibility.
+
+**User Story:** As an ACP integration, I want session updates to conform to the official ACP spec schema, so that spec-compliant ACP clients can consume them without transformation.
+
+**Scope:**
+- Modify: `packages/agent-sdk/src/types.ts` — flatten `AcpSessionUpdate`, add new types, deprecate `ToolCallInfo`
+- Modify: `packages/agent-sdk/src/index.ts` — export new types
+- Modify: `packages/agent-sdk/tests/acp-session-update.test.ts` — update tests for flat fields
+- New: `packages/cli/src/acp/validate-session-update.ts` — runtime validation using `@agentclientprotocol/sdk` Zod schemas
+- Modify: `packages/cli/src/cli/commands/run-agent.ts` — call `validateSessionUpdate()` on each parsed update
+- Modify: `packages/cli/src/acp/acp-agent.ts` — validate updates before forwarding
+- Modify: all agent `parseJsonStreamAsACP` implementations and their tests — emit flat fields, use `kind: "execute"` for Codex
+- Modify: `packages/cli/tests/acp/mock-agent-packages.ts` — update mock fixtures for flat fields
+
+**Testable output:** `npx tsc --noEmit` passes. All existing ACP streaming tests updated for flat fields. Validation logs errors for non-conforming updates but does not block them.
+
+**Implemented** — commit 797d0fa

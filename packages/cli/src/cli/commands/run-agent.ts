@@ -1581,11 +1581,14 @@ async function runAgentJsonMode(
           try {
             const result = parseJsonStreamAsACP(line, previousLine);
             if (result !== null) {
-              const validation = validateAcpUpdate(result);
-              if (!validation.valid) {
-                fileLogger.error(`[stream] ACP validation error: ${validation.errors?.join("; ")}`);
+              const updates = Array.isArray(result) ? result : [result];
+              for (const update of updates) {
+                const validation = validateAcpUpdate(update);
+                if (!validation.valid) {
+                  fileLogger.error(`[stream] ACP validation error: ${validation.errors?.join("; ")}`);
+                }
+                process.stdout.write(JSON.stringify(update) + "\n");
               }
-              process.stdout.write(JSON.stringify(result) + "\n");
             }
           } catch (err) {
             fileLogger.error(`[stream] parse error: ${err instanceof Error ? err.message : String(err)}`);

@@ -150,7 +150,7 @@ describe("json mode streaming parse logic", () => {
    */
   function simulateJsonStreamParse(
     lines: string[],
-    parseJsonStreamAsACP: (line: string, previousLine?: string) => AcpSessionUpdate | null,
+    parseJsonStreamAsACP: (line: string, previousLine?: string) => AcpSessionUpdate | AcpSessionUpdate[] | null,
   ): { output: AcpSessionUpdate[]; previousLine: string | undefined } {
     const output: AcpSessionUpdate[] = [];
     let previousLine: string | undefined;
@@ -161,7 +161,10 @@ describe("json mode streaming parse logic", () => {
         try {
           const result = parseJsonStreamAsACP(line, previousLine);
           if (result !== null) {
-            output.push(result);
+            const updates = Array.isArray(result) ? result : [result];
+            for (const update of updates) {
+              output.push(update);
+            }
           }
         } catch {
           // errors are logged to stderr and skipped
