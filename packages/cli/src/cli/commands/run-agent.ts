@@ -424,7 +424,7 @@ export async function ensureDockerBuild(
   agentType: string,
   projectDir: string,
   deps?: { existsSyncFn?: (p: string) => boolean; forceRebuild?: boolean; devContainerCustomizations?: DevContainerCustomizations; agentConfigCredentials?: string[]; agentArgs?: string[]; initialPrompt?: string; llmConfig?: { provider: string; model: string }; printMode?: boolean; jsonMode?: boolean },
-): Promise<{ dockerBuildDir: string; dockerDir: string }> {
+): Promise<{ dockerBuildDir: string; dockerDir: string; rebuilt: boolean }> {
   const existsSync = deps?.existsSyncFn ?? fs.existsSync;
   const roleName = getAppShortName(roleType.metadata.name);
   const dockerDir = path.join(projectDir, ".mason", "docker");
@@ -493,9 +493,10 @@ export async function ensureDockerBuild(
     fs.writeFileSync(hashFilePath, packagesHash);
 
     console.log(`  Docker artifacts built at .mason/docker/${roleName}/`);
+    return { dockerBuildDir, dockerDir, rebuilt: true };
   }
 
-  return { dockerBuildDir, dockerDir };
+  return { dockerBuildDir, dockerDir, rebuilt: false };
 }
 
 // ── Help Text ─────────────────────────────────────────────────────────
@@ -1303,7 +1304,7 @@ async function runAgentInteractiveMode(
     console.log(`  Source: ${roleType.sources.length > 0 ? roleType.sources.join(", ") : "(none)"}`);
 
     // 4. Ensure docker build artifacts exist (auto-build if missing)
-    const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
+    const { dockerBuildDir, dockerDir, rebuilt } = await ensureDockerBuild(
       roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs, initialPrompt, llmConfig },
     );
 
@@ -1346,19 +1347,21 @@ async function runAgentInteractiveMode(
     console.log(`  Compose: .mason/sessions/${sessionId}/docker-compose.yaml`);
 
     // 7. Build and start proxy detached
-    console.log(`\n  Building proxy (${proxyServiceName})...`);
+    if (rebuilt || buildMode) {
+      console.log(`\n  Building proxy (${proxyServiceName})...`);
 
-    const buildArgs = ["build"];
-    if (buildMode) buildArgs.push("--no-cache");
-    buildArgs.push(proxyServiceName);
+      const buildArgs = ["build"];
+      if (buildMode) buildArgs.push("--no-cache");
+      buildArgs.push(proxyServiceName);
 
-    const buildCode = await execCompose(
-      composeFile,
-      buildArgs,
-      { verbose },
-    );
-    if (buildCode !== 0) {
-      throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+      const buildCode = await execCompose(
+        composeFile,
+        buildArgs,
+        { verbose },
+      );
+      if (buildCode !== 0) {
+        throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+      }
     }
 
     console.log(`  Starting proxy (${proxyServiceName})...`);
@@ -1406,7 +1409,8 @@ async function runAgentInteractiveMode(
 
     // When stdin is not a TTY (e.g. piped from a test), pass -T to disable
     // pseudo-TTY allocation so docker compose run works with piped stdio.
-    const runArgs = ["run", "--rm", "--service-ports", "--build"];
+    const runArgs = ["run", "--rm", "--service-ports"];
+    if (buildMode) runArgs.push("--build");
     if (!process.stdin.isTTY) {
       runArgs.push("-T");
     }
@@ -1482,7 +1486,7 @@ async function runAgentJsonMode(
     console.log(`[json] Role: ${roleName} (${roleType.type})`);
 
     // 2. Ensure docker build artifacts (with jsonMode so json stream args land in agent-launch.json)
-    const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
+    const { dockerBuildDir, dockerDir, rebuilt } = await ensureDockerBuild(
       roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs, initialPrompt, llmConfig, jsonMode: true },
     );
 
@@ -1532,11 +1536,13 @@ async function runAgentJsonMode(
     console.log(`[json] Session: ${sessionId}`);
 
     // 6. Build and start proxy
-    const buildArgs = ["build"];
-    if (buildMode) buildArgs.push("--no-cache");
-    buildArgs.push(proxyServiceName);
-    const buildCode = await execCompose(composeFile, buildArgs, { verbose, logger: fileLogger });
-    if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+    if (rebuilt || buildMode) {
+      const buildArgs = ["build"];
+      if (buildMode) buildArgs.push("--no-cache");
+      buildArgs.push(proxyServiceName);
+      const buildCode = await execCompose(composeFile, buildArgs, { verbose, logger: fileLogger });
+      if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+    }
 
     const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose, logger: fileLogger, timeoutMs: 30_000 });
     if (proxyCode !== 0) throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
@@ -1571,7 +1577,9 @@ async function runAgentJsonMode(
     const parseJsonStreamAsACP = agentPkg?.jsonMode?.parseJsonStreamAsACP;
 
     let previousLine: string | undefined;
-    const runArgs = ["run", "--rm", "--service-ports", "--build", "-T", agentServiceName];
+    const runArgs = ["run", "--rm", "--service-ports"];
+    if (buildMode) runArgs.push("--build");
+    runArgs.push("-T", agentServiceName);
     fileLogger.log(`[json] Docker command: docker compose -f ${composeFile} ${runArgs.join(" ")}`);
     const { code: agentCode, stderr: composeStderr } = await execComposeRunWithStreamCapture(composeFile, runArgs, (line) => {
       fileLogger.log(`[stream] ${line}`);
@@ -1678,7 +1686,7 @@ async function runAgentPrintMode(
     console.log(`[print] Role: ${roleName} (${roleType.type})`);
 
     // 2. Ensure docker build artifacts (with printMode so -p and json stream args land in agent-launch.json)
-    const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
+    const { dockerBuildDir, dockerDir, rebuilt } = await ensureDockerBuild(
       roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs, initialPrompt, llmConfig, printMode: true },
     );
 
@@ -1728,11 +1736,13 @@ async function runAgentPrintMode(
     console.log(`[print] Session: ${sessionId}`);
 
     // 6. Build and start proxy
-    const buildArgs = ["build"];
-    if (buildMode) buildArgs.push("--no-cache");
-    buildArgs.push(proxyServiceName);
-    const buildCode = await execCompose(composeFile, buildArgs, { verbose, logger: fileLogger });
-    if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+    if (rebuilt || buildMode) {
+      const buildArgs = ["build"];
+      if (buildMode) buildArgs.push("--no-cache");
+      buildArgs.push(proxyServiceName);
+      const buildCode = await execCompose(composeFile, buildArgs, { verbose, logger: fileLogger });
+      if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+    }
 
     const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose, logger: fileLogger, timeoutMs: 30_000 });
     if (proxyCode !== 0) throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
@@ -1768,7 +1778,9 @@ async function runAgentPrintMode(
 
     let finalResult: string | null = null;
     let previousLine: string | undefined;
-    const runArgs = ["run", "--rm", "--service-ports", "--build", "-T", agentServiceName];
+    const runArgs = ["run", "--rm", "--service-ports"];
+    if (buildMode) runArgs.push("--build");
+    runArgs.push("-T", agentServiceName);
     fileLogger.log(`[print] Docker command: docker compose -f ${composeFile} ${runArgs.join(" ")}`);
     const { code: agentCode, stderr: composeStderr } = await execComposeRunWithStreamCapture(composeFile, runArgs, (line) => {
       fileLogger.log(`[stream] ${line}`);
@@ -1889,7 +1901,7 @@ async function runAgentDevContainerMode(
     console.log(`  Mode: dev-container`);
 
     // 3. Ensure docker build artifacts
-    const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
+    const { dockerBuildDir, dockerDir, rebuilt } = await ensureDockerBuild(
       roleType, agentType, projectDir,
       { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations, agentConfigCredentials, agentArgs, initialPrompt, llmConfig },
     );
@@ -1962,12 +1974,14 @@ async function runAgentDevContainerMode(
     console.log(`  Compose: .mason/sessions/${sessionId}/docker-compose.yaml`);
 
     // 7. Build and start proxy
-    console.log(`\n  Building proxy (${proxyServiceName})...`);
-    const buildArgs = ["build"];
-    if (buildMode) buildArgs.push("--no-cache");
-    buildArgs.push(proxyServiceName);
-    const buildCode = await execCompose(composeFile, buildArgs, { verbose });
-    if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+    if (rebuilt || buildMode) {
+      console.log(`\n  Building proxy (${proxyServiceName})...`);
+      const buildArgs = ["build"];
+      if (buildMode) buildArgs.push("--no-cache");
+      buildArgs.push(proxyServiceName);
+      const buildCode = await execCompose(composeFile, buildArgs, { verbose });
+      if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+    }
 
     const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose, timeoutMs: 30_000 });
     if (proxyCode !== 0) throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
@@ -1991,12 +2005,14 @@ async function runAgentDevContainerMode(
     console.log(`  Host proxy connected.`);
 
     // 10. Build and start agent container in background (detached)
-    console.log(`\n  Building agent (${agentServiceName})...`);
-    const agentBuildArgs = ["build"];
-    if (buildMode) agentBuildArgs.push("--no-cache");
-    agentBuildArgs.push(agentServiceName);
-    const agentBuildCode = await execCompose(composeFile, agentBuildArgs, { verbose });
-    if (agentBuildCode !== 0) throw new Error(`Failed to build agent image (exit code ${agentBuildCode}).`);
+    if (rebuilt || buildMode) {
+      console.log(`\n  Building agent (${agentServiceName})...`);
+      const agentBuildArgs = ["build"];
+      if (buildMode) agentBuildArgs.push("--no-cache");
+      agentBuildArgs.push(agentServiceName);
+      const agentBuildCode = await execCompose(composeFile, agentBuildArgs, { verbose });
+      if (agentBuildCode !== 0) throw new Error(`Failed to build agent image (exit code ${agentBuildCode}).`);
+    }
 
     const agentUpCode = await execCompose(composeFile, ["up", "-d", agentServiceName], { verbose });
     if (agentUpCode !== 0) throw new Error(`Failed to start agent container (exit code ${agentUpCode}).`);
@@ -2106,7 +2122,7 @@ export async function runProxyOnly(
   const agentType = agentOverride ?? inferAgentType(roleType, readDefaultAgent(projectDir));
 
   // 4. Ensure docker build artifacts exist (auto-build if missing)
-  const { dockerBuildDir, dockerDir } = await ensureDockerBuild(
+  const { dockerBuildDir, dockerDir, rebuilt } = await ensureDockerBuild(
     roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn },
   );
 
@@ -2134,9 +2150,11 @@ export async function runProxyOnly(
   const { sessionId, composeFile, proxyToken, proxyServiceName } = session;
 
   // 7. Build and start proxy detached
-  const buildCode = await execCompose(composeFile, ["build", proxyServiceName]);
-  if (buildCode !== 0) {
-    throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+  if (rebuilt) {
+    const buildCode = await execCompose(composeFile, ["build", proxyServiceName]);
+    if (buildCode !== 0) {
+      throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+    }
   }
 
   const upCode = await execCompose(composeFile, ["up", "-d", proxyServiceName]);
