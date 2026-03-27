@@ -2,6 +2,13 @@
 export type {
   AgentPackage,
   AgentTaskConfig,
+  AcpSessionUpdate,
+  AcpToolCallFields,
+  AcpToolCallUpdateFields,
+  ToolKind,
+  ToolCallStatus,
+  ToolCallContent,
+  ToolCallInfo,
   DockerfileConfig,
   AcpConfig,
   RuntimeConfig,

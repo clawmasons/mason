@@ -1697,3 +1697,146 @@ describe("generateProjectRole", () => {
 });
 
 // vscode-server mount tests now covered in "generateSessionComposeYml (run-agent scenarios)" above
+
+// ── Print Mode Streaming Parse Logic ────────────────────────────────────────
+// These tests validate the streaming callback pattern used in print mode:
+// - previousLine tracking (only JSON-looking lines)
+// - previousLine passed to parser
+// - finalResult keeps updating (last non-null wins, not first)
+
+describe("print mode streaming parse logic", () => {
+  /**
+   * Simulates the streaming callback from run-agent.ts print mode.
+   * This mirrors the inline closure in createRunAction.
+   */
+  function simulateStreamParse(
+    lines: string[],
+    parseFinalResult: (line: string, previousLine?: string) => string | null,
+  ): { finalResult: string | null; previousLine: string | undefined } {
+    let finalResult: string | null = null;
+    let previousLine: string | undefined;
+
+    for (const line of lines) {
+      const trimmed = line.trimStart();
+      if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        try {
+          const result = parseFinalResult(line, previousLine);
+          if (result !== null) {
+            finalResult = result;
+          }
+        } catch {
+          // errors are logged and skipped
+        }
+        previousLine = line;
+      }
+    }
+
+    return { finalResult, previousLine };
+  }
+
+  it("tracks previousLine only for JSON-looking lines", () => {
+    const parser = vi.fn(() => null);
+    const lines = [
+      '{"type":"thread.started"}',
+      "some plain text log",
+      '{"type":"turn.started"}',
+    ];
+
+    simulateStreamParse(lines, parser);
+
+    // First call: no previousLine
+    expect(parser).toHaveBeenNthCalledWith(1, '{"type":"thread.started"}', undefined);
+    // Second line is not JSON — skipped, previousLine stays as first JSON line
+    // Third call: previousLine is the first JSON line
+    expect(parser).toHaveBeenNthCalledWith(2, '{"type":"turn.started"}', '{"type":"thread.started"}');
+  });
+
+  it("keeps updating finalResult on each non-null return (last wins)", () => {
+    const parser = (line: string) => {
+      const event = JSON.parse(line);
+      if (event.type === "agent_message") return event.text;
+      return null;
+    };
+
+    const lines = [
+      '{"type":"agent_message","text":"first message"}',
+      '{"type":"command_execution"}',
+      '{"type":"agent_message","text":"final answer"}',
+      '{"type":"turn.completed"}',
+    ];
+
+    const { finalResult } = simulateStreamParse(lines, parser);
+    expect(finalResult).toBe("final answer");
+  });
+
+  it("returns null when parser never returns non-null", () => {
+    const parser = () => null;
+    const lines = [
+      '{"type":"thread.started"}',
+      '{"type":"turn.completed"}',
+    ];
+
+    const { finalResult } = simulateStreamParse(lines, parser);
+    expect(finalResult).toBeNull();
+  });
+
+  it("passes previousLine to parser for turn.completed pattern", () => {
+    // Simulates the codex-agent parser pattern
+    const parser = (line: string, previousLine?: string): string | null => {
+      const event = JSON.parse(line);
+      if (event.type === "turn.completed" && previousLine) {
+        const prev = JSON.parse(previousLine);
+        if (prev.type === "item.completed" && prev.item?.type === "agent_message") {
+          return prev.item.text ?? "";
+        }
+      }
+      return null;
+    };
+
+    const lines = [
+      '{"type":"item.started","item":{"id":"item_1","type":"agent_message","text":"thinking..."}}',
+      '{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"bash","status":"completed","output":"data"}}',
+      '{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"The final answer is 42."}}',
+      '{"type":"turn.completed","usage":{"input_tokens":100,"output_tokens":50}}',
+    ];
+
+    const { finalResult } = simulateStreamParse(lines, parser);
+    expect(finalResult).toBe("The final answer is 42.");
+  });
+
+  it("handles parse errors gracefully without crashing", () => {
+    const parser = (line: string) => {
+      JSON.parse(line); // will throw on invalid JSON
+      return null;
+    };
+
+    const lines = [
+      '{"type":"valid"}',
+      "{invalid json",
+      '{"type":"also_valid"}',
+    ];
+
+    // Should not throw — errors are caught
+    const { finalResult } = simulateStreamParse(lines, parser);
+    expect(finalResult).toBeNull();
+  });
+
+  it("existing parsers work unchanged with optional previousLine", () => {
+    // claude-code-agent style parser — ignores previousLine
+    const claudeParser = (line: string): string | null => {
+      const event = JSON.parse(line);
+      if (event.type === "result") {
+        return event.result ?? "";
+      }
+      return null;
+    };
+
+    const lines = [
+      '{"type":"message","text":"working..."}',
+      '{"type":"result","result":"Hello, world!"}',
+    ];
+
+    const { finalResult } = simulateStreamParse(lines, claudeParser);
+    expect(finalResult).toBe("Hello, world!");
+  });
+});

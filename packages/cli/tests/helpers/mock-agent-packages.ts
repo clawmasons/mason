@@ -17,6 +17,7 @@ import type {
   AgentValidationResult,
   AgentConfigSchema,
   AgentCredentialRequirement,
+  AcpSessionUpdate,
 } from "@clawmasons/agent-sdk";
 import type { ResolvedAgent } from "@clawmasons/shared";
 
@@ -61,6 +62,27 @@ export const mockClaudeCodeAgent: AgentPackage = {
   },
   dockerfile: {
     installSteps: "RUN npm install -g @anthropic-ai/claude-code",
+  },
+  jsonMode: {
+    jsonStreamArgs: ["--output-format", "stream-json", "--verbose"],
+    buildPromptArgs: (prompt: string) => ["-p", prompt],
+    parseJsonStreamAsACP(line: string): AcpSessionUpdate | null {
+      const event = JSON.parse(line);
+      if (event.type === "assistant" && event.message?.content) {
+        for (const block of event.message.content) {
+          if (block.type === "text") {
+            return { sessionUpdate: "agent_message_chunk", content: { type: "text", text: block.text } };
+          }
+          if (block.type === "tool_use") {
+            return { sessionUpdate: "tool_call", toolCallId: block.id, title: block.name, kind: "other", status: "in_progress" };
+          }
+        }
+      }
+      if (event.type === "result" && event.result) {
+        return { sessionUpdate: "agent_message_chunk", content: { type: "text", text: event.result } };
+      }
+      return null;
+    },
   },
   validate: (agent: ResolvedAgent): AgentValidationResult => {
     const errors: AgentValidationResult["errors"] = [];
@@ -172,6 +194,37 @@ export const mockPiCodingAgent: AgentPackage = {
     command: "pi",
     credentials: [],
   },
+  jsonMode: {
+    jsonStreamArgs: ["--mode", "json"],
+    buildPromptArgs: (prompt: string) => ["-p", prompt],
+    parseJsonStreamAsACP(line: string): AcpSessionUpdate | null {
+      const event = JSON.parse(line);
+      if (event.type === "assistant_message" && Array.isArray(event.content)) {
+        const text = event.content
+          .filter((b: { type: string }) => b.type === "text")
+          .map((b: { text: string }) => b.text)
+          .join("\n");
+        return text ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text } } : null;
+      }
+      if (event.type === "tool_call") {
+        return { sessionUpdate: "tool_call", toolCallId: event.id, title: event.name, kind: "other", status: "in_progress" };
+      }
+      if (event.type === "tool_result") {
+        return { sessionUpdate: "tool_call_update", toolCallId: event.id, status: "completed", content: [{ type: "content", content: { type: "text", text: JSON.stringify(event.content) } }] };
+      }
+      if (event.type === "agent_end" && Array.isArray(event.messages)) {
+        const lastAssistant = [...event.messages].reverse().find((m: { role: string }) => m.role === "assistant");
+        if (lastAssistant?.content) {
+          const text = lastAssistant.content
+            .filter((b: { type: string }) => b.type === "text")
+            .map((b: { text: string }) => b.text)
+            .join("\n");
+          return text ? { sessionUpdate: "agent_message_chunk", content: { type: "text", text } } : null;
+        }
+      }
+      return null;
+    },
+  },
   configSchema: mockPiCodingAgentConfigSchema,
   credentialsFn: (config: Record<string, string>): AgentCredentialRequirement[] => {
     const provider = config["llm.provider"];
@@ -219,5 +272,65 @@ export const mockCodexAgent: AgentPackage = {
     tasks: "tasks",
     apps: "mcp_servers",
     skills: "skills",
+  },
+  jsonMode: {
+    jsonStreamArgs: ["exec", "--dangerously-bypass-approvals-and-sandbox", "--skip-git-repo-check", "--json"],
+    buildPromptArgs: (prompt: string) => [prompt],
+    parseJsonStreamAsACP(line: string): AcpSessionUpdate | null {
+      const event = JSON.parse(line);
+
+      // item.completed + agent_message → agent_message_chunk
+      if (event.type === "item.completed" && event.item?.type === "agent_message") {
+        return { sessionUpdate: "agent_message_chunk", content: { type: "text", text: event.item.text } };
+      }
+
+      // item.completed + reasoning → agent_thought_chunk
+      if (event.type === "item.completed" && event.item?.type === "reasoning") {
+        return { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: event.item.text } };
+      }
+
+      // item.started + command_execution → tool_call (in_progress)
+      if (event.type === "item.started" && event.item?.type === "command_execution") {
+        return { sessionUpdate: "tool_call", toolCallId: event.item.id, title: event.item.command, kind: "execute", status: "in_progress" };
+      }
+
+      // item.completed + command_execution → tool_call_update (completed)
+      if (event.type === "item.completed" && event.item?.type === "command_execution") {
+        return { sessionUpdate: "tool_call_update", toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text: event.item.aggregated_output ?? "" } }] };
+      }
+
+      // item.completed + file_change → tool_call_update
+      if (event.type === "item.completed" && event.item?.type === "file_change") {
+        const changes = event.item.changes?.map((c: { path: string; kind: string }) => `${c.kind}: ${c.path}`).join(", ") ?? "";
+        return { sessionUpdate: "tool_call_update", toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text: changes } }] };
+      }
+
+      // item.started + mcp_tool_call → tool_call (in_progress)
+      if (event.type === "item.started" && event.item?.type === "mcp_tool_call") {
+        return { sessionUpdate: "tool_call", toolCallId: event.item.id, title: `${event.item.server}:${event.item.tool}`, kind: "other", status: "in_progress" };
+      }
+
+      // item.completed + mcp_tool_call → tool_call_update (completed)
+      if (event.type === "item.completed" && event.item?.type === "mcp_tool_call") {
+        const text = event.item.result?.content ? JSON.stringify(event.item.result.content) : "";
+        return { sessionUpdate: "tool_call_update", toolCallId: event.item.id, status: "completed", content: [{ type: "content", content: { type: "text", text } }] };
+      }
+
+      // todo_list → plan (both item.started and item.updated)
+      if ((event.type === "item.started" || event.type === "item.updated") && event.item?.type === "todo_list") {
+        const entries = event.item.items.map((i: { text: string; completed: boolean }, idx: number) => {
+          let status: "pending" | "in_progress" | "completed" = "pending";
+          if (i.completed) {
+            status = "completed";
+          } else if (idx === event.item.items.findIndex((x: { completed: boolean }) => !x.completed)) {
+            status = "in_progress";
+          }
+          return { content: i.text, priority: "medium" as const, status };
+        });
+        return { sessionUpdate: "plan", entries };
+      }
+
+      return null;
+    },
   },
 };

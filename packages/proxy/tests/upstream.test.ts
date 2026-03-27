@@ -131,14 +131,15 @@ describe("proxy/upstream", () => {
   });
 
   describe("createTransport", () => {
-    it("creates StdioClientTransport for stdio apps", () => {
+    it("creates StdioClientTransport for stdio apps with stderr piped", () => {
       const config: UpstreamAppConfig = {
         name: "github",
         app: makeStdioApp(),
         env: { GITHUB_TOKEN: "ghp_test" },
       };
-      const transport = createTransport(config);
+      const transport = createTransport(config) as unknown as { type: string; params: Record<string, unknown> };
       expect(transport).toHaveProperty("type", "stdio");
+      expect(transport.params).toHaveProperty("stderr", "pipe");
     });
 
     it("creates SSEClientTransport for sse apps", () => {
@@ -230,13 +231,26 @@ describe("proxy/upstream", () => {
         expect(mockConnect).toHaveBeenCalledTimes(3);
       });
 
-      it("throws on connection failure", async () => {
+      it("throws on connection failure with upstream name and command", async () => {
         mockConnect.mockRejectedValueOnce(new Error("Connection refused"));
         const configs: UpstreamAppConfig[] = [
           { name: "broken", app: makeStdioApp() },
         ];
         const manager = new UpstreamManager(configs);
-        await expect(manager.initialize()).rejects.toThrow("Connection refused");
+        await expect(manager.initialize()).rejects.toThrow(
+          /Failed to connect to upstream "broken" \(command: node server\.js\): Connection refused/,
+        );
+      });
+
+      it("includes url in error for sse/http upstream failures", async () => {
+        mockConnect.mockRejectedValueOnce(new Error("Connection refused"));
+        const configs: UpstreamAppConfig[] = [
+          { name: "broken-sse", app: makeSseApp() },
+        ];
+        const manager = new UpstreamManager(configs);
+        await expect(manager.initialize()).rejects.toThrow(
+          /Failed to connect to upstream "broken-sse" \(url: http:\/\/localhost:3000\/sse\): Connection refused/,
+        );
       });
 
       it("throws on timeout", async () => {
@@ -285,7 +299,9 @@ describe("proxy/upstream", () => {
         ];
         const manager = new UpstreamManager(configs);
 
-        await expect(manager.initialize()).rejects.toThrow("Connection refused");
+        await expect(manager.initialize()).rejects.toThrow(
+          /Failed to connect to upstream "app-fail".*Connection refused/,
+        );
         // shutdown was called, so close was called for the one that connected
         expect(mockClose).toHaveBeenCalled();
         // After cleanup, no clients should remain — getTools should throw

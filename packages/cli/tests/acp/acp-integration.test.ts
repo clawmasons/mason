@@ -44,10 +44,10 @@ vi.mock("../../src/acp/discovery-cache.js", () => ({
 // ---------------------------------------------------------------------------
 // Mock prompt-executor
 // ---------------------------------------------------------------------------
-const mockExecutePrompt = vi.fn();
+const mockExecutePromptStreaming = vi.fn();
 
 vi.mock("../../src/acp/prompt-executor.js", () => ({
-  executePrompt: (...args: unknown[]) => mockExecutePrompt(...args),
+  executePromptStreaming: (...args: unknown[]) => mockExecutePromptStreaming(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -156,15 +156,20 @@ describe("ACP protocol lifecycle integration", () => {
     sessionUpdates = pair.sessionUpdates;
 
     mockDiscoverForCwd.mockResolvedValue(defaultDiscovery());
-    mockExecutePrompt.mockResolvedValue({
-      output: "Agent response for integration test.",
-      cancelled: false,
-    });
+    mockExecutePromptStreaming.mockImplementation(
+      (opts: { onSessionUpdate: (update: Record<string, unknown>) => void }) => {
+        opts.onSessionUpdate({
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "Agent response for integration test." },
+        });
+        return Promise.resolve({ cancelled: false });
+      },
+    );
   });
 
   afterAll(async () => {
     mockDiscoverForCwd.mockReset();
-    mockExecutePrompt.mockReset();
+    mockExecutePromptStreaming.mockReset();
     mockResolveRole.mockReset();
     await rm(tempDir, { recursive: true, force: true }).catch(() => {});
   });
@@ -280,13 +285,14 @@ describe("ACP protocol lifecycle integration", () => {
 
     expect(response.stopReason).toBe("end_turn");
 
-    // Verify executePrompt was called with correct args
-    expect(mockExecutePrompt).toHaveBeenCalledWith(
+    // Verify executePromptStreaming was called with correct args
+    expect(mockExecutePromptStreaming).toHaveBeenCalledWith(
       expect.objectContaining({
         agent: "claude-code-agent",
         role: "project",
         text: "hello from integration test",
         cwd: tempDir,
+        onSessionUpdate: expect.any(Function),
       }),
     );
 
@@ -445,13 +451,13 @@ describe("ACP protocol lifecycle integration", () => {
   // -----------------------------------------------------------------------
 
   it("8. session/cancel during prompt — returns stopReason cancelled", async () => {
-    // Mock executePrompt to be slow and check signal
-    mockExecutePrompt.mockImplementation(
+    // Mock executePromptStreaming to be slow and check signal
+    mockExecutePromptStreaming.mockImplementation(
       (opts: { signal?: AbortSignal }) =>
-        new Promise<{ output: string; cancelled: boolean }>((resolve) => {
+        new Promise<{ cancelled: boolean }>((resolve) => {
           const checkSignal = () => {
             if (opts.signal?.aborted) {
-              resolve({ output: "", cancelled: true });
+              resolve({ cancelled: true });
               return;
             }
             setTimeout(checkSignal, 10);

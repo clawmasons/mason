@@ -510,6 +510,65 @@ describe("generateAgentLaunchJson", () => {
     const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, "test prompt", true));
     expect(config.args).toEqual(["--stream", "-p", "test prompt"]);
   });
+
+  // ── jsonMode tests ────────────────────────────────────────────────────────
+
+  it("appends json stream args and -p flag when jsonMode is true", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--effort", "max"] },
+      jsonMode: {
+        jsonStreamArgs: ["--output-format", "stream-json"],
+        parseJsonStreamAsACP: () => null,
+      },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, "say hello", false, true));
+    expect(config.args).toEqual(["--effort", "max", "--output-format", "stream-json", "-p", "say hello"]);
+  });
+
+  it("uses buildPromptArgs callback when defined in jsonMode", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--flag"] },
+      jsonMode: {
+        jsonStreamArgs: ["--output-format", "stream-json"],
+        buildPromptArgs: (prompt) => ["--prompt", prompt],
+        parseJsonStreamAsACP: () => null,
+      },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, "hello world", false, true));
+    expect(config.args).toEqual(["--flag", "--output-format", "stream-json", "--prompt", "hello world"]);
+  });
+
+  it("falls back to ['-p', prompt] when buildPromptArgs is not defined in jsonMode", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd" },
+      jsonMode: {
+        jsonStreamArgs: ["--stream"],
+        parseJsonStreamAsACP: () => null,
+      },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, "test prompt", false, true));
+    expect(config.args).toEqual(["--stream", "-p", "test prompt"]);
+  });
+
+  it("ignores jsonMode when agentPkg.jsonMode is undefined", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--flag"] },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, "say hello", false, true));
+    expect(config.args).toEqual(["--flag", "say hello"]);
+  });
+
+  it("ignores jsonMode in ACP mode", () => {
+    const pkg = makeAgentPackage({
+      acp: { command: "cmd-acp" },
+      jsonMode: {
+        jsonStreamArgs: ["--output-format", "stream-json"],
+        parseJsonStreamAsACP: () => null,
+      },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], true, undefined, undefined, "do this", false, true));
+    expect(config.args).toBeUndefined();
+  });
 });
 
 // ── readSkills ────────────────────────────────────────────────────────────────

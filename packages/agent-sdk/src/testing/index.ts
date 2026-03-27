@@ -6,14 +6,17 @@
  *
  * Dependency constraint: This module MUST NOT import from @clawmasons/cli,
  * @clawmasons/mcp-agent, or any agent implementation package. Only Node.js
- * built-ins are allowed.
+ * built-ins and @agentclientprotocol/sdk are allowed.
  */
 
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { execFileSync, execSync, type ChildProcess } from "node:child_process";
+import { execFileSync, execSync, spawn, type ChildProcess } from "node:child_process";
+
+export type { ChildProcess };
 import { fileURLToPath } from "node:url";
+import type { AcpSessionUpdate } from "../types.js";
 
 // ── Path Constants ──────────────────────────────────────────────────────
 
@@ -441,25 +444,93 @@ export function testFileContents(workspaceDir: string, relPath: string, expected
 }
 
 /**
- * Symlink a locally-built agent package into a workspace's .mason/node_modules/
- * so the CLI's discovery phase finds it without npm install.
+ * Spawn mason in print mode and wait for it to exit.
+ * Returns the child process (for pid inspection) and captured output.
  *
- * Reads the agent's package.json to determine the scoped name, then creates
- * a symlink at `<workspaceDir>/.mason/node_modules/@scope/name` pointing to
- * the agent's package root.
+ * @param args - CLI arguments to pass after `mason`
+ * @param cwd - Working directory
+ * @param opts.timeout - Kill the process after this many ms (default: 300_000)
+ * @param opts.env - Extra environment variables merged onto `process.env`
  */
-export function installLocalAgent(workspaceDir: string, agentPackageDir: string): void {
-  const pkgJsonPath = path.join(agentPackageDir, "package.json");
-  const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
-  const pkgName: string = pkgJson.name;
-  const parts = pkgName.split("/");
-  if (parts.length !== 2) {
-    throw new Error(`Expected scoped package name (e.g. @scope/name), got "${pkgName}"`);
-  }
-  const scopeDir = path.join(workspaceDir, ".mason", "node_modules", parts[0]);
-  fs.mkdirSync(scopeDir, { recursive: true });
-  const targetDir = path.join(scopeDir, parts[1]);
-  if (!fs.existsSync(targetDir)) {
-    fs.symlinkSync(path.resolve(agentPackageDir), targetDir, "dir");
-  }
+export function runMasonPrint(
+  args: string[],
+  cwd: string,
+  opts?: { timeout?: number; env?: Record<string, string> },
+): Promise<{ proc: ChildProcess; stdout: string; stderr: string; exitCode: number | null }> {
+  const timeoutMs = opts?.timeout ?? 300_000;
+
+  return new Promise((resolve) => {
+    const proc = spawn("node", [MASON_BIN, ...args], {
+      cwd,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        ...opts?.env,
+      },
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    if (proc.stdout) {
+      proc.stdout.on("data", (chunk: Buffer) => {
+        stdout += chunk.toString();
+      });
+    }
+    if (proc.stderr) {
+      proc.stderr.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString();
+      });
+    }
+
+    const timer = setTimeout(() => {
+      proc.kill("SIGKILL");
+      resolve({ proc, stdout, stderr, exitCode: null });
+    }, timeoutMs);
+
+    proc.on("exit", (code) => {
+      clearTimeout(timer);
+      resolve({ proc, stdout, stderr, exitCode: code });
+    });
+  });
 }
+
+/**
+ * Spawn mason in JSON mode and wait for it to exit.
+ * Returns the child process, captured output, and parsed NDJSON updates.
+ *
+ * Delegates to {@link runMasonPrint} for process spawning, then parses
+ * stdout as newline-delimited JSON into `AcpSessionUpdate[]`.
+ *
+ * @param args - CLI arguments to pass after `mason` (should include `--json <prompt>`)
+ * @param cwd - Working directory
+ * @param opts.timeout - Kill the process after this many ms (default: 300_000)
+ * @param opts.env - Extra environment variables merged onto `process.env`
+ */
+export async function runMasonJson(
+  args: string[],
+  cwd: string,
+  opts?: { timeout?: number; env?: Record<string, string> },
+): Promise<{
+  proc: ChildProcess;
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  updates: AcpSessionUpdate[];
+}> {
+  const result = await runMasonPrint(args, cwd, opts);
+  const updates: AcpSessionUpdate[] = [];
+  for (const line of result.stdout.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("{")) continue;
+    try {
+      updates.push(JSON.parse(trimmed) as AcpSessionUpdate);
+    } catch {
+      // skip non-JSON lines
+    }
+  }
+  return { ...result, updates };
+}
+
+export { runMasonACP, type AcpResult } from "./acp-client.js";
+

@@ -29,6 +29,8 @@ export interface MaterializeOptions {
   llmConfig?: { provider: string; model: string };
   /** When true, enable print mode: append JSON stream args and -p flag in agent-launch.json. */
   printMode?: boolean;
+  /** When true, enable JSON streaming mode: append jsonMode.jsonStreamArgs and prompt args in agent-launch.json. */
+  jsonMode?: boolean;
 }
 
 /**
@@ -87,6 +89,79 @@ export interface RuntimeMaterializer {
 
 // Re-export AgentTaskConfig from shared (canonical definition lives in @clawmasons/shared)
 export type { AgentTaskConfig } from "@clawmasons/shared";
+
+// ── ACP Session Update Types ──
+// These types mirror the official ACP spec from @agentclientprotocol/sdk.
+// Tool call fields are FLAT on the session update object (not nested in a wrapper).
+
+/**
+ * Categories of tools that can be invoked.
+ * Matches the ACP spec ToolKind enum.
+ */
+export type ToolKind = "read" | "edit" | "delete" | "move" | "search" | "execute" | "think" | "fetch" | "switch_mode" | "other";
+
+/**
+ * Execution status of a tool call.
+ * Matches the ACP spec ToolCallStatus enum.
+ */
+export type ToolCallStatus = "pending" | "in_progress" | "completed" | "failed";
+
+/** Content produced by a tool call. */
+export type ToolCallContent = { type: "content"; content: { type: "text"; text: string } };
+
+/**
+ * Fields for a `tool_call` session update (creating a new tool call).
+ * Per ACP spec, `title` is required and fields are flat on the update object.
+ */
+export interface AcpToolCallFields {
+  toolCallId: string;
+  title: string;
+  kind?: ToolKind;
+  status?: ToolCallStatus;
+  content?: Array<ToolCallContent>;
+}
+
+/**
+ * Fields for a `tool_call_update` session update (updating an existing tool call).
+ * Per ACP spec, only `toolCallId` is required; all other fields are optional.
+ */
+export interface AcpToolCallUpdateFields {
+  toolCallId: string;
+  title?: string | null;
+  kind?: ToolKind | null;
+  status?: ToolCallStatus | null;
+  content?: Array<ToolCallContent> | null;
+}
+
+/**
+ * @deprecated Use `AcpToolCallFields` or `AcpToolCallUpdateFields` instead.
+ * This nested wrapper does not match the ACP spec (fields should be flat).
+ */
+export interface ToolCallInfo {
+  toolCallId: string;
+  title?: string;
+  kind?: string;
+  status: "in_progress" | "completed";
+  content?: Array<ToolCallContent>;
+}
+
+/**
+ * Discriminated union of ACP session update types.
+ * Each variant is identified by its `sessionUpdate` field.
+ *
+ * Tool call fields are FLAT on the update object, matching the official ACP spec
+ * (`ToolCall & { sessionUpdate: "tool_call" }`).
+ *
+ * Used as the return type of `jsonMode.parseJsonStreamAsACP` and by the ACP
+ * prompt executor when forwarding updates to the editor.
+ */
+export type AcpSessionUpdate =
+  | { sessionUpdate: "agent_message_chunk"; content: { type: "text"; text: string } }
+  | ({ sessionUpdate: "tool_call" } & AcpToolCallFields)
+  | ({ sessionUpdate: "tool_call_update" } & AcpToolCallUpdateFields)
+  | { sessionUpdate: "agent_thought_chunk"; content: { type: "text"; text: string } }
+  | { sessionUpdate: "plan"; entries: Array<{ content: string; priority: "high" | "medium" | "low"; status: "pending" | "in_progress" | "completed" }> }
+  | { sessionUpdate: "current_mode_update"; modeId: string };
 
 // ── Agent Package Types ──
 
@@ -201,6 +276,27 @@ export interface AgentPackage {
    */
   mcpNameTemplate?: string;
 
+  /** JSON streaming mode configuration for ACP session update streaming. */
+  jsonMode?: {
+    /** Args to append to agent command to enable JSON streaming output. */
+    jsonStreamArgs: string[];
+    /**
+     * Build the CLI args that pass the initial prompt to the agent.
+     * Defaults to `["-p", prompt]` when not defined.
+     */
+    buildPromptArgs?: (prompt: string) => string[];
+    /**
+     * Parse a line from the agent's JSON stream and convert it to an ACP session update.
+     * Return an ACP session update object when the line maps to one, or null to skip.
+     * Called with try/catch — exceptions are logged and the line is skipped.
+     *
+     * @param line - The current JSON stream line from the agent
+     * @param previousLine - The previous JSON-parseable line (if any)
+     * @returns An ACP session update, an array of updates (for multi-block events), or null to skip
+     */
+    parseJsonStreamAsACP(line: string, previousLine?: string): AcpSessionUpdate | AcpSessionUpdate[] | null;
+  };
+
   /** Print mode configuration for non-interactive prompt execution with JSON streaming. */
   printMode?: {
     /** Args to append to agent command to enable JSON streaming output. */
@@ -213,7 +309,9 @@ export interface AgentPackage {
     /**
      * Parse a line from the JSON stream. Return the final result text when found, or null to keep reading.
      * Called with try/catch — exceptions are logged and treated as null.
+     * @param line - The current JSON stream line
+     * @param previousLine - The previous JSON-looking line from the stream (if any)
      */
-    parseJsonStreamFinalResult(line: string): string | null;
+    parseJsonStreamFinalResult(line: string, previousLine?: string): string | null;
   };
 }
