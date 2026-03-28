@@ -52,11 +52,11 @@ describe("mockClaudeCodeMaterializer SessionStart hook", () => {
     expect(command).toContain("/home/mason/.mason/session/meta.json");
   });
 
-  it("hook command reads CLAUDE_SESSION_ID env var", () => {
+  it("hook command reads session_id from stdin JSON", () => {
     const settings = getSettings();
     const hooks = settings.hooks as { SessionStart: Array<{ hooks: Array<{ command: string }> }> };
     const command = hooks.SessionStart[0].hooks[0].command;
-    expect(command).toContain("process.env.CLAUDE_SESSION_ID");
+    expect(command).toContain("i.session_id");
   });
 
   it("preserves permissions alongside hooks", () => {
@@ -72,6 +72,6 @@ describe("mockClaudeCodeMaterializer SessionStart hook", () => {
     const settings = getSettings();
     const hooks = settings.hooks as { SessionStart: Array<{ hooks: Array<{ command: string }> }> };
     const command = hooks.SessionStart[0].hooks[0].command;
-    expect(command).toContain("d.agentSessionId=process.env.CLAUDE_SESSION_ID");
+    expect(command).toContain("m.agentSessionId=i.session_id");
   });
 });

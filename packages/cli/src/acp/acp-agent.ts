@@ -284,7 +284,7 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
         const prePromptMeta = await readSession(session.cwd, sessionId);
         const shouldResume = prePromptMeta?.agentSessionId != null;
         if (shouldResume) {
-          acpLog("prompt: resuming session", { sessionId, agentSessionId: prePromptMeta!.agentSessionId });
+          acpLog("prompt: resuming session", { sessionId, agentSessionId: prePromptMeta?.agentSessionId });
         }
 
         // 5. Execute prompt via subprocess (streaming mode)

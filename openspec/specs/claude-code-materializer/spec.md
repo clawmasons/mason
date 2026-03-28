@@ -32,13 +32,16 @@ This applies to both `materializeWorkspace` and `materializeSupervisor`. Neither
 
 The Claude Code materializer SHALL generate a `.claude/settings.json` file containing:
 1. A `permissions` block with `allow: ["mcp__mason__*"]` and `deny: []`
-2. A `hooks` block with a `SessionStart` hook that captures `CLAUDE_SESSION_ID` into the mounted session `meta.json`
+2. A `hooks` block with a `SessionStart` hook that captures the agent's `session_id` (provided via stdin JSON) into the mounted session `meta.json`
 
 The SessionStart hook SHALL:
+- Read the hook input JSON from stdin (Claude Code passes `{ "session_id": "...", "hook_event_name": "SessionStart", ... }`)
 - Check that `/home/mason/.mason/session/meta.json` exists before reading
-- Check that `CLAUDE_SESSION_ID` environment variable is set before writing
-- Write `agentSessionId` field to meta.json with the value of `CLAUDE_SESSION_ID`
-- Exit silently if either precondition fails (safe degradation — resume won't activate)
+- Check that `session_id` is present in the stdin JSON before writing
+- Write `agentSessionId` field to meta.json with the value of `session_id`
+- Exit silently if any precondition fails (safe degradation — resume won't activate)
+
+Additionally, the Docker build directory generator SHALL merge workspace hooks into the home-level `.claude/settings.json` (from `materializeHome`) so that hooks are always active at the user settings level, regardless of project root detection.
 
 #### Scenario: settings.json contains permissions and hooks
 - **WHEN** `materializeWorkspace` is called for any agent
@@ -46,7 +49,7 @@ The SessionStart hook SHALL:
 
 #### Scenario: SessionStart hook captures agent session ID
 - **WHEN** the agent starts inside the container
-- **AND** `CLAUDE_SESSION_ID` is set in the environment
+- **AND** `session_id` is present in the stdin JSON
 - **AND** `/home/mason/.mason/session/meta.json` exists
 - **THEN** the SessionStart hook SHALL write `agentSessionId` to meta.json
 

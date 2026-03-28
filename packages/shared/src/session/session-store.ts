@@ -30,7 +30,7 @@ export interface Session {
   cwd: string;
   agent: string;
   role: string;
-  agentSessionId: string | null; // Populated by agent hook (e.g., CLAUDE_SESSION_ID)
+  agentSessionId: string | null; // Populated by agent SessionStart hook (reads session_id from stdin JSON)
   firstPrompt: string | null;
   lastUpdated: string; // ISO 8601
   closed: boolean;

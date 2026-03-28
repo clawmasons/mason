@@ -36,7 +36,7 @@ export const mockClaudeCodeMaterializer: RuntimeMaterializer = {
         SessionStart: [{
           hooks: [{
             type: "command",
-            command: "node -e \"const f='/home/mason/.mason/session/meta.json';const d=JSON.parse(require('fs').readFileSync(f));d.agentSessionId=process.env.CLAUDE_SESSION_ID;require('fs').writeFileSync(f,JSON.stringify(d,null,2))\"",
+            command: "node -e \"let s='';process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>{try{const i=JSON.parse(s);const f='/home/mason/.mason/session/meta.json';if(require('fs').existsSync(f)&&i.session_id){const m=JSON.parse(require('fs').readFileSync(f,'utf8'));m.agentSessionId=i.session_id;require('fs').writeFileSync(f,JSON.stringify(m,null,2))}}catch(e){}})\"",
           }],
         }],
       },

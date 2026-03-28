@@ -105,6 +105,7 @@ export function logDroppedServers(
   unmatched: DroppedServer[],
   agentName: string,
   roleName: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _acpClient?: string,
 ): void {
   for (const server of unmatched) {

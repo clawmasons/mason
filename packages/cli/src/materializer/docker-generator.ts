@@ -331,6 +331,25 @@ export function generateRoleDockerBuildDir(
     deps.writeFileSync(fullPath, content);
   }
 
+  // Merge workspace hooks into home settings so they're always active at the user level.
+  // Project-level settings may not be discovered by the agent depending on CWD / project root detection.
+  if (hasHome && !isSupervisor) {
+    const workspaceSettings = workspace.get(".claude/settings.json");
+    if (workspaceSettings) {
+      try {
+        const wsSettings = JSON.parse(workspaceSettings) as Record<string, unknown>;
+        if (wsSettings.hooks && typeof wsSettings.hooks === "object" && Object.keys(wsSettings.hooks as object).length > 0) {
+          const homeSettingsPath = path.join(homeBuildDir, ".claude", "settings.json");
+          let homeSettings: Record<string, unknown> = {};
+          try { homeSettings = JSON.parse(fs.readFileSync(homeSettingsPath, "utf8")) as Record<string, unknown>; } catch { /* no existing file */ }
+          homeSettings.hooks = { ...(homeSettings.hooks as Record<string, unknown> ?? {}), ...(wsSettings.hooks as Record<string, unknown>) };
+          deps.mkdirSync(path.dirname(homeSettingsPath), { recursive: true });
+          deps.writeFileSync(homeSettingsPath, JSON.stringify(homeSettings, null, 2));
+        }
+      } catch { /* non-JSON settings — skip merge */ }
+    }
+  }
+
   // --- MCP Proxy subdirectory ---
   const proxyDir = path.join(buildDir, "mcp-proxy");
   deps.mkdirSync(proxyDir, { recursive: true });
