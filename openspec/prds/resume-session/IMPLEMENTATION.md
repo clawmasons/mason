@@ -206,7 +206,12 @@ Add the `--resume` option to the `mason run` command with full session validatio
 
 **Testable output:** (a) `mason run --resume` resolves latest symlink, (b) `mason run --resume <id>` uses explicit session ID, (c) `mason run --resume latest` equivalent to no ID, (d) error when session not found includes available sessions list, (e) error when session is closed, (f) error when Docker image missing, (g) warning printed when `--agent` used with `--resume`, (h) warning printed when `--role` used with `--resume`, (i) `agent-launch.json` includes resume flag + agent session ID, (j) `agent-launch.json` includes new prompt from `-p` flag.
 
-**Not Implemented Yet**
+**Implemented** — [Spec](../../changes/archive/2026-03-27-resume-cli-flag/proposal.md) | [Design](../../changes/archive/2026-03-27-resume-cli-flag/design.md) | [Tasks](../../changes/archive/2026-03-27-resume-cli-flag/tasks.md)
+
+Files changed:
+- `packages/cli/src/cli/commands/run-agent.ts` — Added `--resume [session-id]` option to `registerRunCommand()`; added `handleResume()` with full session validation and launch flow; added `formatRelativeTime()`, `getResumeDockerImage()`, `printSessionNotFoundError()` helpers; updated `refreshAgentLaunchJson()` with `resumeId` post-processing
+- `packages/shared/src/index.ts` — Exported `resolveLatestSession` from main index
+- `packages/cli/tests/cli/run-agent.test.ts` — Added 16 tests covering command registration, session resolution, validation, warnings, and launch JSON generation
 
 ---
 

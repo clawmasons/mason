@@ -1,0 +1,28 @@
+## Tasks
+
+- [x] Add `--resume [session-id]` option to `registerRunCommand()` in `run-agent.ts`
+- [x] Add `resume` to `createRunAction()` options type
+- [x] Add `formatRelativeTime()` helper function
+- [x] Add `printSessionNotFoundError()` function for listing available sessions
+- [x] Add `getResumeDockerImage()` function for extracting and validating Docker image from compose file
+- [x] Add `handleResume()` function implementing the full resume flow
+- [x] Update `refreshAgentLaunchJson()` to accept `resumeId` option and post-process launch JSON
+- [x] Wire resume flow into `createRunAction()` to short-circuit before agent/role resolution
+- [x] Import `readSession`, `resolveLatestSession`, `listSessions`, `updateSession` from `@clawmasons/shared`
+- [x] Export `resolveLatestSession` from `@clawmasons/shared` main index
+- [x] Add test: `--resume` option is registered on the run command
+- [x] Add test: `--resume` resolves latest symlink via `resolveLatestSession()`
+- [x] Add test: `--resume <id>` uses explicit session ID
+- [x] Add test: `--resume latest` is equivalent to no ID
+- [x] Add test: error when session not found includes available sessions list
+- [x] Add test: error when session is closed
+- [x] Add test: error when Docker image is missing
+- [x] Add test: warning printed when `--agent` used with `--resume`
+- [x] Add test: warning printed when `--role` used with `--resume`
+- [x] Add test: `agent-launch.json` includes resume flag + agent session ID
+- [x] Add test: `agent-launch.json` includes new prompt from `-p` flag
+- [x] Verify TypeScript compilation (`npx tsc --noEmit`)
+- [x] Verify linting (`npx eslint src/ tests/` from cli package)
+- [x] Verify all cli tests pass (696 tests, 43 files)
+- [x] Verify all shared tests pass (294 tests, 14 files)
+- [x] Verify all agent-sdk tests pass (265 tests, 8 files)
