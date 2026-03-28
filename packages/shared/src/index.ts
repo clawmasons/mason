@@ -104,6 +104,7 @@ export {
   updateSession,
   listSessions,
   closeSession,
+  resolveLatestSession,
 } from "./session/index.js";
 
 // MCP name rewriting

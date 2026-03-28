@@ -3,13 +3,13 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { checkDockerCompose } from "./docker-utils.js";
 import { quickAutoCleanup } from "./doctor.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedApp, Role, AppConfig, TaskRef, SkillRef } from "@clawmasons/shared";
-import { resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect, createSession as createMetaSession } from "@clawmasons/shared";
+import { resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect, createSession as createMetaSession, readSession, resolveLatestSession, listSessions, updateSession } from "@clawmasons/shared";
 import { getAgentFromRegistry, getAgentFromRegistryWithAutoInstall, initRegistry, getAllRegisteredNames, BUILTIN_AGENTS, materializeForAgent } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig, readDefaultAgent, resolveAgentPackageName } from "@clawmasons/agent-sdk";
 import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.js";
@@ -605,6 +605,297 @@ export interface RunAgentDeps {
   initRegistryFn?: (projectDir: string, cliVersion?: string) => Promise<void>;
 }
 
+// ── Resume Flow ───────────────────────────────────────────────────────
+
+/**
+ * Format an ISO 8601 date string as a human-readable relative time.
+ */
+export function formatRelativeTime(isoDate: string): string {
+  const now = Date.now();
+  const then = new Date(isoDate).getTime();
+  const diffMs = now - then;
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffSec < 60) return "just now";
+  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
+  if (diffHr < 24) return `${diffHr} hour${diffHr === 1 ? "" : "s"} ago`;
+  if (diffDay === 1) return "yesterday";
+  return `${diffDay} day${diffDay === 1 ? "" : "s"} ago`;
+}
+
+/**
+ * Extract the Docker image name for the agent service from a session's
+ * docker-compose.yaml. Returns null if the compose file doesn't exist
+ * or the image field can't be parsed.
+ */
+export function getResumeDockerImage(sessionDir: string): string | null {
+  const composeFile = path.join(sessionDir, "docker-compose.yaml");
+  try {
+    const content = fs.readFileSync(composeFile, "utf-8");
+    // Find the agent service's image line. Agent services are named "agent-*"
+    // and the image field follows on the next line after the service key.
+    const lines = content.split("\n");
+    let inAgentService = false;
+    for (const line of lines) {
+      if (/^\s{2}agent-[^:]+:/.test(line)) {
+        inAgentService = true;
+        // Check for image on the same line (format: "  agent-foo:\n    image: name")
+        continue;
+      }
+      if (inAgentService) {
+        const imageMatch = line.match(/^\s+image:\s*(.+)/);
+        if (imageMatch) return imageMatch[1].trim();
+        // If we hit another top-level service key or a non-indented line, stop
+        if (/^\s{2}\S/.test(line) && !/^\s{4,}/.test(line)) {
+          inAgentService = false;
+        }
+      }
+    }
+  } catch {
+    // Compose file not readable
+  }
+  return null;
+}
+
+/**
+ * Print an error message when a session is not found, including a list
+ * of available sessions for guidance.
+ */
+async function printSessionNotFoundError(
+  sessionId: string,
+  cwd: string,
+): Promise<void> {
+  const sessions = await listSessions(cwd);
+  console.error(`\n  Error: Cannot resume session "${sessionId}" — session not found.\n`);
+  if (sessions.length > 0) {
+    console.error("  Available sessions:");
+    for (const s of sessions) {
+      const shortId = s.sessionId.slice(0, 8);
+      const prompt = s.firstPrompt ? `"${s.firstPrompt.slice(0, 40)}"` : "(no prompt)";
+      const ago = formatRelativeTime(s.lastUpdated);
+      console.error(`    ${shortId}  ${s.agent} / ${s.role}  ${prompt}  (${ago})`);
+    }
+    console.error("");
+  }
+  console.error(`  Run "mason run --resume <session-id>" with a valid session.\n`);
+}
+
+/**
+ * Handle `mason run --resume [session-id]`.
+ *
+ * Resolves the session, validates it, generates agent-launch.json with
+ * resume args, and launches Docker compose from the existing session directory.
+ */
+async function handleResume(
+  projectDir: string,
+  opts: {
+    resume: string | boolean;
+    agent?: string;
+    role?: string;
+    initialPrompt?: string;
+    isPrintMode?: boolean;
+    isJsonMode?: boolean;
+    verbose?: boolean;
+    build?: boolean;
+    proxyPort: number;
+  },
+): Promise<void> {
+  // 1. Resolve session ID
+  let sessionId: string;
+  if (opts.resume === true || opts.resume === "latest") {
+    const latest = await resolveLatestSession(projectDir);
+    if (!latest) {
+      console.error(`\n  Error: No latest session found. Run "mason run" first to create a session.\n`);
+      process.exit(1);
+      return;
+    }
+    sessionId = latest;
+  } else {
+    sessionId = opts.resume as string;
+  }
+
+  // 2. Load session metadata
+  const session = await readSession(projectDir, sessionId);
+  if (!session) {
+    await printSessionNotFoundError(sessionId, projectDir);
+    process.exit(1);
+    return;
+  }
+
+  // 3. Validate session is not closed
+  if (session.closed) {
+    console.error(`\n  Error: Cannot resume session "${sessionId}" — session is closed.\n`);
+    process.exit(1);
+    return;
+  }
+
+  // 4. Validate Docker image exists
+  const sessionDir = path.join(projectDir, ".mason", "sessions", sessionId);
+  const imageName = getResumeDockerImage(sessionDir);
+  if (imageName) {
+    try {
+      execSync(`docker image inspect "${imageName}"`, { stdio: "ignore" });
+    } catch {
+      console.error(`\n  Error: Docker image "${imageName}" not found. The session's container image may have been removed.\n`);
+      process.exit(1);
+      return;
+    }
+  }
+
+  // 5. Warn if --agent or --role were provided
+  if (opts.agent) {
+    console.warn("  Warning: --agent is ignored when resuming a session (agent is fixed at session creation).");
+  }
+  if (opts.role) {
+    console.warn("  Warning: --role is ignored when resuming a session (role is fixed at session creation).");
+  }
+
+  // 6. Extract agent + role from session metadata
+  const { agent: agentType, role: roleName } = session;
+
+  // Initialize agent registry so we can look up agent package
+  await initRegistry(projectDir, getCliVersion());
+
+  // 7. Resolve resume args from agent's resume config
+  const agentPkg = getAgentFromRegistry(agentType);
+  let resumeId: string | undefined;
+  if (session.agentSessionId && agentPkg?.resume) {
+    // Read the session ID field specified by the agent's resume config
+    const field = agentPkg.resume.sessionIdField;
+    resumeId = (session as unknown as Record<string, unknown>)[field] as string | undefined;
+  }
+
+  console.log(`\n  Resuming session: ${sessionId}`);
+  console.log(`  Agent: ${agentType}`);
+  console.log(`  Role: ${roleName}`);
+  if (resumeId) {
+    console.log(`  Agent session: ${resumeId}`);
+  }
+
+  // 8. Resolve role and regenerate agent-launch.json with resume args
+  const resolveRoleFn = defaultResolveRole;
+  let roleType: Role;
+  try {
+    roleType = await resolveRoleFn(roleName, projectDir);
+  } catch {
+    // If role resolution fails (e.g., role was removed), create a minimal role
+    // This is acceptable since resume reuses existing Docker artifacts
+    roleType = {
+      metadata: { name: roleName },
+      type: "project",
+      sources: [],
+    } as unknown as Role;
+  }
+
+  refreshAgentLaunchJson(roleType, agentType, sessionDir, {
+    initialPrompt: opts.initialPrompt,
+    printMode: opts.isPrintMode,
+    jsonMode: opts.isJsonMode,
+    resumeId,
+  });
+
+  // 9. Update lastUpdated in meta.json
+  await updateSession(projectDir, sessionId, {
+    lastUpdated: new Date().toISOString(),
+  });
+
+  // 10. Launch Docker compose from existing session directory
+  const composeFile = path.join(sessionDir, "docker-compose.yaml");
+  if (!fs.existsSync(composeFile)) {
+    console.error(`\n  Error: Compose file not found at ${composeFile}.\n`);
+    process.exit(1);
+    return;
+  }
+
+  // Pre-flight: check Docker Compose is available
+  try {
+    checkDockerCompose();
+  } catch (err) {
+    console.error(`\n  ${(err as Error).message}\n`);
+    process.exit(1);
+    return;
+  }
+
+  const proxyServiceName = `proxy-${roleName}`;
+  const agentServiceName = `agent-${roleName}`;
+
+  console.log(`  Compose: .mason/sessions/${sessionId}/docker-compose.yaml`);
+
+  // Start proxy
+  console.log(`  Starting proxy (${proxyServiceName})...`);
+  const proxyCode = await execComposeCommand(
+    composeFile,
+    ["up", "-d", proxyServiceName],
+    { verbose: opts.verbose },
+  );
+  if (proxyCode !== 0) {
+    console.error(`\n  Error: Failed to start proxy (exit code ${proxyCode}).\n`);
+    process.exit(1);
+    return;
+  }
+  console.log(`  Proxy started in background.`);
+
+  // Wait for proxy health
+  console.log(`  Waiting for proxy to be ready...`);
+  await defaultWaitForProxyHealth(`http://localhost:${opts.proxyPort}/health`, 60_000);
+  console.log(`  Proxy ready.`);
+
+  // Start host proxy in-process
+  const adaptRoleFn = defaultAdaptRole;
+  const resolvedAgent = adaptRoleFn(roleType, agentType);
+  mergeAgentConfigCredentials(resolvedAgent, undefined);
+  const envCredentials = collectEnvCredentials(resolvedAgent);
+  const hostApps = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
+
+  // Read relay token from compose file
+  const composeContent = fs.readFileSync(composeFile, "utf-8");
+  const relayTokenMatch = composeContent.match(/RELAY_TOKEN=([a-f0-9]+)/);
+  const relayToken = relayTokenMatch ? relayTokenMatch[1] : crypto.randomBytes(32).toString("hex");
+
+  console.log(`  Starting host proxy (in-process)...`);
+  let hostProxyHandle: { stop: () => Promise<void> } | null = null;
+  try {
+    hostProxyHandle = await defaultStartHostProxy({
+      proxyPort: opts.proxyPort,
+      relayToken,
+      envCredentials,
+      hostApps: hostApps.length > 0 ? hostApps : undefined,
+    });
+    console.log(`  Host proxy connected to Docker proxy.`);
+  } catch (err) {
+    console.error(`\n  Error: Failed to start host proxy: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(1);
+    return;
+  }
+
+  // Start agent interactively
+  console.log(`  Starting agent (${agentServiceName})...\n`);
+  const runArgs = ["run", "--rm", "--service-ports"];
+  if (!process.stdin.isTTY) {
+    runArgs.push("-T");
+  }
+  runArgs.push(agentServiceName);
+
+  const agentCode = await runAgentWithOciRestart(composeFile, runArgs);
+
+  // Tear down
+  console.log(`\n  Agent exited (code ${agentCode}). Tearing down services...`);
+  try {
+    if (hostProxyHandle) {
+      await hostProxyHandle.stop();
+    }
+  } catch { /* best-effort */ }
+
+  await execComposeCommand(composeFile, ["down"], { verbose: opts.verbose });
+
+  console.log(`  Services stopped.`);
+  console.log(`  Session retained at: .mason/sessions/${sessionId}/`);
+  console.log(`\n  agent complete\n`);
+}
+
 // ── Command Registration ──────────────────────────────────────────────
 
 /**
@@ -799,6 +1090,7 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
       proxyPort: string;
       print?: string;
       json?: string;
+      resume?: string | boolean;
     },
   ) => {
     // Disambiguate positional args:
@@ -819,6 +1111,22 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     const isPrintMode = !!options.print;
     const isJsonMode = !!options.json;
     const projectDir = process.cwd();
+
+    // ── Resume flow (short-circuits normal agent/role resolution) ─────
+    if (options.resume) {
+      await handleResume(projectDir, {
+        resume: options.resume,
+        agent: options.agent,
+        role: options.role,
+        initialPrompt,
+        isPrintMode,
+        isJsonMode,
+        verbose: options.verbose,
+        build: options.build,
+        proxyPort: parseInt(options.proxyPort, 10),
+      });
+      return;
+    }
 
     // Auto-init .mason/config.json when an agent name is provided
     if (agentInput) {
@@ -1072,6 +1380,7 @@ export function registerRunCommand(program: Command): void {
     .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
     .option("-p, --print <prompt>", "Run in print mode: execute prompt non-interactively, output response only")
     .option("--json <prompt>", "Run in JSON streaming mode: emit newline-delimited ACP session update objects")
+    .option("--resume [session-id]", "Resume a previous session (default: latest)")
     .addOption(
       new Option("--source <name>", "Agent source directory to scan (repeatable). Overrides role sources.")
         .argParser((value: string, previous: string[] | undefined) => [...(previous ?? []), value]),
@@ -1248,12 +1557,23 @@ function refreshAgentLaunchJson(
     llmConfig?: { provider: string; model: string };
     printMode?: boolean;
     jsonMode?: boolean;
+    resumeId?: string;
   },
 ): void {
   try {
     const workspace = materializeForAgent(roleType, agentType, undefined, undefined, options);
-    const launchJson = workspace.get("agent-launch.json");
+    let launchJson = workspace.get("agent-launch.json");
     if (launchJson) {
+      // Post-process to inject resume args when resuming a session.
+      // This works regardless of which materializer generated the launch JSON.
+      if (options?.resumeId) {
+        const agentPkg = getAgentFromRegistry(agentType);
+        if (agentPkg?.resume) {
+          const parsed = JSON.parse(launchJson) as { args?: string[]; [key: string]: unknown };
+          parsed.args = [...(parsed.args ?? []), agentPkg.resume.flag, options.resumeId];
+          launchJson = JSON.stringify(parsed, null, 2);
+        }
+      }
       fs.mkdirSync(sessionDir, { recursive: true });
       fs.writeFileSync(path.join(sessionDir, "agent-launch.json"), launchJson);
     }
