@@ -303,6 +303,8 @@ export interface AgentPackage {
     flag: string;
     /** meta.json field containing the agent's session ID (e.g., "agentSessionId"). */
     sessionIdField: string;
+    /** Where to insert resume args: "append" (default) adds at end, "after-first" inserts after the first arg. */
+    position?: "append" | "after-first";
   };
 
   /** Print mode configuration for non-interactive prompt execution with JSON streaming. */

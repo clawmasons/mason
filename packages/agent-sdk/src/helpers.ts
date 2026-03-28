@@ -175,7 +175,12 @@ export function generateAgentLaunchJson(
 
   // Append resume flag + session ID when both resumeId and agent resume config are present
   if (resumeId && agentPkg.resume) {
-    args = [...(args ?? []), agentPkg.resume.flag, resumeId];
+    const resumeArgs = [agentPkg.resume.flag, resumeId];
+    if (agentPkg.resume.position === "after-first" && args && args.length > 0) {
+      args = [args[0], ...resumeArgs, ...args.slice(1)];
+    } else {
+      args = [...(args ?? []), ...resumeArgs];
+    }
   }
 
   const config: Record<string, unknown> = { credentials, command };
