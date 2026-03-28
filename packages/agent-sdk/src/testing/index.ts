@@ -18,6 +18,64 @@ export type { ChildProcess };
 import { fileURLToPath } from "node:url";
 import type { AcpSessionUpdate } from "../types.js";
 
+// ── Logging Helpers ─────────────────────────────────────────────────────
+
+/**
+ * Format a single AcpSessionUpdate into a readable one-liner for logging.
+ */
+export function formatUpdate(u: AcpSessionUpdate): string {
+  switch (u.sessionUpdate) {
+    case "tool_call":
+      return `[tool_call] "${u.title}" (id=${u.toolCallId}, kind=${u.kind ?? "?"}, status=${u.status ?? "?"})`;
+    case "tool_call_update":
+      return `[tool_call_update] id=${u.toolCallId} status=${u.status ?? "?"} title=${u.title ?? ""}`;
+    case "agent_message_chunk": {
+      const text = u.content.text;
+      return `[message] "${text.slice(0, 80)}${text.length > 80 ? "…" : ""}"`;
+    }
+    case "agent_thought_chunk": {
+      const text = u.content.text;
+      return `[thought] "${text.slice(0, 80)}${text.length > 80 ? "…" : ""}"`;
+    }
+    case "plan":
+      return `[plan] ${u.entries.length} entries`;
+    case "current_mode_update":
+      return `[mode] modeId="${u.modeId}"`;
+    default:
+      return `[${(u as { sessionUpdate: string }).sessionUpdate}]`;
+  }
+}
+
+/**
+ * Log a summary of all updates, focusing on tool calls with their final status.
+ */
+export function logUpdatesSummary(updates: AcpSessionUpdate[]): void {
+  const toolCalls = updates.filter((u) => u.sessionUpdate === "tool_call");
+  const toolUpdates = updates.filter((u) => u.sessionUpdate === "tool_call_update");
+  const messages = updates.filter((u) => u.sessionUpdate === "agent_message_chunk");
+  const thoughts = updates.filter((u) => u.sessionUpdate === "agent_thought_chunk");
+
+  console.log("── Tool Call Summary ──");
+  if (toolCalls.length === 0) {
+    console.log("  (no tool calls)");
+  } else {
+    for (const tc of toolCalls) {
+      if (tc.sessionUpdate !== "tool_call") continue;
+      const finalUpdate = [...toolUpdates]
+        .reverse()
+        .find((u) => u.sessionUpdate === "tool_call_update" && u.toolCallId === tc.toolCallId);
+      const finalStatus =
+        (finalUpdate as { status?: string } | undefined)?.status ?? tc.status ?? "?";
+      console.log(
+        `  "${tc.title}" (id=${tc.toolCallId}, kind=${tc.kind ?? "?"}, final_status=${finalStatus})`,
+      );
+    }
+  }
+  console.log(
+    `Total updates: ${updates.length} | Tool calls: ${toolCalls.length} | Messages: ${messages.length} | Thoughts: ${thoughts.length}`,
+  );
+}
+
 // ── Path Constants ──────────────────────────────────────────────────────
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -459,6 +517,8 @@ export function runMasonPrint(
 ): Promise<{ proc: ChildProcess; stdout: string; stderr: string; exitCode: number | null }> {
   const timeoutMs = opts?.timeout ?? 300_000;
 
+  console.log(`[runMasonPrint] mason ${args.join(" ")} (cwd=${cwd})`);
+
   return new Promise((resolve) => {
     const proc = spawn("node", [MASON_BIN, ...args], {
       cwd,
@@ -484,12 +544,14 @@ export function runMasonPrint(
     }
 
     const timer = setTimeout(() => {
+      console.log(`[runMasonPrint] TIMEOUT after ${timeoutMs}ms — killing process`);
       proc.kill("SIGKILL");
       resolve({ proc, stdout, stderr, exitCode: null });
     }, timeoutMs);
 
     proc.on("exit", (code) => {
       clearTimeout(timer);
+      console.log(`[runMasonPrint] exited with code ${code}`);
       resolve({ proc, stdout, stderr, exitCode: code });
     });
   });
@@ -524,11 +586,14 @@ export async function runMasonJson(
     const trimmed = line.trim();
     if (!trimmed.startsWith("{")) continue;
     try {
-      updates.push(JSON.parse(trimmed) as AcpSessionUpdate);
+      const update = JSON.parse(trimmed) as AcpSessionUpdate;
+      console.log(`[runMasonJson] ${formatUpdate(update)}`);
+      updates.push(update);
     } catch {
-      // skip non-JSON lines
+      console.log(`[runMasonJson] skipped non-JSON: ${trimmed.slice(0, 120)}`);
     }
   }
+  logUpdatesSummary(updates);
   return { ...result, updates };
 }
 

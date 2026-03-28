@@ -13,7 +13,8 @@ import {
   type SessionNotification,
   type PromptResponse,
 } from "@agentclientprotocol/sdk";
-import { MASON_BIN } from "./index.js";
+import { MASON_BIN, formatUpdate, logUpdatesSummary } from "./index.js";
+import type { AcpSessionUpdate } from "../types.js";
 
 export type { SessionNotification, PromptResponse };
 
@@ -58,10 +59,14 @@ export async function runMasonACP(
     },
   });
 
+  console.log(`[runMasonACP] spawning mason acp (cwd=${workspaceDir})`);
+
   let stderr = "";
   if (proc.stderr) {
     proc.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
+      const text = chunk.toString();
+      stderr += text;
+      console.log(`[runMasonACP] [stderr] ${text.trimEnd()}`);
     });
   }
 
@@ -90,6 +95,12 @@ export async function runMasonACP(
         },
         async sessionUpdate(params: SessionNotification) {
           sessionUpdates.push(params);
+          const p = params as Record<string, unknown>;
+          if (p.sessionUpdate) {
+            console.log(`[runMasonACP] ${formatUpdate(params as unknown as AcpSessionUpdate)}`);
+          } else {
+            console.log(`[runMasonACP] notification: ${JSON.stringify(params).slice(0, 200)}`);
+          }
         },
       }),
       stream,
@@ -98,6 +109,7 @@ export async function runMasonACP(
     let step = "initialize";
     try {
       // 1. Initialize
+      console.log(`[runMasonACP] step: initialize`);
       const initResponse = await clientConn.initialize({
         protocolVersion: PROTOCOL_VERSION,
         clientCapabilities: {},
@@ -109,6 +121,7 @@ export async function runMasonACP(
 
       // 2. Create session
       step = "newSession";
+      console.log(`[runMasonACP] step: newSession`);
       const { sessionId, configOptions } = await clientConn.newSession({
         cwd: workspaceDir,
         mcpServers: [],
@@ -143,11 +156,14 @@ export async function runMasonACP(
 
       // 4. Send prompt and wait for completion
       step = "prompt";
+      console.log(`[runMasonACP] step: prompt (${prompt.length} chars)`);
       const promptResponse = await clientConn.prompt({
         sessionId,
         prompt: [{ type: "text", text: prompt }],
       });
 
+      console.log(`[runMasonACP] prompt complete (stopReason=${promptResponse.stopReason})`);
+      logUpdatesSummary(sessionUpdates as unknown as AcpSessionUpdate[]);
       return { updates: sessionUpdates, promptResponse, proc };
     } catch (err: unknown) {
       // Surface the actual error details — the ACP SDK's RequestError
