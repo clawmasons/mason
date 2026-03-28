@@ -21,6 +21,20 @@ describe("loadLaunchConfig", () => {
     expect(result === null || typeof result === "object").toBe(true);
   });
 
+  it("checks session path before workspace path in search order", () => {
+    // Verify the source code search paths include the session mount path first.
+    // We can't easily test the /home/mason paths in unit tests (they don't exist),
+    // but we verify the function source includes the session path.
+    const fnSource = loadLaunchConfig.toString();
+    const sessionPathIndex = fnSource.indexOf("/home/mason/.mason/session/agent-launch.json");
+    const workspacePathIndex = fnSource.indexOf("/home/mason/workspace/agent-launch.json");
+
+    // Session path should appear before workspace path in search order
+    expect(sessionPathIndex).toBeGreaterThan(-1);
+    expect(workspacePathIndex).toBeGreaterThan(-1);
+    expect(sessionPathIndex).toBeLessThan(workspacePathIndex);
+  });
+
   it("throws on invalid JSON", () => {
     tempDir = mkdtempSync(join(tmpdir(), "agent-launch-test-"));
     const configPath = join(tempDir, "agent-launch.json");

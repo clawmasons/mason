@@ -7,4 +7,6 @@ export {
   updateSession,
   listSessions,
   closeSession,
+  updateLatestSymlink,
+  resolveLatestSession,
 } from "./session-store.js";

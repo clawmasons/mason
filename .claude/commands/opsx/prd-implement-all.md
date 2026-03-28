@@ -12,9 +12,20 @@ Before doing anything else, run these checks and **stop immediately** if any fai
 
 2. **Check branch name** — Run `git branch --show-current`. The current branch should be a PRD feature branch (NOT `main` or `master`). This branch is the **PRD branch** — all change PRs will target it. Save this branch name for the entire flow.
 
-3. **Find the PRD** — The branch name IS the PRD directory name. Look up `openspec/prds/<branch-name>/IMPLEMENTATION.md` directly. If it doesn't exist, stop with an error: "No PRD found at `openspec/prds/<branch-name>/`. The branch name must match the PRD directory."
+3. **Verify lint and tests ware working before starting**
+   - docker system prune -a
+   - npm run lint
+   - npm run build
+   - npm run test
+   - npm run test:e2e
+   - in ../mason-extensions, run `npm run lint`
+   - ../mason-extensions, run `npm run build`
+   - in ../mason-extensions `npm run test`
+   - in ../mason-extensions `npm run test:e2e`
+  
+4. **Find the PRD** — The branch name IS the PRD directory name. Look up `openspec/prds/<branch-name>/IMPLEMENTATION.md` directly. If it doesn't exist, stop with an error: "No PRD found at `openspec/prds/<branch-name>/`. The branch name must match the PRD directory."
 
-4. **Identify unimplemented changes** — Read IMPLEMENTATION.md and list all changes with their implementation status. Filter to only changes that are NOT marked as `**Implemented**`. If all changes are already implemented, tell the user and stop.
+5. **Identify unimplemented changes** — Read IMPLEMENTATION.md and list all changes with their implementation status. Filter to only changes that are NOT marked as `**Implemented**`. If all changes are already implemented, tell the user and stop.
 
 If checks pass, present the list of unimplemented changes and confirm with the user before starting.
 
@@ -75,13 +86,15 @@ After the sub-agent completes successfully:
 When all changes are implemented:
 
 1. Ensure PRD branch is clean
-2. Run linter
-3. Run non-e2e tests.  Fix any problems
-4. Run e2e tests and fix all problems 
-   `cd e2e && npx vitest run --config vitest.config.ts 2>&1`. 
-5. Iterate 20 times until tests work
-6. Create commit and push the test fixes to the PRD branch
-
+  - npm run lint
+   - npm run build
+   - npm run test
+   - npm run test:e2e
+   - in ../mason-extensions, run `npm run lint`
+   - ../mason-extensions, run `npm run build`
+   - in ../mason-extensions `npm run test`
+   - in ../mason-extensions `npm run test:e2e`
+- 
 ## Completion
 
 When final Testing is complete:

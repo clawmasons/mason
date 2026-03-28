@@ -10,12 +10,12 @@ description: How to create test workspaces, run agents, and write e2e tests.
 The `scripts/create-test-dir.ts` script creates a workspace from the `claude-test-project` fixture.
 
 ```bash
-npx tsx scripts/create-test-dir.ts [output-dir]
+npx tsx scripts/create-test-dir.ts [test-output-dir]
 ```
 
 **What it does:**
 - Copies the `packages/agent-sdk/fixtures/claude-test-project/` fixture via `copyFixtureWorkspace`
-- If no output dir is given, creates a timestamped temp directory (`$TMPDIR/mason-e2e-test-dir-<timestamp>`)
+- If no [test-output-dir] is given, creates a timestamped temp directory (`$TMPDIR/mason-e2e-test-dir-<timestamp>`)
 
 Agents are **auto-linked by `mason.js`** at runtime: when mason.js detects a `.mason/` directory in the workspace, it symlinks the built-in `mcp-agent` and all agents from the sibling `mason-extensions/agents/` repo. No manual linking is needed.
 

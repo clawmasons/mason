@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { auditPreHook, auditPostHook, logDroppedServers, setLocalAuditPath } from "../../src/hooks/audit.js";
 import type { HookContext } from "../../src/hooks/audit.js";
 import type { RelayServer } from "../../src/relay/server.js";

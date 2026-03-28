@@ -280,7 +280,14 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
       session.abortController = abortController;
 
       try {
-        // 4. Execute prompt via subprocess (streaming mode)
+        // 4. Check if we should resume (agentSessionId captured by a prior prompt)
+        const prePromptMeta = await readSession(session.cwd, sessionId);
+        const shouldResume = prePromptMeta?.agentSessionId != null;
+        if (shouldResume) {
+          acpLog("prompt: resuming session", { sessionId, agentSessionId: prePromptMeta?.agentSessionId });
+        }
+
+        // 5. Execute prompt via subprocess (streaming mode)
         const result = await executePromptStreaming({
           agent: session.agent,
           role: session.role,
@@ -294,6 +301,7 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
               update: update as AcpSessionUpdate,
             });
           },
+          ...(shouldResume && { masonSessionId: sessionId }),
         });
 
         if (result.cancelled) {

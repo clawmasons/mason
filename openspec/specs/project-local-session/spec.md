@@ -37,6 +37,57 @@ The docker-compose.yml SHALL mount the project directory into the agent containe
 - **WHEN** the session compose file is generated for project `/home/user/my-project`
 - **THEN** the agent service SHALL have a volume mount from `/home/user/my-project` into the container's workspace directory
 
+### Requirement: Session directory contains meta.json for all sessions
+
+Every session — whether started via `mason run` or ACP — SHALL have a `meta.json` in its session directory. The `meta.json` SHALL contain:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sessionId` | `string` | UUID v7 session identifier |
+| `masonSessionId` | `string` | Identical to `sessionId`; stored for container access |
+| `cwd` | `string` | Project directory |
+| `agent` | `string` | Agent type name |
+| `role` | `string` | Role name |
+| `agentSessionId` | `string \| null` | Agent's internal session ID; populated by agent hook |
+| `firstPrompt` | `string \| null` | First prompt text; set after first prompt |
+| `lastUpdated` | `string` | ISO timestamp; updated on each session activity |
+| `closed` | `boolean` | Whether session is closed |
+| `closedAt` | `string \| null` | ISO timestamp of closure |
+
+#### Scenario: CLI session creates meta.json
+- **WHEN** `mason run -p "hello"` is executed
+- **THEN** `meta.json` SHALL be created in the session directory with `agentSessionId: null`
+
+#### Scenario: ACP session creates meta.json
+- **WHEN** an ACP `session/new` request creates a session
+- **THEN** `meta.json` SHALL be created with all required fields
+
+### Requirement: Session directory contains per-session agent-launch.json
+
+Each session SHALL have its own `agent-launch.json` in the session directory (`.mason/sessions/{id}/agent-launch.json`), enabling per-session launch customization (e.g., resume args).
+
+The session directory is mounted into the container at `/home/mason/.mason/session/` (read-write), giving the agent access to both `meta.json` and `agent-launch.json`.
+
+#### Scenario: Session mount in compose
+- **WHEN** a session's docker-compose.yaml is generated
+- **THEN** the agent service volumes SHALL include a bind mount from `.mason/sessions/{id}/` to `/home/mason/.mason/session`
+
+### Requirement: Latest session symlink tracks most recent session
+
+A symbolic link at `.mason/sessions/latest` SHALL point to the most recently started session directory. The symlink SHALL be updated atomically (create temp, then rename) on every session start.
+
+#### Scenario: Symlink created on first session
+- **WHEN** the first session `019d2b36` is created
+- **THEN** `.mason/sessions/latest` SHALL be a relative symlink pointing to `019d2b36`
+
+#### Scenario: Symlink updated on subsequent session
+- **WHEN** a second session `019d2c00` is started
+- **THEN** `.mason/sessions/latest` SHALL point to `019d2c00`
+
+#### Scenario: Symlink missing does not block session creation
+- **WHEN** symlink creation fails (e.g., filesystem issue)
+- **THEN** the session SHALL still be created (symlink update is best-effort)
+
 ### Requirement: Session logs are written to the session directory
 
 All session logs SHALL be written to `{projectDir}/.clawmasons/sessions/{session-id}/logs/` rather than any global log directory.

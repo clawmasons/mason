@@ -114,6 +114,25 @@ The child process SHALL inherit stdin/stdout/stderr from the container process v
 - **WHEN** `launchRuntime` is called with a non-existent command
 - **THEN** it rejects with "Failed to launch runtime" error
 
+### Requirement: agent-entry loads launch config from per-session path first
+
+The `loadLaunchConfig()` function SHALL search for `agent-launch.json` in the following order:
+1. `/home/mason/.mason/session/agent-launch.json` — per-session mount (primary)
+2. `/home/mason/workspace/agent-launch.json` — legacy workspace path (fallback)
+3. `./agent-launch.json` — current working directory (fallback)
+
+The first path found SHALL be used. This ensures per-session launch configuration (with resume args) takes priority over the shared workspace copy.
+
+#### Scenario: Per-session agent-launch.json found
+- **WHEN** `/home/mason/.mason/session/agent-launch.json` exists
+- **THEN** agent-entry SHALL load config from that path
+- **AND** SHALL NOT check the workspace or cwd paths
+
+#### Scenario: Fallback to workspace agent-launch.json
+- **WHEN** `/home/mason/.mason/session/agent-launch.json` does NOT exist
+- **AND** `/home/mason/workspace/agent-launch.json` exists
+- **THEN** agent-entry SHALL load config from the workspace path
+
 ### Requirement: MCP client initializes session and calls tools via Streamable HTTP
 
 The lightweight MCP client (`mcp-client.ts`) SHALL implement MCP Streamable HTTP transport for calling tools on the proxy. It sends JSON-RPC requests via POST to the proxy's `/mcp` endpoint.

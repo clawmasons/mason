@@ -197,3 +197,126 @@ The run command SHALL implement the OCI restart policy when executing the runtim
 - **WHEN** `docker compose run --rm claude-code-agent` exits non-zero
 - **AND** its output does NOT contain `"OCI runtime"`
 - **THEN** the run command SHALL exit immediately with the same exit code without retry
+
+### Requirement: mason run supports --resume flag for session resumption
+
+The run command SHALL accept an optional `--resume [session-id]` flag. When present, the command SHALL resume an existing session instead of creating a new one.
+
+- `--resume` without a value: resolve via `.mason/sessions/latest` symlink
+- `--resume <session-id>`: use the specified session ID directly
+- `--resume latest`: equivalent to `--resume` without a value
+
+When resuming, the command SHALL short-circuit normal agent/role resolution and instead:
+1. Resolve the session ID (explicit, "latest", or symlink)
+2. Read `meta.json` from `.mason/sessions/{id}/` to extract `agent`, `role`, `agentSessionId`
+3. Validate the session exists, is not closed, and Docker artifacts are present
+4. Warn (to stderr) if `--agent` or `--role` are also provided (they are ignored)
+5. Regenerate `agent-launch.json` into the session directory with resume args injected
+6. Launch Docker compose from the existing session directory
+7. Update `lastUpdated` in `meta.json`
+
+#### Scenario: Resume latest session via symlink
+- **WHEN** `mason run --resume -p "add tests"` is executed
+- **AND** `.mason/sessions/latest` symlink exists pointing to a valid session
+- **THEN** the CLI SHALL resolve the symlink, read meta.json, and launch the session with resume args
+
+#### Scenario: Resume specific session by ID
+- **WHEN** `mason run --resume 019d2b36 -p "continue"` is executed
+- **AND** `.mason/sessions/019d2b36/meta.json` exists and session is not closed
+- **THEN** the CLI SHALL resume that specific session
+
+#### Scenario: Resume with --agent flag prints warning
+- **WHEN** `mason run --resume --agent claude -p "go"` is executed
+- **THEN** the CLI SHALL print "Warning: --agent is ignored when resuming a session" to stderr
+- **AND** SHALL use the agent from the session's meta.json
+
+#### Scenario: Session not found shows available sessions
+- **WHEN** `mason run --resume nonexistent` is executed
+- **AND** no session with that ID exists
+- **THEN** the CLI SHALL print an error listing available sessions with agent, role, first prompt, and relative time
+- **AND** SHALL exit with non-zero status
+
+#### Scenario: Session is closed
+- **WHEN** `mason run --resume <id>` is executed
+- **AND** the session's `meta.json` has `closed: true`
+- **THEN** the CLI SHALL print an error and exit with non-zero status
+
+#### Scenario: Docker image missing
+- **WHEN** `mason run --resume <id>` is executed
+- **AND** `docker image inspect` fails for the session's image
+- **THEN** the CLI SHALL print an error and exit with non-zero status
+
+#### Scenario: No latest session
+- **WHEN** `mason run --resume` is executed
+- **AND** `.mason/sessions/latest` symlink does not exist or is dangling
+- **THEN** the CLI SHALL print an error and exit with non-zero status
+
+### Requirement: mason run creates meta.json for all sessions
+
+Every `mason run` invocation SHALL call `createSession()` from the session store to create a `meta.json` at `.mason/sessions/{uuid-v7}/`. This applies to all modes: interactive, JSON, print, dev-container, and proxy-only.
+
+The `meta.json` SHALL contain:
+- `sessionId`: UUID v7 identifier
+- `masonSessionId`: identical to sessionId (for container access)
+- `cwd`: project directory
+- `agent`: agent type name
+- `role`: role name
+- `agentSessionId`: null (populated later by agent hook)
+- `firstPrompt`: null (populated after first prompt)
+- `lastUpdated`: ISO timestamp
+- `closed`: false
+- `closedAt`: null
+
+#### Scenario: CLI session creates meta.json
+- **WHEN** `mason run -p "hello"` is executed
+- **THEN** `.mason/sessions/{uuid-v7}/meta.json` SHALL be created with all required fields
+- **AND** `agentSessionId` SHALL be null
+
+### Requirement: mason run maintains latest session symlink
+
+Every session start SHALL atomically update `.mason/sessions/latest` to point to the new session directory. The symlink target SHALL be relative (just the session ID, not an absolute path).
+
+#### Scenario: Latest symlink updated on session start
+- **WHEN** `mason run -p "hello"` creates session `019d2b36`
+- **THEN** `.mason/sessions/latest` SHALL be a symlink pointing to `019d2b36`
+
+#### Scenario: Latest symlink overwritten on subsequent session
+- **WHEN** a second session `019d2c00` is started
+- **THEN** `.mason/sessions/latest` SHALL point to `019d2c00`, not the first session
+
+### Requirement: mason run generates per-session agent-launch.json
+
+The run command SHALL generate `agent-launch.json` into `.mason/sessions/{id}/` instead of the shared build directory. This enables per-session launch configuration (e.g., resume args).
+
+The session directory is mounted into the container at `/home/mason/.mason/session/`, where `agent-entry` loads it as the primary config path.
+
+#### Scenario: agent-launch.json written to session directory
+- **WHEN** `mason run -p "hello"` creates a session
+- **THEN** `agent-launch.json` SHALL be written to `.mason/sessions/{id}/agent-launch.json`
+
+### Requirement: Resume regenerates agent-launch.json with resume args
+
+When resuming, `refreshAgentLaunchJson()` SHALL inject the agent's resume flag and the agent session ID into the args array. If the agent's `AgentPackage` declares a `resume` config and `agentSessionId` is present in meta.json, the generated args SHALL include `[resume.flag, agentSessionId]`.
+
+If `refreshAgentLaunchJson()` fails during resume (e.g., materialization error), it SHALL throw an error rather than silently falling back to a stale workspace copy.
+
+#### Scenario: Resume args injected into agent-launch.json
+- **WHEN** session is resumed and `agentSessionId` is `"sess_abc123"`
+- **AND** the agent declares `resume: { flag: "--resume", sessionIdField: "agentSessionId" }`
+- **THEN** the generated `agent-launch.json` args SHALL end with `["--resume", "sess_abc123"]`
+
+#### Scenario: Resume args omitted when agentSessionId is null
+- **WHEN** session is resumed but `agentSessionId` is null
+- **THEN** the generated `agent-launch.json` SHALL NOT include any resume flag
+
+### Requirement: Resume extracts relay token from existing compose file
+
+When resuming, the CLI SHALL extract the `RELAY_TOKEN` from the existing `docker-compose.yaml` via regex. If extraction fails, the CLI SHALL fail with an explicit error rather than generating a new token.
+
+#### Scenario: Relay token extracted successfully
+- **WHEN** the session's `docker-compose.yaml` contains `RELAY_TOKEN=abc123def`
+- **THEN** the host proxy SHALL use `abc123def` as the relay token
+
+#### Scenario: Relay token extraction fails
+- **WHEN** the session's `docker-compose.yaml` does not contain a recognizable `RELAY_TOKEN`
+- **THEN** the CLI SHALL print an error and exit with non-zero status

@@ -9,7 +9,15 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  readlink,
+  rename,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 // ---------------------------------------------------------------------------
@@ -18,9 +26,11 @@ import { dirname, join } from "node:path";
 
 export interface Session {
   sessionId: string; // UUID v7
+  masonSessionId: string; // Always equals sessionId — stored for container access
   cwd: string;
   agent: string;
   role: string;
+  agentSessionId: string | null; // Populated by agent SessionStart hook (reads session_id from stdin JSON)
   firstPrompt: string | null;
   lastUpdated: string; // ISO 8601
   closed: boolean;
@@ -85,6 +95,10 @@ function sessionMetaPath(cwd: string, sessionId: string): string {
   return join(sessionDir(cwd, sessionId), "meta.json");
 }
 
+function latestSymlinkPath(cwd: string): string {
+  return join(sessionsDir(cwd), "latest");
+}
+
 // ---------------------------------------------------------------------------
 // Atomic write helper
 // ---------------------------------------------------------------------------
@@ -101,6 +115,42 @@ async function writeMetaAtomic(
 }
 
 // ---------------------------------------------------------------------------
+// Latest session symlink
+// ---------------------------------------------------------------------------
+
+/**
+ * Atomically create/update `.mason/sessions/latest` as a relative symlink
+ * pointing to `sessionId`. Uses create-temp-then-rename for atomicity.
+ */
+export async function updateLatestSymlink(
+  cwd: string,
+  sessionId: string,
+): Promise<void> {
+  const dir = sessionsDir(cwd);
+  await mkdir(dir, { recursive: true });
+
+  const linkPath = latestSymlinkPath(cwd);
+  const tmpPath = join(dir, `.latest-tmp-${randomBytes(4).toString("hex")}`);
+
+  await symlink(sessionId, tmpPath);
+  await rename(tmpPath, linkPath);
+}
+
+/**
+ * Read the `.mason/sessions/latest` symlink and return the session ID it
+ * points to, or `null` if the symlink doesn't exist or is unreadable.
+ */
+export async function resolveLatestSession(
+  cwd: string,
+): Promise<string | null> {
+  try {
+    return await readlink(latestSymlinkPath(cwd));
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // CRUD operations
 // ---------------------------------------------------------------------------
 
@@ -113,11 +163,14 @@ export async function createSession(
   agent: string,
   role: string,
 ): Promise<Session> {
+  const id = uuidv7();
   const session: Session = {
-    sessionId: uuidv7(),
+    sessionId: id,
+    masonSessionId: id,
     cwd,
     agent,
     role,
+    agentSessionId: null,
     firstPrompt: null,
     lastUpdated: new Date().toISOString(),
     closed: false,
@@ -125,6 +178,15 @@ export async function createSession(
   };
 
   await writeMetaAtomic(sessionMetaPath(cwd, session.sessionId), session);
+
+  // Best-effort update of the latest symlink — failure should not prevent
+  // session creation.
+  try {
+    await updateLatestSymlink(cwd, session.sessionId);
+  } catch {
+    // Symlink update is non-critical; swallow errors.
+  }
+
   return session;
 }
 
@@ -184,6 +246,9 @@ export async function listSessions(cwd: string): Promise<Session[]> {
   const sessions: Session[] = [];
 
   for (const entry of entries) {
+    // Skip the "latest" symlink — it's a convenience pointer, not a session.
+    if (entry === "latest" || entry.startsWith(".latest-tmp-")) continue;
+
     try {
       const raw = await readFile(join(dir, entry, "meta.json"), "utf-8");
       const session = JSON.parse(raw) as Session;

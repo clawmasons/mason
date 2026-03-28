@@ -506,13 +506,56 @@ export async function loadConfigAgents(projectDir: string): Promise<AgentPackage
         path.join(projectDir, ".mason", "node_modules", "_resolver.cjs"),
       );
       let resolvedPath: string;
+
+      // Prefer mason.entrypoint from the package's package.json (same as
+      // discoverInstalledAgents) so packages whose `main` is a CLI binary
+      // still load correctly as agent packages.
+      // We read package.json directly from node_modules rather than using
+      // require.resolve(), because the package's `exports` field may block
+      // resolving package.json.
+      const pkgDir = path.join(
+        projectDir, ".mason", "node_modules", ...entry.package.split("/"),
+      );
+      const pkgJsonPath = path.join(pkgDir, "package.json");
+      let masonEntrypoint: string | undefined;
       try {
-        resolvedPath = masonRequire.resolve(entry.package);
+        const pkgJson = JSON.parse(
+          fs.readFileSync(pkgJsonPath, "utf-8"),
+        ) as Record<string, unknown>;
+        const masonField = pkgJson.mason;
+        if (
+          masonField &&
+          typeof masonField === "object" &&
+          typeof (masonField as Record<string, unknown>).entrypoint === "string"
+        ) {
+          masonEntrypoint = (masonField as Record<string, unknown>).entrypoint as string;
+        }
       } catch {
-        resolvedPath = entry.package;
+        // package.json not readable — fall through to require.resolve
+      }
+
+      if (masonEntrypoint) {
+        resolvedPath = path.resolve(pkgDir, masonEntrypoint);
+      } else {
+        try {
+          resolvedPath = masonRequire.resolve(entry.package);
+        } catch {
+          resolvedPath = entry.package;
+        }
       }
       const mod = await import(resolvedPath) as { default?: unknown };
-      const agentPkg = mod.default;
+      // Handle CJS interop: when importing a CJS module that sets
+      // `exports.default = ...`, Node wraps module.exports as `mod.default`,
+      // so the actual value ends up at `mod.default.default`.
+      let agentPkg = mod.default;
+      if (
+        agentPkg &&
+        typeof agentPkg === "object" &&
+        "default" in agentPkg &&
+        !isValidAgentPackage(agentPkg)
+      ) {
+        agentPkg = (agentPkg as Record<string, unknown>).default;
+      }
 
       if (!isValidAgentPackage(agentPkg)) {
         console.warn(

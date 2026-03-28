@@ -94,12 +94,13 @@ export class ProxyServer {
     this.sessionStore = new SessionStore(config.riskLevel);
 
     if (config.relayToken) {
-      this.relayServer = new RelayServer({
+      const relay = new RelayServer({
         token: config.relayToken,
       });
+      this.relayServer = relay;
 
       // Handle host MCP server tool registration
-      this.relayServer.registerHandler("mcp_tools_register", (msg) => {
+      relay.registerHandler("mcp_tools_register", (msg) => {
         const regMsg = msg as McpToolsRegisterMessage;
         const tools: Tool[] = regMsg.tools.map((t) => ({
           name: t.name,
@@ -114,7 +115,7 @@ export class ProxyServer {
           type: "mcp_tools_registered",
           app_name: regMsg.app_name,
         };
-        this.relayServer!.send(confirmation);
+        relay.send(confirmation);
       });
     }
   }

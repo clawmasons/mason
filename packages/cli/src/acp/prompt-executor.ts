@@ -124,6 +124,7 @@ export interface ExecutePromptStreamingOptions {
   cwd: string;
   signal?: AbortSignal;
   onSessionUpdate: (update: Record<string, unknown>) => void;
+  masonSessionId?: string;  // When set, use --resume instead of --agent/--role
 }
 
 export interface ExecutePromptStreamingResult {
@@ -148,16 +149,13 @@ export interface ExecutePromptStreamingResult {
 export function executePromptStreaming(
   options: ExecutePromptStreamingOptions,
 ): Promise<ExecutePromptStreamingResult> {
-  const { agent, role, text, cwd, signal, onSessionUpdate } = options;
+  const { agent, role, text, cwd, signal, onSessionUpdate, masonSessionId } = options;
   const masonBin = getMasonBinPath();
   acpLog("executePromptStreaming: resolved mason bin", { masonBin });
 
-  const args = [
-    "run",
-    "--agent", agent,
-    "--role", role,
-    "--json", text,
-  ];
+  const args = masonSessionId
+    ? ["run", "--resume", masonSessionId, "--json", text]
+    : ["run", "--agent", agent, "--role", role, "--json", text];
   acpLog("executePromptStreaming: spawning", { bin: masonBin, args, cwd });
 
   return new Promise<ExecutePromptStreamingResult>((resolve, reject) => {

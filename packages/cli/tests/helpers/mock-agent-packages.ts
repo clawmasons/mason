@@ -30,7 +30,17 @@ export const mockClaudeCodeMaterializer: RuntimeMaterializer = {
   materializeWorkspace: (_agent, proxyEndpoint, proxyToken) => {
     const files = new Map<string, string>();
     files.set(".claude.json", JSON.stringify({ mcpServers: { mason: { type: "sse", url: `${proxyEndpoint || "http://proxy:3100"}/sse` } } }, null, 2));
-    files.set(".claude/settings.json", JSON.stringify({ permissions: { allow: ["mcp__mason__*"], deny: [] } }, null, 2));
+    files.set(".claude/settings.json", JSON.stringify({
+      permissions: { allow: ["mcp__mason__*"], deny: [] },
+      hooks: {
+        SessionStart: [{
+          hooks: [{
+            type: "command",
+            command: "node -e \"let s='';process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>{try{const i=JSON.parse(s);const f='/home/mason/.mason/session/meta.json';if(require('fs').existsSync(f)&&i.session_id){const m=JSON.parse(require('fs').readFileSync(f,'utf8'));m.agentSessionId=i.session_id;require('fs').writeFileSync(f,JSON.stringify(m,null,2))}}catch(e){}})\"",
+          }],
+        }],
+      },
+    }, null, 2));
     files.set("agent-launch.json", JSON.stringify({ agent: "claude-code-agent", proxy: proxyEndpoint || "http://proxy:3100", token: proxyToken || "" }, null, 2));
     return files;
   },
@@ -83,6 +93,10 @@ export const mockClaudeCodeAgent: AgentPackage = {
       }
       return null;
     },
+  },
+  resume: {
+    flag: "--resume",
+    sessionIdField: "agentSessionId",
   },
   validate: (agent: ResolvedAgent): AgentValidationResult => {
     const errors: AgentValidationResult["errors"] = [];

@@ -94,6 +94,7 @@ export class RelayServer {
     }
 
     const timeout = timeoutMs ?? this.defaultTimeoutMs;
+    const ws = this.ws;
 
     return new Promise<RelayMessage>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -103,7 +104,7 @@ export class RelayServer {
 
       this.pendingRequests.set(message.id, { resolve, reject, timer });
 
-      this.ws!.send(JSON.stringify(message), (err) => {
+      ws.send(JSON.stringify(message), (err) => {
         if (err) {
           clearTimeout(timer);
           this.pendingRequests.delete(message.id);

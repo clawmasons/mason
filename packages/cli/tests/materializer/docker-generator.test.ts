@@ -642,9 +642,25 @@ describe("generateSessionComposeYml", () => {
   it("does not include home mount when homePath is omitted", () => {
     const yml = generateSessionComposeYml(baseOpts);
     const lines = yml.split("\n");
-    // No volume line should mount directly to /home/mason (only /home/mason/workspace/project)
-    const homeMountLines = lines.filter((l) => l.includes(":/home/mason") && !l.includes(":/home/mason/workspace"));
+    // No volume line should mount directly to /home/mason (only /home/mason/workspace/project or /home/mason/.mason/session)
+    const homeMountLines = lines.filter((l) => l.includes(":/home/mason") && !l.includes(":/home/mason/workspace") && !l.includes(":/home/mason/.mason/session"));
     expect(homeMountLines).toHaveLength(0);
+  });
+
+  it("includes session directory mount at /home/mason/.mason/session", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+
+    expect(yml).toContain(":/home/mason/.mason/session");
+  });
+
+  it("session directory mount path is relative to session dir", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+    const lines = yml.split("\n");
+    const sessionMountLine = lines.find((l) => l.includes(":/home/mason/.mason/session"));
+
+    expect(sessionMountLine).toBeDefined();
+    // The host path should be relative (starts with ./ since sessionDir maps to itself)
+    expect(sessionMountLine).toMatch(/- \.\//);
   });
 
   it("includes HOST_UID and HOST_GID build args with provided values", () => {

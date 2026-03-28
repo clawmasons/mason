@@ -119,6 +119,7 @@ export function generateAgentLaunchJson(
   initialPrompt?: string,
   printMode?: boolean,
   jsonMode?: boolean,
+  resumeId?: string,
 ): string {
   // Start with runtime-specific credentials from the agent package
   const credentials: LaunchCredentialConfig[] = [
@@ -170,6 +171,11 @@ export function generateAgentLaunchJson(
     } else {
       args = [...(args ?? []), initialPrompt];
     }
+  }
+
+  // Append resume flag + session ID when both resumeId and agent resume config are present
+  if (resumeId && agentPkg.resume) {
+    args = [...(args ?? []), agentPkg.resume.flag, resumeId];
   }
 
   const config: Record<string, unknown> = { credentials, command };

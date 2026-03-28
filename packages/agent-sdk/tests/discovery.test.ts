@@ -1348,15 +1348,6 @@ describe("E2E validation: auto-install + discovery integration", () => {
     );
   }
 
-  /**
-   * Helper: write .mason/config.json.
-   */
-  function writeMasonConfig(projectDir: string, content: unknown): void {
-    const masonDir = path.join(projectDir, ".mason");
-    fs.mkdirSync(masonDir, { recursive: true });
-    fs.writeFileSync(path.join(masonDir, "config.json"), JSON.stringify(content));
-  }
-
   it("syncExtensionVersions rewrites all deps to new version", () => {
     writeMasonPackageJson(tmpDir, {
       "@clawmasons/claude-code-agent": "~0.1.0",

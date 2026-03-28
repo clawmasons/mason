@@ -49,6 +49,26 @@
 
 ---
 
+### Requirement: claude-code-agent declares resume configuration
+
+The `claude-code-agent` `AgentPackage` SHALL declare a `resume` field:
+```typescript
+resume: {
+  flag: "--resume",
+  sessionIdField: "agentSessionId",
+}
+```
+
+This tells the CLI to pass `--resume <agentSessionId>` to Claude Code when resuming a session. Claude Code uses its own `--resume` flag to restore conversation state.
+
+#### Scenario: Resume field present
+- **WHEN** the `claudeCodeAgent` package is loaded
+- **THEN** `claudeCodeAgent.resume` SHALL be defined
+- **AND** `claudeCodeAgent.resume.flag` SHALL equal `"--resume"`
+- **AND** `claudeCodeAgent.resume.sessionIdField` SHALL equal `"agentSessionId"`
+
+---
+
 ### Requirement: AgentPackage interface defines the contract for agent packages
 
 The system SHALL define an `AgentPackage` interface that all agent packages MUST implement. The interface SHALL include:
@@ -58,6 +78,7 @@ The system SHALL define an `AgentPackage` interface that all agent packages MUST
 - `dockerfile?: DockerfileConfig` — optional Dockerfile generation hooks
 - `acp?: AcpConfig` — optional ACP mode configuration
 - `runtime?: RuntimeConfig` — optional runtime command configuration
+- `resume?: { flag: string; sessionIdField: string }` — optional session resume configuration
 - `jsonMode?: { jsonStreamArgs, buildPromptArgs?, parseJsonStreamAsACP }` — optional JSON streaming mode for ACP session update streaming
 
 The claude-code-agent SHALL declare a `jsonMode` property on its `AgentPackage` with:
