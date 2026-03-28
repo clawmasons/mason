@@ -608,6 +608,35 @@ describe("generateAgentLaunchJson", () => {
     const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, ["--extra"], "do this", false, false, "sess-456"));
     expect(config.args).toEqual(["--effort", "max", "--extra", "do this", "--continue", "sess-456"]);
   });
+
+  // ── position: "after-first" tests ──────────────────────────────────────────
+
+  it("inserts resume args after first arg when position is 'after-first'", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["exec", "--flag", "--verbose"] },
+      resume: { flag: "resume", sessionIdField: "agentSessionId", position: "after-first" },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, undefined, false, false, "session-abc"));
+    expect(config.args).toEqual(["exec", "resume", "session-abc", "--flag", "--verbose"]);
+  });
+
+  it("falls back to append when position is 'after-first' but args is empty", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd" },
+      resume: { flag: "resume", sessionIdField: "agentSessionId", position: "after-first" },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, undefined, false, false, "session-abc"));
+    expect(config.args).toEqual(["resume", "session-abc"]);
+  });
+
+  it("appends resume args at end when position is 'append'", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["exec", "--flag"] },
+      resume: { flag: "--resume", sessionIdField: "agentSessionId", position: "append" },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, undefined, false, false, "session-xyz"));
+    expect(config.args).toEqual(["exec", "--flag", "--resume", "session-xyz"]);
+  });
 });
 
 // ── readSkills ────────────────────────────────────────────────────────────────

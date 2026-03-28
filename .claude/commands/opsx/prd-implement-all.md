@@ -13,7 +13,6 @@ Before doing anything else, run these checks and **stop immediately** if any fai
 2. **Check branch name** — Run `git branch --show-current`. The current branch should be a PRD feature branch (NOT `main` or `master`). This branch is the **PRD branch** — all change PRs will target it. Save this branch name for the entire flow.
 
 3. **Verify lint and tests ware working before starting**
-   - docker system prune -a
    - npm run lint
    - npm run build
    - npm run test
@@ -22,7 +21,9 @@ Before doing anything else, run these checks and **stop immediately** if any fai
    - ../mason-extensions, run `npm run build`
    - in ../mason-extensions `npm run test`
    - in ../mason-extensions `npm run test:e2e`
-  
+
+If tests fail, make a plan to fix them and present it to the user
+
 4. **Find the PRD** — The branch name IS the PRD directory name. Look up `openspec/prds/<branch-name>/IMPLEMENTATION.md` directly. If it doesn't exist, stop with an error: "No PRD found at `openspec/prds/<branch-name>/`. The branch name must match the PRD directory."
 
 5. **Identify unimplemented changes** — Read IMPLEMENTATION.md and list all changes with their implementation status. Filter to only changes that are NOT marked as `**Implemented**`. If all changes are already implemented, tell the user and stop.

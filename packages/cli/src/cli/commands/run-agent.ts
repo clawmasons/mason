@@ -1575,7 +1575,11 @@ function refreshAgentLaunchJson(
         const agentPkg = getAgentFromRegistry(agentType);
         if (agentPkg?.resume) {
           const parsed = JSON.parse(launchJson) as { args?: string[]; [key: string]: unknown };
-          parsed.args = [...(parsed.args ?? []), agentPkg.resume.flag, options.resumeId];
+          if (agentPkg.resume.position === "after-first" && parsed.args && parsed.args.length > 0) {
+            parsed.args = [parsed.args[0], agentPkg.resume.flag, options.resumeId, ...parsed.args.slice(1)];
+          } else {
+            parsed.args = [...(parsed.args ?? []), agentPkg.resume.flag, options.resumeId];
+          }
           launchJson = JSON.stringify(parsed, null, 2);
         }
       }
