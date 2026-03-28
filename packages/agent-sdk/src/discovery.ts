@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { execSync } from "node:child_process";
 import { createRequire } from "node:module";
 import type { AgentPackage } from "./types.js";
+import { sdkLogger } from "./logger.js";
 
 /**
  * Agent registry mapping agent type names (and aliases) to AgentPackage instances.
@@ -124,13 +125,13 @@ const VALID_MODES = new Set<string>(["terminal", "bash"]);
  */
 function parseEntryConfig(name: string, raw: unknown): AgentEntryConfig | null {
   if (!raw || typeof raw !== "object") {
-    console.warn(`[agent-sdk] Invalid agent config for "${name}": missing "package" field`);
+    sdkLogger.warn(`Invalid agent config for "${name}": missing "package" field`);
     return null;
   }
   const obj = raw as Record<string, unknown>;
 
   if (typeof obj.package !== "string") {
-    console.warn(`[agent-sdk] Invalid agent config for "${name}": missing "package" field`);
+    sdkLogger.warn(`Invalid agent config for "${name}": missing "package" field`);
     return null;
   }
 
@@ -140,8 +141,8 @@ function parseEntryConfig(name: string, raw: unknown): AgentEntryConfig | null {
   const runtimeFields = ["home", "mode", "role", "credentials", "dev-container-customizations"] as const;
   const foundDeprecated = runtimeFields.filter((f) => obj[f] !== undefined);
   if (foundDeprecated.length > 0) {
-    console.warn(
-      `[agent-sdk] Agent "${name}" has runtime fields (${foundDeprecated.join(", ")}) in the "agents" config. ` +
+    sdkLogger.warn(
+      `Agent "${name}" has runtime fields (${foundDeprecated.join(", ")}) in the "agents" config. ` +
       `Move these to an "aliases" entry. Runtime fields in "agents" will be removed in a future version.`,
     );
   }
@@ -154,8 +155,8 @@ function parseEntryConfig(name: string, raw: unknown): AgentEntryConfig | null {
     if (typeof obj.mode === "string" && VALID_MODES.has(obj.mode)) {
       entry.mode = obj.mode as "terminal" | "bash"; // deprecated
     } else {
-      console.warn(
-        `[agent-sdk] Agent "${name}" has invalid mode "${String(obj.mode)}" (expected terminal or bash). Defaulting to terminal.`,
+      sdkLogger.warn(
+        `Agent "${name}" has invalid mode "${String(obj.mode)}" (expected terminal or bash). Defaulting to terminal.`,
       );
       entry.mode = "terminal"; // deprecated
     }
@@ -173,14 +174,14 @@ function parseEntryConfig(name: string, raw: unknown): AgentEntryConfig | null {
 
   if (obj.credentials !== undefined) {
     if (!Array.isArray(obj.credentials)) {
-      console.warn(`[agent-sdk] Agent "${name}" has invalid credentials value (expected array). Ignoring.`);
+      sdkLogger.warn(`Agent "${name}" has invalid credentials value (expected array). Ignoring.`);
     } else {
       const validKeys: string[] = [];
       for (const item of obj.credentials) {
         if (typeof item === "string") {
           validKeys.push(item);
         } else {
-          console.warn(`[agent-sdk] Agent "${name}" credentials contains non-string entry "${String(item)}". Skipping.`);
+          sdkLogger.warn(`Agent "${name}" credentials contains non-string entry "${String(item)}". Skipping.`);
         }
       }
       entry.credentials = validKeys; // deprecated
@@ -222,7 +223,7 @@ function readMasonConfig(projectDir: string): MasonConfig | null {
     const raw = fs.readFileSync(configPath, "utf-8");
     return JSON.parse(raw) as MasonConfig;
   } catch {
-    console.warn(`[agent-sdk] Failed to parse .mason/config.json`);
+    sdkLogger.warn(`Failed to parse .mason/config.json`);
     return null;
   }
 }
@@ -431,7 +432,7 @@ export async function discoverInstalledAgents(projectDir: string): Promise<Agent
       const raw = fs.readFileSync(pkgJsonPath, "utf-8");
       pkgJson = JSON.parse(raw) as Record<string, unknown>;
     } catch {
-      console.warn(`[agent-sdk] Failed to parse package.json in ${pkgDir}`);
+      sdkLogger.warn(`Failed to parse package.json in ${pkgDir}`);
       continue;
     }
 
@@ -464,16 +465,16 @@ export async function discoverInstalledAgents(projectDir: string): Promise<Agent
       }
 
       if (!isValidAgentPackage(agentPkg)) {
-        console.warn(
-          `[agent-sdk] Package "@clawmasons/${entry}" does not export a valid AgentPackage (missing name or materializer)`,
+        sdkLogger.warn(
+          `Package "@clawmasons/${entry}" does not export a valid AgentPackage (missing name or materializer)`,
         );
         continue;
       }
 
       agents.push(agentPkg);
     } catch (err) {
-      console.warn(
-        `[agent-sdk] Failed to load agent from "@clawmasons/${entry}": ${err instanceof Error ? err.message : String(err)}`,
+      sdkLogger.warn(
+        `Failed to load agent from "@clawmasons/${entry}": ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }
@@ -558,16 +559,16 @@ export async function loadConfigAgents(projectDir: string): Promise<AgentPackage
       }
 
       if (!isValidAgentPackage(agentPkg)) {
-        console.warn(
-          `[agent-sdk] Package "${entry.package}" does not export a valid AgentPackage`,
+        sdkLogger.warn(
+          `Package "${entry.package}" does not export a valid AgentPackage`,
         );
         continue;
       }
 
       agents.push(agentPkg);
     } catch {
-      console.warn(
-        `[agent-sdk] Agent package "${entry.package}" not found. Install it with: npm install ${entry.package}`,
+      sdkLogger.warn(
+        `Agent package "${entry.package}" not found. Install it with: npm install ${entry.package}`,
       );
     }
   }
@@ -692,18 +693,18 @@ function parseAliasEntryConfig(
   knownAgentNames: Set<string>,
 ): AliasEntryConfig | null {
   if (!raw || typeof raw !== "object") {
-    console.warn(`[agent-sdk] Invalid alias config for "${name}": must be an object`);
+    sdkLogger.warn(`Invalid alias config for "${name}": must be an object`);
     return null;
   }
   const obj = raw as Record<string, unknown>;
 
   if (typeof obj.agent !== "string") {
-    console.warn(`[agent-sdk] Invalid alias config for "${name}": missing "agent" field`);
+    sdkLogger.warn(`Invalid alias config for "${name}": missing "agent" field`);
     return null;
   }
 
   if (!knownAgentNames.has(obj.agent)) {
-    console.error(`[agent-sdk] Alias "${name}" references unknown agent "${obj.agent}"`);
+    sdkLogger.error(`Alias "${name}" references unknown agent "${obj.agent}"`);
     process.exit(1);
   }
 
@@ -713,8 +714,8 @@ function parseAliasEntryConfig(
     if (typeof obj.mode === "string" && VALID_MODES.has(obj.mode)) {
       entry.mode = obj.mode as "terminal" | "bash";
     } else {
-      console.warn(
-        `[agent-sdk] Alias "${name}" has invalid mode "${String(obj.mode)}" (expected terminal or bash). Defaulting to terminal.`,
+      sdkLogger.warn(
+        `Alias "${name}" has invalid mode "${String(obj.mode)}" (expected terminal or bash). Defaulting to terminal.`,
       );
       entry.mode = "terminal";
     }
@@ -736,14 +737,14 @@ function parseAliasEntryConfig(
 
   if (obj.credentials !== undefined) {
     if (!Array.isArray(obj.credentials)) {
-      console.warn(`[agent-sdk] Alias "${name}" has invalid credentials value (expected array). Ignoring.`);
+      sdkLogger.warn(`Alias "${name}" has invalid credentials value (expected array). Ignoring.`);
     } else {
       const validKeys: string[] = [];
       for (const item of obj.credentials) {
         if (typeof item === "string") {
           validKeys.push(item);
         } else {
-          console.warn(`[agent-sdk] Alias "${name}" credentials contains non-string entry "${String(item)}". Skipping.`);
+          sdkLogger.warn(`Alias "${name}" credentials contains non-string entry "${String(item)}". Skipping.`);
         }
       }
       entry.credentials = validKeys;
@@ -752,14 +753,14 @@ function parseAliasEntryConfig(
 
   if (obj["agent-args"] !== undefined) {
     if (!Array.isArray(obj["agent-args"])) {
-      console.warn(`[agent-sdk] Alias "${name}" has invalid agent-args value (expected array). Ignoring.`);
+      sdkLogger.warn(`Alias "${name}" has invalid agent-args value (expected array). Ignoring.`);
     } else {
       const validArgs: string[] = [];
       for (const item of obj["agent-args"]) {
         if (typeof item === "string") {
           validArgs.push(item);
         } else {
-          console.warn(`[agent-sdk] Alias "${name}" agent-args contains non-string entry "${String(item)}". Skipping.`);
+          sdkLogger.warn(`Alias "${name}" agent-args contains non-string entry "${String(item)}". Skipping.`);
         }
       }
       entry.agentArgs = validArgs;
@@ -951,8 +952,8 @@ export async function resolveAgentWithAutoInstall(
   try {
     autoInstallAgent(projectDir, packageName, cliVersion);
   } catch (err) {
-    console.warn(
-      `[agent-sdk] Failed to auto-install "${packageName}": ${err instanceof Error ? err.message : String(err)}`,
+    sdkLogger.warn(
+      `Failed to auto-install "${packageName}": ${err instanceof Error ? err.message : String(err)}`,
     );
     return null;
   }

@@ -26,6 +26,7 @@ import {
 } from "../src/discovery.js";
 import type { AgentRegistry } from "../src/discovery.js";
 import type { AgentPackage } from "../src/types.js";
+import { sdkLogger } from "../src/logger.js";
 
 const mockExecSync = vi.mocked(execSync);
 
@@ -304,7 +305,7 @@ describe("loadConfigAgentEntry", () => {
 
   it("returns the entry for a named agent", () => {
     const tmpDir = makeTmpDir();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: {
@@ -349,7 +350,7 @@ describe("loadConfigAgentEntry", () => {
 
   it("warns and defaults mode to terminal for invalid mode value", () => {
     const tmpDir = makeTmpDir();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: { myagent: { package: "@foo/bar", mode: "interactive" } },
@@ -369,7 +370,7 @@ describe("loadConfigAgentEntry", () => {
 
   it("parses home and role optional fields (with deprecation warning)", () => {
     const tmpDir = makeTmpDir();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: {
@@ -389,7 +390,7 @@ describe("loadConfigAgentEntry", () => {
 
   it("parses dev-container-customizations when present (with deprecation warning)", () => {
     const tmpDir = makeTmpDir();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: {
@@ -432,7 +433,7 @@ describe("loadConfigAgentEntry", () => {
 
   it("parses credentials array correctly (with deprecation warning)", () => {
     const tmpDir = makeTmpDir();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: {
@@ -465,7 +466,7 @@ describe("loadConfigAgentEntry", () => {
 
   it("warns and ignores credentials when value is not an array", () => {
     const tmpDir = makeTmpDir();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: { myagent: { package: "@foo/bar", credentials: "MY_KEY" } },
@@ -482,7 +483,7 @@ describe("loadConfigAgentEntry", () => {
 
   it("warns and skips non-string entries in credentials array", () => {
     const tmpDir = makeTmpDir();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: { myagent: { package: "@foo/bar", credentials: ["VALID_KEY", 123, null] } },
@@ -593,7 +594,7 @@ describe("loadConfigAliasEntry", () => {
 
   it("warns and defaults to terminal for invalid mode in alias", () => {
     const tmpDir = makeTmpDir();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: { claude: { package: "@clawmasons/claude-code-agent" } },
@@ -611,7 +612,7 @@ describe("loadConfigAliasEntry", () => {
 
   it("returns null for alias missing agent field", () => {
     const tmpDir = makeTmpDir();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       writeMasonConfig(tmpDir, {
         agents: { claude: { package: "@clawmasons/claude-code-agent" } },
@@ -818,7 +819,7 @@ describe("discoverInstalledAgents", () => {
 
   it("skips invalid agent packages (bad exports) with a warning", async () => {
     const tmpDir = makeTmpDir();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       createFakeAgentPackage(tmpDir, "bad-agent", { masonType: "agent", validExport: false });
 
@@ -835,7 +836,7 @@ describe("discoverInstalledAgents", () => {
 
   it("warns when entrypoint cannot be loaded", async () => {
     const tmpDir = makeTmpDir();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       createFakeAgentPackage(tmpDir, "broken-agent", { masonType: "agent", noEntrypoint: true });
 
@@ -879,7 +880,7 @@ describe("discoverInstalledAgents", () => {
 
   it("skips directories with bad package.json", async () => {
     const tmpDir = makeTmpDir();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       createFakeAgentPackage(tmpDir, "bad-json-pkg", { masonType: "agent", badJson: true });
 
@@ -908,7 +909,7 @@ describe("discoverInstalledAgents", () => {
 
   it("discovers multiple valid agents and skips invalid ones", async () => {
     const tmpDir = makeTmpDir();
-    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
     try {
       createFakeAgentPackage(tmpDir, "good-agent-a", { masonType: "agent", agentName: "good-agent-a" });
       createFakeAgentPackage(tmpDir, "good-agent-b", { masonType: "agent", agentName: "good-agent-b" });
@@ -1262,7 +1263,7 @@ describe("resolveAgentWithAutoInstall", () => {
     mockExecSync.mockImplementation(() => {
       throw new Error("npm failed");
     });
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(sdkLogger, "warn").mockImplementation(() => {});
 
     const registry: AgentRegistry = new Map();
     const result = await resolveAgentWithAutoInstall(tmpDir, "pi", "0.1.6", registry);
