@@ -554,6 +554,10 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
   // Logs dir mount
   agentVolumeLines.push(`      - ${relLogsDir}:/logs`);
 
+  // Session directory mount (per-session agent-launch.json + meta.json)
+  const relSessionDir = rel(sessionDir);
+  agentVolumeLines.push(`      - ${relSessionDir}:/home/mason/.mason/session`);
+
   // Workspace directory mount (live bind mount for agent-launch.json)
   if (workspacePath) {
     const relWorkspacePath = rel(workspacePath);

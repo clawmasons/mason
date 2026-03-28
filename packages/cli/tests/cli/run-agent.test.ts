@@ -493,7 +493,7 @@ describe("generateSessionComposeYml (run-agent scenarios)", () => {
     const agentSection = yml.split("agent-writer:")[1]!;
     // No mount to bare /home/mason/ (only /home/mason/workspace...)
     const lines = agentSection.split("\n");
-    const homeMountLines = lines.filter((l: string) => l.includes(":/home/mason/") && !l.includes(":/home/mason/workspace"));
+    const homeMountLines = lines.filter((l: string) => l.includes(":/home/mason/") && !l.includes(":/home/mason/workspace") && !l.includes(":/home/mason/.mason/session"));
     expect(homeMountLines).toHaveLength(0);
   });
 

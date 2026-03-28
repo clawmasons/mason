@@ -98,7 +98,15 @@ const searchPaths = [
 
 **Testable output:** (a) `refreshAgentLaunchJson()` writes to session dir, not build dir, (b) `generateSessionComposeYml()` output includes `/home/mason/.mason/session` volume mount, (c) `agent-entry` loads from `/home/mason/.mason/session/agent-launch.json` when present, (d) `agent-entry` falls back to `/home/mason/workspace/agent-launch.json` when session path missing, (e) `meta.json` is accessible inside container at `/home/mason/.mason/session/meta.json` (e2e).
 
-**Not Implemented Yet**
+**Implemented** — [Spec](../../changes/archive/2026-03-27-per-session-agent-launch/proposal.md) | [Design](../../changes/archive/2026-03-27-per-session-agent-launch/design.md) | [Tasks](../../changes/archive/2026-03-27-per-session-agent-launch/tasks.md)
+
+Files changed:
+- `packages/cli/src/cli/commands/run-agent.ts` — Updated `refreshAgentLaunchJson()` to write to session dir; moved all 4 call sites after `createSessionDirectory()`
+- `packages/cli/src/materializer/docker-generator.ts` — Added session directory bind mount (`:/home/mason/.mason/session`) in `generateSessionComposeYml()`
+- `packages/agent-entry/src/index.ts` — Added `/home/mason/.mason/session/agent-launch.json` as primary search path in `loadLaunchConfig()`
+- `packages/cli/tests/materializer/docker-generator.test.ts` — Added tests for session mount in compose output
+- `packages/agent-entry/tests/launch-config.test.ts` — Added test for search path order
+- `packages/cli/tests/cli/run-agent.test.ts` — Updated home mount filter to exclude session mount
 
 ---
 

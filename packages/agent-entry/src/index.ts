@@ -79,16 +79,18 @@ export interface AgentLaunchConfig {
 }
 
 /**
- * Load agent-launch.json from the workspace or working directory.
+ * Load agent-launch.json from the session directory, workspace, or working directory.
  *
  * Search order:
- * 1. /home/mason/workspace/agent-launch.json (Docker container path)
- * 2. ./agent-launch.json (current working directory)
+ * 1. /home/mason/.mason/session/agent-launch.json (per-session, primary)
+ * 2. /home/mason/workspace/agent-launch.json (legacy workspace path)
+ * 3. ./agent-launch.json (current working directory)
  *
  * Returns null if no config file is found (falls back to env vars).
  */
 export function loadLaunchConfig(): AgentLaunchConfig | null {
   const searchPaths = [
+    "/home/mason/.mason/session/agent-launch.json",
     "/home/mason/workspace/agent-launch.json",
     path.join(process.cwd(), "agent-launch.json"),
   ];
