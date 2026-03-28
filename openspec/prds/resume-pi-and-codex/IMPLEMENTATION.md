@@ -106,7 +106,7 @@
    - In `../mason-extensions`: `npm run test`
    - In `../mason-extensions`: `npm run test:e2e`
 
-**Not Implemented Yet**
+**Implemented** — mason-extensions commit on resume-pi-and-codex branch
 
 ---
 
