@@ -1,6 +1,6 @@
 # Session Resume — Product Requirements Document
 
-**Version:** 0.1.0 · Draft
+**Version:** 0.2.0 · Implemented
 **Date:** March 2026
 **Author:** ClawForge, Inc.
 
@@ -365,3 +365,24 @@ The session directory and its contents must be readable and writable by the cont
 
 - Resume should not rebuild Docker images. It reuses the existing image from the original session.
 - `docker image inspect` for validation adds negligible latency (<100ms).
+
+---
+
+## 11. Implementation Notes
+
+### 11.1 Relay Token Extraction on Resume
+
+When resuming a session, the CLI reads the relay token from the existing `docker-compose.yaml` via regex extraction (`/RELAY_TOKEN=([a-f0-9]+)/`). If extraction fails (e.g., compose file corrupted), the CLI SHALL fail with an explicit error rather than generating a new token — a mismatched token would silently break host proxy communication.
+
+### 11.2 Resume Error Propagation in agent-launch.json Generation
+
+During resume, `refreshAgentLaunchJson()` SHALL propagate errors from `materializeForAgent()` rather than silently catching them. If the agent-launch.json cannot be generated with resume args, the session would silently degrade to a fresh start — this is unacceptable for resume semantics and must be a hard failure.
+
+For non-resume paths, the silent catch is retained since the initial build already created a fallback copy.
+
+### 11.3 SessionStart Hook Error Handling
+
+The SessionStart hook that captures `CLAUDE_SESSION_ID` SHALL guard against missing state:
+- Check that `/home/mason/.mason/session/meta.json` exists before reading
+- Check that `CLAUDE_SESSION_ID` environment variable is set before writing
+- If either condition fails, the hook exits silently (no error) — this means `agentSessionId` stays `null` and resume won't activate, which is safe degradation

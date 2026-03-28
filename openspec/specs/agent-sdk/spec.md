@@ -92,7 +92,7 @@ Each agent package SHALL export its `AgentPackage` object as the default export 
 ### Requirement: SDK exports common helper functions
 
 The `@clawmasons/agent-sdk` package SHALL export the following helper functions for use by agent materializer implementations:
-- `generateAgentLaunchJson(agentPkg: AgentPackage, roleCredentials: string[], acpMode?: boolean, instructions?: string, agentArgs?: string[], initialPrompt?: string, printMode?: boolean, jsonMode?: boolean): string`
+- `generateAgentLaunchJson(agentPkg: AgentPackage, roleCredentials: string[], acpMode?: boolean, instructions?: string, agentArgs?: string[], initialPrompt?: string, printMode?: boolean, jsonMode?: boolean, resumeId?: string): string`
 - `formatPermittedTools(permissions): string`
 - `collectAllTasks(roles: ResolvedRole[]): Array<[ResolvedTask, ResolvedRole[]]>`
 - `readTasks(config: AgentTaskConfig, projectDir: string): ResolvedTask[]`
@@ -390,6 +390,43 @@ The legacy `ToolCallInfo` interface SHALL be exported with a `@deprecated` annot
 #### Scenario: ToolKind values match ACP spec
 - **WHEN** a parser sets `kind` on a tool call
 - **THEN** the value SHALL be one of the `ToolKind` union members (e.g., `"execute"` for command execution, `"other"` for generic tools)
+
+### Requirement: AgentPackage includes optional resume config
+
+The `AgentPackage` interface SHALL include an optional `resume` field with the following shape:
+
+- `flag: string` — the CLI argument flag for resuming (e.g., `"--resume"`)
+- `sessionIdField: string` — the `meta.json` field containing the agent's session ID to pass (e.g., `"agentSessionId"`)
+
+When an agent declares `resume`, the CLI can inject resume arguments into `agent-launch.json` during session resumption. Different agents may use different flags (e.g., `--resume`, `--continue`, `--session`) without CLI changes.
+
+#### Scenario: Agent package declares resume config
+- **WHEN** an agent package exports an `AgentPackage` with `resume: { flag: "--resume", sessionIdField: "agentSessionId" }`
+- **THEN** the agent registry SHALL accept it
+- **AND** the CLI SHALL use this config to inject resume args when resuming a session
+
+#### Scenario: Agent package omits resume config
+- **WHEN** an agent package exports an `AgentPackage` without `resume`
+- **THEN** the agent registry SHALL accept it
+- **AND** the CLI SHALL NOT inject resume args (resume may still work without agent-level session continuity)
+
+### Requirement: generateAgentLaunchJson supports resumeId parameter
+
+`generateAgentLaunchJson` SHALL accept an optional `resumeId?: string` parameter (after `jsonMode`). When `resumeId` is provided and the agent package declares a `resume` config, the function SHALL append `[resume.flag, resumeId]` to the args array.
+
+The resume args SHALL be appended after all other args (base args, instructions, agent args, mode-specific args).
+
+#### Scenario: resumeId appended when agent has resume config
+- **WHEN** `generateAgentLaunchJson` is called with `resumeId = "session-123"` and `agentPkg.resume = { flag: "--resume", sessionIdField: "agentSessionId" }`
+- **THEN** `args` SHALL end with `["--resume", "session-123"]`
+
+#### Scenario: resumeId ignored when agent has no resume config
+- **WHEN** `generateAgentLaunchJson` is called with `resumeId = "session-123"` but `agentPkg.resume` is undefined
+- **THEN** `args` SHALL NOT contain `"session-123"` or any resume flag
+
+#### Scenario: No resumeId — backward compatible
+- **WHEN** `generateAgentLaunchJson` is called without `resumeId`
+- **THEN** the output SHALL be identical to previous behavior
 
 ### Requirement: AgentPackage includes optional jsonMode config
 

@@ -2,6 +2,7 @@
 
 **PRD:** [openspec/prds/resume-session/PRD.md](./PRD.md)
 **Phase:** P0 (Core Changes)
+**Status:** Implemented with post-review fixes
 
 ---
 
@@ -192,6 +193,10 @@ Files changed:
 - `packages/cli/tests/helpers/mock-agent-packages.ts` — Added `resume: { flag: "--resume", sessionIdField: "agentSessionId" }` to `mockClaudeCodeAgent`; updated materializer to include `SessionStart` hook in `.claude/settings.json`
 - `packages/cli/tests/helpers/mock-agent-packages.test.ts` — New test file with 7 tests covering resume field, hook presence, meta.json path, env var reference, permissions preservation
 
+**Post-review fix** (real agent in mason-extensions):
+- `mason-extensions/agents/claude-code-agent/src/index.ts` — Added `resume: { flag: "--resume", sessionIdField: "agentSessionId" }` to the real `AgentPackage` export
+- `mason-extensions/agents/claude-code-agent/src/materializer.ts` — Updated `generateSettingsJson()` to include `SessionStart` hook that captures `CLAUDE_SESSION_ID` into `/home/mason/.mason/session/meta.json` with error guards (checks file exists and env var is set before writing)
+
 ---
 
 ### CHANGE 6: `mason run --resume` CLI Flag
@@ -212,6 +217,9 @@ Files changed:
 - `packages/cli/src/cli/commands/run-agent.ts` — Added `--resume [session-id]` option to `registerRunCommand()`; added `handleResume()` with full session validation and launch flow; added `formatRelativeTime()`, `getResumeDockerImage()`, `printSessionNotFoundError()` helpers; updated `refreshAgentLaunchJson()` with `resumeId` post-processing
 - `packages/shared/src/index.ts` — Exported `resolveLatestSession` from main index
 - `packages/cli/tests/cli/run-agent.test.ts` — Added 16 tests covering command registration, session resolution, validation, warnings, and launch JSON generation
+
+**Post-review fixes:**
+- `packages/cli/src/cli/commands/run-agent.ts` — (1) Relay token extraction in `handleResume()` now fails explicitly instead of generating a new random token when regex extraction fails. (2) `refreshAgentLaunchJson()` now propagates errors during resume instead of silently catching them.
 
 ---
 

@@ -28,17 +28,35 @@ This applies to both `materializeWorkspace` and `materializeSupervisor`. Neither
 - **WHEN** `materializeWorkspace` is called without a `proxyToken`
 - **THEN** `.claude.json` SHALL have `mcpServers.chapter.headers.Authorization` equal to `"Bearer ${MCP_PROXY_TOKEN}"`
 
-### Requirement: Claude Code materializer generates settings.json with permissions only
+### Requirement: Claude Code materializer generates settings.json with permissions and SessionStart hook
 
-The Claude Code materializer SHALL generate a `.claude/settings.json` file containing only a `permissions` block with `allow: ["mcp__chapter__*"]` and `deny: []`. The file SHALL NOT contain a `mcpServers` key.
+The Claude Code materializer SHALL generate a `.claude/settings.json` file containing:
+1. A `permissions` block with `allow: ["mcp__mason__*"]` and `deny: []`
+2. A `hooks` block with a `SessionStart` hook that captures `CLAUDE_SESSION_ID` into the mounted session `meta.json`
 
-#### Scenario: settings.json contains only permissions
+The SessionStart hook SHALL:
+- Check that `/home/mason/.mason/session/meta.json` exists before reading
+- Check that `CLAUDE_SESSION_ID` environment variable is set before writing
+- Write `agentSessionId` field to meta.json with the value of `CLAUDE_SESSION_ID`
+- Exit silently if either precondition fails (safe degradation — resume won't activate)
+
+#### Scenario: settings.json contains permissions and hooks
 - **WHEN** `materializeWorkspace` is called for any agent
-- **THEN** the result SHALL contain key `.claude/settings.json` with a JSON object having only a `permissions` key
+- **THEN** the result SHALL contain key `.claude/settings.json` with a JSON object having both `permissions` and `hooks` keys
 
-#### Scenario: Single chapter permission
+#### Scenario: SessionStart hook captures agent session ID
+- **WHEN** the agent starts inside the container
+- **AND** `CLAUDE_SESSION_ID` is set in the environment
+- **AND** `/home/mason/.mason/session/meta.json` exists
+- **THEN** the SessionStart hook SHALL write `agentSessionId` to meta.json
+
+#### Scenario: SessionStart hook is safe when meta.json missing
+- **WHEN** the agent starts but `/home/mason/.mason/session/meta.json` does not exist
+- **THEN** the hook SHALL exit silently without error
+
+#### Scenario: Single mason permission
 - **WHEN** settings.json is generated for any agent
-- **THEN** `permissions.allow` SHALL equal `["mcp__chapter__*"]`
+- **THEN** `permissions.allow` SHALL equal `["mcp__mason__*"]`
 
 ### Requirement: Claude Code materializer generates slash commands from tasks
 

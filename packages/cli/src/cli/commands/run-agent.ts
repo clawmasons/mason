@@ -853,7 +853,12 @@ async function handleResume(
   // Read relay token from compose file
   const composeContent = fs.readFileSync(composeFile, "utf-8");
   const relayTokenMatch = composeContent.match(/RELAY_TOKEN=([a-f0-9]+)/);
-  const relayToken = relayTokenMatch ? relayTokenMatch[1] : crypto.randomBytes(32).toString("hex");
+  if (!relayTokenMatch) {
+    console.error(`\n  Error: Could not extract RELAY_TOKEN from compose file. Session may be corrupted.\n`);
+    process.exit(1);
+    return;
+  }
+  const relayToken = relayTokenMatch[1];
 
   console.log(`  Starting host proxy (in-process)...`);
   let hostProxyHandle: { stop: () => Promise<void> } | null = null;
@@ -1577,8 +1582,13 @@ function refreshAgentLaunchJson(
       fs.mkdirSync(sessionDir, { recursive: true });
       fs.writeFileSync(path.join(sessionDir, "agent-launch.json"), launchJson);
     }
-  } catch {
-    // Best-effort: the initial build already created agent-launch.json in
+  } catch (err) {
+    if (options?.resumeId) {
+      // During resume, failing to generate agent-launch.json with resume args
+      // means the agent would start fresh instead of resuming — surface the error.
+      throw new Error(`Failed to generate agent-launch.json for resume: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    // Best-effort for non-resume: the initial build already created agent-launch.json in
     // the workspace directory. If re-materialization fails (e.g., incomplete
     // role schema), agent-entry will fall back to the workspace copy.
   }

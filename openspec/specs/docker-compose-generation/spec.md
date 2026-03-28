@@ -71,3 +71,24 @@ The values SHALL be determined at build time from the host system.
 #### Scenario: Default UID/GID when not provided
 - **WHEN** `generateSessionComposeYml()` is called without `hostUid`/`hostGid`
 - **THEN** the build args SHALL default to `"1000"` for both
+
+### Requirement: Session compose mounts session directory into agent container
+
+The `generateSessionComposeYml()` function SHALL include a bind mount from the session directory to `/home/mason/.mason/session` (read-write) in the agent service. This mount provides the agent access to:
+- `agent-launch.json` — per-session launch configuration
+- `meta.json` — session metadata (agent hooks write `agentSessionId` here)
+
+```yaml
+volumes:
+  - {relSessionDir}:/home/mason/.mason/session
+```
+
+The path SHALL be relative from the session directory.
+
+#### Scenario: Session directory mount included
+- **WHEN** `generateSessionComposeYml()` is called with a `sessionDir`
+- **THEN** the agent service volumes SHALL include a bind mount to `/home/mason/.mason/session`
+
+#### Scenario: Session mount coexists with other mounts
+- **WHEN** workspace, home, project, and session mounts are all configured
+- **THEN** the agent service SHALL have all volume mounts including the session mount at `/home/mason/.mason/session`
