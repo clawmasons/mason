@@ -457,7 +457,6 @@ describe("generateSessionComposeYml", () => {
     agentName: "@acme/agent",
     proxyToken: "test-proxy-token",
     relayToken: "test-cred-token",
-    proxyPort: 3000,
     volumeMasks: generateVolumeMasks([".mason/", ".claude/", ".env"]),
     sessionDir: "/project/.mason/sessions/abc12345",
     logsDir: "/project/.mason/sessions/abc12345/logs",
@@ -596,10 +595,10 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain("MCP_PROXY_TOKEN=test-proxy-token");
   });
 
-  it("includes proxy port mapping", () => {
+  it("includes proxy port mapping with random localhost port", () => {
     const yml = generateSessionComposeYml(baseOpts);
 
-    expect(yml).toContain('"3000:9090"');
+    expect(yml).toContain('"127.0.0.1::9090"');
   });
 
   it("agent depends on proxy", () => {

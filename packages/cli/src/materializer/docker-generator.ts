@@ -422,8 +422,6 @@ export interface SessionComposeOptions {
   proxyToken: string;
   /** Credential proxy token. */
   relayToken: string;
-  /** Proxy port on host. */
-  proxyPort?: number;
   /** Volume mask entries from generateVolumeMasks(). */
   volumeMasks?: VolumeMaskEntry[];
   /** Role-declared extra mounts. */
@@ -487,7 +485,6 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
     agentType,
     proxyToken,
     relayToken,
-    proxyPort = 9090,
     volumeMasks = [],
     roleMounts,
     credentialKeys,
@@ -686,7 +683,7 @@ services:
     environment:
 ${proxyEnvLines.join("\n")}
     ports:
-      - "${proxyPort}:9090"
+      - "127.0.0.1::9090"
     restart: "no"
     init: true
 
@@ -727,8 +724,6 @@ export interface CreateSessionOptions {
   agentType: string;
   /** Agent name for proxy CMD. */
   agentName: string;
-  /** Proxy port. */
-  proxyPort?: number;
   /** Role-declared mounts. */
   roleMounts?: RoleMount[];
   /** Declared credential keys. */

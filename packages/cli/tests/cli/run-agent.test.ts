@@ -38,6 +38,7 @@ import {
   normalizeSourceFlags,
   generateProjectRole,
   inferAgentType,
+  parseProxyPortOutput,
   ensureDockerBuild,
   formatRelativeTime,
   getResumeDockerImage,
@@ -377,7 +378,6 @@ describe("generateSessionComposeYml (run-agent scenarios)", () => {
     roleName: "writer",
     proxyToken: "test-token-abc",
     relayToken: "cred-token-xyz",
-    proxyPort: 3000,
     sessionDir: "/projects/my-project/.mason/sessions/abc123",
     logsDir: "/projects/my-project/.mason/sessions/abc123/logs",
     masonLogsDir: "/projects/my-project/.mason/logs",
@@ -395,7 +395,7 @@ describe("generateSessionComposeYml (run-agent scenarios)", () => {
     expect(yml).not.toContain("credential-service:");
     expect(yml).toContain("mcp-proxy/Dockerfile");
     expect(yml).toContain("/home/mason/workspace/project");
-    expect(yml).toContain("3000:9090");
+    expect(yml).toContain('"127.0.0.1::9090"');
     expect(yml).toContain("stdin_open: true");
     expect(yml).toContain("tty: true");
     expect(yml).toContain("init: true");
@@ -848,6 +848,7 @@ describe("runAgent", () => {
           calls.push({ composeFile, args, opts: { interactive: true } });
           return overrides?.agentExitCode ?? 0;
         },
+        discoverProxyPortFn: async () => 19700,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         startHostProxyFn: async (_opts: {
           proxyPort: number;
@@ -944,6 +945,7 @@ describe("runAgent", () => {
       } as ResolvedAgent),
       ensureGitignoreEntryFn: () => false,
       existsSyncFn: (p: string) => fs.existsSync(p),
+      discoverProxyPortFn: async () => 19700,
       waitForProxyHealthFn: async () => {},
       startHostProxyFn: async () => ({ stop: async () => {} }),
       initRegistryFn: async () => {},
@@ -1272,6 +1274,7 @@ describe("runProxyOnly", () => {
           return 0;
         },
         startHostProxyFn: async () => ({ stop: async () => {} }),
+        discoverProxyPortFn: async () => 19700,
       },
     };
   }
@@ -1279,7 +1282,7 @@ describe("runProxyOnly", () => {
   it("starts proxy detached without build when artifacts already exist", async () => {
     const { calls, deps } = makeDeps();
 
-    await runProxyOnly(projectDir, "claude-code-agent", "writer", 19700, deps);
+    await runProxyOnly(projectDir, "claude-code-agent", "writer", deps);
 
     // Only up call (no build when docker artifacts already exist)
     expect(calls).toHaveLength(1);
@@ -1291,7 +1294,7 @@ describe("runProxyOnly", () => {
   it("does NOT start agent or host proxy", async () => {
     const { calls, deps } = makeDeps();
 
-    await runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps);
+    await runProxyOnly(projectDir, "claude-code-agent", "writer", deps);
 
     // Only 1 compose call: up (no build when artifacts exist, no agent run, no down)
     expect(calls).toHaveLength(1);
@@ -1303,7 +1306,7 @@ describe("runProxyOnly", () => {
   it("outputs JSON with connection info to stdout", async () => {
     const { deps } = makeDeps({ sessionId: "json0001" });
 
-    await runProxyOnly(projectDir, "claude-code-agent", "writer", 19700, deps);
+    await runProxyOnly(projectDir, "claude-code-agent", "writer", deps);
 
     // logSpy captures the JSON output (origLog is called once with JSON)
     const jsonCall = logSpy.mock.calls.find((call) => {
@@ -1330,7 +1333,7 @@ describe("runProxyOnly", () => {
     // ensureDockerBuild will detect the hash mismatch and attempt to regenerate,
     // which will either fail in the test env or succeed and then the proxy build fails
     await expect(
-      runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps),
+      runProxyOnly(projectDir, "claude-code-agent", "writer", deps),
     ).rejects.toThrow();
   });
 
@@ -1338,14 +1341,14 @@ describe("runProxyOnly", () => {
     const { deps } = makeDeps({ upExitCode: 1 });
 
     await expect(
-      runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps),
+      runProxyOnly(projectDir, "claude-code-agent", "writer", deps),
     ).rejects.toThrow("Failed to start proxy");
   });
 
   it("creates compose file with correct paths", async () => {
     const { deps } = makeDeps({ sessionId: "path0001" });
 
-    await runProxyOnly(projectDir, "claude-code-agent", "writer", 3000, deps);
+    await runProxyOnly(projectDir, "claude-code-agent", "writer", deps);
 
     const composeFile = path.join(
       projectDir, ".mason", "sessions", "path0001", "docker-compose.yaml",
@@ -1534,6 +1537,7 @@ describe("source override applied to role", () => {
       existsSyncFn: (p: string) => fs.existsSync(p),
       execComposeFn: async () => 0,
       runAgentFn: async () => 0,
+      discoverProxyPortFn: async () => 19700,
       startHostProxyFn: async () => ({ stop: async () => {} }),
       initRegistryFn: async () => {},
     };
@@ -2114,5 +2118,39 @@ describe("resume session flow", () => {
     expect(args).toContain("now add tests for that");
     expect(args).toContain("--resume");
     expect(args).toContain("agent-session-123");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseProxyPortOutput
+// ---------------------------------------------------------------------------
+
+describe("parseProxyPortOutput", () => {
+  it("parses 127.0.0.1:55123 and returns 55123", () => {
+    expect(parseProxyPortOutput("127.0.0.1:55123")).toBe(55123);
+  });
+
+  it("parses 0.0.0.0:9090 and returns 9090", () => {
+    expect(parseProxyPortOutput("0.0.0.0:9090")).toBe(9090);
+  });
+
+  it("handles output with trailing newline", () => {
+    expect(parseProxyPortOutput("127.0.0.1:32768\n")).toBe(32768);
+  });
+
+  it("handles output with leading/trailing whitespace", () => {
+    expect(parseProxyPortOutput("  127.0.0.1:12345  ")).toBe(12345);
+  });
+
+  it("throws on empty output", () => {
+    expect(() => parseProxyPortOutput("")).toThrow("Could not determine proxy port");
+  });
+
+  it("throws on malformed output without port", () => {
+    expect(() => parseProxyPortOutput("no-port-here")).toThrow("Could not determine proxy port");
+  });
+
+  it("throws on output with no colon-delimited port", () => {
+    expect(() => parseProxyPortOutput("127.0.0.1")).toThrow("Could not determine proxy port");
   });
 });

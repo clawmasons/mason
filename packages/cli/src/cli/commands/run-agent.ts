@@ -239,6 +239,40 @@ export function execComposeCommand(
   });
 }
 
+// ── Proxy port discovery ────────────────────────────────────────────
+
+/**
+ * Parse the output of `docker compose port` to extract the host port.
+ * Expected format: "127.0.0.1:55123" or "0.0.0.0:55123".
+ */
+export function parseProxyPortOutput(output: string): number {
+  const match = output.trim().match(/:(\d+)$/);
+  if (!match) {
+    throw new Error(
+      `Could not determine proxy port from 'docker compose port' output: "${output}"`,
+    );
+  }
+  return parseInt(match[1], 10);
+}
+
+/**
+ * Discover the randomly assigned host port for a proxy service.
+ * Runs `docker compose port <service> 9090` and parses the output.
+ */
+export async function discoverProxyPort(
+  composeFile: string,
+  proxyServiceName: string,
+): Promise<number> {
+  const { execFileSync } = await import("child_process");
+  const output = execFileSync(
+    "docker",
+    ["compose", "-f", composeFile, "port", proxyServiceName, "9090"],
+    { encoding: "utf-8", timeout: 10_000 },
+  ).trim();
+
+  return parseProxyPortOutput(output);
+}
+
 // ── OCI Restart Policy ───────────────────────────────────────────────
 
 const OCI_RESTART_MAX = 3;
@@ -595,6 +629,8 @@ export interface RunAgentDeps {
     envCredentials: Record<string, string>;
     hostApps?: ResolvedApp[];
   }) => Promise<{ stop: () => Promise<void> }>;
+  /** Override proxy port discovery (for testing). */
+  discoverProxyPortFn?: (composeFile: string, proxyServiceName: string) => Promise<number>;
   /** Override proxy health check (for testing). */
   waitForProxyHealthFn?: (url: string, timeoutMs: number) => Promise<void>;
   /** Override logger creation (for testing). */
@@ -700,7 +736,6 @@ async function handleResume(
     isJsonMode?: boolean;
     verbose?: boolean;
     build?: boolean;
-    proxyPort: number;
   },
 ): Promise<void> {
   // 1. Resolve session ID
@@ -838,9 +873,10 @@ async function handleResume(
   }
   console.log(`  Proxy started in background.`);
 
-  // Wait for proxy health
-  console.log(`  Waiting for proxy to be ready...`);
-  await defaultWaitForProxyHealth(`http://localhost:${opts.proxyPort}/health`, 60_000);
+  // Discover random port, then wait for proxy health
+  const proxyPort = await discoverProxyPort(composeFile, proxyServiceName);
+  console.log(`  Waiting for proxy to be ready (port ${proxyPort})...`);
+  await defaultWaitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
   console.log(`  Proxy ready.`);
 
   // Start host proxy in-process
@@ -864,7 +900,7 @@ async function handleResume(
   let hostProxyHandle: { stop: () => Promise<void> } | null = null;
   try {
     hostProxyHandle = await defaultStartHostProxy({
-      proxyPort: opts.proxyPort,
+      proxyPort,
       relayToken,
       envCredentials,
       hostApps: hostApps.length > 0 ? hostApps : undefined,
@@ -1128,7 +1164,6 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         isJsonMode,
         verbose: options.verbose,
         build: options.build,
-        proxyPort: parseInt(options.proxyPort, 10),
       });
       return;
     }
@@ -1305,11 +1340,11 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     const effectiveRoleName = role ?? "project";
 
     if (options.proxyOnly) {
-      await runProxyOnly(projectDir, resolvedAgentType, effectiveRoleName, parseInt(options.proxyPort, 10), undefined, preResolvedRole);
+      await runProxyOnly(projectDir, resolvedAgentType, effectiveRoleName, undefined, preResolvedRole);
     } else if (options.devContainer) {
       await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
         devContainer: true,
-        proxyPort: parseInt(options.proxyPort, 10),
+
         build: options.build,
         verbose: options.verbose,
         homeOverride,
@@ -1324,7 +1359,7 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     } else if (isPrintMode) {
       await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
         printMode: true,
-        proxyPort: parseInt(options.proxyPort, 10),
+
         build: options.build,
         verbose: options.verbose,
         homeOverride,
@@ -1338,7 +1373,7 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     } else if (isJsonMode) {
       await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
         jsonMode: true,
-        proxyPort: parseInt(options.proxyPort, 10),
+
         build: options.build,
         verbose: options.verbose,
         homeOverride,
@@ -1351,7 +1386,7 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
       });
     } else {
       await runAgent(projectDir, resolvedAgentType, effectiveRoleName, undefined, {
-        proxyPort: parseInt(options.proxyPort, 10),
+
         bash: effectiveBash,
         build: options.build,
         verbose: options.verbose,
@@ -1382,7 +1417,6 @@ export function registerRunCommand(program: Command): void {
     .option("--dev-container", "Start in dev-container mode: print IDE attach instructions and optionally launch VSCode")
     .option("--proxy-only", "Start proxy infrastructure only, output connection info as JSON")
     .option("--verbose", "Show Docker build and compose output")
-    .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
     .option("-p, --print <prompt>", "Run in print mode: execute prompt non-interactively, output response only")
     .option("--json <prompt>", "Run in JSON streaming mode: emit newline-delimited ACP session update objects")
     .option("--resume [session-id]", "Resume a previous session (default: latest)")
@@ -1411,7 +1445,6 @@ export function registerConfigureCommand(program: Command): void {
     .option("--dev-container", "Start in dev-container mode: print IDE attach instructions and optionally launch VSCode")
     .option("--proxy-only", "Start proxy infrastructure only, output connection info as JSON")
     .option("--verbose", "Show Docker build and compose output")
-    .option("--proxy-port <number>", "Internal proxy port (default: 3000)", "3000")
     .action(createRunAction(CONFIGURE_ROLE, CONFIGURE_PROMPT));
 }
 
@@ -1423,7 +1456,6 @@ export async function runAgent(
   role: string,
   deps?: RunAgentDeps,
   acpOptions?: {
-    proxyPort?: number;
     bash?: boolean;
     build?: boolean;
     verbose?: boolean;
@@ -1463,7 +1495,6 @@ export async function runAgent(
   }
 
   const isDevContainerMode = acpOptions?.devContainer === true;
-  const proxyPort = acpOptions?.proxyPort ?? 3000;
   const bashMode = acpOptions?.bash === true;
   const buildMode = acpOptions?.build === true;
   const homeOverride = deps?.homeOverride ?? acpOptions?.homeOverride;
@@ -1478,14 +1509,14 @@ export async function runAgent(
 
   if (isJsonMode) {
     const verbose = acpOptions?.verbose === true;
-    return runAgentJsonMode(projectDir, agent, role, proxyPort, deps, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole, llmConfig);
+    return runAgentJsonMode(projectDir, agent, role, deps, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole, llmConfig);
   } else if (isPrintMode) {
     const verbose = acpOptions?.verbose === true;
-    return runAgentPrintMode(projectDir, agent, role, proxyPort, deps, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole, llmConfig);
+    return runAgentPrintMode(projectDir, agent, role, deps, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole, llmConfig);
   } else if (isDevContainerMode) {
     const verbose = acpOptions?.verbose === true;
     return runAgentDevContainerMode(
-      projectDir, agent, role, proxyPort, deps, buildMode, verbose, homeOverride,
+      projectDir, agent, role, deps, buildMode, verbose, homeOverride,
       acpOptions?.devContainerCustomizations,
       agentConfigCredentials,
       agentArgs,
@@ -1496,7 +1527,7 @@ export async function runAgent(
     );
   } else {
     const verbose = acpOptions?.verbose === true;
-    return runAgentInteractiveMode(projectDir, agent, role, proxyPort, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole, llmConfig);
+    return runAgentInteractiveMode(projectDir, agent, role, deps, bashMode, buildMode, verbose, homeOverride, agentConfigCredentials, agentArgs, initialPrompt, sourceOverride, preResolvedRole, llmConfig);
   }
 }
 
@@ -1604,7 +1635,6 @@ async function runAgentInteractiveMode(
   projectDir: string,
   agentOverride: string | undefined,
   role: string,
-  proxyPort: number,
   deps?: RunAgentDeps,
   bashMode?: boolean,
   buildMode?: boolean,
@@ -1623,6 +1653,7 @@ async function runAgentInteractiveMode(
   const startHostProxy = deps?.startHostProxyFn ?? defaultStartHostProxy;
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
   const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
+  const discoverPort = deps?.discoverProxyPortFn ?? discoverProxyPort;
 
   try {
     // 1. Resolve role from project directory (skip if pre-resolved)
@@ -1665,7 +1696,6 @@ async function runAgentInteractiveMode(
       role: roleType,
       agentType,
       agentName: roleName,
-      proxyPort,
       roleMounts: roleType.container?.mounts,
       credentialKeys: declaredCredentialKeys,
       hostUid: uid,
@@ -1692,7 +1722,7 @@ async function runAgentInteractiveMode(
 
       const buildArgs = ["build"];
       if (buildMode) buildArgs.push("--no-cache");
-      buildArgs.push(proxyServiceName);
+      buildArgs.push(proxyServiceName, agentServiceName);
 
       const buildCode = await execCompose(
         composeFile,
@@ -1700,7 +1730,7 @@ async function runAgentInteractiveMode(
         { verbose },
       );
       if (buildCode !== 0) {
-        throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+        throw new Error(`Failed to build images (exit code ${buildCode}).`);
       }
     }
 
@@ -1716,8 +1746,9 @@ async function runAgentInteractiveMode(
     }
     console.log(`  Proxy started in background.`);
 
-    // 8b. Wait for proxy health before connecting credential service
-    console.log(`  Waiting for proxy to be ready...`);
+    // 8b. Discover random port, then wait for proxy health
+    const proxyPort = await discoverPort(composeFile, proxyServiceName);
+    console.log(`  Waiting for proxy to be ready (port ${proxyPort})...`);
     await waitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
     console.log(`  Proxy ready.`);
 
@@ -1750,7 +1781,6 @@ async function runAgentInteractiveMode(
     // When stdin is not a TTY (e.g. piped from a test), pass -T to disable
     // pseudo-TTY allocation so docker compose run works with piped stdio.
     const runArgs = ["run", "--rm", "--service-ports"];
-    if (buildMode) runArgs.push("--build");
     if (!process.stdin.isTTY) {
       runArgs.push("-T");
     }
@@ -1785,7 +1815,6 @@ async function runAgentJsonMode(
   projectDir: string,
   agentOverride: string | undefined,
   role: string,
-  proxyPort: number,
   deps?: RunAgentDeps,
   buildMode?: boolean,
   verbose?: boolean,
@@ -1802,6 +1831,7 @@ async function runAgentJsonMode(
   const startHostProxy = deps?.startHostProxyFn ?? defaultStartHostProxy;
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
   const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
+  const discoverPort = deps?.discoverProxyPortFn ?? discoverProxyPort;
 
   // Early log suppression: buffer console output until file logger is ready
   const origLog = console.log.bind(console);
@@ -1857,7 +1887,6 @@ async function runAgentJsonMode(
       role: roleType,
       agentType,
       agentName: roleName,
-      proxyPort,
       roleMounts: roleType.container?.mounts,
       credentialKeys: declaredCredentialKeys,
       hostUid: uid,
@@ -1880,16 +1909,17 @@ async function runAgentJsonMode(
     if (rebuilt || buildMode) {
       const buildArgs = ["build"];
       if (buildMode) buildArgs.push("--no-cache");
-      buildArgs.push(proxyServiceName);
+      buildArgs.push(proxyServiceName, agentServiceName);
       const buildCode = await execCompose(composeFile, buildArgs, { verbose, logger: fileLogger });
-      if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+      if (buildCode !== 0) throw new Error(`Failed to build images (exit code ${buildCode}).`);
     }
 
     const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose, logger: fileLogger, timeoutMs: 30_000 });
     if (proxyCode !== 0) throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
 
+    const proxyPort = await discoverPort(composeFile, proxyServiceName);
     await waitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
-    console.log(`[json] Proxy ready.`);
+    console.log(`[json] Proxy ready (port ${proxyPort}).`);
 
     // 7. Start host proxy
     const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
@@ -1918,9 +1948,7 @@ async function runAgentJsonMode(
     const parseJsonStreamAsACP = agentPkg?.jsonMode?.parseJsonStreamAsACP;
 
     let previousLine: string | undefined;
-    const runArgs = ["run", "--rm", "--service-ports"];
-    if (buildMode) runArgs.push("--build");
-    runArgs.push("-T", agentServiceName);
+    const runArgs = ["run", "--rm", "--service-ports", "-T", agentServiceName];
     fileLogger.log(`[json] Docker command: docker compose -f ${composeFile} ${runArgs.join(" ")}`);
     const { code: agentCode, stderr: composeStderr } = await execComposeRunWithStreamCapture(composeFile, runArgs, (line) => {
       fileLogger.log(`[stream] ${line}`);
@@ -1986,7 +2014,6 @@ async function runAgentPrintMode(
   projectDir: string,
   agentOverride: string | undefined,
   role: string,
-  proxyPort: number,
   deps?: RunAgentDeps,
   buildMode?: boolean,
   verbose?: boolean,
@@ -2003,6 +2030,7 @@ async function runAgentPrintMode(
   const startHostProxy = deps?.startHostProxyFn ?? defaultStartHostProxy;
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
   const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
+  const discoverPort = deps?.discoverProxyPortFn ?? discoverProxyPort;
 
   // Early log suppression: buffer console output until file logger is ready
   const origLog = console.log.bind(console);
@@ -2058,7 +2086,6 @@ async function runAgentPrintMode(
       role: roleType,
       agentType,
       agentName: roleName,
-      proxyPort,
       roleMounts: roleType.container?.mounts,
       credentialKeys: declaredCredentialKeys,
       hostUid: uid,
@@ -2081,16 +2108,17 @@ async function runAgentPrintMode(
     if (rebuilt || buildMode) {
       const buildArgs = ["build"];
       if (buildMode) buildArgs.push("--no-cache");
-      buildArgs.push(proxyServiceName);
+      buildArgs.push(proxyServiceName, agentServiceName);
       const buildCode = await execCompose(composeFile, buildArgs, { verbose, logger: fileLogger });
-      if (buildCode !== 0) throw new Error(`Failed to build proxy image (exit code ${buildCode}).`);
+      if (buildCode !== 0) throw new Error(`Failed to build images (exit code ${buildCode}).`);
     }
 
     const proxyCode = await execCompose(composeFile, ["up", "-d", proxyServiceName], { verbose, logger: fileLogger, timeoutMs: 30_000 });
     if (proxyCode !== 0) throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
 
+    const proxyPort = await discoverPort(composeFile, proxyServiceName);
     await waitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
-    console.log(`[print] Proxy ready.`);
+    console.log(`[print] Proxy ready (port ${proxyPort}).`);
 
     // 7. Start host proxy
     const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
@@ -2120,9 +2148,7 @@ async function runAgentPrintMode(
 
     let finalResult: string | null = null;
     let previousLine: string | undefined;
-    const runArgs = ["run", "--rm", "--service-ports"];
-    if (buildMode) runArgs.push("--build");
-    runArgs.push("-T", agentServiceName);
+    const runArgs = ["run", "--rm", "--service-ports", "-T", agentServiceName];
     fileLogger.log(`[print] Docker command: docker compose -f ${composeFile} ${runArgs.join(" ")}`);
     const { code: agentCode, stderr: composeStderr } = await execComposeRunWithStreamCapture(composeFile, runArgs, (line) => {
       fileLogger.log(`[stream] ${line}`);
@@ -2205,7 +2231,6 @@ async function runAgentDevContainerMode(
   projectDir: string,
   agentOverride: string | undefined,
   role: string,
-  proxyPort: number,
   deps?: RunAgentDeps,
   buildMode?: boolean,
   verbose?: boolean,
@@ -2223,6 +2248,7 @@ async function runAgentDevContainerMode(
   const startHostProxy = deps?.startHostProxyFn ?? defaultStartHostProxy;
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
   const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
+  const discoverPort = deps?.discoverProxyPortFn ?? discoverProxyPort;
   const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
 
   try {
@@ -2289,7 +2315,6 @@ async function runAgentDevContainerMode(
       role: roleType,
       agentType,
       agentName: roleName,
-      proxyPort,
       roleMounts: roleType.container?.mounts,
       credentialKeys: declaredCredentialKeys,
       hostUid: uid,
@@ -2330,8 +2355,9 @@ async function runAgentDevContainerMode(
     if (proxyCode !== 0) throw new Error(`Failed to start proxy (exit code ${proxyCode}).`);
     console.log(`  Proxy started.`);
 
+    const proxyPort = await discoverPort(composeFile, proxyServiceName);
     await waitForProxyHealth(`http://localhost:${proxyPort}/health`, 60_000);
-    console.log(`  Proxy ready.`);
+    console.log(`  Proxy ready (port ${proxyPort}).`);
 
     // 9. Start host proxy
     const resolvedAgent = adaptRoleFn(roleType, agentType);
@@ -2444,13 +2470,13 @@ export async function runProxyOnly(
   projectDir: string,
   agentOverride: string | undefined,
   role: string,
-  proxyPort: number,
   deps?: RunAgentDeps,
   preResolvedRole?: Role,
 ): Promise<void> {
   const execCompose = deps?.execComposeFn ?? execComposeCommand;
   const ensureGitignore = deps?.ensureGitignoreEntryFn ?? ensureGitignoreEntry;
   const resolveRoleFn = deps?.resolveRoleFn ?? defaultResolveRole;
+  const discoverPort = deps?.discoverProxyPortFn ?? discoverProxyPort;
 
   // Redirect console.log to stderr so only JSON goes to stdout
   const origLog = console.log;
@@ -2483,7 +2509,6 @@ export async function runProxyOnly(
     role: roleType,
     agentType,
     agentName: roleName,
-    proxyPort,
     roleMounts: roleType.container?.mounts,
     hostUid: uid,
     hostGid: gid,
@@ -2506,7 +2531,8 @@ export async function runProxyOnly(
     throw new Error(`Failed to start proxy (exit code ${upCode}).`);
   }
 
-  // 9. Output connection info as JSON to stdout
+  // 9. Discover random port and output connection info as JSON to stdout
+  const proxyPort = await discoverPort(composeFile, proxyServiceName);
   const info = {
     proxyPort,
     proxyToken,
