@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadLaunchConfig, installCredentials } from "../src/index.js";
@@ -19,6 +19,20 @@ describe("loadLaunchConfig", () => {
     const result = loadLaunchConfig();
     // May return null or find a file depending on cwd — just verify it doesn't throw
     expect(result === null || typeof result === "object").toBe(true);
+  });
+
+  it("checks session path before workspace path in search order", () => {
+    // Verify the source code search paths include the session mount path first.
+    // We can't easily test the /home/mason paths in unit tests (they don't exist),
+    // but we verify the function source includes the session path.
+    const fnSource = loadLaunchConfig.toString();
+    const sessionPathIndex = fnSource.indexOf("/home/mason/.mason/session/agent-launch.json");
+    const workspacePathIndex = fnSource.indexOf("/home/mason/workspace/agent-launch.json");
+
+    // Session path should appear before workspace path in search order
+    expect(sessionPathIndex).toBeGreaterThan(-1);
+    expect(workspacePathIndex).toBeGreaterThan(-1);
+    expect(sessionPathIndex).toBeLessThan(workspacePathIndex);
   });
 
   it("throws on invalid JSON", () => {

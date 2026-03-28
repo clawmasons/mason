@@ -1227,16 +1227,20 @@ function mergeAgentConfigCredentials(
 }
 
 /**
- * Regenerate agent-launch.json in the workspace directory.
+ * Regenerate agent-launch.json in the per-session directory.
  *
- * The workspace is live-mounted (not baked into the Docker image), so it's
- * safe to refresh every session without a full Docker rebuild.  This ensures
- * credential lists and launch args always reflect the current configuration.
+ * Writes to `.mason/sessions/{id}/agent-launch.json` so each session can have
+ * its own launch configuration (e.g., resume args). The session directory is
+ * mounted into the container at `/home/mason/.mason/session/`, where
+ * `agent-entry` loads it as the primary config path.
+ *
+ * Falls back silently if materialization fails -- the initial build already
+ * created a copy in the workspace directory as a fallback.
  */
 function refreshAgentLaunchJson(
   roleType: Role,
   agentType: string,
-  dockerBuildDir: string,
+  sessionDir: string,
   options?: {
     agentConfigCredentials?: string[];
     agentArgs?: string[];
@@ -1250,14 +1254,13 @@ function refreshAgentLaunchJson(
     const workspace = materializeForAgent(roleType, agentType, undefined, undefined, options);
     const launchJson = workspace.get("agent-launch.json");
     if (launchJson) {
-      const workspaceDir = path.join(dockerBuildDir, agentType, "workspace");
-      fs.mkdirSync(workspaceDir, { recursive: true });
-      fs.writeFileSync(path.join(workspaceDir, "agent-launch.json"), launchJson);
+      fs.mkdirSync(sessionDir, { recursive: true });
+      fs.writeFileSync(path.join(sessionDir, "agent-launch.json"), launchJson);
     }
   } catch {
-    // Best-effort: the initial build already created agent-launch.json.
-    // If re-materialization fails (e.g., incomplete role schema), keep the
-    // existing file rather than blocking the session.
+    // Best-effort: the initial build already created agent-launch.json in
+    // the workspace directory. If re-materialization fails (e.g., incomplete
+    // role schema), agent-entry will fall back to the workspace copy.
   }
 }
 
@@ -1310,11 +1313,6 @@ async function runAgentInteractiveMode(
       roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs, initialPrompt, llmConfig },
     );
 
-    // 4b. Always refresh agent-launch.json (live-mounted, not baked into image)
-    refreshAgentLaunchJson(roleType, agentType, dockerBuildDir, {
-      agentConfigCredentials, agentArgs, initialPrompt, llmConfig,
-    });
-
     // 5. Ensure .mason is in project's .gitignore
     ensureGitignore(projectDir, ".mason");
 
@@ -1343,6 +1341,11 @@ async function runAgentInteractiveMode(
       verbose,
       sessionId: metaSession.sessionId,
       agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
+    });
+
+    // 6b. Write per-session agent-launch.json (after session dir exists)
+    refreshAgentLaunchJson(roleType, agentType, session.sessionDir, {
+      agentConfigCredentials, agentArgs, initialPrompt, llmConfig,
     });
 
     const { sessionId, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
@@ -1493,11 +1496,6 @@ async function runAgentJsonMode(
       roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs, initialPrompt, llmConfig, jsonMode: true },
     );
 
-    // 2b. Always refresh agent-launch.json (live-mounted, not baked into image)
-    refreshAgentLaunchJson(roleType, agentType, dockerBuildDir, {
-      agentConfigCredentials, agentArgs, initialPrompt, llmConfig, jsonMode: true,
-    });
-
     // 3. Create file logger and flush early buffer
     const sessionLogsDir = path.join(projectDir, ".mason", "logs");
     fs.mkdirSync(sessionLogsDir, { recursive: true });
@@ -1534,6 +1532,11 @@ async function runAgentJsonMode(
       verbose,
       sessionId: metaSession.sessionId,
       agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
+    });
+
+    // 5b. Write per-session agent-launch.json (after session dir exists)
+    refreshAgentLaunchJson(roleType, agentType, session.sessionDir, {
+      agentConfigCredentials, agentArgs, initialPrompt, llmConfig, jsonMode: true,
     });
 
     const { sessionId, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
@@ -1694,11 +1697,6 @@ async function runAgentPrintMode(
       roleType, agentType, projectDir, { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, agentConfigCredentials, agentArgs, initialPrompt, llmConfig, printMode: true },
     );
 
-    // 2b. Always refresh agent-launch.json (live-mounted, not baked into image)
-    refreshAgentLaunchJson(roleType, agentType, dockerBuildDir, {
-      agentConfigCredentials, agentArgs, initialPrompt, llmConfig, printMode: true,
-    });
-
     // 3. Create file logger and flush early buffer
     const sessionLogsDir = path.join(projectDir, ".mason", "logs");
     fs.mkdirSync(sessionLogsDir, { recursive: true });
@@ -1735,6 +1733,11 @@ async function runAgentPrintMode(
       verbose,
       sessionId: metaSession.sessionId,
       agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
+    });
+
+    // 5b. Write per-session agent-launch.json (after session dir exists)
+    refreshAgentLaunchJson(roleType, agentType, session.sessionDir, {
+      agentConfigCredentials, agentArgs, initialPrompt, llmConfig, printMode: true,
     });
 
     const { sessionId, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
@@ -1911,11 +1914,6 @@ async function runAgentDevContainerMode(
       { existsSyncFn: deps?.existsSyncFn, forceRebuild: buildMode, devContainerCustomizations, agentConfigCredentials, agentArgs, initialPrompt, llmConfig },
     );
 
-    // 3b. Always refresh agent-launch.json (live-mounted, not baked into image)
-    refreshAgentLaunchJson(roleType, agentType, dockerBuildDir, {
-      agentConfigCredentials, agentArgs, initialPrompt, llmConfig,
-    });
-
     // 4. Ensure .mason is in .gitignore
     ensureGitignore(projectDir, ".mason");
 
@@ -1967,6 +1965,11 @@ async function runAgentDevContainerMode(
       verbose,
       sessionId: metaSession.sessionId,
       agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
+    });
+
+    // 6b. Write per-session agent-launch.json (after session dir exists)
+    refreshAgentLaunchJson(roleType, agentType, session.sessionDir, {
+      agentConfigCredentials, agentArgs, initialPrompt, llmConfig,
     });
 
     const { sessionId, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
