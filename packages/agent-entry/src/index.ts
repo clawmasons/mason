@@ -338,8 +338,12 @@ export async function launchRuntime(
       stdio: "inherit",
     });
 
-    child.on("error", (err) => {
-      reject(new Error(`Failed to launch runtime: ${err.message}`));
+    child.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") {
+        resolve(127);
+      } else {
+        reject(new Error(`Failed to launch runtime: ${err.message}`));
+      }
     });
 
     child.on("close", (code) => {
