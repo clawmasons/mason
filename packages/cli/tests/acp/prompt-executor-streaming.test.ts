@@ -214,4 +214,32 @@ describe("executePromptStreaming", () => {
 
     await expect(promise).rejects.toThrow("mason run failed to spawn: ENOENT");
   });
+
+  it("spawns mason run with --resume when masonSessionId is provided", async () => {
+    const opts = defaultOptions({ masonSessionId: "019d2b36-8cad-71c0-949f-8756b44edd77" });
+    const promise = executePromptStreaming(opts);
+    emitLines([]);
+
+    await promise;
+
+    expect(spawn).toHaveBeenCalledWith(
+      expect.any(String),
+      ["run", "--resume", "019d2b36-8cad-71c0-949f-8756b44edd77", "--json", "hello world"],
+      expect.objectContaining({ cwd: "/tmp/test" }),
+    );
+  });
+
+  it("spawns mason run with --agent/--role when masonSessionId is not provided", async () => {
+    const opts = defaultOptions();
+    const promise = executePromptStreaming(opts);
+    emitLines([]);
+
+    await promise;
+
+    expect(spawn).toHaveBeenCalledWith(
+      expect.any(String),
+      ["run", "--agent", "claude-code-agent", "--role", "project", "--json", "hello world"],
+      expect.objectContaining({ cwd: "/tmp/test" }),
+    );
+  });
 });
