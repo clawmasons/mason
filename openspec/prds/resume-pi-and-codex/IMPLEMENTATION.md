@@ -144,4 +144,4 @@
    - In `../mason-extensions`: `npm run test:e2e`
    - In `../mason` (this repo): `npm run lint` and `npm run build` (to ensure SDK type changes are compatible)
 
-**Not Implemented Yet**
+**Implemented** — mason-extensions commit on resume-pi-and-codex branch
