@@ -186,7 +186,11 @@ Configure the claude-code-agent to support resume and capture its session ID via
 
 **Testable output:** (a) claude-code-agent `AgentPackage` export includes `resume` field, (b) materializer output includes `.claude/settings.json` with `SessionStart` hook, (c) hook command references `/home/mason/.mason/session/meta.json`, (d) hook command reads `CLAUDE_SESSION_ID` env var, (e) existing permissions in settings.json are preserved alongside hooks (e2e).
 
-**Not Implemented Yet**
+**Implemented** — [Spec](../../changes/archive/2026-03-27-claude-code-resume-hook/proposal.md) | [Design](../../changes/archive/2026-03-27-claude-code-resume-hook/design.md) | [Tasks](../../changes/archive/2026-03-27-claude-code-resume-hook/tasks.md)
+
+Files changed:
+- `packages/cli/tests/helpers/mock-agent-packages.ts` — Added `resume: { flag: "--resume", sessionIdField: "agentSessionId" }` to `mockClaudeCodeAgent`; updated materializer to include `SessionStart` hook in `.claude/settings.json`
+- `packages/cli/tests/helpers/mock-agent-packages.test.ts` — New test file with 7 tests covering resume field, hook presence, meta.json path, env var reference, permissions preservation
 
 ---
 
