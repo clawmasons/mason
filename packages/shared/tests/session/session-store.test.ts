@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { lstat, mkdtemp, readlink, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -8,6 +8,8 @@ import {
   updateSession,
   listSessions,
   closeSession,
+  updateLatestSymlink,
+  resolveLatestSession,
   uuidv7,
 } from "../../src/session/session-store.js";
 
@@ -248,6 +250,85 @@ describe("session-store", () => {
       await expect(closeSession(tmpDir, "non-existent-id")).rejects.toThrow(
         "Session not found: non-existent-id",
       );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // updateLatestSymlink
+  // -----------------------------------------------------------------------
+
+  describe("updateLatestSymlink", () => {
+    it("creates a symlink at .mason/sessions/latest", async () => {
+      const session = await createSession(tmpDir, "claude-code", "project");
+      await updateLatestSymlink(tmpDir, session.sessionId);
+
+      const linkPath = join(tmpDir, ".mason", "sessions", "latest");
+      const stats = await lstat(linkPath);
+      expect(stats.isSymbolicLink()).toBe(true);
+    });
+
+    it("symlink target is relative (just the session ID)", async () => {
+      const session = await createSession(tmpDir, "claude-code", "project");
+      await updateLatestSymlink(tmpDir, session.sessionId);
+
+      const linkPath = join(tmpDir, ".mason", "sessions", "latest");
+      const target = await readlink(linkPath);
+      expect(target).toBe(session.sessionId);
+      // Ensure it's not an absolute path
+      expect(target.startsWith("/")).toBe(false);
+    });
+
+    it("calling twice overwrites the first symlink", async () => {
+      const s1 = await createSession(tmpDir, "claude-code", "project");
+      await updateLatestSymlink(tmpDir, s1.sessionId);
+
+      const s2 = await createSession(tmpDir, "codex", "project");
+      await updateLatestSymlink(tmpDir, s2.sessionId);
+
+      const linkPath = join(tmpDir, ".mason", "sessions", "latest");
+      const target = await readlink(linkPath);
+      expect(target).toBe(s2.sessionId);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // resolveLatestSession
+  // -----------------------------------------------------------------------
+
+  describe("resolveLatestSession", () => {
+    it("returns the session ID from the symlink", async () => {
+      const session = await createSession(tmpDir, "claude-code", "project");
+      await updateLatestSymlink(tmpDir, session.sessionId);
+
+      const result = await resolveLatestSession(tmpDir);
+      expect(result).toBe(session.sessionId);
+    });
+
+    it("returns null when symlink does not exist", async () => {
+      const result = await resolveLatestSession(tmpDir);
+      expect(result).toBeNull();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // createSession + latest symlink integration
+  // -----------------------------------------------------------------------
+
+  describe("createSession latest symlink", () => {
+    it("automatically updates the latest symlink", async () => {
+      const session = await createSession(tmpDir, "claude-code", "project");
+
+      const result = await resolveLatestSession(tmpDir);
+      expect(result).toBe(session.sessionId);
+    });
+
+    it("second createSession updates symlink to newer session", async () => {
+      const s1 = await createSession(tmpDir, "claude-code", "project");
+      const s2 = await createSession(tmpDir, "codex", "project");
+
+      const result = await resolveLatestSession(tmpDir);
+      expect(result).toBe(s2.sessionId);
+      expect(result).not.toBe(s1.sessionId);
     });
   });
 });
