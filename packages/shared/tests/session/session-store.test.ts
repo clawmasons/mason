@@ -73,6 +73,16 @@ describe("session-store", () => {
       const persisted = JSON.parse(raw);
       expect(persisted).toEqual(session);
     });
+
+    it("returns masonSessionId equal to sessionId", async () => {
+      const session = await createSession(tmpDir, "claude-code", "project");
+      expect(session.masonSessionId).toBe(session.sessionId);
+    });
+
+    it("returns agentSessionId as null", async () => {
+      const session = await createSession(tmpDir, "claude-code", "project");
+      expect(session.agentSessionId).toBeNull();
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -89,6 +99,18 @@ describe("session-store", () => {
     it("returns null for non-existent session", async () => {
       const result = await readSession(tmpDir, "non-existent-id");
       expect(result).toBeNull();
+    });
+
+    it("round-trips masonSessionId and agentSessionId", async () => {
+      const created = await createSession(tmpDir, "claude-code", "project");
+      await updateSession(tmpDir, created.sessionId, {
+        agentSessionId: "agent-xyz-789",
+      });
+
+      const read = await readSession(tmpDir, created.sessionId);
+      expect(read).not.toBeNull();
+      expect(read!.masonSessionId).toBe(created.sessionId);
+      expect(read!.agentSessionId).toBe("agent-xyz-789");
     });
   });
 
@@ -124,6 +146,21 @@ describe("session-store", () => {
 
       const updated = await readSession(tmpDir, created.sessionId);
       expect(updated!.sessionId).toBe(created.sessionId);
+    });
+
+    it("can set agentSessionId to a string value", async () => {
+      const created = await createSession(tmpDir, "claude-code", "project");
+      expect(created.agentSessionId).toBeNull();
+
+      await updateSession(tmpDir, created.sessionId, {
+        agentSessionId: "claude-session-abc123",
+      });
+
+      const updated = await readSession(tmpDir, created.sessionId);
+      expect(updated).not.toBeNull();
+      expect(updated!.agentSessionId).toBe("claude-session-abc123");
+      // masonSessionId should be unchanged
+      expect(updated!.masonSessionId).toBe(created.sessionId);
     });
 
     it("throws for non-existent session", async () => {

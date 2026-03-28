@@ -18,9 +18,11 @@ import { dirname, join } from "node:path";
 
 export interface Session {
   sessionId: string; // UUID v7
+  masonSessionId: string; // Always equals sessionId — stored for container access
   cwd: string;
   agent: string;
   role: string;
+  agentSessionId: string | null; // Populated by agent hook (e.g., CLAUDE_SESSION_ID)
   firstPrompt: string | null;
   lastUpdated: string; // ISO 8601
   closed: boolean;
@@ -113,11 +115,14 @@ export async function createSession(
   agent: string,
   role: string,
 ): Promise<Session> {
+  const id = uuidv7();
   const session: Session = {
-    sessionId: uuidv7(),
+    sessionId: id,
+    masonSessionId: id,
     cwd,
     agent,
     role,
+    agentSessionId: null,
     firstPrompt: null,
     lastUpdated: new Date().toISOString(),
     closed: false,

@@ -36,7 +36,13 @@ export interface Session {
 
 **Testable output:** Unit tests: (a) `createSession()` returns session with `masonSessionId === sessionId`, (b) `createSession()` returns `agentSessionId: null`, (c) `updateSession()` can set `agentSessionId` to a string value, (d) `readSession()` round-trips both new fields, (e) CLI `mason run` creates meta.json in `.mason/sessions/{uuid-v7}/` (integration), (f) `generateSessionId()` is no longer used for session directory creation.
 
-**Not Implemented Yet**
+**Implemented** — [Spec](../../changes/archive/2026-03-27-universal-meta-json/proposal.md) | [Design](../../changes/archive/2026-03-27-universal-meta-json/design.md) | [Tasks](../../changes/archive/2026-03-27-universal-meta-json/tasks.md)
+
+Files changed:
+- `packages/shared/src/session/session-store.ts` — Extended `Session` interface with `masonSessionId` and `agentSessionId`; updated `createSession()` to populate both fields
+- `packages/cli/src/cli/commands/run-agent.ts` — Replaced `generateSessionId()` calls with `createSession()` from session store at all 5 call sites; added `createSessionFn` to `RunAgentDeps`
+- `packages/shared/tests/session/session-store.test.ts` — Added tests for new fields
+- `packages/cli/tests/cli/run-agent.test.ts` — Added `createSessionFn` mock to all test dep factories
 
 ---
 
