@@ -54,7 +54,7 @@
    - In `../mason-extensions`: `npm run test`
    - In `../mason-extensions`: `npm run test:e2e`
 
-**Not Implemented Yet**
+**Implemented** — PR #254
 
 ---
 
