@@ -569,6 +569,45 @@ describe("generateAgentLaunchJson", () => {
     const config = JSON.parse(generateAgentLaunchJson(pkg, [], true, undefined, undefined, "do this", false, true));
     expect(config.args).toBeUndefined();
   });
+
+  // ── resumeId tests ────────────────────────────────────────────────────────
+
+  it("appends resume flag and resumeId when agent has resume config", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--flag"] },
+      resume: { flag: "--resume", sessionIdField: "agentSessionId" },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, undefined, false, false, "session-123"));
+    expect(config.args).toEqual(["--flag", "--resume", "session-123"]);
+  });
+
+  it("ignores resumeId when agent has no resume config", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--flag"] },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, undefined, false, false, "session-123"));
+    expect(config.args).toEqual(["--flag"]);
+  });
+
+  it("produces same output without resumeId (backward compatible)", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--flag"] },
+      resume: { flag: "--resume", sessionIdField: "agentSessionId" },
+    });
+    const withoutResume = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, undefined, false, false));
+    const withUndefined = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, undefined, undefined, false, false, undefined));
+    expect(withoutResume.args).toEqual(["--flag"]);
+    expect(withUndefined.args).toEqual(["--flag"]);
+  });
+
+  it("places resume args after agentArgs and initialPrompt", () => {
+    const pkg = makeAgentPackage({
+      runtime: { command: "cmd", args: ["--effort", "max"] },
+      resume: { flag: "--continue", sessionIdField: "agentSessionId" },
+    });
+    const config = JSON.parse(generateAgentLaunchJson(pkg, [], false, undefined, ["--extra"], "do this", false, false, "sess-456"));
+    expect(config.args).toEqual(["--effort", "max", "--extra", "do this", "--continue", "sess-456"]);
+  });
 });
 
 // ── readSkills ────────────────────────────────────────────────────────────────

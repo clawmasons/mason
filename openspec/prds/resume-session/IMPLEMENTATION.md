@@ -151,7 +151,12 @@ export function generateAgentLaunchJson(
 
 **Testable output:** Unit tests: (a) `generateAgentLaunchJson()` with `resumeId` and agent having `resume` config appends `[flag, resumeId]` to args, (b) `generateAgentLaunchJson()` with `resumeId` but no `resume` config ignores it, (c) `generateAgentLaunchJson()` without `resumeId` produces same output as before (backward compatible), (d) TypeScript compiles with new `resume` field on AgentPackage.
 
-**Not Implemented Yet**
+**Implemented** — [Spec](../../changes/archive/2026-03-27-agent-resume-sdk-config/proposal.md) | [Design](../../changes/archive/2026-03-27-agent-resume-sdk-config/design.md) | [Tasks](../../changes/archive/2026-03-27-agent-resume-sdk-config/tasks.md)
+
+Files changed:
+- `packages/agent-sdk/src/types.ts` — Added optional `resume` field to `AgentPackage` interface with `flag` and `sessionIdField`
+- `packages/agent-sdk/src/helpers.ts` — Added `resumeId` parameter to `generateAgentLaunchJson()`; appends `[resume.flag, resumeId]` to args when both are present
+- `packages/agent-sdk/tests/helpers.test.ts` — Added 4 test cases for resume behavior (config present, config absent, backward compat, arg ordering)
 
 ---
 

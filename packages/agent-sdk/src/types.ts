@@ -297,6 +297,14 @@ export interface AgentPackage {
     parseJsonStreamAsACP(line: string, previousLine?: string): AcpSessionUpdate | AcpSessionUpdate[] | null;
   };
 
+  /** Session resume configuration. When present, the CLI can inject resume arguments into agent-launch.json. */
+  resume?: {
+    /** CLI argument flag for resuming (e.g., "--resume"). */
+    flag: string;
+    /** meta.json field containing the agent's session ID (e.g., "agentSessionId"). */
+    sessionIdField: string;
+  };
+
   /** Print mode configuration for non-interactive prompt execution with JSON streaming. */
   printMode?: {
     /** Args to append to agent command to enable JSON streaming output. */
