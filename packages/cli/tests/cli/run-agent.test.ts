@@ -795,6 +795,10 @@ describe("runAgent", () => {
       calls,
       deps: {
         generateSessionIdFn: () => overrides?.sessionId ?? "abcd1234",
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        createSessionFn: async (_cwd: string, _agent: string, _role: string) => ({
+          sessionId: overrides?.sessionId ?? "abcd1234",
+        }),
         checkDockerComposeFn: () => {},
         waitForProxyHealthFn: async () => {},
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -955,12 +959,14 @@ describe("runAgent", () => {
 
     await runAgent(projectDir, "claude-code-agent", "writer", {
       ...baseDeps,
-      generateSessionIdFn: () => ids[callCount++]!,
+      generateSessionIdFn: () => ids[callCount]!,
+      createSessionFn: async () => ({ sessionId: ids[callCount++]! }),
     });
 
     await runAgent(projectDir, "claude-code-agent", "writer", {
       ...baseDeps,
-      generateSessionIdFn: () => ids[callCount++]!,
+      generateSessionIdFn: () => ids[callCount]!,
+      createSessionFn: async () => ({ sessionId: ids[callCount++]! }),
     });
 
     const sessionsDir = path.join(projectDir, ".mason", "sessions");
@@ -1250,6 +1256,9 @@ describe("runProxyOnly", () => {
       calls,
       deps: {
         generateSessionIdFn: () => overrides?.sessionId ?? "proxy001",
+        createSessionFn: async () => ({
+          sessionId: overrides?.sessionId ?? "proxy001",
+        }),
         checkDockerComposeFn: () => {},
         resolveRoleFn: async () => makeRole(),
         ensureGitignoreEntryFn: () => false,
@@ -1507,6 +1516,7 @@ describe("source override applied to role", () => {
   function makeSourceTestDeps(captureRef: { role?: Role }) {
     return {
       generateSessionIdFn: () => "test1234",
+      createSessionFn: async () => ({ sessionId: "test1234" }),
       checkDockerComposeFn: () => {},
       waitForProxyHealthFn: async () => {},
       resolveRoleFn: async () => makeSourceTestRole(),

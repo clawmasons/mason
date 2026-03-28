@@ -9,7 +9,7 @@ import { checkDockerCompose } from "./docker-utils.js";
 import { quickAutoCleanup } from "./doctor.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedApp, Role, AppConfig, TaskRef, SkillRef } from "@clawmasons/shared";
-import { resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect } from "@clawmasons/shared";
+import { resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect, createSession as createMetaSession } from "@clawmasons/shared";
 import { getAgentFromRegistry, getAgentFromRegistryWithAutoInstall, initRegistry, getAllRegisteredNames, BUILTIN_AGENTS, materializeForAgent } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig, readDefaultAgent, resolveAgentPackageName } from "@clawmasons/agent-sdk";
 import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.js";
@@ -572,6 +572,8 @@ export interface RunAgentDeps {
   ) => Promise<number>;
   /** Override session ID generation (for testing). */
   generateSessionIdFn?: () => string;
+  /** Override session store createSession (for testing). */
+  createSessionFn?: (cwd: string, agent: string, role: string) => Promise<{ sessionId: string }>;
   /** Override docker compose check (for testing). */
   checkDockerComposeFn?: () => void;
   /** Override .gitignore entry management (for testing). */
@@ -1322,7 +1324,8 @@ async function runAgentInteractiveMode(
     // 6. Create session directory with compose file
     const { uid, gid } = getHostIds();
     const declaredCredentialKeys = collectDeclaredCredentialKeys(agentType, agentConfigCredentials, roleType);
-    const sessionIdOverride = (deps?.generateSessionIdFn ?? generateSessionId)();
+    const createSessionStore = deps?.createSessionFn ?? createMetaSession;
+    const metaSession = await createSessionStore(projectDir, agentType, roleName);
     const session = createSessionDirectory({
       projectDir,
       dockerBuildDir,
@@ -1338,7 +1341,7 @@ async function runAgentInteractiveMode(
       homeOverride,
       bashMode,
       verbose,
-      sessionId: sessionIdOverride,
+      sessionId: metaSession.sessionId,
       agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
     });
 
@@ -1513,7 +1516,8 @@ async function runAgentJsonMode(
     // 5. Create session directory
     const { uid, gid } = getHostIds();
     const declaredCredentialKeys = collectDeclaredCredentialKeys(agentType, agentConfigCredentials, roleType);
-    const sessionIdOverride = (deps?.generateSessionIdFn ?? generateSessionId)();
+    const createSessionStore = deps?.createSessionFn ?? createMetaSession;
+    const metaSession = await createSessionStore(projectDir, agentType, roleName);
     const session = createSessionDirectory({
       projectDir,
       dockerBuildDir,
@@ -1528,7 +1532,7 @@ async function runAgentJsonMode(
       hostGid: gid,
       homeOverride,
       verbose,
-      sessionId: sessionIdOverride,
+      sessionId: metaSession.sessionId,
       agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
     });
 
@@ -1713,7 +1717,8 @@ async function runAgentPrintMode(
     // 5. Create session directory
     const { uid, gid } = getHostIds();
     const declaredCredentialKeys = collectDeclaredCredentialKeys(agentType, agentConfigCredentials, roleType);
-    const sessionIdOverride = (deps?.generateSessionIdFn ?? generateSessionId)();
+    const createSessionStore = deps?.createSessionFn ?? createMetaSession;
+    const metaSession = await createSessionStore(projectDir, agentType, roleName);
     const session = createSessionDirectory({
       projectDir,
       dockerBuildDir,
@@ -1728,7 +1733,7 @@ async function runAgentPrintMode(
       hostGid: gid,
       homeOverride,
       verbose,
-      sessionId: sessionIdOverride,
+      sessionId: metaSession.sessionId,
       agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
     });
 
@@ -1943,7 +1948,8 @@ async function runAgentDevContainerMode(
     // 6. Create session directory with compose file
     const { uid, gid } = getHostIds();
     const declaredCredentialKeys = collectDeclaredCredentialKeys(agentType, agentConfigCredentials, roleType);
-    const sessionIdOverride = (deps?.generateSessionIdFn ?? generateSessionId)();
+    const createSessionStore = deps?.createSessionFn ?? createMetaSession;
+    const metaSession = await createSessionStore(projectDir, agentType, roleName);
     const session = createSessionDirectory({
       projectDir,
       dockerBuildDir,
@@ -1959,7 +1965,7 @@ async function runAgentDevContainerMode(
       homeOverride,
       vscodeServerHostPath,
       verbose,
-      sessionId: sessionIdOverride,
+      sessionId: metaSession.sessionId,
       agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
     });
 
@@ -2131,7 +2137,8 @@ export async function runProxyOnly(
 
   // 6. Create session directory with compose file
   const { uid, gid } = getHostIds();
-  const sessionIdOverride = (deps?.generateSessionIdFn ?? generateSessionId)();
+  const createSessionStore = deps?.createSessionFn ?? createMetaSession;
+  const metaSession = await createSessionStore(projectDir, agentType, roleName);
   const session = createSessionDirectory({
     projectDir,
     dockerBuildDir,
@@ -2143,7 +2150,7 @@ export async function runProxyOnly(
     roleMounts: roleType.container?.mounts,
     hostUid: uid,
     hostGid: gid,
-    sessionId: sessionIdOverride,
+    sessionId: metaSession.sessionId,
     agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
   });
 
