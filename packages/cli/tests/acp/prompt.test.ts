@@ -11,7 +11,7 @@ import {
   getSessionState,
   extractTextFromPrompt,
 } from "../../src/acp/acp-agent.js";
-import { readSession } from "@clawmasons/shared";
+import { readSession, updateSession } from "@clawmasons/shared";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -405,5 +405,122 @@ describe("session/cancel handler", () => {
     // Cancel when nothing is running -- should not throw
     await clientConn.cancel({ sessionId });
     // If we get here without throwing, the test passes
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: ACP automatic resume
+// ---------------------------------------------------------------------------
+
+describe("ACP automatic resume", () => {
+  let tempDir: string;
+  let clientConn: ClientSideConnection;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "mason-acp-resume-test-"));
+
+    const pair = createConnectionPair();
+    clientConn = pair.clientConn;
+
+    mockDiscoverForCwd.mockResolvedValue({
+      roles: [fakeRole("project", "local")],
+      registry: new Map(),
+      agentNames: ["claude-code-agent"],
+      defaultRole: fakeRole("project", "local"),
+      defaultAgent: "claude-code-agent",
+    });
+
+    // Default mock: executePromptStreaming resolves successfully
+    mockExecutePromptStreaming.mockImplementation(
+      (opts: { onSessionUpdate: (update: Record<string, unknown>) => void }) => {
+        opts.onSessionUpdate({
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "Done." },
+        });
+        return Promise.resolve({ cancelled: false });
+      },
+    );
+  });
+
+  afterEach(async () => {
+    mockDiscoverForCwd.mockReset();
+    mockExecutePromptStreaming.mockReset();
+    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  });
+
+  it("first prompt does not pass masonSessionId (no resume)", async () => {
+    const sessionId = await initAndCreateSession(clientConn, tempDir);
+
+    await clientConn.prompt({
+      sessionId,
+      prompt: [{ type: "text", text: "scaffold API" }],
+    });
+
+    expect(mockExecutePromptStreaming).toHaveBeenCalledTimes(1);
+    const callArgs = mockExecutePromptStreaming.mock.calls[0][0];
+    expect(callArgs.masonSessionId).toBeUndefined();
+  });
+
+  it("second prompt passes masonSessionId when agentSessionId is captured", async () => {
+    const sessionId = await initAndCreateSession(clientConn, tempDir);
+
+    // First prompt — simulate agent hook writing agentSessionId during execution
+    mockExecutePromptStreaming.mockImplementationOnce(
+      async (opts: { onSessionUpdate: (update: Record<string, unknown>) => void }) => {
+        // Simulate the agent's SessionStart hook writing agentSessionId to meta.json
+        await updateSession(tempDir, sessionId, { agentSessionId: "claude-session-abc123" });
+        opts.onSessionUpdate({
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "Done." },
+        });
+        return { cancelled: false };
+      },
+    );
+
+    await clientConn.prompt({
+      sessionId,
+      prompt: [{ type: "text", text: "scaffold API" }],
+    });
+
+    // Second prompt — should detect agentSessionId and use resume
+    await clientConn.prompt({
+      sessionId,
+      prompt: [{ type: "text", text: "add auth" }],
+    });
+
+    expect(mockExecutePromptStreaming).toHaveBeenCalledTimes(2);
+
+    // First call: no masonSessionId
+    const firstCallArgs = mockExecutePromptStreaming.mock.calls[0][0];
+    expect(firstCallArgs.masonSessionId).toBeUndefined();
+
+    // Second call: masonSessionId should be the session ID
+    const secondCallArgs = mockExecutePromptStreaming.mock.calls[1][0];
+    expect(secondCallArgs.masonSessionId).toBe(sessionId);
+  });
+
+  it("second prompt does not pass masonSessionId when agentSessionId is still null", async () => {
+    const sessionId = await initAndCreateSession(clientConn, tempDir);
+
+    // First prompt — no agent hook writes agentSessionId
+    await clientConn.prompt({
+      sessionId,
+      prompt: [{ type: "text", text: "scaffold API" }],
+    });
+
+    // Second prompt — agentSessionId still null, should not resume
+    await clientConn.prompt({
+      sessionId,
+      prompt: [{ type: "text", text: "add auth" }],
+    });
+
+    expect(mockExecutePromptStreaming).toHaveBeenCalledTimes(2);
+
+    // Both calls: no masonSessionId
+    const firstCallArgs = mockExecutePromptStreaming.mock.calls[0][0];
+    expect(firstCallArgs.masonSessionId).toBeUndefined();
+
+    const secondCallArgs = mockExecutePromptStreaming.mock.calls[1][0];
+    expect(secondCallArgs.masonSessionId).toBeUndefined();
   });
 });

@@ -240,4 +240,10 @@ export interface ExecutePromptStreamingOptions {
 
 **Testable output:** (a) first ACP prompt spawns `mason run --agent X --role Y --json text` (no resume), (b) second ACP prompt (after agentSessionId captured) spawns `mason run --resume <sessionId> --json text`, (c) `executePromptStreaming()` with `masonSessionId` produces correct args array, (d) `executePromptStreaming()` without `masonSessionId` produces legacy args (backward compatible), (e) ACP prompt reads `meta.json` after each prompt to check for `agentSessionId`.
 
-**Not Implemented Yet**
+**Implemented** — [Spec](../../changes/archive/2026-03-27-acp-automatic-resume/proposal.md) | [Design](../../changes/archive/2026-03-27-acp-automatic-resume/design.md) | [Tasks](../../changes/archive/2026-03-27-acp-automatic-resume/tasks.md)
+
+Files changed:
+- `packages/cli/src/acp/prompt-executor.ts` — Added optional `masonSessionId` field to `ExecutePromptStreamingOptions`; conditional args construction uses `--resume` when set
+- `packages/cli/src/acp/acp-agent.ts` — Prompt handler reads `meta.json` before each prompt to detect `agentSessionId`; passes `masonSessionId` to `executePromptStreaming()` when resuming
+- `packages/cli/tests/acp/prompt-executor-streaming.test.ts` — Added 2 tests for resume args and legacy args
+- `packages/cli/tests/acp/prompt.test.ts` — Added 3 tests for ACP auto-resume flow (first prompt, second with agentSessionId, second without)
