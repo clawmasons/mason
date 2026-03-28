@@ -64,7 +64,12 @@ function resolveLatestSession(cwd: string): string | null;
 
 **Testable output:** Unit tests: (a) `updateLatestSymlink()` creates symlink at `.mason/sessions/latest`, (b) symlink target is relative (just the session ID, not absolute path), (c) `resolveLatestSession()` returns the session ID from the symlink, (d) calling `updateLatestSymlink()` twice overwrites the first symlink, (e) `resolveLatestSession()` returns null when symlink doesn't exist, (f) `createSession()` automatically updates the symlink.
 
-**Not Implemented Yet**
+**Implemented** — [Spec](../../changes/archive/2026-03-27-latest-session-symlink/proposal.md) | [Design](../../changes/archive/2026-03-27-latest-session-symlink/design.md) | [Tasks](../../changes/archive/2026-03-27-latest-session-symlink/tasks.md)
+
+Files changed:
+- `packages/shared/src/session/session-store.ts` — Added `updateLatestSymlink()` and `resolveLatestSession()` functions; updated `createSession()` to update symlink; updated `listSessions()` to skip symlink entries
+- `packages/shared/src/session/index.ts` — Exported `updateLatestSymlink` and `resolveLatestSession`
+- `packages/shared/tests/session/session-store.test.ts` — Added 7 tests covering symlink creation, relative target, overwrite, resolve, null case, and createSession integration
 
 ---
 
