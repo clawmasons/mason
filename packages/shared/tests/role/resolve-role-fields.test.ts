@@ -31,6 +31,7 @@ function makeRole(overrides: Partial<Role> = {}): Role {
     },
     governance: { risk: "LOW", credentials: [] },
     resources: [],
+    role: { includes: [] },
     source: { type: "local", agentDialect: "mason", path: "/fake" },
     ...overrides,
   };

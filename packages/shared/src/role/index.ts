@@ -47,4 +47,10 @@ export {
 } from "./wildcard.js";
 
 // Role field resolution
-export { resolveRoleFields } from "./resolve-role-fields.js";
+export { resolveRoleFields, expandRoleWildcards } from "./resolve-role-fields.js";
+
+// Role merge
+export { mergeRoles } from "./merge.js";
+
+// Role includes
+export { resolveIncludes, RoleIncludeError, type ExpandWildcardsFn } from "./includes.js";

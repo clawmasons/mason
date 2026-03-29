@@ -1090,6 +1090,7 @@ export async function generateProjectRole(
     },
     governance: { risk: "LOW", credentials: [] },
     resources: [],
+    role: { includes: [] },
     source: { type: "local", agentDialect: primaryDialect, path: path.join(projectDir, ".mason", "roles", "project") },
   };
 

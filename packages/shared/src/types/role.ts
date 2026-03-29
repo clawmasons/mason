@@ -11,6 +11,7 @@ import type {
   roleSourceSchema,
   mountConfigSchema,
   toolPermissionsSchema,
+  roleConfigSchema,
 } from "../schemas/role-types.js";
 
 export type Role = z.infer<typeof roleSchema>;
@@ -24,3 +25,4 @@ export type ResourceFile = z.infer<typeof resourceFileSchema>;
 export type RoleSource = z.infer<typeof roleSourceSchema>;
 export type MountConfig = z.infer<typeof mountConfigSchema>;
 export type ToolPermissions = z.infer<typeof toolPermissionsSchema>;
+export type RoleConfig = z.infer<typeof roleConfigSchema>;

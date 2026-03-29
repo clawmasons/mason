@@ -86,6 +86,9 @@ export async function readMaterializedRole(rolePath: string): Promise<Role> {
     ? (frontmatter.sources as string[])
     : [];
 
+  // Extract role config (includes)
+  const role = frontmatter.role ?? {};
+
   // Build the role object and validate through Zod
   const roleData = {
     metadata,
@@ -98,6 +101,7 @@ export async function readMaterializedRole(rolePath: string): Promise<Role> {
     container,
     governance,
     resources,
+    role,
     source: {
       type: "local" as const,
       agentDialect: dialect.name,

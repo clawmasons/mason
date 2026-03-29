@@ -1,9 +1,10 @@
 /**
- * Role field resolution — expands wildcard patterns in tasks and skills.
+ * Role field resolution — expands wildcard patterns in tasks and skills,
+ * then resolves role includes.
  *
  * This is a pipeline step called after role loading and before materialization.
  * It calls scanProject() to discover available items, then expands any wildcard
- * entries in the role's tasks and skills arrays.
+ * entries in the role's tasks and skills arrays, then resolves any role.includes.
  */
 
 import type { Role } from "../types/role.js";
@@ -14,23 +15,20 @@ import {
   expandSkillWildcards,
   isWildcardPattern,
 } from "./wildcard.js";
+import { resolveIncludes } from "./includes.js";
 
 /**
- * Resolve wildcard patterns in a role's tasks and skills arrays.
+ * Expand wildcard patterns in a role's tasks and skills arrays.
  *
- * Scans the project directory using the role's sources, then expands any
- * wildcard entries against the discovered items. Returns a new Role with
- * expanded arrays.
+ * This is the pure wildcard expansion step — no include resolution.
+ * Used both for the top-level role and for included roles during
+ * recursive resolution.
  *
- * If the role has no wildcard entries, it is returned unchanged.
- * If the role has no sources, wildcards cannot be expanded — a warning is
- * emitted and the role is returned unchanged.
- *
- * @param role - The role to resolve
+ * @param role - The role to expand wildcards in
  * @param projectDir - Absolute path to the project root
  * @returns A new Role with wildcard patterns expanded
  */
-export async function resolveRoleFields(
+export async function expandRoleWildcards(
   role: Role,
   projectDir: string,
 ): Promise<Role> {
@@ -77,4 +75,26 @@ export async function resolveRoleFields(
   }
 
   return { ...role, tasks, skills };
+}
+
+/**
+ * Resolve wildcard patterns in a role's tasks and skills arrays,
+ * then resolve role includes.
+ *
+ * This is the full resolution pipeline step called from the CLI
+ * after role loading and before materialization.
+ *
+ * @param role - The role to resolve
+ * @param projectDir - Absolute path to the project root
+ * @returns A new Role with wildcard patterns expanded and includes merged
+ */
+export async function resolveRoleFields(
+  role: Role,
+  projectDir: string,
+): Promise<Role> {
+  // Step 1: Expand wildcards in the current role
+  const expanded = await expandRoleWildcards(role, projectDir);
+
+  // Step 2: Resolve includes (each included role gets its own wildcards expanded)
+  return resolveIncludes(expanded, projectDir, expandRoleWildcards);
 }

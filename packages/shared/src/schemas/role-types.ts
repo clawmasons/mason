@@ -97,6 +97,10 @@ export const roleSourceSchema = z.object({
   packageName: z.string().optional(),
 });
 
+export const roleConfigSchema = z.object({
+  includes: z.array(z.string()).optional().default([]),
+});
+
 // --- Top-level Role schema ---
 
 export const roleSchema = z.object({
@@ -110,5 +114,6 @@ export const roleSchema = z.object({
   container: containerRequirementsSchema.optional().default({}),
   governance: governanceConfigSchema.optional().default({}),
   resources: z.array(resourceFileSchema).optional().default([]),
+  role: roleConfigSchema.optional().default({}),
   source: roleSourceSchema,
 });

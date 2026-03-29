@@ -202,7 +202,13 @@ Implement PRD §8 — a new `role.includes` field that lets a ROLE.md reference 
 - `npm run test:e2e`
 - In `../mason-extensions`: `npm run lint && npm run build && npm run test && npm run test:e2e`
 
-**Not Implemented Yet**
+**Implemented**
+
+**Artifacts:**
+- Proposal: [openspec/changes/archive/2026-03-29-role-composition-includes/proposal.md](../../changes/archive/2026-03-29-role-composition-includes/proposal.md)
+- Design: [openspec/changes/archive/2026-03-29-role-composition-includes/design.md](../../changes/archive/2026-03-29-role-composition-includes/design.md)
+- Tasks: [openspec/changes/archive/2026-03-29-role-composition-includes/tasks.md](../../changes/archive/2026-03-29-role-composition-includes/tasks.md)
+- Spec: [openspec/changes/archive/2026-03-29-role-composition-includes/specs/role-composition-includes/spec.md](../../changes/archive/2026-03-29-role-composition-includes/specs/role-composition-includes/spec.md)
 
 ---
 

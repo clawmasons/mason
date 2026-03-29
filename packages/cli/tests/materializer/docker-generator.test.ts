@@ -60,6 +60,7 @@ function makeTestRole(overrides?: Partial<Role>): Role {
     type: "project" as const,
     sources: [],
     resources: [],
+    role: { includes: [] },
     source: {
       type: "local",
       agentDialect: "claude-code-agent",
