@@ -164,7 +164,7 @@ The ACP session SHALL resolve roles using `resolveRole(name, projectDir)` from t
 
 When the ACP `prompt` handler fires for an existing session, it SHALL check `meta.json` for an `agentSessionId`. If present (non-null), it SHALL pass `masonSessionId` to `executePromptStreaming()`, which spawns `mason run --resume <masonSessionId> --json <text>` instead of `mason run --agent X --role Y --json <text>`.
 
-The `executePromptStreaming()` function SHALL accept an optional `masonSessionId` field in its options. When set, the args SHALL be constructed as:
+The `executePromptStreaming()` function SHALL accept an optional `masonSessionId` field and an optional `source` field in its options. When `masonSessionId` is set, the args SHALL be constructed as:
 ```
 ["run", "--resume", masonSessionId, "--json", text]
 ```
@@ -173,6 +173,8 @@ When not set, the legacy args are used:
 ```
 ["run", "--agent", agent, "--role", role, "--json", text]
 ```
+
+When `source` is provided, `--source <path>` SHALL be appended to the args in either case.
 
 #### Scenario: First prompt creates session normally
 - **WHEN** the first ACP `prompt` is sent for a new session
@@ -189,6 +191,11 @@ When not set, the legacy args are used:
 - **WHEN** a second ACP `prompt` is sent
 - **AND** `meta.json` still has `agentSessionId: null` (hook didn't fire or failed)
 - **THEN** the handler SHALL spawn `mason run --agent X --role Y --json <text>` (no resume)
+
+#### Scenario: Source is appended when pinned
+- **WHEN** source is pinned to `/abs/path/src`
+- **AND** a prompt is executed (new or resumed)
+- **THEN** `--source /abs/path/src` SHALL be appended to the subprocess args
 
 ### Requirement: ACP session logs written to session directory
 

@@ -46,6 +46,33 @@ const { version: CLI_VERSION } = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
 type AcpSessionUpdate = Parameters<AgentSideConnection["sessionUpdate"]>[0]["update"];
 
 // ---------------------------------------------------------------------------
+// Pinned CLI args (connection-scoped, set once from `mason acp` command)
+// ---------------------------------------------------------------------------
+
+export interface PinnedArgs {
+  agent?: string;
+  role?: string;
+  source?: string;
+}
+
+let pinnedArgs: PinnedArgs = {};
+
+/** Set pinned args from CLI options. Called once before connection is created. */
+export function setPinnedArgs(args: PinnedArgs): void {
+  pinnedArgs = { ...args };
+}
+
+/** Get current pinned args. */
+export function getPinnedArgs(): PinnedArgs {
+  return pinnedArgs;
+}
+
+/** Reset pinned args. Used by tests. */
+export function clearPinnedArgs(): void {
+  pinnedArgs = {};
+}
+
+// ---------------------------------------------------------------------------
 // In-memory session state (runtime data not persisted to meta.json)
 // ---------------------------------------------------------------------------
 
@@ -54,6 +81,7 @@ export interface SessionState {
   cwd: string;
   role: string;
   agent: string;
+  source?: string;
   abortController?: AbortController;
 }
 
@@ -77,14 +105,18 @@ export function clearSessionStates(): void {
 /**
  * Build the `configOptions` array for an ACP session response.
  * Reused by `newSession`, `loadSession`, and `setConfigOption`.
+ * Pinned fields are excluded — clients don't need selectors for pinned values.
  */
 export function buildConfigOptions(
   discovery: { roles: { metadata: { name: string }; source: { type: string; packageName?: string } }[]; agentNames: string[] },
   currentRole: string,
   currentAgent: string,
+  pinned: PinnedArgs = {},
 ): SessionConfigOption[] {
-  return [
-    {
+  const options: SessionConfigOption[] = [];
+
+  if (!pinned.role) {
+    options.push({
       id: "role",
       name: "Role",
       type: "select" as const,
@@ -98,8 +130,11 @@ export function buildConfigOptions(
             ? `(packaged: ${r.source.packageName ?? "unknown"})`
             : "(local)",
       })),
-    },
-    {
+    });
+  }
+
+  if (!pinned.agent) {
+    options.push({
       id: "agent",
       name: "Agent",
       type: "select" as const,
@@ -109,8 +144,10 @@ export function buildConfigOptions(
         value: name,
         name,
       })),
-    },
-  ];
+    });
+  }
+
+  return options;
 }
 
 // ---------------------------------------------------------------------------
@@ -233,20 +270,25 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
         defaultAgent,
       });
 
+      // Apply pinned overrides
+      const effectiveAgent = pinnedArgs.agent ?? defaultAgent;
+      const effectiveRole = pinnedArgs.role ?? defaultRole.metadata.name;
+
       // Persist session to disk
-      const session = await createSession(cwd, defaultAgent, defaultRole.metadata.name);
+      const session = await createSession(cwd, effectiveAgent, effectiveRole);
 
       // Track in-memory state
       sessions.set(session.sessionId, {
         sessionId: session.sessionId,
         cwd,
-        role: defaultRole.metadata.name,
-        agent: defaultAgent,
+        role: effectiveRole,
+        agent: effectiveAgent,
+        source: pinnedArgs.source,
       });
-      acpLog("session/new created", { sessionId: session.sessionId, role: defaultRole.metadata.name, agent: defaultAgent });
+      acpLog("session/new created", { sessionId: session.sessionId, role: effectiveRole, agent: effectiveAgent, pinned: pinnedArgs });
 
-      // Build configOptions
-      const configOptions = buildConfigOptions(discovery, defaultRole.metadata.name, defaultAgent);
+      // Build configOptions (pinned fields excluded)
+      const configOptions = buildConfigOptions(discovery, effectiveRole, effectiveAgent, pinnedArgs);
 
       const response: NewSessionResponse = {
         sessionId: session.sessionId,
@@ -305,6 +347,7 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
           text,
           cwd: session.cwd,
           signal: abortController.signal,
+          source: session.source,
           onSessionUpdate: (update) => {
             // Forward each parsed NDJSON line as a session update to the editor
             void conn.sessionUpdate({
@@ -406,15 +449,20 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
       // Run discovery so we can build configOptions
       const discovery = await discoverForCwd(cwd);
 
+      // Apply pinned overrides
+      const effectiveAgent = pinnedArgs.agent ?? meta.agent;
+      const effectiveRole = pinnedArgs.role ?? meta.role;
+
       // Populate in-memory state
       sessions.set(sessionId, {
         sessionId,
         cwd,
-        role: meta.role,
-        agent: meta.agent,
+        role: effectiveRole,
+        agent: effectiveAgent,
+        source: pinnedArgs.source,
       });
 
-      const configOptions = buildConfigOptions(discovery, meta.role, meta.agent);
+      const configOptions = buildConfigOptions(discovery, effectiveRole, effectiveAgent, pinnedArgs);
 
       // History replay is deferred to P1 — no session/update notifications sent
       return { configOptions };
@@ -450,6 +498,14 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
         throw RequestError.invalidParams(`Session not found: ${sessionId}`);
       }
 
+      // Reject changes to pinned fields
+      if (configId === "agent" && pinnedArgs.agent) {
+        throw RequestError.invalidParams("agent is pinned via CLI argument and cannot be changed");
+      }
+      if (configId === "role" && pinnedArgs.role) {
+        throw RequestError.invalidParams("role is pinned via CLI argument and cannot be changed");
+      }
+
       const stringValue = String(value);
 
       if (configId === "agent") {
@@ -478,7 +534,7 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
 
         // Send config_option_update after building updated options
         const discovery = await discoverForCwd(session.cwd);
-        const configOptions = buildConfigOptions(discovery, session.role, session.agent);
+        const configOptions = buildConfigOptions(discovery, session.role, session.agent, pinnedArgs);
 
         void conn.sessionUpdate({
           sessionId,
@@ -495,7 +551,7 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
 
       // For non-role changes, just return updated configOptions
       const discovery = await discoverForCwd(session.cwd);
-      const configOptions = buildConfigOptions(discovery, session.role, session.agent);
+      const configOptions = buildConfigOptions(discovery, session.role, session.agent, pinnedArgs);
       return { configOptions };
     },
 
