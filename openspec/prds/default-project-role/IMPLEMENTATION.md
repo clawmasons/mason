@@ -275,7 +275,13 @@ The `loadAndResolveProjectRole()` function reads the file via `readMaterializedR
 - `npm run test:e2e`
 - In `../mason-extensions`: `npm run lint && npm run build && npm run test && npm run test:e2e`
 
-**Not Implemented Yet**
+**Implemented**
+
+**Artifacts:**
+- Proposal: [openspec/changes/archive/2026-03-29-auto-create-default-project-role/proposal.md](../../changes/archive/2026-03-29-auto-create-default-project-role/proposal.md)
+- Design: [openspec/changes/archive/2026-03-29-auto-create-default-project-role/design.md](../../changes/archive/2026-03-29-auto-create-default-project-role/design.md)
+- Tasks: [openspec/changes/archive/2026-03-29-auto-create-default-project-role/tasks.md](../../changes/archive/2026-03-29-auto-create-default-project-role/tasks.md)
+- Spec: [openspec/changes/archive/2026-03-29-auto-create-default-project-role/specs/auto-create-default-project-role/spec.md](../../changes/archive/2026-03-29-auto-create-default-project-role/specs/auto-create-default-project-role/spec.md)
 
 ---
 
