@@ -132,7 +132,13 @@ Implement PRD §6-§7 — support `*` glob patterns in `tasks` and `skills` arra
 - `npx vitest run packages/cli/tests/`
 - In `../mason-extensions`: `npm run lint && npm run build && npm run test`
 
-**Not Implemented Yet**
+**Implemented**
+
+**Artifacts:**
+- Proposal: [openspec/changes/archive/2026-03-29-wildcard-patterns-tasks-skills/proposal.md](../../changes/archive/2026-03-29-wildcard-patterns-tasks-skills/proposal.md)
+- Design: [openspec/changes/archive/2026-03-29-wildcard-patterns-tasks-skills/design.md](../../changes/archive/2026-03-29-wildcard-patterns-tasks-skills/design.md)
+- Tasks: [openspec/changes/archive/2026-03-29-wildcard-patterns-tasks-skills/tasks.md](../../changes/archive/2026-03-29-wildcard-patterns-tasks-skills/tasks.md)
+- Spec: [openspec/changes/archive/2026-03-29-wildcard-patterns-tasks-skills/specs/wildcard-expansion/spec.md](../../changes/archive/2026-03-29-wildcard-patterns-tasks-skills/specs/wildcard-expansion/spec.md)
 
 ---
 
