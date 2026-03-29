@@ -8,7 +8,7 @@ import { HostProxy } from "../../src/host-proxy.js";
 import { ToolRouter } from "../../src/router.js";
 import { createRelayMessage } from "../../src/relay/messages.js";
 import type { RelayMessage, McpToolsRegisterMessage, McpToolsRegisteredMessage, McpToolResultMessage } from "../../src/relay/messages.js";
-import type { ResolvedApp } from "@clawmasons/shared";
+import type { ResolvedMcpServer } from "@clawmasons/shared";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 
 // ── Mock the approval dialog (osascript not available in tests) ─────
@@ -51,7 +51,7 @@ function getPort(): number {
 
 // ── Fixtures ────────────────────────────────────────────────────────
 
-function makeHostApp(name: string): ResolvedApp {
+function makeHostApp(name: string): ResolvedMcpServer {
   return {
     name,
     version: "1.0.0",

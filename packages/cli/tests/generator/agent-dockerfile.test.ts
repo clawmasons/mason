@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { generateAgentDockerfile } from "../../src/generator/agent-dockerfile.js";
 import { generateProxyDockerfile } from "../../src/generator/proxy-dockerfile.js";
-import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
+import type { ResolvedAgent, ResolvedMcpServer, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
 
 // ── Test Helpers ───────────────────────────────────────────────────────
 
-function makeGithubApp(): ResolvedApp {
+function makeGithubApp(): ResolvedMcpServer {
   return {
     name: "@acme.platform/app-github",
     version: "1.0.0",
@@ -20,7 +20,7 @@ function makeGithubApp(): ResolvedApp {
   };
 }
 
-function makeFilesystemApp(): ResolvedApp {
+function makeFilesystemApp(): ResolvedMcpServer {
   return {
     name: "@acme.platform/app-filesystem",
     version: "1.0.0",
@@ -72,7 +72,7 @@ function makeWriterRole(): ResolvedRole {
       },
     },
     tasks: [makeWriteTask()],
-    apps: [makeFilesystemApp()],
+    mcp: [makeFilesystemApp()],
     skills: [],
   };
 }
@@ -90,7 +90,7 @@ function makeReviewerRole(): ResolvedRole {
       },
     },
     tasks: [makeTriageTask()],
-    apps: [makeGithubApp()],
+    mcp: [makeGithubApp()],
     skills: [makeLabelingSkill()],
   };
 }

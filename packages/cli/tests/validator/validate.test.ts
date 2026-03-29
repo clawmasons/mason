@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateAgent } from "../../src/validator/validate.js";
-import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
+import type { ResolvedAgent, ResolvedMcpServer, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
 import type { AgentPackage, AgentRegistry } from "@clawmasons/agent-sdk";
 import { mockPiCodingAgent, mockClaudeCodeAgent } from "../helpers/mock-agent-packages.js";
 
@@ -17,7 +17,7 @@ const mockRegistry = createMockRegistry();
 
 // --- Test helpers ---
 
-function makeApp(overrides: Partial<ResolvedApp> = {}): ResolvedApp {
+function makeApp(overrides: Partial<ResolvedMcpServer> = {}): ResolvedMcpServer {
   return {
     name: "@clawmasons/app-github",
     version: "1.0.0",
@@ -64,7 +64,7 @@ function makeRole(overrides: Partial<ResolvedRole> = {}): ResolvedRole {
       },
     },
     tasks: [makeTask()],
-    apps: [makeApp()],
+    mcp: [makeApp()],
     skills: [makeSkill()],
     ...overrides,
   };
@@ -129,7 +129,7 @@ describe("validateAgent", () => {
             name: "@clawmasons/task-triage-issue",
           }),
         ],
-        apps: [githubApp, slackApp],
+        mcp: [githubApp, slackApp],
         skills: [skill],
       });
 
@@ -142,7 +142,7 @@ describe("validateAgent", () => {
           },
         },
         tasks: [],
-        apps: [githubApp],
+        mcp: [githubApp],
         skills: [],
       });
 
@@ -220,7 +220,7 @@ describe("validateAgent", () => {
         permissions: {
           "@clawmasons/app-broken": { allow: ["create_issue"], deny: [] },
         },
-        apps: [badApp],
+        mcp: [badApp],
         tasks: [makeTask()],
       });
 
@@ -242,7 +242,7 @@ describe("validateAgent", () => {
         permissions: {
           "@clawmasons/app-broken": { allow: ["create_issue"], deny: [] },
         },
-        apps: [badApp],
+        mcp: [badApp],
         tasks: [makeTask()],
       });
 
@@ -265,7 +265,7 @@ describe("validateAgent", () => {
         permissions: {
           "@clawmasons/app-remote": { allow: ["search"], deny: [] },
         },
-        apps: [badApp],
+        mcp: [badApp],
         tasks: [makeTask()],
       });
 
@@ -295,7 +295,7 @@ describe("validateAgent", () => {
         permissions: {
           "@clawmasons/app-amap": { allow: ["get_directions"], deny: [] },
         },
-        apps: [sseApp],
+        mcp: [sseApp],
         tasks: [],
         skills: [],
       });
@@ -483,7 +483,7 @@ describe("validateAgent", () => {
         credentials: ["SERP_API_KEY"],
       });
       const role = makeRole({
-        apps: [app],
+        mcp: [app],
         tasks: [],
         skills: [],
         permissions: {
@@ -506,7 +506,7 @@ describe("validateAgent", () => {
         credentials: ["SERP_API_KEY"],
       });
       const role = makeRole({
-        apps: [app],
+        mcp: [app],
         tasks: [],
         skills: [],
         permissions: {
@@ -532,7 +532,7 @@ describe("validateAgent", () => {
 
     it("no warnings when both agent and apps have no credentials", () => {
       const app = makeApp({ credentials: [] });
-      const role = makeRole({ apps: [app] });
+      const role = makeRole({ mcp: [app] });
       const agent = makeMember({ credentials: [], roles: [role] });
 
       const result = validateAgent(agent);
@@ -550,7 +550,7 @@ describe("validateAgent", () => {
         credentials: ["OPENAI_API_KEY", "SERP_API_KEY"],
       });
       const role = makeRole({
-        apps: [app1, app2],
+        mcp: [app1, app2],
         tasks: [],
         skills: [],
         permissions: {
@@ -575,7 +575,7 @@ describe("validateAgent", () => {
         credentials: ["SERP_API_KEY"],
       });
       const role = makeRole({
-        apps: [app],
+        mcp: [app],
         tasks: [],
         skills: [],
         permissions: {
@@ -603,7 +603,7 @@ describe("validateAgent", () => {
       });
       const role1 = makeRole({
         name: "@clawmasons/role-researcher",
-        apps: [app1],
+        mcp: [app1],
         tasks: [],
         skills: [],
         permissions: {
@@ -612,7 +612,7 @@ describe("validateAgent", () => {
       });
       const role2 = makeRole({
         name: "@clawmasons/role-communicator",
-        apps: [app2],
+        mcp: [app2],
         tasks: [],
         skills: [],
         permissions: {
@@ -654,7 +654,7 @@ describe("validateAgent", () => {
           },
         },
         tasks: [makeTask()],
-        apps: [makeApp(), badApp],
+        mcp: [makeApp(), badApp],
       });
 
       const result = validateAgent(makeMember({ roles: [role] }));

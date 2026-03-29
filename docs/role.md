@@ -20,7 +20,7 @@ description: A writing assistant with access to GitHub tools
 type: project
 commands: ['take-notes']
 skills: ['@acme/skill-markdown-conventions']
-mcp_servers:
+mcp:
   - name: github
     tools:
       allow: ['create_issue', 'list_repos']
@@ -51,7 +51,7 @@ You are a technical writer. Help create clear, well-structured documentation.
 | `instructions` | string[] | No | — | Task/command references (Codex dialect) |
 | `conventions` | string[] | No | — | Task/command references (Aider dialect) |
 | `skills` | string[] | No | — | Skill package references |
-| `mcp_servers` | object[] | No | — | MCP server tool permissions |
+| `mcp` | object[] | No | — | MCP server tool permissions |
 | `container` | object | No | — | Container configuration |
 | `risk` | `"HIGH"` \| `"MEDIUM"` \| `"LOW"` | No | `"LOW"` | Risk level affecting session limits |
 | `credentials` | string[] | No | `[]` | Credential keys needed at runtime |
@@ -64,7 +64,7 @@ ROLE.md uses agent-native field names. The system normalizes these to a generic 
 | Generic (ROLE_TYPES) | Claude Code | Codex | Aider |
 |----------------------|-------------|-------|-------|
 | `tasks` | `commands` | `instructions` | `conventions` |
-| `apps` | `mcp_servers` | `mcp_servers` | `mcp_servers` |
+| `mcp` | `mcp` | `mcp` | `mcp` |
 | `skills` | `skills` | `skills` | `skills` |
 
 You can use any dialect's field names in your ROLE.md — the dialect registry maps them to the generic representation before materialization.
@@ -179,7 +179,7 @@ For packaged/published roles (npm packages), the role configuration lives in `pa
 
 ## Permissions
 
-The `permissions` field (in package.json) or `mcp_servers` (in ROLE.md) maps apps to their tool access rules:
+The `permissions` field (in package.json) or `mcp` (in ROLE.md) maps apps to their tool access rules:
 
 - **`allow`** — Tools the agent can use
 - **`deny`** — Tools explicitly blocked (deny wins over allow)

@@ -204,7 +204,7 @@ describe("readPackagedRole — valid packages", () => {
     expect(role.tasks).toHaveLength(2);
     expect(role.tasks[0].name).toBe("define-change");
 
-    // "mcp_servers" normalized to apps
+    // "mcp_servers" normalized to mcp via backwards-compat fallback
     expect(role.mcp).toHaveLength(1);
     expect(role.mcp[0].name).toBe("github");
 

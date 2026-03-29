@@ -76,8 +76,8 @@ describe("resolveRolePackage", () => {
     expect(resolved.tasks[0]!.name).toBe("@clawmasons/task-triage-issue");
     expect(resolved.skills).toHaveLength(1);
     expect(resolved.skills[0]!.name).toBe("@clawmasons/skill-labeling");
-    expect(resolved.apps).toHaveLength(1);
-    expect(resolved.apps[0]!.name).toBe("@clawmasons/app-github");
+    expect(resolved.mcp).toHaveLength(1);
+    expect(resolved.mcp[0]!.name).toBe("@clawmasons/app-github");
   });
 
   it("throws PackageNotFoundError for missing role", () => {

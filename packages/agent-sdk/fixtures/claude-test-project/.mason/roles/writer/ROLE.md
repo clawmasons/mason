@@ -10,7 +10,7 @@ tasks:
 skills:
   - ./.claude/skills/markdown-conventions
 
-mcp_servers:
+mcp:
   - name: filesystem
     location: proxy
     transport: stdio

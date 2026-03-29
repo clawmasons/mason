@@ -277,7 +277,7 @@ function makeRole(projectDir: string, overrides?: Partial<Role>): Role {
     skills: [],
     commands: [],
     tools: [],
-    apps: [],
+    mcp: [],
     ...overrides,
   } as Role;
 }

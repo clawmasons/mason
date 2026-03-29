@@ -229,8 +229,8 @@ describe("adaptRoleToResolvedAgent", () => {
 
   // ---- App mapping ----
 
-  describe("app mapping", () => {
-    it("maps AppConfigs to ResolvedApps", () => {
+  describe("MCP server mapping", () => {
+    it("maps McpServerConfigs to ResolvedMcpServers", () => {
       const role = minimalRole({
         mcp: [
           {

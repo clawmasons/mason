@@ -34,9 +34,6 @@ export {
   roleSchema,
 } from "./schemas/index.js";
 
-/** @deprecated Use mcpServerConfigSchema */
-export { mcpServerConfigSchema as appConfigSchema } from "./schemas/index.js";
-
 // ROLE_TYPES types
 export type {
   Role,
@@ -52,9 +49,6 @@ export type {
   ToolPermissions,
 } from "./types/role.js";
 
-/** @deprecated Use McpServerConfig */
-export type { McpServerConfig as AppConfig } from "./types/role.js";
-
 // Resolved types
 export type {
   DiscoveredPackage,
@@ -66,9 +60,6 @@ export type {
   AgentSkillConfig,
   AgentTaskConfig,
 } from "./types.js";
-
-/** @deprecated Use ResolvedMcpServer */
-export type { ResolvedMcpServer as ResolvedApp } from "./types.js";
 
 // Tool filtering
 export {

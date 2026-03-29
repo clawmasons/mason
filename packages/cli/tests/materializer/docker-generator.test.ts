@@ -31,7 +31,7 @@ function makeTestRole(overrides?: Partial<Role>): Role {
     },
     instructions: "You are a PRD author.",
     tasks: [{ name: "define-change" }],
-    apps: [
+    mcp: [
       {
         name: "github",
         transport: "stdio" as const,

@@ -116,7 +116,7 @@ export async function runBuild(
   const dockerDir = path.join(projectDir, ".mason", "docker");
   ensureProxyDependencies(dockerDir, projectDir);
 
-  // 7. Synthesize inline app/role packages for roles with mcp_servers
+  // 7. Synthesize inline app/role packages for roles with mcp servers
   for (const role of targetRoles) {
     synthesizeRolePackages(role, dockerDir);
   }

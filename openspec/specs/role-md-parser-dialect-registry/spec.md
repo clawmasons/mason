@@ -5,7 +5,7 @@ Parse ROLE.md files (YAML frontmatter + markdown body) and normalize agent-speci
 ## Requirements
 
 ### Requirement: Dialect Registry
-The system SHALL maintain a registry of agent dialects, mapping directory names to field name translations. Built-in dialects: Claude Code (`.claude/`, `commands`→`tasks`, `mcp_servers`→`apps`), Codex (`.codex/`, `instructions`→`tasks`, `mcp_servers`→`apps`), Aider (`.aider/`, `conventions`→`tasks`, `mcp_servers`→`apps`).
+The system SHALL maintain a registry of agent dialects, mapping directory names to field name translations. Built-in dialects: Claude Code (`.claude/`, `commands`→`tasks`, `mcp`→`mcp`), Codex (`.codex/`, `instructions`→`tasks`, `mcp`→`mcp`), Aider (`.aider/`, `conventions`→`tasks`, `mcp`→`mcp`).
 
 #### Scenario: Look up Claude Code dialect by directory
 - **WHEN** `getDialectByDirectory("claude")` is called
@@ -87,9 +87,9 @@ The system SHALL normalize agent-specific field names to generic ROLE_TYPES name
 - **WHEN** a ROLE.md has `commands: ['ops:triage:label-issue']`
 - **THEN** the result has `tasks: [{name: 'label-issue', scope: 'ops:triage'}]`
 
-#### Scenario: mcp_servers to apps
-- **WHEN** a ROLE.md has `mcp_servers: [{name: 'github', tools: {allow: ['create_issue']}}]`
-- **THEN** the result has `apps: [{name: 'github', tools: {allow: ['create_issue'], deny: []}}]`
+#### Scenario: mcp field to mcp
+- **WHEN** a ROLE.md has `mcp: [{name: 'github', tools: {allow: ['create_issue']}}]`
+- **THEN** the result has `mcp: [{name: 'github', tools: {allow: ['create_issue'], deny: []}}]`
 
 #### Scenario: Slash-delimited task reference
 - **WHEN** a ROLE.md has `commands: ['opsx/apply']`

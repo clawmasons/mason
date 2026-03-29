@@ -65,7 +65,7 @@ The system SHALL generate a valid ROLE.md string from scanner results.
 #### Scenario: Minimal permissions (least-privilege)
 - **GIVEN** a `ScanResult` with MCP servers
 - **WHEN** `proposeRoleMd(scanResult)` is called
-- **THEN** each `mcp_servers` entry has an empty `tools.allow` array (no tools granted by default)
+- **THEN** each `mcp` entry has an empty `tools.allow` array (no tools granted by default)
 
 #### Scenario: Extract credentials from MCP server env
 - **GIVEN** a `ScanResult` with an MCP server that has `env: { "GITHUB_TOKEN": "" }`

@@ -63,7 +63,7 @@ describe("runPermissions", () => {
     writeRole("issue-manager", `name: issue-manager
 description: "Manages GitHub issues"
 version: "1.0.0"
-mcp_servers:
+mcp:
   - name: "@test/app-github"
     transport: stdio
     command: npx

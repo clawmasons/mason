@@ -11,14 +11,14 @@ import {
   type ReadResourceResult,
   type GetPromptResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { ResolvedApp } from "@clawmasons/shared";
+import type { ResolvedMcpServer } from "@clawmasons/shared";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-export interface UpstreamAppConfig {
+export interface UpstreamMcpConfig {
   /** Full package name, e.g., "@clawmasons/app-github". Used as lookup key. */
   name: string;
-  app: ResolvedApp;
+  server: ResolvedMcpServer;
   env?: Record<string, string>;
   /** Working directory for stdio transport child processes. */
   cwd?: string;
@@ -29,19 +29,19 @@ export interface UpstreamAppConfig {
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 export class UpstreamManager {
-  private configs: UpstreamAppConfig[];
+  private configs: UpstreamMcpConfig[];
   private clients = new Map<string, Client>();
   private initialized = false;
 
-  constructor(apps: UpstreamAppConfig[]) {
-    const names = apps.map((a) => a.name);
+  constructor(servers: UpstreamMcpConfig[]) {
+    const names = servers.map((a) => a.name);
     const dupes = names.filter((n, i) => names.indexOf(n) !== i);
     if (dupes.length > 0) {
       throw new Error(
-        `Duplicate app names: ${[...new Set(dupes)].join(", ")}`,
+        `Duplicate server names: ${[...new Set(dupes)].join(", ")}`,
       );
     }
-    this.configs = apps;
+    this.configs = servers;
   }
 
   async initialize(timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<void> {
@@ -75,10 +75,10 @@ export class UpstreamManager {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         const detail =
-          config.app.transport === "stdio"
-            ? ` (command: ${config.app.command} ${(config.app.args ?? []).join(" ")})`
-            : config.app.url
-              ? ` (url: ${config.app.url})`
+          config.server.transport === "stdio"
+            ? ` (command: ${config.server.command} ${(config.server.args ?? []).join(" ")})`
+            : config.server.url
+              ? ` (url: ${config.server.url})`
               : "";
         const stderrInfo = stderrOutput.trim()
           ? `\nChild process stderr:\n${stderrOutput.trim()}`
@@ -205,20 +205,20 @@ export class UpstreamManager {
 // ── Transport Factory ──────────────────────────────────────────────────
 
 export function createTransport(
-  config: UpstreamAppConfig,
+  config: UpstreamMcpConfig,
 ): StdioClientTransport | SSEClientTransport | StreamableHTTPClientTransport {
-  const { app, env } = config;
+  const { server, env } = config;
 
-  switch (app.transport) {
+  switch (server.transport) {
     case "stdio": {
-      if (!app.command) {
+      if (!server.command) {
         throw new Error(
-          `App "${config.name}" has transport "stdio" but no command specified`,
+          `Server "${config.name}" has transport "stdio" but no command specified`,
         );
       }
       return new StdioClientTransport({
-        command: app.command,
-        args: app.args,
+        command: server.command,
+        args: server.args,
         env: env
           ? {
               ...Object.fromEntries(
@@ -234,24 +234,24 @@ export function createTransport(
       });
     }
     case "sse": {
-      if (!app.url) {
+      if (!server.url) {
         throw new Error(
-          `App "${config.name}" has transport "sse" but no url specified`,
+          `Server "${config.name}" has transport "sse" but no url specified`,
         );
       }
-      return new SSEClientTransport(new URL(app.url));
+      return new SSEClientTransport(new URL(server.url));
     }
     case "streamable-http": {
-      if (!app.url) {
+      if (!server.url) {
         throw new Error(
-          `App "${config.name}" has transport "streamable-http" but no url specified`,
+          `Server "${config.name}" has transport "streamable-http" but no url specified`,
         );
       }
-      return new StreamableHTTPClientTransport(new URL(app.url));
+      return new StreamableHTTPClientTransport(new URL(server.url));
     }
     default:
       throw new Error(
-        `App "${config.name}" has unsupported transport: ${app.transport as string}`,
+        `Server "${config.name}" has unsupported transport: ${server.transport as string}`,
       );
   }
 }

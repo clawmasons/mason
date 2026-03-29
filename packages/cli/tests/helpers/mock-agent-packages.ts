@@ -53,7 +53,7 @@ export const mockClaudeCodeAgent: AgentPackage = {
   dialect: "claude",
   dialectFields: {
     tasks: "commands",
-    apps: "mcp_servers",
+    mcp: "mcp",
     skills: "skills",
   },
   tasks: {
@@ -191,7 +191,7 @@ export const mockPiCodingAgent: AgentPackage = {
   dialect: "pi",
   dialectFields: {
     tasks: "prompts",
-    apps: "mcp_servers",
+    mcp: "mcp",
     skills: "skills",
   },
   tasks: {
@@ -284,7 +284,7 @@ export const mockCodexAgent: AgentPackage = {
   dialect: "codex",
   dialectFields: {
     tasks: "tasks",
-    apps: "mcp_servers",
+    mcp: "mcp",
     skills: "skills",
   },
   jsonMode: {
