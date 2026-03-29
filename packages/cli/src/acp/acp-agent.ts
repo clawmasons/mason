@@ -36,7 +36,7 @@ import {
 } from "@clawmasons/shared";
 import { discoverForCwd } from "./discovery-cache.js";
 import { executePromptStreaming } from "./prompt-executor.js";
-import { initAcpLogger, acpLog, acpError } from "./acp-logger.js";
+import { initAcpLogger, acpLog, acpError, acpStartupLog } from "./acp-logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(__dirname, "..", "..", "package.json");
@@ -168,15 +168,17 @@ export function extractTextFromPrompt(prompt: ContentBlock[]): string {
  * prompt, cancel, listSessions, loadSession, closeSession, and setConfigOption.
  */
 export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
+  acpStartupLog("createMasonAcpAgent called, agent factory invoked");
+
   return {
     async initialize(params: InitializeRequest): Promise<InitializeResponse> {
+      acpStartupLog("initialize request", JSON.stringify(params, null, 2));
+
       // Store client capabilities for future use
       storedClientCapabilities = params.clientCapabilities ?? undefined;
       storedClientInfo = params.clientInfo ?? undefined;
 
-      acpLog("initialize", { clientInfo: storedClientInfo, capabilities: storedClientCapabilities });
-
-      return {
+      const response: InitializeResponse = {
         protocolVersion: PROTOCOL_VERSION,
         agentCapabilities: {
           loadSession: true,
@@ -200,15 +202,24 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
           version: CLI_VERSION,
         },
       };
+
+      acpStartupLog("initialize response", JSON.stringify(response, null, 2));
+      acpLog("initialize", { clientInfo: storedClientInfo, capabilities: storedClientCapabilities });
+
+      return response;
     },
 
     async newSession(params: NewSessionRequest): Promise<NewSessionResponse> {
+      acpStartupLog("newSession request", JSON.stringify(params, null, 2));
+
       const { cwd } = params;
       if (!cwd) {
+        acpStartupLog("newSession error: cwd is missing");
         throw RequestError.invalidParams("cwd is required for session/new");
       }
 
-      // Initialize file logger now that we have a cwd
+      // Initialize file logger now that we have a cwd — this closes the startup logger
+      acpStartupLog("about to initialize CWD logger", { cwd });
       initAcpLogger(cwd);
       acpLog("session/new", { cwd });
 

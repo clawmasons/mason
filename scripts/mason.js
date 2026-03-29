@@ -4,6 +4,11 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { run } from "../packages/cli/dist/cli/index.js";
 
+// Set MASON_BIN so child processes (e.g. ACP prompt-executor) can find this script
+// without requiring the env var to be set externally.
+const __filename = fileURLToPath(import.meta.url);
+process.env.MASON_BIN = __filename;
+
 // Auto-link agents when CWD has a .mason/ directory (dev environments).
 // Resolves the monorepo root from this script's location, then symlinks
 // all agents from the sibling mason-extensions/agents/ repo.
@@ -28,6 +33,9 @@ if (fs.existsSync(masonDir)) {
       // skip silently — agent may be missing package.json or be malformed
     }
   }
+
+  // Built-in mcp-agent from this monorepo
+  linkAgent(path.join(monorepoRoot, "packages", "mcp-agent"));
 
   // Sibling mason-extensions repo
   const extensionsDir = path.join(monorepoRoot, "..", "mason-extensions", "agents");
