@@ -6,7 +6,7 @@ import * as path from "node:path";
 import { spawn, execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { checkDockerCompose } from "./docker-utils.js";
-import { quickAutoCleanup } from "./doctor.js";
+
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedApp, Role, AppConfig, TaskRef, SkillRef } from "@clawmasons/shared";
 import { resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect, createSession as createMetaSession, readSession, resolveLatestSession, listSessions, updateSession } from "@clawmasons/shared";
@@ -1486,13 +1486,6 @@ export async function runAgent(
     return;
   }
 
-  // Silent housekeeping: remove stopped containers, dangling images, orphaned sessions
-  try {
-    await quickAutoCleanup(projectDir);
-  } catch (cleanupErr) {
-    // Cleanup failures should never block the run
-    console.warn(`  Warning: auto-cleanup failed: ${(cleanupErr as Error).message}`);
-  }
 
   const isDevContainerMode = acpOptions?.devContainer === true;
   const bashMode = acpOptions?.bash === true;
@@ -1680,9 +1673,6 @@ async function runAgentInteractiveMode(
 
     // 5. Ensure .mason is in project's .gitignore
     ensureGitignore(projectDir, ".mason");
-
-    // 5b. Pre-flight cleanup of stale Docker resources
-    await quickAutoCleanup(projectDir);
 
     // 6. Create session directory with compose file
     const { uid, gid } = getHostIds();
@@ -1873,7 +1863,6 @@ async function runAgentJsonMode(
 
     // 4. Ensure .mason is in .gitignore
     ensureGitignore(projectDir, ".mason");
-    await quickAutoCleanup(projectDir);
 
     // 5. Create session directory
     const { uid, gid } = getHostIds();
@@ -2072,7 +2061,6 @@ async function runAgentPrintMode(
 
     // 4. Ensure .mason is in .gitignore
     ensureGitignore(projectDir, ".mason");
-    await quickAutoCleanup(projectDir);
 
     // 5. Create session directory
     const { uid, gid } = getHostIds();
@@ -2299,9 +2287,6 @@ async function runAgentDevContainerMode(
         fs.readFileSync(serverEnvSetupPath, "utf-8") !== serverEnvSetupContent) {
       fs.writeFileSync(serverEnvSetupPath, serverEnvSetupContent, { mode: 0o755 });
     }
-
-    // 5b. Pre-flight cleanup of stale Docker resources
-    await quickAutoCleanup(projectDir);
 
     // 6. Create session directory with compose file
     const { uid, gid } = getHostIds();

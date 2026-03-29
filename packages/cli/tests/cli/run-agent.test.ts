@@ -4,15 +4,6 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-// Mock quickAutoCleanup to avoid slow Docker calls in tests
-vi.mock("../../src/cli/commands/doctor.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../src/cli/commands/doctor.js")>();
-  return {
-    ...actual,
-    quickAutoCleanup: vi.fn(async () => {}),
-  };
-});
-
 // Mock ensureProxyDependencies to avoid expensive node_modules BFS/copy in tests
 vi.mock("../../src/materializer/proxy-dependencies.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/materializer/proxy-dependencies.js")>();
