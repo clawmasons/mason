@@ -96,7 +96,7 @@ function makeResolvedRole(name: string): ResolvedRole {
       "@test/app-github": { allow: ["create_pr"], deny: [] },
     },
     tasks: [],
-    apps: [
+    mcp: [
       {
         name: "@test/app-github",
         version: "1.0.0",

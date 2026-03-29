@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { checkDockerCompose } from "./docker-utils.js";
 
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
-import type { ResolvedAgent, ResolvedApp, Role, AppConfig, TaskRef, SkillRef } from "@clawmasons/shared";
+import type { ResolvedAgent, ResolvedMcpServer, Role, McpServerConfig, TaskRef, SkillRef } from "@clawmasons/shared";
 import { resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect, createSession as createMetaSession, readSession, resolveLatestSession, listSessions, updateSession } from "@clawmasons/shared";
 import { getAgentFromRegistry, getAgentFromRegistryWithAutoInstall, initRegistry, getAllRegisteredNames, BUILTIN_AGENTS, materializeForAgent } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig, readDefaultAgent, resolveAgentPackageName } from "@clawmasons/agent-sdk";
@@ -430,7 +430,7 @@ export function collectEnvCredentials(
 ): Record<string, string> {
   const declaredKeys = new Set<string>(agent.credentials);
   for (const role of agent.roles) {
-    for (const app of role.apps) {
+    for (const app of role.mcp) {
       for (const key of app.credentials) {
         declaredKeys.add(key);
       }
@@ -517,7 +517,7 @@ export async function ensureDockerBuild(
     // Populate shared proxy dependencies
     ensureProxyDependencies(dockerDir, projectDir);
 
-    // Synthesize inline app/role packages (e.g. mcp_servers from ROLE.md)
+    // Synthesize inline app/role packages (e.g. mcp from ROLE.md)
     synthesizeRolePackages(roleType, dockerDir);
 
     // Create per-role cache directory for NODE_COMPILE_CACHE and NPM_CONFIG_CACHE
@@ -627,7 +627,7 @@ export interface RunAgentDeps {
     proxyPort: number;
     relayToken: string;
     envCredentials: Record<string, string>;
-    hostApps?: ResolvedApp[];
+    hostApps?: ResolvedMcpServer[];
   }) => Promise<{ stop: () => Promise<void> }>;
   /** Override proxy port discovery (for testing). */
   discoverProxyPortFn?: (composeFile: string, proxyServiceName: string) => Promise<number>;
@@ -884,7 +884,7 @@ async function handleResume(
   const resolvedAgent = adaptRoleFn(roleType, agentType);
   mergeAgentConfigCredentials(resolvedAgent, undefined);
   const envCredentials = collectEnvCredentials(resolvedAgent);
-  const hostApps = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
+  const hostApps = resolvedAgent.roles.flatMap((r) => r.mcp).filter((a) => a.location === "host");
 
   // Read relay token from compose file
   const composeContent = fs.readFileSync(composeFile, "utf-8");
@@ -1035,12 +1035,12 @@ export async function generateProjectRole(
     }
   }
 
-  const seenApps = new Set<string>();
-  const apps: AppConfig[] = [];
+  const seenMcp = new Set<string>();
+  const mcp: McpServerConfig[] = [];
   for (const server of scanResult.mcpServers) {
-    if (!seenApps.has(server.name)) {
-      seenApps.add(server.name);
-      const app: AppConfig = {
+    if (!seenMcp.has(server.name)) {
+      seenMcp.add(server.name);
+      const mcpEntry: McpServerConfig = {
         name: server.name,
         transport: server.url ? "sse" : "stdio",
         env: server.env ?? {},
@@ -1048,10 +1048,10 @@ export async function generateProjectRole(
         credentials: [],
         location: "proxy",
       };
-      if (server.command) app.command = server.command;
-      if (server.args) app.args = server.args;
-      if (server.url) app.url = server.url;
-      apps.push(app);
+      if (server.command) mcpEntry.command = server.command;
+      if (server.args) mcpEntry.args = server.args;
+      if (server.url) mcpEntry.url = server.url;
+      mcp.push(mcpEntry);
     }
   }
 
@@ -1081,7 +1081,7 @@ export async function generateProjectRole(
     instructions: "",
     tasks,
     skills,
-    apps,
+    mcp,
     sources: sources,
     container: {
       packages: { apt: [], npm: [], pip: [] },
@@ -1537,7 +1537,7 @@ function collectDeclaredCredentialKeys(
   const agentPkg = getAgentFromRegistry(agentType);
   const sdkCredKeys = agentPkg?.runtime?.credentials?.map((c) => c.key) ?? [];
   const keys = [...sdkCredKeys, ...(agentConfigCredentials ?? []), ...(roleType.governance?.credentials ?? [])];
-  for (const app of roleType.apps ?? []) {
+  for (const app of roleType.mcp ?? []) {
     for (const key of app.credentials ?? []) {
       if (!keys.includes(key)) {
         keys.push(key);
@@ -1748,7 +1748,7 @@ async function runAgentInteractiveMode(
     if (llmConfig) resolvedAgent.llm = llmConfig;
     mergeAgentConfigCredentials(resolvedAgent, agentConfigCredentials);
     const envCredentials = collectEnvCredentials(resolvedAgent);
-    const hostApps = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
+    const hostApps = resolvedAgent.roles.flatMap((r) => r.mcp).filter((a) => a.location === "host");
 
     console.log(`  Starting host proxy (in-process)...`);
 
@@ -1916,7 +1916,7 @@ async function runAgentJsonMode(
     if (llmConfig) resolvedAgent.llm = llmConfig;
     mergeAgentConfigCredentials(resolvedAgent, agentConfigCredentials);
     const envCredentials = collectEnvCredentials(resolvedAgent);
-    const hostApps = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
+    const hostApps = resolvedAgent.roles.flatMap((r) => r.mcp).filter((a) => a.location === "host");
 
     let hostProxyHandle: { stop: () => Promise<void> } | null = null;
     try {
@@ -2114,7 +2114,7 @@ async function runAgentPrintMode(
     if (llmConfig) resolvedAgent.llm = llmConfig;
     mergeAgentConfigCredentials(resolvedAgent, agentConfigCredentials);
     const envCredentials = collectEnvCredentials(resolvedAgent);
-    const hostApps = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
+    const hostApps = resolvedAgent.roles.flatMap((r) => r.mcp).filter((a) => a.location === "host");
 
     let hostProxyHandle: { stop: () => Promise<void> } | null = null;
     try {
@@ -2345,7 +2345,7 @@ async function runAgentDevContainerMode(
     if (llmConfig) resolvedAgent.llm = llmConfig;
     mergeAgentConfigCredentials(resolvedAgent, agentConfigCredentials);
     const envCredentials = collectEnvCredentials(resolvedAgent);
-    const hostAppsDevContainer = resolvedAgent.roles.flatMap((r) => r.apps).filter((a) => a.location === "host");
+    const hostAppsDevContainer = resolvedAgent.roles.flatMap((r) => r.mcp).filter((a) => a.location === "host");
     const hostProxyHandle = await startHostProxy({
       proxyPort,
       relayToken,
@@ -2548,7 +2548,7 @@ async function defaultStartHostProxy(opts: {
   proxyPort: number;
   relayToken: string;
   envCredentials: Record<string, string>;
-  hostApps?: ResolvedApp[];
+  hostApps?: ResolvedMcpServer[];
 }): Promise<{ stop: () => Promise<void> }> {
   const hostProxy = new HostProxy({
     relayUrl: `ws://localhost:${opts.proxyPort}/ws/relay`,

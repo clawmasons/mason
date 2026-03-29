@@ -100,8 +100,6 @@ export interface ResolvedRole {
   npmPackages?: string[];
   tasks: ResolvedTask[];
   mcp: ResolvedMcpServer[];
-  /** @deprecated Use mcp */
-  apps?: ResolvedMcpServer[];
   skills: ResolvedSkill[];
 }
 

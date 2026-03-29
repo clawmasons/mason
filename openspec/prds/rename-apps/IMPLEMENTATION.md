@@ -211,4 +211,8 @@ After all changes, run:
    - in `../mason-extensions`, run `npm run test`
    - in `../mason-extensions`, run `npm run test:e2e`
 
-**Not Implemented Yet**
+**Implemented** — Branch: `consumers-remove-compat`
+- [Proposal](../../changes/archive/2026-03-29-consumers-remove-compat/proposal.md)
+- [Design](../../changes/archive/2026-03-29-consumers-remove-compat/design.md)
+- [Tasks](../../changes/archive/2026-03-29-consumers-remove-compat/tasks.md)
+- [Spec](../../changes/archive/2026-03-29-consumers-remove-compat/spec.md)

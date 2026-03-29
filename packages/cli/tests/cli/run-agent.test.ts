@@ -621,7 +621,7 @@ describe("packages-hash invalidation", () => {
       type: "project",
       sources: ["claude"],
       source: { agentDialect: "claude-code-agent", agentDir: ".claude", roleDir: "" },
-      skills: [], commands: [], tools: [], apps: [],
+      skills: [], commands: [], tools: [], mcp: [],
       ...overrides,
     } as Role;
   }
@@ -730,7 +730,7 @@ describe("runAgent", () => {
       skills: [],
       commands: [],
       tools: [],
-      apps: [],
+      mcp: [],
       ...overrides,
     } as Role;
   }
@@ -807,7 +807,7 @@ describe("runAgent", () => {
           slug: "writer",
           runtimes: ["claude-code-agent"],
           credentials: [],
-          roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
+          roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], mcp: [], skills: [] }],
         } as ResolvedAgent),
         ensureGitignoreEntryFn: (dir: string, pattern: string) => {
           if (overrides?.gitignoreCalled) {
@@ -933,7 +933,7 @@ describe("runAgent", () => {
       adaptRoleFn: () => ({
         name: "writer", version: "1.0.0", agentName: "writer", slug: "writer",
         runtimes: ["claude-code-agent"], credentials: [],
-        roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
+        roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], mcp: [], skills: [] }],
       } as ResolvedAgent),
       ensureGitignoreEntryFn: () => false,
       existsSyncFn: (p: string) => fs.existsSync(p),
@@ -1212,7 +1212,7 @@ describe("runProxyOnly", () => {
       skills: [],
       commands: [],
       tools: [],
-      apps: [],
+      mcp: [],
       ...overrides,
     } as Role;
   }
@@ -1493,7 +1493,7 @@ describe("source override applied to role", () => {
       skills: [],
       commands: [],
       tools: [],
-      apps: [],
+      mcp: [],
       sources: ["claude-code-agent"],
       ...overrides,
     } as Role;
@@ -1522,7 +1522,7 @@ describe("source override applied to role", () => {
         return {
           name: "writer", version: "1.0.0", agentName: "writer", slug: "writer",
           runtimes: ["claude-code-agent"], credentials: [],
-          roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], apps: [], skills: [] }],
+          roles: [{ name: "writer", version: "1.0.0", risk: "LOW", permissions: {}, tasks: [], mcp: [], skills: [] }],
         } as ResolvedAgent;
       },
       ensureGitignoreEntryFn: () => false,
@@ -1601,10 +1601,10 @@ describe("generateProjectRole", () => {
     expect(role.tasks[0].name).toBe("review");
     expect(role.skills).toHaveLength(1);
     expect(role.skills[0].name).toBe("testing");
-    expect(role.apps).toHaveLength(1);
-    expect(role.apps[0].name).toBe("my-server");
-    expect(role.apps[0].command).toBe("node");
-    expect(role.apps[0].args).toEqual(["server.js"]);
+    expect(role.mcp).toHaveLength(1);
+    expect(role.mcp[0].name).toBe("my-server");
+    expect(role.mcp[0].command).toBe("node");
+    expect(role.mcp[0].args).toEqual(["server.js"]);
   });
 
   it("handles multi-source with first-wins deduplication", async () => {
@@ -1646,7 +1646,7 @@ describe("generateProjectRole", () => {
     );
     expect(role.tasks).toHaveLength(0);
     expect(role.skills).toHaveLength(0);
-    expect(role.apps).toHaveLength(0);
+    expect(role.mcp).toHaveLength(0);
   });
 
   it("adds .env to ignore paths when present at project root", async () => {
@@ -1700,9 +1700,9 @@ describe("generateProjectRole", () => {
 
     const role = await generateProjectRole(tmpDir, ["claude-code-agent"]);
 
-    expect(role.apps).toHaveLength(1);
-    expect(role.apps[0].transport).toBe("sse");
-    expect(role.apps[0].url).toBe("http://localhost:8080");
+    expect(role.mcp).toHaveLength(1);
+    expect(role.mcp[0].transport).toBe("sse");
+    expect(role.mcp[0].url).toBe("http://localhost:8080");
   });
 });
 

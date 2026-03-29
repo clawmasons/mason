@@ -113,7 +113,7 @@ describe("skillRefSchema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AppConfig
+// McpServerConfig
 // ---------------------------------------------------------------------------
 describe("mcpServerConfigSchema", () => {
   it("accepts a full stdio app config", () => {

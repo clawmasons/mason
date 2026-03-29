@@ -254,11 +254,11 @@ export interface AgentPackage {
 
   /**
    * ROLE.md frontmatter field name overrides for this agent's dialect.
-   * When omitted, defaults to: tasks="tasks", apps="mcp_servers", skills="skills".
+   * When omitted, defaults to: tasks="tasks", mcp="mcp", skills="skills".
    */
   dialectFields?: {
     tasks?: string;
-    apps?: string;
+    mcp?: string;
     skills?: string;
   };
 

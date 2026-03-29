@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { UpstreamManager, createTransport } from "../src/upstream.js";
-import type { UpstreamAppConfig } from "../src/upstream.js";
-import type { ResolvedApp } from "@clawmasons/shared";
+import type { UpstreamMcpConfig } from "../src/upstream.js";
+import type { ResolvedMcpServer } from "@clawmasons/shared";
 
 // ── Mock MCP SDK ────────────────────────────────────────────────────────
 
@@ -72,7 +72,7 @@ vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
 
 // ── Fixtures ────────────────────────────────────────────────────────────
 
-function makeStdioApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
+function makeStdioApp(overrides?: Partial<ResolvedMcpServer>): ResolvedMcpServer {
   return {
     name: "@clawmasons/app-github",
     version: "1.0.0",
@@ -87,7 +87,7 @@ function makeStdioApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
   };
 }
 
-function makeSseApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
+function makeSseApp(overrides?: Partial<ResolvedMcpServer>): ResolvedMcpServer {
   return {
     name: "@clawmasons/app-slack",
     version: "1.0.0",
@@ -101,7 +101,7 @@ function makeSseApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
   };
 }
 
-function makeStreamableApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
+function makeStreamableApp(overrides?: Partial<ResolvedMcpServer>): ResolvedMcpServer {
   return {
     name: "@clawmasons/app-atlassian",
     version: "1.0.0",
@@ -115,11 +115,11 @@ function makeStreamableApp(overrides?: Partial<ResolvedApp>): ResolvedApp {
   };
 }
 
-function makeConfigs(): UpstreamAppConfig[] {
+function makeConfigs(): UpstreamMcpConfig[] {
   return [
-    { name: "github", app: makeStdioApp(), env: { GITHUB_TOKEN: "ghp_test" } },
-    { name: "slack", app: makeSseApp() },
-    { name: "atlassian", app: makeStreamableApp() },
+    { name: "github", server: makeStdioApp(), env: { GITHUB_TOKEN: "ghp_test" } },
+    { name: "slack", server: makeSseApp() },
+    { name: "atlassian", server: makeStreamableApp() },
   ];
 }
 
@@ -132,9 +132,9 @@ describe("proxy/upstream", () => {
 
   describe("createTransport", () => {
     it("creates StdioClientTransport for stdio apps with stderr piped", () => {
-      const config: UpstreamAppConfig = {
+      const config: UpstreamMcpConfig = {
         name: "github",
-        app: makeStdioApp(),
+        server: makeStdioApp(),
         env: { GITHUB_TOKEN: "ghp_test" },
       };
       const transport = createTransport(config) as unknown as { type: string; params: Record<string, unknown> };
@@ -143,27 +143,27 @@ describe("proxy/upstream", () => {
     });
 
     it("creates SSEClientTransport for sse apps", () => {
-      const config: UpstreamAppConfig = {
+      const config: UpstreamMcpConfig = {
         name: "slack",
-        app: makeSseApp(),
+        server: makeSseApp(),
       };
       const transport = createTransport(config);
       expect(transport).toHaveProperty("type", "sse");
     });
 
     it("creates StreamableHTTPClientTransport for streamable-http apps", () => {
-      const config: UpstreamAppConfig = {
+      const config: UpstreamMcpConfig = {
         name: "atlassian",
-        app: makeStreamableApp(),
+        server: makeStreamableApp(),
       };
       const transport = createTransport(config);
       expect(transport).toHaveProperty("type", "streamableHttp");
     });
 
     it("passes cwd to StdioClientTransport when provided", () => {
-      const config: UpstreamAppConfig = {
+      const config: UpstreamMcpConfig = {
         name: "github",
-        app: makeStdioApp(),
+        server: makeStdioApp(),
         env: { GITHUB_TOKEN: "ghp_test" },
         cwd: "/home/mason/workspace/project",
       };
@@ -172,32 +172,32 @@ describe("proxy/upstream", () => {
     });
 
     it("throws for stdio app without command", () => {
-      const config: UpstreamAppConfig = {
+      const config: UpstreamMcpConfig = {
         name: "broken",
-        app: makeStdioApp({ command: undefined }),
+        server: makeStdioApp({ command: undefined }),
       };
       expect(() => createTransport(config)).toThrow(
-        'App "broken" has transport "stdio" but no command specified',
+        'Server "broken" has transport "stdio" but no command specified',
       );
     });
 
     it("throws for sse app without url", () => {
-      const config: UpstreamAppConfig = {
+      const config: UpstreamMcpConfig = {
         name: "broken",
-        app: makeSseApp({ url: undefined }),
+        server: makeSseApp({ url: undefined }),
       };
       expect(() => createTransport(config)).toThrow(
-        'App "broken" has transport "sse" but no url specified',
+        'Server "broken" has transport "sse" but no url specified',
       );
     });
 
     it("throws for streamable-http app without url", () => {
-      const config: UpstreamAppConfig = {
+      const config: UpstreamMcpConfig = {
         name: "broken",
-        app: makeStreamableApp({ url: undefined }),
+        server: makeStreamableApp({ url: undefined }),
       };
       expect(() => createTransport(config)).toThrow(
-        'App "broken" has transport "streamable-http" but no url specified',
+        'Server "broken" has transport "streamable-http" but no url specified',
       );
     });
   });
@@ -211,14 +211,14 @@ describe("proxy/upstream", () => {
         expect(mockConnect).not.toHaveBeenCalled();
       });
 
-      it("throws on duplicate app names", () => {
-        const configs: UpstreamAppConfig[] = [
-          { name: "github", app: makeStdioApp() },
-          { name: "slack", app: makeSseApp() },
-          { name: "github", app: makeStreamableApp() },
+      it("throws on duplicate server names", () => {
+        const configs: UpstreamMcpConfig[] = [
+          { name: "github", server: makeStdioApp() },
+          { name: "slack", server: makeSseApp() },
+          { name: "github", server: makeStreamableApp() },
         ];
         expect(() => new UpstreamManager(configs)).toThrow(
-          "Duplicate app names: github",
+          "Duplicate server names: github",
         );
       });
     });
@@ -233,8 +233,8 @@ describe("proxy/upstream", () => {
 
       it("throws on connection failure with upstream name and command", async () => {
         mockConnect.mockRejectedValueOnce(new Error("Connection refused"));
-        const configs: UpstreamAppConfig[] = [
-          { name: "broken", app: makeStdioApp() },
+        const configs: UpstreamMcpConfig[] = [
+          { name: "broken", server: makeStdioApp() },
         ];
         const manager = new UpstreamManager(configs);
         await expect(manager.initialize()).rejects.toThrow(
@@ -244,8 +244,8 @@ describe("proxy/upstream", () => {
 
       it("includes url in error for sse/http upstream failures", async () => {
         mockConnect.mockRejectedValueOnce(new Error("Connection refused"));
-        const configs: UpstreamAppConfig[] = [
-          { name: "broken-sse", app: makeSseApp() },
+        const configs: UpstreamMcpConfig[] = [
+          { name: "broken-sse", server: makeSseApp() },
         ];
         const manager = new UpstreamManager(configs);
         await expect(manager.initialize()).rejects.toThrow(
@@ -257,8 +257,8 @@ describe("proxy/upstream", () => {
         mockConnect.mockImplementationOnce(
           () => new Promise((resolve) => setTimeout(resolve, 5000)),
         );
-        const configs: UpstreamAppConfig[] = [
-          { name: "slow-app", app: makeStdioApp() },
+        const configs: UpstreamMcpConfig[] = [
+          { name: "slow-app", server: makeStdioApp() },
         ];
         const manager = new UpstreamManager(configs);
         await expect(manager.initialize(100)).rejects.toThrow(
@@ -267,8 +267,8 @@ describe("proxy/upstream", () => {
       });
 
       it("throws on double initialize", async () => {
-        const configs: UpstreamAppConfig[] = [
-          { name: "github", app: makeStdioApp() },
+        const configs: UpstreamMcpConfig[] = [
+          { name: "github", server: makeStdioApp() },
         ];
         const manager = new UpstreamManager(configs);
         await manager.initialize();
@@ -278,8 +278,8 @@ describe("proxy/upstream", () => {
       });
 
       it("allows re-initialize after shutdown", async () => {
-        const configs: UpstreamAppConfig[] = [
-          { name: "github", app: makeStdioApp() },
+        const configs: UpstreamMcpConfig[] = [
+          { name: "github", server: makeStdioApp() },
         ];
         const manager = new UpstreamManager(configs);
         await manager.initialize();
@@ -293,9 +293,9 @@ describe("proxy/upstream", () => {
           .mockResolvedValueOnce(undefined)
           .mockRejectedValueOnce(new Error("Connection refused"));
 
-        const configs: UpstreamAppConfig[] = [
-          { name: "app-ok", app: makeStdioApp() },
-          { name: "app-fail", app: makeSseApp() },
+        const configs: UpstreamMcpConfig[] = [
+          { name: "app-ok", server: makeStdioApp() },
+          { name: "app-fail", server: makeSseApp() },
         ];
         const manager = new UpstreamManager(configs);
 
@@ -334,8 +334,8 @@ describe("proxy/upstream", () => {
             nextCursor: undefined,
           });
 
-        const configs: UpstreamAppConfig[] = [
-          { name: "paginated", app: makeStdioApp() },
+        const configs: UpstreamMcpConfig[] = [
+          { name: "paginated", server: makeStdioApp() },
         ];
         const manager = new UpstreamManager(configs);
         await manager.initialize();
@@ -379,8 +379,8 @@ describe("proxy/upstream", () => {
             nextCursor: undefined,
           });
 
-        const configs: UpstreamAppConfig[] = [
-          { name: "paginated", app: makeStdioApp() },
+        const configs: UpstreamMcpConfig[] = [
+          { name: "paginated", server: makeStdioApp() },
         ];
         const manager = new UpstreamManager(configs);
         await manager.initialize();
@@ -424,8 +424,8 @@ describe("proxy/upstream", () => {
             nextCursor: undefined,
           });
 
-        const configs: UpstreamAppConfig[] = [
-          { name: "paginated", app: makeStdioApp() },
+        const configs: UpstreamMcpConfig[] = [
+          { name: "paginated", server: makeStdioApp() },
         ];
         const manager = new UpstreamManager(configs);
         await manager.initialize();
@@ -464,8 +464,8 @@ describe("proxy/upstream", () => {
       });
 
       it("passes undefined args through correctly", async () => {
-        const configs: UpstreamAppConfig[] = [
-          { name: "github", app: makeStdioApp() },
+        const configs: UpstreamMcpConfig[] = [
+          { name: "github", server: makeStdioApp() },
         ];
         const manager = new UpstreamManager(configs);
         await manager.initialize();

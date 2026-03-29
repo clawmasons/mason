@@ -64,8 +64,8 @@ function printRole(role: Role): void {
   if (role.tasks.length > 0) {
     children.push(`tasks: ${role.tasks.map((t) => t.name).join(", ")}`);
   }
-  if (role.apps.length > 0) {
-    children.push(`apps: ${role.apps.map((a) => a.name).join(", ")}`);
+  if (role.mcp.length > 0) {
+    children.push(`mcp: ${role.mcp.map((a) => a.name).join(", ")}`);
   }
   if (role.skills.length > 0) {
     children.push(`skills: ${role.skills.map((s) => s.name).join(", ")}`);

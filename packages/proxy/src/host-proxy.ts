@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import type { ResolvedApp } from "@clawmasons/shared";
+import type { ResolvedMcpServer } from "@clawmasons/shared";
 import { RelayClient } from "./relay/client.js";
 import { CredentialResolver } from "./credentials/resolver.js";
 import { CredentialService } from "./credentials/service.js";
@@ -27,7 +27,7 @@ export interface HostProxyConfig {
   /** Environment credential overrides (e.g. from ACP client mcpServers config). */
   envCredentials?: Record<string, string>;
   /** Host-side MCP server apps to start and manage. */
-  hostApps?: ResolvedApp[];
+  hostApps?: ResolvedMcpServer[];
 }
 
 // ── Discovered tools per app ─────────────────────────────────────────────
@@ -224,7 +224,7 @@ export class HostProxy {
       try {
         const transport = createTransport({
           name: app.name,
-          app,
+          server: app,
         });
 
         const client = new Client(

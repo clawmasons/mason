@@ -21,7 +21,7 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { ProxyServer } from "../src/server.js";
 import { UpstreamManager } from "../src/upstream.js";
 import { ToolRouter } from "../src/router.js";
-import type { ResolvedApp, ToolFilter } from "@clawmasons/shared";
+import type { ResolvedMcpServer, ToolFilter } from "@clawmasons/shared";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -49,7 +49,7 @@ beforeAll(async () => {
   writeFileSync(join(tmpDir, "hello.txt"), "Hello from mason integration test");
 
   // 2. Configure UpstreamManager with real filesystem server
-  const filesystemApp: ResolvedApp = {
+  const filesystemApp: ResolvedMcpServer = {
     name: APP_NAME,
     version: "0.0.0",
     transport: "stdio",
@@ -61,7 +61,7 @@ beforeAll(async () => {
     location: "proxy",
   };
 
-  upstream = new UpstreamManager([{ name: APP_NAME, app: filesystemApp }]);
+  upstream = new UpstreamManager([{ name: APP_NAME, server: filesystemApp }]);
   await upstream.initialize(30_000);
 
   // 3. Discover tools from upstream and build router

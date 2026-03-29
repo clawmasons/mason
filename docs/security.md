@@ -32,7 +32,7 @@ Credentials are resolved in priority order:
 Every agent runs under a [role](role.md) that defines explicit tool permissions:
 
 ```yaml
-mcp_servers:
+mcp:
   - name: github
     tools:
       allow: [create_pr, list_issues]

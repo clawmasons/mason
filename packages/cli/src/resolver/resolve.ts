@@ -4,7 +4,7 @@ import type {
   SkillField,
   TaskField,
   DiscoveredPackage,
-  ResolvedApp,
+  ResolvedMcpServer,
   ResolvedRole,
   ResolvedSkill,
   ResolvedTask,
@@ -48,13 +48,13 @@ function assertType(
 }
 
 /**
- * Resolve an app package to a ResolvedApp.
+ * Resolve an app package to a ResolvedMcpServer.
  */
 function resolveApp(
   name: string,
   packages: Map<string, DiscoveredPackage>,
   context?: string,
-): ResolvedApp {
+): ResolvedMcpServer {
   const pkg = getPackage(name, packages, context);
   assertType(pkg, "app", context);
   const field = pkg.field as AppField;
@@ -144,8 +144,8 @@ function resolveRole(
     }
   }
 
-  // Collect all apps referenced by permissions (these are the apps this role touches)
-  const apps: ResolvedApp[] = [];
+  // Collect all MCP servers referenced by permissions
+  const mcp: ResolvedMcpServer[] = [];
   const permissionKeys = Object.keys(field.permissions);
   const hasWildcard = permissionKeys.includes("*");
 
@@ -153,7 +153,7 @@ function resolveRole(
     // Wildcard "*" means all apps in the workspace
     for (const [, pkg] of packages) {
       if (pkg.field.type === "app") {
-        apps.push(resolveApp(pkg.name, packages, roleContext));
+        mcp.push(resolveApp(pkg.name, packages, roleContext));
       }
     }
   }
@@ -161,9 +161,9 @@ function resolveRole(
   // Also resolve any explicitly named apps
   for (const appName of permissionKeys) {
     if (appName === "*") continue;
-    if (apps.some((a) => a.name === appName)) continue; // already added by wildcard
+    if (mcp.some((a) => a.name === appName)) continue; // already added by wildcard
     try {
-      apps.push(resolveApp(appName, packages, roleContext));
+      mcp.push(resolveApp(appName, packages, roleContext));  // resolveApp is internal name for the function
     } catch (e) {
       if (e instanceof PackageNotFoundError) {
         throw new PackageNotFoundError(
@@ -186,7 +186,7 @@ function resolveRole(
     baseImage: field.baseImage,
     aptPackages: field.aptPackages,
     tasks,
-    apps,
+    mcp,
     skills,
   };
 }

@@ -11,7 +11,7 @@ export {
   type Field,
   type DiscoveredPackage,
   type ResolvedAgent,
-  type ResolvedApp,
+  type ResolvedMcpServer,
   type ResolvedRole,
   type ResolvedSkill,
   type ResolvedTask,

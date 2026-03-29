@@ -49,7 +49,7 @@ function makeRole(name: string, tasks: ResolvedTask[] = [], skills: ResolvedSkil
       },
     },
     tasks,
-    apps: [],
+    mcp: [],
     skills,
   };
 }

@@ -1,4 +1,4 @@
-import type { ResolvedAgent, ResolvedApp, ResolvedRole } from "@clawmasons/shared";
+import type { ResolvedAgent, ResolvedMcpServer, ResolvedRole } from "@clawmasons/shared";
 import type { AgentRegistry } from "@clawmasons/agent-sdk";
 import type { ValidationError, ValidationWarning, ValidationErrorCategory, ValidationWarningCategory, ValidationResult } from "./types.js";
 
@@ -14,7 +14,7 @@ function checkToolExistence(
     // Wildcard "*" app or wildcard allow — skip tool existence checks
     if (appName === "*" || perms.allow.includes("*")) continue;
 
-    const resolvedApp = role.apps.find((a) => a.name === appName);
+    const resolvedApp = role.mcp.find((a) => a.name === appName);
     if (!resolvedApp) {
       // App not resolved — this would have been caught by the resolver.
       // Skip tool checks for unresolved apps.
@@ -39,7 +39,7 @@ function checkToolExistence(
  * sse/streamable-http apps need url.
  */
 function checkAppLaunchConfig(
-  app: ResolvedApp,
+  app: ResolvedMcpServer,
   errors: ValidationError[],
 ): void {
   if (app.transport === "stdio") {
@@ -72,12 +72,12 @@ function checkAppLaunchConfig(
 /**
  * Collect all unique apps from a resolved agent's roles.
  */
-function collectAllApps(agent: ResolvedAgent): ResolvedApp[] {
+function collectAllApps(agent: ResolvedAgent): ResolvedMcpServer[] {
   const seen = new Set<string>();
-  const apps: ResolvedApp[] = [];
+  const apps: ResolvedMcpServer[] = [];
 
   for (const role of agent.roles) {
-    for (const app of role.apps) {
+    for (const app of role.mcp) {
       if (!seen.has(app.name)) {
         seen.add(app.name);
         apps.push(app);
@@ -99,7 +99,7 @@ function checkCredentialCoverage(
   const agentCredentials = new Set(agent.credentials);
 
   for (const role of agent.roles) {
-    for (const app of role.apps) {
+    for (const app of role.mcp) {
       for (const credential of app.credentials) {
         if (!agentCredentials.has(credential)) {
           warnings.push({

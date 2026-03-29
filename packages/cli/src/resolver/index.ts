@@ -1,7 +1,7 @@
 export type {
   DiscoveredPackage,
   ResolvedAgent,
-  ResolvedApp,
+  ResolvedMcpServer,
   ResolvedRole,
   ResolvedSkill,
   ResolvedTask,
