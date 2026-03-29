@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { mcpAgentMaterializer } from "@clawmasons/mcp-agent/agent-package";
 import { ACP_RUNTIME_COMMANDS } from "../../src/materializer/common.js";
-import type { ResolvedAgent, ResolvedApp, ResolvedRole } from "@clawmasons/shared";
+import type { ResolvedAgent, ResolvedMcpServer, ResolvedRole } from "@clawmasons/shared";
 
-function makeFilesystemApp(): ResolvedApp {
+function makeFilesystemApp(): ResolvedMcpServer {
   return {
     name: "@clawmasons/app-filesystem",
     version: "1.0.0",
@@ -32,7 +32,7 @@ function makeMcpTestAgent(): ResolvedAgent {
       },
     },
     tasks: [],
-    apps: [filesystemApp],
+    mcp: [filesystemApp],
     skills: [],
   };
 

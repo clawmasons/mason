@@ -38,7 +38,7 @@ function makeTestRole(): Role {
       { name: "define-change" },
       { name: "review-change" },
     ],
-    apps: [
+    mcp: [
       {
         name: "github",
         transport: "stdio",

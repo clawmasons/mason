@@ -3,7 +3,7 @@ export type { ProxyServerConfig } from "./server.js";
 export { ToolRouter, ResourceRouter, PromptRouter } from "./router.js";
 export type { RouteEntry, ResourceRouteEntry, PromptRouteEntry } from "./router.js";
 export { UpstreamManager, createTransport } from "./upstream.js";
-export type { UpstreamAppConfig } from "./upstream.js";
+export type { UpstreamMcpConfig } from "./upstream.js";
 export { loadEnvFile, resolveEnvVars } from "./env-utils.js";
 export { auditPreHook, auditPostHook, logDroppedServers, setLocalAuditPath } from "./hooks/audit.js";
 export type { HookContext, AuditPreHookResult, AuditStatus, DroppedServer } from "./hooks/audit.js";

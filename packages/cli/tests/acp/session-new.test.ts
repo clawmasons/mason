@@ -64,7 +64,7 @@ function fakeRole(name: string, type: "local" | "package" = "local", tasks: { na
     instructions: "Test instructions",
     type: "project" as const,
     tasks,
-    apps: [],
+    mcp: [],
     skills: [],
     sources: [],
     container: {},

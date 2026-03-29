@@ -144,7 +144,7 @@ MCP servers can run on the host machine instead of inside Docker. This is useful
 Add `location: host` to an MCP server in your ROLE.md:
 
 ```yaml
-mcp_servers:
+mcp:
   - name: xcode-sim
     location: host
     transport: stdio

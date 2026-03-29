@@ -43,7 +43,7 @@ name: writer
 description: A writing assistant with filesystem access
 commands: ['take-notes']
 skills: ['@acme/skill-markdown-conventions']
-mcp_servers:
+mcp:
   - name: filesystem
     tools:
       allow: ['read_file', 'write_file', 'list_directory']

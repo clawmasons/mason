@@ -22,7 +22,7 @@ describe("registerAgentDialect", () => {
     expect(entry!.name).toBe("claude-code-agent");
     expect(entry!.directory).toBe("claude");
     expect(entry!.fieldMapping.tasks).toBe("commands");
-    expect(entry!.fieldMapping.apps).toBe("mcp_servers");
+    expect(entry!.fieldMapping.mcp).toBe("mcp");
     expect(entry!.fieldMapping.skills).toBe("skills");
   });
 
@@ -48,20 +48,20 @@ describe("registerAgentDialect", () => {
     const entry = getDialect("test-default-agent");
     expect(entry).toBeDefined();
     expect(entry!.fieldMapping.tasks).toBe("tasks");
-    expect(entry!.fieldMapping.apps).toBe("mcp_servers");
+    expect(entry!.fieldMapping.mcp).toBe("mcp");
     expect(entry!.fieldMapping.skills).toBe("skills");
   });
 
-  it("allows custom apps and skills field names", () => {
+  it("allows custom mcp and skills field names", () => {
     registerAgentDialect({
       name: "test-custom-agent",
       dialect: "testcustom",
-      dialectFields: { tasks: "instructions", apps: "tools", skills: "modules" },
+      dialectFields: { tasks: "instructions", mcp: "tools", skills: "modules" },
     });
     const entry = getDialect("test-custom-agent");
     expect(entry).toBeDefined();
     expect(entry!.fieldMapping.tasks).toBe("instructions");
-    expect(entry!.fieldMapping.apps).toBe("tools");
+    expect(entry!.fieldMapping.mcp).toBe("tools");
     expect(entry!.fieldMapping.skills).toBe("modules");
   });
 

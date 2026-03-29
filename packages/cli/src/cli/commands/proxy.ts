@@ -13,7 +13,7 @@ import {
   PromptRouter,
   ProxyServer,
 } from "@clawmasons/proxy";
-import type { UpstreamAppConfig } from "@clawmasons/proxy";
+import type { UpstreamMcpConfig } from "@clawmasons/proxy";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -109,8 +109,8 @@ export async function startProxy(
 
     // ── Step 5: Create upstream manager ──────────────────────────────────
     const projectDir = process.env.PROJECT_DIR;
-    const appConfigs = collectApps(agent, loadedEnv, projectDir);
-    upstream = new UpstreamManager(appConfigs);
+    const mcpConfigs = collectMcpServers(agent, loadedEnv, projectDir);
+    upstream = new UpstreamManager(mcpConfigs);
 
     const timeoutMs = options.startupTimeout
       ? parseInt(options.startupTimeout, 10) * 1000
@@ -169,7 +169,7 @@ export async function startProxy(
     console.log(`${elapsed()} Server listening (${stepMs()}ms)`);
 
     // ── Step 8: Connect upstream MCP servers ─────────────────────────────
-    console.log(`${elapsed()} Connecting to ${appConfigs.length} upstream server(s)...`);
+    console.log(`${elapsed()} Connecting to ${mcpConfigs.length} upstream server(s)...`);
     stepStart = performance.now();
     await upstream.initialize(timeoutMs);
     console.log(`${elapsed()} Upstream connected (${stepMs()}ms)`);
@@ -181,7 +181,7 @@ export async function startProxy(
     const upstreamResources = new Map<string, import("@modelcontextprotocol/sdk/types.js").Resource[]>();
     const upstreamPrompts = new Map<string, import("@modelcontextprotocol/sdk/types.js").Prompt[]>();
 
-    for (const config of appConfigs) {
+    for (const config of mcpConfigs) {
       const [tools, resources, prompts] = await Promise.all([
         upstream.getTools(config.name),
         upstream.getResources(config.name).catch(() => []),
@@ -261,26 +261,26 @@ function resolveRoleName(
 }
 
 /**
- * Collect unique apps from all roles, resolving env vars with loaded credentials.
+ * Collect unique MCP servers from all roles, resolving env vars with loaded credentials.
  */
-function collectApps(
+function collectMcpServers(
   agent: ResolvedAgent,
   loadedEnv: Record<string, string>,
   cwd?: string,
-): UpstreamAppConfig[] {
-  const seen = new Map<string, UpstreamAppConfig>();
+): UpstreamMcpConfig[] {
+  const seen = new Map<string, UpstreamMcpConfig>();
 
   for (const role of agent.roles) {
-    for (const app of role.apps) {
-      if (seen.has(app.name)) continue;
+    for (const server of role.mcp) {
+      if (seen.has(server.name)) continue;
 
-      const resolvedEnv = app.env
-        ? resolveEnvVars(app.env, loadedEnv)
+      const resolvedEnv = server.env
+        ? resolveEnvVars(server.env, loadedEnv)
         : undefined;
 
-      seen.set(app.name, {
-        name: app.name,
-        app,
+      seen.set(server.name, {
+        name: server.name,
+        server,
         env: resolvedEnv,
         cwd,
       });

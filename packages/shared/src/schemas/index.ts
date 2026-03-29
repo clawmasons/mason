@@ -10,7 +10,7 @@ export {
   roleMetadataSchema,
   taskRefSchema,
   skillRefSchema,
-  appConfigSchema,
+  mcpServerConfigSchema,
   mountConfigSchema,
   containerRequirementsSchema,
   governanceConfigSchema,

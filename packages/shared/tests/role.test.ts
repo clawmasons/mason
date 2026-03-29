@@ -4,7 +4,7 @@ import {
   roleMetadataSchema,
   taskRefSchema,
   skillRefSchema,
-  appConfigSchema,
+  mcpServerConfigSchema,
   mountConfigSchema,
   containerRequirementsSchema,
   governanceConfigSchema,
@@ -113,11 +113,11 @@ describe("skillRefSchema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AppConfig
+// McpServerConfig
 // ---------------------------------------------------------------------------
-describe("appConfigSchema", () => {
+describe("mcpServerConfigSchema", () => {
   it("accepts a full stdio app config", () => {
-    const result = appConfigSchema.parse({
+    const result = mcpServerConfigSchema.parse({
       name: "github",
       transport: "stdio",
       command: "npx",
@@ -130,7 +130,7 @@ describe("appConfigSchema", () => {
   });
 
   it("accepts a remote streamable-http app config", () => {
-    const result = appConfigSchema.parse({
+    const result = mcpServerConfigSchema.parse({
       name: "remote-api",
       transport: "streamable-http",
       url: "https://api.example.com",
@@ -140,7 +140,7 @@ describe("appConfigSchema", () => {
   });
 
   it("applies defaults for env, tools, credentials", () => {
-    const result = appConfigSchema.parse({ name: "minimal" });
+    const result = mcpServerConfigSchema.parse({ name: "minimal" });
     expect(result.env).toEqual({});
     expect(result.tools).toEqual({ allow: [], deny: [] });
     expect(result.credentials).toEqual([]);
@@ -148,12 +148,12 @@ describe("appConfigSchema", () => {
 
   it("rejects invalid transport type", () => {
     expect(() =>
-      appConfigSchema.parse({ name: "bad", transport: "websocket" })
+      mcpServerConfigSchema.parse({ name: "bad", transport: "websocket" })
     ).toThrow();
   });
 
   it("rejects missing name", () => {
-    expect(() => appConfigSchema.parse({})).toThrow();
+    expect(() => mcpServerConfigSchema.parse({})).toThrow();
   });
 });
 
@@ -330,7 +330,7 @@ describe("roleSchema", () => {
     expect(result.metadata.name).toBe("test");
     expect(result.instructions).toBe("You are a test agent.");
     expect(result.tasks).toEqual([]);
-    expect(result.apps).toEqual([]);
+    expect(result.mcp).toEqual([]);
     expect(result.skills).toEqual([]);
     expect(result.sources).toEqual([]);
     expect(result.resources).toEqual([]);
@@ -390,7 +390,7 @@ describe("roleSchema", () => {
       },
       instructions: "You are a PRD author.",
       tasks: [{ name: "define-change", ref: "@acme/task-define-change" }],
-      apps: [
+      mcp: [
         {
           name: "github",
           transport: "stdio" as const,
@@ -431,7 +431,7 @@ describe("roleSchema", () => {
     const result = roleSchema.parse(fullRole);
     expect(result.metadata.name).toBe("create-prd");
     expect(result.tasks).toHaveLength(1);
-    expect(result.apps).toHaveLength(1);
+    expect(result.mcp).toHaveLength(1);
     expect(result.skills).toHaveLength(1);
     expect(result.resources).toHaveLength(1);
     expect(result.governance.risk).toBe("HIGH");

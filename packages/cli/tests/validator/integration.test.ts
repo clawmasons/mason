@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 import { validateAgent } from "../../src/validator/validate.js";
-import type { ResolvedAgent, ResolvedApp, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
+import type { ResolvedAgent, ResolvedMcpServer, ResolvedRole, ResolvedSkill, ResolvedTask } from "@clawmasons/shared";
 import type { AgentPackage, AgentRegistry, AgentValidationResult } from "@clawmasons/agent-sdk";
 import { mockPiCodingAgent, mockClaudeCodeAgent } from "../helpers/mock-agent-packages.js";
 
@@ -37,7 +37,7 @@ const testRegistry = createTestRegistry();
 
 // ── Test Helpers ─────────────────────────────────────────────────────
 
-function makeApp(overrides: Partial<ResolvedApp> = {}): ResolvedApp {
+function makeApp(overrides: Partial<ResolvedMcpServer> = {}): ResolvedMcpServer {
   return {
     name: "@test/app",
     version: "1.0.0",
@@ -62,7 +62,7 @@ function makeRole(overrides: Partial<ResolvedRole> = {}): ResolvedRole {
       "@test/app": { allow: ["tool_a"], deny: [] },
     },
     tasks: [] as ResolvedTask[],
-    apps: [makeApp()],
+    mcp: [makeApp()],
     skills: [] as ResolvedSkill[],
     ...overrides,
   };

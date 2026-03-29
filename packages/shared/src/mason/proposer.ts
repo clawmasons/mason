@@ -72,7 +72,7 @@ export function proposeRoleMd(
 
   // MCP Servers with least-privilege permissions
   if (scanResult.mcpServers.length > 0) {
-    frontmatter.mcp_servers = scanResult.mcpServers.map((server) => {
+    frontmatter.mcp = scanResult.mcpServers.map((server) => {
       const entry: Record<string, unknown> = {
         name: server.name,
         tools: {

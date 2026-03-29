@@ -11,9 +11,9 @@ export interface DiscoveredPackage {
 }
 
 /**
- * A fully-resolved app (MCP server) in the dependency graph.
+ * A fully-resolved MCP server in the dependency graph.
  */
-export interface ResolvedApp {
+export interface ResolvedMcpServer {
   name: string;
   version: string;
   transport: "stdio" | "sse" | "streamable-http";
@@ -99,7 +99,7 @@ export interface ResolvedRole {
   aptPackages?: string[];
   npmPackages?: string[];
   tasks: ResolvedTask[];
-  apps: ResolvedApp[];
+  mcp: ResolvedMcpServer[];
   skills: ResolvedSkill[];
 }
 

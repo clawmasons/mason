@@ -449,7 +449,7 @@ function copyProxyBundle(dockerDir: string): void {
  * Synthesize npm packages from a Role's inline apps and role config
  * into the Docker build node_modules.
  *
- * When roles define `mcp_servers` inline (native .claude format) instead of
+ * When roles define `mcp` inline (native .claude format) instead of
  * referencing npm workspace packages, the proxy inside Docker has no packages
  * to discover. This function bridges the gap by writing synthetic package.json
  * files that `discoverPackages` / `resolveRolePackage` can find at runtime.
@@ -465,8 +465,8 @@ export function synthesizeRolePackages(
 ): void {
   const nodeModulesDir = path.join(dockerDir, "node_modules");
 
-  // Synthesize app packages from inline mcp_servers
-  for (const app of role.apps) {
+  // Synthesize app packages from inline mcp servers
+  for (const app of role.mcp) {
     const pkgDir = path.join(nodeModulesDir, app.name);
     if (fs.existsSync(pkgDir)) continue;
 
@@ -499,7 +499,7 @@ export function synthesizeRolePackages(
 
   // Build permissions map from inline apps
   const permissions: Record<string, { allow: string[]; deny: string[] }> = {};
-  for (const app of role.apps) {
+  for (const app of role.mcp) {
     permissions[app.name] = {
       allow: [...(app.tools?.allow ?? [])],
       deny: [...(app.tools?.deny ?? [])],

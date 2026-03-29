@@ -25,7 +25,7 @@ export const skillRefSchema = z.object({
   ref: z.string().optional(),
 });
 
-export const appConfigSchema = z.object({
+export const mcpServerConfigSchema = z.object({
   name: z.string(),
   package: z.string().optional(),
   transport: z
@@ -104,7 +104,7 @@ export const roleSchema = z.object({
   instructions: z.string(),
   type: z.enum(["project", "supervisor"]).optional().default("project"),
   tasks: z.array(taskRefSchema).optional().default([]),
-  apps: z.array(appConfigSchema).optional().default([]),
+  mcp: z.array(mcpServerConfigSchema).optional().default([]),
   skills: z.array(skillRefSchema).optional().default([]),
   sources: z.array(z.string()).optional().default([]),
   container: containerRequirementsSchema.optional().default({}),
