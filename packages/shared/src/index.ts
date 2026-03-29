@@ -31,6 +31,7 @@ export {
   governanceConfigSchema,
   resourceFileSchema,
   roleSourceSchema,
+  roleConfigSchema,
   roleSchema,
 } from "./schemas/index.js";
 
@@ -47,6 +48,7 @@ export type {
   RoleSource,
   MountConfig,
   ToolPermissions,
+  RoleConfig,
 } from "./types/role.js";
 
 // Resolved types
@@ -100,6 +102,11 @@ export {
   expandSkillWildcards,
   WildcardPatternError,
   resolveRoleFields,
+  expandRoleWildcards,
+  mergeRoles,
+  resolveIncludes,
+  RoleIncludeError,
+  type ExpandWildcardsFn,
 } from "./role/index.js";
 
 // Session storage
