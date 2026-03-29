@@ -67,7 +67,7 @@ const GENERIC_FIELD_MAPPING: DialectEntry = {
   directory: "",
   fieldMapping: {
     tasks: "tasks",
-    apps: "apps",
+    mcp: "mcp",
     skills: "skills",
   },
 };
@@ -129,7 +129,7 @@ export async function readPackagedRole(packagePath: string): Promise<Role> {
 
   // 6. Normalize fields using dialect mapping
   const tasks = normalizeField(frontmatter, dialect.fieldMapping.tasks);
-  const apps = normalizeApps(frontmatter, dialect.fieldMapping.apps);
+  const mcp = normalizeMcp(frontmatter, dialect);
   const skills = normalizeSkills(
     frontmatter,
     dialect.fieldMapping.skills,
@@ -159,7 +159,7 @@ export async function readPackagedRole(packagePath: string): Promise<Role> {
     instructions: body,
     type: frontmatter.type as string | undefined,
     tasks,
-    apps,
+    mcp,
     skills,
     container,
     governance,
@@ -261,13 +261,20 @@ function normalizeField(
 }
 
 /**
- * Normalize apps field.
+ * Normalize MCP servers field.
  */
-function normalizeApps(
+function normalizeMcp(
   frontmatter: Record<string, unknown>,
-  fieldName: string,
+  dialect: DialectEntry,
 ): Array<Record<string, unknown>> {
-  const raw = frontmatter[fieldName];
+  const fieldName = dialect.fieldMapping.mcp;
+  let raw = frontmatter[fieldName];
+
+  // Backwards compat: accept old "mcp_servers" field
+  if (!raw && fieldName !== "mcp_servers" && frontmatter["mcp_servers"]) {
+    raw = frontmatter["mcp_servers"];
+  }
+
   if (!raw) return [];
   if (!Array.isArray(raw)) return [];
 

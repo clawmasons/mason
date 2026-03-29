@@ -1,24 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { appConfigSchema } from "@clawmasons/shared";
+import { mcpServerConfigSchema } from "@clawmasons/shared";
 
-describe("appConfigSchema — location field", () => {
+describe("mcpServerConfigSchema — location field", () => {
   it("accepts location: 'proxy'", () => {
-    const result = appConfigSchema.parse({ name: "test", location: "proxy" });
+    const result = mcpServerConfigSchema.parse({ name: "test", location: "proxy" });
     expect(result.location).toBe("proxy");
   });
 
   it("accepts location: 'host'", () => {
-    const result = appConfigSchema.parse({ name: "test", location: "host" });
+    const result = mcpServerConfigSchema.parse({ name: "test", location: "host" });
     expect(result.location).toBe("host");
   });
 
   it("defaults location to 'proxy' when omitted", () => {
-    const result = appConfigSchema.parse({ name: "test" });
+    const result = mcpServerConfigSchema.parse({ name: "test" });
     expect(result.location).toBe("proxy");
   });
 
   it("rejects invalid location values", () => {
-    const result = appConfigSchema.safeParse({
+    const result = mcpServerConfigSchema.safeParse({
       name: "test",
       location: "invalid",
     });
@@ -26,7 +26,7 @@ describe("appConfigSchema — location field", () => {
   });
 
   it("preserves location through full app config", () => {
-    const result = appConfigSchema.parse({
+    const result = mcpServerConfigSchema.parse({
       name: "xcode-sim",
       transport: "stdio",
       command: "npx",

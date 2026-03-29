@@ -106,7 +106,7 @@ describe("proposeRoleMd", () => {
       }),
     );
 
-    expect(result).toContain("mcp_servers:");
+    expect(result).toContain("mcp:");
     expect(result).toContain("name: github");
     expect(result).toContain("allow: []");
   });
@@ -196,9 +196,9 @@ describe("proposeRoleMd", () => {
     expect(parsed.tasks[0].name).toBe("deploy");
     expect(parsed.skills).toHaveLength(1);
     expect(parsed.skills[0].name).toBe("my-skill");
-    expect(parsed.apps).toHaveLength(1);
-    expect(parsed.apps[0].name).toBe("github");
-    expect(parsed.apps[0].tools.allow).toEqual([]);
+    expect(parsed.mcp).toHaveLength(1);
+    expect(parsed.mcp[0].name).toBe("github");
+    expect(parsed.mcp[0].tools.allow).toEqual([]);
     expect(parsed.governance.credentials).toContain("GITHUB_TOKEN");
     expect(parsed.instructions).toContain("You are a code reviewer.");
   });

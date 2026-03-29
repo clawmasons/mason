@@ -116,7 +116,11 @@ Update all test files in `packages/shared/tests/` to use new names:
    - in `../mason-extensions`, run `npm run test`
    - in `../mason-extensions`, run `npm run test:e2e`
 
-**Not Implemented Yet**
+**Implemented** — Branch: `shared-mcp-rename`
+- [Proposal](../../changes/archive/2026-03-29-shared-mcp-rename/proposal.md)
+- [Design](../../changes/archive/2026-03-29-shared-mcp-rename/design.md)
+- [Tasks](../../changes/archive/2026-03-29-shared-mcp-rename/tasks.md)
+- [Spec](../../changes/archive/2026-03-29-shared-mcp-rename/spec.md)
 
 ---
 

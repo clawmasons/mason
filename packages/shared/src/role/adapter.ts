@@ -12,7 +12,7 @@
 
 import type {
   Role,
-  AppConfig,
+  McpServerConfig,
   TaskRef,
   SkillRef,
 } from "../types/role.js";
@@ -20,7 +20,7 @@ import type {
   ResolvedAgent,
   ResolvedRole,
   ResolvedTask,
-  ResolvedApp,
+  ResolvedMcpServer,
   ResolvedSkill,
 } from "../types.js";
 import { getDialect } from "./dialect-registry.js";
@@ -85,9 +85,9 @@ export function adaptRoleToResolvedAgent(
 // ---------------------------------------------------------------------------
 
 function buildResolvedRole(role: Role, version: string): ResolvedRole {
-  const permissions = aggregatePermissions(role.apps);
+  const permissions = aggregatePermissions(role.mcp);
   const tasks = role.tasks.map((t) => adaptTask(t));
-  const apps = role.apps.map(adaptApp);
+  const mcp = role.mcp.map(adaptMcpServer);
   const skills = role.skills.map(adaptSkill);
 
   const resolvedRole: ResolvedRole = {
@@ -98,7 +98,7 @@ function buildResolvedRole(role: Role, version: string): ResolvedRole {
     risk: role.governance.risk ?? "LOW",
     permissions,
     tasks,
-    apps,
+    mcp,
     skills,
   };
 
@@ -143,14 +143,14 @@ function buildResolvedRole(role: Role, version: string): ResolvedRole {
  * that ResolvedRole expects: { [appName]: { allow: string[], deny: string[] } }
  */
 function aggregatePermissions(
-  apps: AppConfig[],
+  mcp: McpServerConfig[],
 ): Record<string, { allow: string[]; deny: string[] }> {
   const permissions: Record<string, { allow: string[]; deny: string[] }> = {};
 
-  for (const app of apps) {
-    permissions[app.name] = {
-      allow: [...(app.tools?.allow ?? [])],
-      deny: [...(app.tools?.deny ?? [])],
+  for (const server of mcp) {
+    permissions[server.name] = {
+      allow: [...(server.tools?.allow ?? [])],
+      deny: [...(server.tools?.deny ?? [])],
     };
   }
 
@@ -170,7 +170,7 @@ function adaptTask(task: TaskRef): ResolvedTask {
   };
 }
 
-function adaptApp(app: AppConfig): ResolvedApp {
+function adaptMcpServer(app: McpServerConfig): ResolvedMcpServer {
   return {
     name: app.name,
     version: "0.0.0",

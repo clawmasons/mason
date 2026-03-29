@@ -3,7 +3,7 @@ import type {
   roleSchema,
   roleMetadataSchema,
   taskRefSchema,
-  appConfigSchema,
+  mcpServerConfigSchema,
   skillRefSchema,
   containerRequirementsSchema,
   governanceConfigSchema,
@@ -16,7 +16,7 @@ import type {
 export type Role = z.infer<typeof roleSchema>;
 export type RoleMetadata = z.infer<typeof roleMetadataSchema>;
 export type TaskRef = z.infer<typeof taskRefSchema>;
-export type AppConfig = z.infer<typeof appConfigSchema>;
+export type McpServerConfig = z.infer<typeof mcpServerConfigSchema>;
 export type SkillRef = z.infer<typeof skillRefSchema>;
 export type ContainerRequirements = z.infer<typeof containerRequirementsSchema>;
 export type GovernanceConfig = z.infer<typeof governanceConfigSchema>;

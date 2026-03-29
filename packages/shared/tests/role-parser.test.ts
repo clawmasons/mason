@@ -138,7 +138,7 @@ describe("dialectRegistry", () => {
     expect(claude).toBeDefined();
     expect(claude!.directory).toBe("claude");
     expect(claude!.fieldMapping.tasks).toBe("commands");
-    expect(claude!.fieldMapping.apps).toBe("mcp_servers");
+    expect(claude!.fieldMapping.mcp).toBe("mcp");
     expect(claude!.fieldMapping.skills).toBe("skills");
   });
 
@@ -165,7 +165,7 @@ describe("dialectRegistry", () => {
     registerDialect({
       name: "test-dialect",
       directory: "testdir",
-      fieldMapping: { tasks: "actions", apps: "servers", skills: "modules" },
+      fieldMapping: { tasks: "actions", mcp: "servers", skills: "modules" },
     });
     const d = getDialect("test-dialect");
     expect(d).toBeDefined();
@@ -177,7 +177,7 @@ describe("dialectRegistry", () => {
     const aider = getDialect("aider");
     expect(aider).toBeDefined();
     expect(aider!.fieldMapping.tasks).toBe("conventions");
-    expect(aider!.fieldMapping.apps).toBe("mcp_servers");
+    expect(aider!.fieldMapping.mcp).toBe("mcp");
   });
 });
 
@@ -412,11 +412,11 @@ describe("readMaterializedRole — Claude Code", () => {
     expect(role.tasks[0].name).toBe("define-change");
     expect(role.tasks[1].name).toBe("review-change");
 
-    // Apps (normalized from "mcp_servers")
-    expect(role.apps).toHaveLength(1);
-    expect(role.apps[0].name).toBe("github");
-    expect(role.apps[0].tools.allow).toContain("create_issue");
-    expect(role.apps[0].tools.deny).toContain("delete_repo");
+    // MCP servers (normalized from "mcp_servers" via backwards-compat fallback)
+    expect(role.mcp).toHaveLength(1);
+    expect(role.mcp[0].name).toBe("github");
+    expect(role.mcp[0].tools.allow).toContain("create_issue");
+    expect(role.mcp[0].tools.deny).toContain("delete_repo");
 
     // Skills
     expect(role.skills).toHaveLength(1);
@@ -499,9 +499,9 @@ describe("readMaterializedRole — Codex", () => {
     expect(role.tasks[0].name).toBe("review-diff");
     expect(role.tasks[1].name).toBe("suggest-fixes");
 
-    // Apps from mcp_servers
-    expect(role.apps).toHaveLength(1);
-    expect(role.apps[0].name).toBe("github");
+    // MCP servers from mcp_servers (backwards-compat fallback)
+    expect(role.mcp).toHaveLength(1);
+    expect(role.mcp[0].name).toBe("github");
 
     // Source
     expect(role.source.agentDialect).toBe("codex");
@@ -670,7 +670,7 @@ Do minimal things.`,
     expect(role.metadata.description).toBe("A minimal role");
     expect(role.instructions).toBe("Do minimal things.");
     expect(role.tasks).toEqual([]);
-    expect(role.apps).toEqual([]);
+    expect(role.mcp).toEqual([]);
     expect(role.skills).toEqual([]);
     expect(role.resources).toEqual([]);
     expect(role.governance.risk).toBe("LOW");

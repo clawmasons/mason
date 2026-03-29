@@ -348,7 +348,7 @@ describe("scanProject", () => {
       registerDialect({
         name: "test-kebab-agent",
         directory: "testkebab",
-        fieldMapping: { tasks: "prompts", apps: "mcp_servers", skills: "skills" },
+        fieldMapping: { tasks: "prompts", mcp: "mcp", skills: "skills" },
         taskConfig: {
           projectFolder: ".testkebab/prompts",
           nameFormat: "{scopeKebab}-{taskName}.md",
