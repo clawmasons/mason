@@ -1,7 +1,8 @@
 import type { Command } from "commander";
+import { resolve } from "node:path";
 import { Readable, Writable } from "node:stream";
 import { AgentSideConnection, ndJsonStream } from "@agentclientprotocol/sdk";
-import { createMasonAcpAgent } from "./acp-agent.js";
+import { createMasonAcpAgent, setPinnedArgs } from "./acp-agent.js";
 import { closeAcpLogger, acpStartupLog } from "./acp-logger.js";
 
 /**
@@ -16,8 +17,18 @@ export function registerAcpCommand(program: Command): void {
   program
     .command("acp")
     .description("Start an ACP (Agent Client Protocol) agent over stdio")
-    .action(async () => {
+    .option("--agent <name>", "Pin agent for all sessions on this connection")
+    .option("--role <name>", "Pin role for all sessions on this connection")
+    .option("--source <path>", "Pin source directory for all sessions on this connection")
+    .action(async (opts: { agent?: string; role?: string; source?: string }) => {
       acpStartupLog("acp command action entered", { pid: process.pid, argv: process.argv });
+
+      // Store pinned args before creating the connection
+      setPinnedArgs({
+        agent: opts.agent,
+        role: opts.role,
+        source: opts.source ? resolve(process.cwd(), opts.source) : undefined,
+      });
 
       // Redirect console output to stderr so stdout is reserved for ACP messages
       const stderrConsole = new console.Console(process.stderr, process.stderr);

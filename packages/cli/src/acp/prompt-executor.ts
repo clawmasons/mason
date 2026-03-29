@@ -36,6 +36,7 @@ export interface ExecutePromptOptions {
   text: string;
   cwd: string;
   signal?: AbortSignal;
+  source?: string;
 }
 
 export interface ExecutePromptResult {
@@ -55,7 +56,7 @@ export interface ExecutePromptResult {
  * Throws on non-zero exit codes (unless aborted).
  */
 export function executePrompt(options: ExecutePromptOptions): Promise<ExecutePromptResult> {
-  const { agent, role, text, cwd, signal } = options;
+  const { agent, role, text, cwd, signal, source } = options;
   const masonBin = getMasonBinPath();
   acpLog("executePrompt: resolved mason bin", { masonBin });
 
@@ -63,6 +64,7 @@ export function executePrompt(options: ExecutePromptOptions): Promise<ExecutePro
     "run",
     "--agent", agent,
     "--role", role,
+    ...(source ? ["--source", source] : []),
     "-p", text,
   ];
   acpLog("executePrompt: spawning", { bin: masonBin, args, cwd });
@@ -123,6 +125,7 @@ export interface ExecutePromptStreamingOptions {
   text: string;
   cwd: string;
   signal?: AbortSignal;
+  source?: string;
   onSessionUpdate: (update: Record<string, unknown>) => void;
   masonSessionId?: string;  // When set, use --resume instead of --agent/--role
 }
@@ -149,13 +152,14 @@ export interface ExecutePromptStreamingResult {
 export function executePromptStreaming(
   options: ExecutePromptStreamingOptions,
 ): Promise<ExecutePromptStreamingResult> {
-  const { agent, role, text, cwd, signal, onSessionUpdate, masonSessionId } = options;
+  const { agent, role, text, cwd, signal, source, onSessionUpdate, masonSessionId } = options;
   const masonBin = getMasonBinPath();
   acpLog("executePromptStreaming: resolved mason bin", { masonBin });
 
+  const sourceArgs = source ? ["--source", source] : [];
   const args = masonSessionId
-    ? ["run", "--resume", masonSessionId, "--json", text]
-    : ["run", "--agent", agent, "--role", role, "--json", text];
+    ? ["run", "--resume", masonSessionId, ...sourceArgs, "--json", text]
+    : ["run", "--agent", agent, "--role", role, ...sourceArgs, "--json", text];
   acpLog("executePromptStreaming: spawning", { bin: masonBin, args, cwd });
 
   return new Promise<ExecutePromptStreamingResult>((resolve, reject) => {

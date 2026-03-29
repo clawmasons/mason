@@ -242,4 +242,43 @@ describe("executePromptStreaming", () => {
       expect.objectContaining({ cwd: "/tmp/test" }),
     );
   });
+
+  it("includes --source in args when source is provided (new prompt)", async () => {
+    const opts = defaultOptions({ source: "/abs/path/src" });
+    const promise = executePromptStreaming(opts);
+    emitLines([]);
+
+    await promise;
+
+    expect(spawn).toHaveBeenCalledWith(
+      expect.any(String),
+      ["run", "--agent", "claude-code-agent", "--role", "project", "--source", "/abs/path/src", "--json", "hello world"],
+      expect.objectContaining({ cwd: "/tmp/test" }),
+    );
+  });
+
+  it("includes --source in args when source is provided (resume)", async () => {
+    const opts = defaultOptions({ source: "/abs/path/src", masonSessionId: "sess-123" });
+    const promise = executePromptStreaming(opts);
+    emitLines([]);
+
+    await promise;
+
+    expect(spawn).toHaveBeenCalledWith(
+      expect.any(String),
+      ["run", "--resume", "sess-123", "--source", "/abs/path/src", "--json", "hello world"],
+      expect.objectContaining({ cwd: "/tmp/test" }),
+    );
+  });
+
+  it("does not include --source when source is not provided", async () => {
+    const opts = defaultOptions();
+    const promise = executePromptStreaming(opts);
+    emitLines([]);
+
+    await promise;
+
+    const spawnArgs = (spawn as ReturnType<typeof vi.fn>).mock.calls[0][1] as string[];
+    expect(spawnArgs).not.toContain("--source");
+  });
 });
