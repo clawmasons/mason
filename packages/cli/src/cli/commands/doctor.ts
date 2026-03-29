@@ -402,7 +402,7 @@ function cleanup(
     try {
       // Try to stop any lingering containers for this session first
       try {
-        const cmd = `docker compose -f .mason/sessions/${sessionId}/docker-compose.yaml down 2>/dev/null`;
+        const cmd = `docker compose -f .mason/sessions/${sessionId}/docker-compose.yaml down --volumes 2>/dev/null`;
         logCmd(cmd);
         exec(cmd);
       } catch {

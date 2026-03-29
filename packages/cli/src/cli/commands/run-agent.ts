@@ -930,7 +930,7 @@ async function handleResume(
     }
   } catch { /* best-effort */ }
 
-  await execComposeCommand(composeFile, ["down"], { verbose: opts.verbose });
+  await execComposeCommand(composeFile, ["down", "--volumes"], { verbose: opts.verbose });
 
   console.log(`  Services stopped.`);
   console.log(`  Session retained at: .mason/sessions/${sessionId}/`);
@@ -1797,7 +1797,7 @@ async function runAgentInteractiveMode(
       }
     } catch { /* best-effort */ }
 
-    await execCompose(composeFile, ["down"], { verbose });
+    await execCompose(composeFile, ["down", "--volumes"], { verbose });
 
     console.log(`  Services stopped.`);
     console.log(`  Session retained at: .mason/sessions/${sessionId}/`);
@@ -1985,7 +1985,7 @@ async function runAgentJsonMode(
     // 9. Tear down
     console.log(`[json] Agent exited (code ${agentCode}). Tearing down...`);
     try { if (hostProxyHandle) await hostProxyHandle.stop(); } catch { /* best-effort */ }
-    await execCompose(composeFile, ["down"], { verbose: false });
+    await execCompose(composeFile, ["down", "--volumes"], { verbose: false });
 
     // 10. Restore console
     console.log = origLog;
@@ -2178,7 +2178,7 @@ async function runAgentPrintMode(
     // 9. Tear down
     console.log(`[print] Agent exited (code ${agentCode}). Tearing down...`);
     try { if (hostProxyHandle) await hostProxyHandle.stop(); } catch { /* best-effort */ }
-    await execCompose(composeFile, ["down"], { verbose: false });
+    await execCompose(composeFile, ["down", "--volumes"], { verbose: false });
 
     // 10. Restore console and output result
     console.log = origLog;
@@ -2418,7 +2418,7 @@ async function runAgentDevContainerMode(
     // 14. Tear down
     console.log(`\n  Tearing down services...`);
     try { await hostProxyHandle.stop(); } catch { /* best-effort */ }
-    await execCompose(composeFile, ["down"], { verbose });
+    await execCompose(composeFile, ["down", "--volumes"], { verbose });
     console.log(`  Services stopped.`);
     console.log(`  Session retained at: .mason/sessions/${sessionId}/`);
     console.log(`\n  dev-container session complete\n`);

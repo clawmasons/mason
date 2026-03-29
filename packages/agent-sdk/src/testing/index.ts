@@ -353,8 +353,7 @@ export function cleanupDockerSessions(workspaceDir: string): void {
     const composeFile = path.join(
       sessionsDir,
       sessionId,
-      "docker",
-      "docker-compose.yml",
+      "docker-compose.yaml",
     );
     if (fs.existsSync(composeFile)) {
       try {
@@ -402,8 +401,7 @@ export function testIfProcessAndDockerStopped(
     const composeFile = path.join(
       sessionsDir,
       sessionId,
-      "docker",
-      "docker-compose.yml",
+      "docker-compose.yaml",
     );
     if (!fs.existsSync(composeFile)) continue;
 
