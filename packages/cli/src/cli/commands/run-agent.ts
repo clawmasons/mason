@@ -2316,11 +2316,7 @@ async function runAgentDevContainerMode(
       agentConfigCredentials, agentArgs, initialPrompt, llmConfig,
     });
 
-    const { sessionId, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
-
-    // Derive compose project name for container name (VSCode attach)
-    const projectHash = crypto.createHash("sha256").update(projectDir).digest("hex").slice(0, 8);
-    const composeName = `mason-${projectHash}`;
+    const { sessionId, composeName, composeFile, relayToken, proxyServiceName, agentServiceName } = session;
     const containerName = deriveContainerName(composeName, agentServiceName);
 
     console.log(`  Session: ${sessionId}`);

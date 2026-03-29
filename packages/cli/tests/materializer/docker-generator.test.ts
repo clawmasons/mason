@@ -458,6 +458,7 @@ describe("generateSessionComposeYml", () => {
     proxyToken: "test-proxy-token",
     relayToken: "test-cred-token",
     volumeMasks: generateVolumeMasks([".mason/", ".claude/", ".env"]),
+    sessionId: "abc12345",
     sessionDir: "/project/.mason/sessions/abc12345",
     logsDir: "/project/.mason/sessions/abc12345/logs",
     masonLogsDir: "/project/.mason/logs",

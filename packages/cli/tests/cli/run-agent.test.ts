@@ -369,6 +369,7 @@ describe("generateSessionComposeYml (run-agent scenarios)", () => {
     roleName: "writer",
     proxyToken: "test-token-abc",
     relayToken: "cred-token-xyz",
+    sessionId: "abc123",
     sessionDir: "/projects/my-project/.mason/sessions/abc123",
     logsDir: "/projects/my-project/.mason/sessions/abc123/logs",
     masonLogsDir: "/projects/my-project/.mason/logs",

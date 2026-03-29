@@ -462,6 +462,8 @@ export interface SessionComposeOptions {
   verbose?: boolean;
   /** Short agent identifier (e.g. "pi", "claude") for Docker image naming. */
   agentShortName?: string;
+  /** Session ID — included in compose project name for per-session isolation. */
+  sessionId: string;
 }
 
 /**
@@ -507,9 +509,9 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
     agentShortName,
   } = opts;
 
-  // Unique compose project name derived from project directory
+  // Unique compose project name derived from project directory + session ID
   const projectHash = crypto.createHash("sha256").update(projectDir).digest("hex").slice(0, 8);
-  const composeName = `mason-${projectHash}`;
+  const composeName = `mason-${projectHash}-${opts.sessionId}`;
 
   // Compute relative paths from session directory.
   // Prefix with ./ so Docker Compose treats them as bind mounts (not named volumes).
@@ -753,6 +755,8 @@ export interface CreateSessionOptions {
 export interface SessionResult {
   /** Unique session ID. */
   sessionId: string;
+  /** Docker Compose project name (unique per session). */
+  composeName: string;
   /** Absolute path to the session directory. */
   sessionDir: string;
   /** Absolute path to the compose file. */
@@ -848,6 +852,7 @@ export function createSessionDirectory(
   // Generate compose file
   const composeContent = generateSessionComposeYml({
     ...opts,
+    sessionId,
     roleName,
     proxyToken,
     relayToken,
@@ -868,8 +873,12 @@ export function createSessionDirectory(
   const proxyServiceName = `proxy-${roleName}`;
   const agentServiceName = `agent-${roleName}`;
 
+  const projectHash = crypto.createHash("sha256").update(projectDir).digest("hex").slice(0, 8);
+  const composeName = `mason-${projectHash}-${sessionId}`;
+
   return {
     sessionId,
+    composeName,
     sessionDir,
     composeFile,
     logsDir,
