@@ -79,7 +79,13 @@ Implement PRD §5 — accept either `tasks` or `commands` as a field name in ROL
 - `npx vitest run packages/cli/tests/`
 - In `../mason-extensions`: `npm run lint && npm run build && npm run test`
 
-**Not Implemented Yet**
+**Implemented**
+
+**Artifacts:**
+- Proposal: [openspec/changes/archive/2026-03-29-tasks-commands-field-aliasing/proposal.md](../../changes/archive/2026-03-29-tasks-commands-field-aliasing/proposal.md)
+- Design: [openspec/changes/archive/2026-03-29-tasks-commands-field-aliasing/design.md](../../changes/archive/2026-03-29-tasks-commands-field-aliasing/design.md)
+- Tasks: [openspec/changes/archive/2026-03-29-tasks-commands-field-aliasing/tasks.md](../../changes/archive/2026-03-29-tasks-commands-field-aliasing/tasks.md)
+- Spec: [openspec/changes/archive/2026-03-29-tasks-commands-field-aliasing/specs/role-md-parser-dialect-registry/spec.md](../../changes/archive/2026-03-29-tasks-commands-field-aliasing/specs/role-md-parser-dialect-registry/spec.md)
 
 ---
 
