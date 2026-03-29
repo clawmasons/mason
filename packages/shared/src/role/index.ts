@@ -35,3 +35,16 @@ export { adaptRoleToResolvedAgent, AdapterError } from "./adapter.js";
 
 // Discovery
 export { discoverRoles, resolveRole, RoleDiscoveryError } from "./discovery.js";
+
+// Wildcard expansion
+export {
+  isWildcardPattern,
+  validatePattern,
+  matchWildcard,
+  expandTaskWildcards,
+  expandSkillWildcards,
+  WildcardPatternError,
+} from "./wildcard.js";
+
+// Role field resolution
+export { resolveRoleFields } from "./resolve-role-fields.js";

@@ -93,6 +93,13 @@ export {
   discoverRoles,
   resolveRole,
   RoleDiscoveryError,
+  isWildcardPattern,
+  validatePattern,
+  matchWildcard,
+  expandTaskWildcards,
+  expandSkillWildcards,
+  WildcardPatternError,
+  resolveRoleFields,
 } from "./role/index.js";
 
 // Session storage
