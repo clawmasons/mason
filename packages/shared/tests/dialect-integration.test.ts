@@ -35,7 +35,7 @@ describe("Pi agent dialect integration", () => {
   it("uses custom tasks field mapping (prompts)", () => {
     const entry = getDialect("pi-coding-agent");
     expect(entry!.fieldMapping.tasks).toBe("prompts");
-    expect(entry!.fieldMapping.apps).toBe("mcp_servers");
+    expect(entry!.fieldMapping.mcp).toBe("mcp");
     expect(entry!.fieldMapping.skills).toBe("skills");
   });
 
@@ -88,7 +88,7 @@ describe("Claude agent dialect integration", () => {
   it("uses custom tasks field mapping (commands)", () => {
     const entry = getDialect("claude-code-agent");
     expect(entry!.fieldMapping.tasks).toBe("commands");
-    expect(entry!.fieldMapping.apps).toBe("mcp_servers");
+    expect(entry!.fieldMapping.mcp).toBe("mcp");
     expect(entry!.fieldMapping.skills).toBe("skills");
   });
 
@@ -166,7 +166,7 @@ describe("cross-dialect integration", () => {
     expect(entry).toBeDefined();
     expect(entry!.directory).toBe("acme");
     expect(entry!.fieldMapping.tasks).toBe("instructions");
-    expect(entry!.fieldMapping.apps).toBe("mcp_servers"); // default
+    expect(entry!.fieldMapping.mcp).toBe("mcp"); // default
     expect(entry!.taskConfig!.projectFolder).toBe(".acme/instructions");
     expect(entry!.skillConfig!.projectFolder).toBe(".acme/skills");
 

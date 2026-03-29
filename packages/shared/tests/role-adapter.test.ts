@@ -21,7 +21,7 @@ function minimalRole(overrides: Record<string, unknown> = {}): Role {
     },
     instructions: raw.instructions ?? "You are a test agent.",
     tasks: raw.tasks ?? [],
-    apps: raw.apps ?? [],
+    mcp: raw.mcp ?? [],
     skills: raw.skills ?? [],
     container: raw.container ?? {},
     governance: raw.governance ?? {},
@@ -44,7 +44,7 @@ function fullRole(): Role {
       { name: "define-change" },
       { name: "review-change", ref: "./tasks/review" },
     ],
-    apps: [
+    mcp: [
       {
         name: "github",
         transport: "streamable-http",
@@ -232,7 +232,7 @@ describe("adaptRoleToResolvedAgent", () => {
   describe("app mapping", () => {
     it("maps AppConfigs to ResolvedApps", () => {
       const role = minimalRole({
-        apps: [
+        mcp: [
           {
             name: "github",
             transport: "streamable-http",
@@ -244,7 +244,7 @@ describe("adaptRoleToResolvedAgent", () => {
         ],
       });
       const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
-      const app = agent.roles[0].apps[0];
+      const app = agent.roles[0].mcp[0];
 
       expect(app.name).toBe("github");
       expect(app.version).toBe("0.0.0");
@@ -258,26 +258,26 @@ describe("adaptRoleToResolvedAgent", () => {
 
     it("defaults transport to stdio", () => {
       const role = minimalRole({
-        apps: [{ name: "local-server" }],
+        mcp: [{ name: "local-server" }],
       });
       const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
-      expect(agent.roles[0].apps[0].transport).toBe("stdio");
+      expect(agent.roles[0].mcp[0].transport).toBe("stdio");
     });
 
     it("defaults location to proxy when omitted", () => {
       const role = minimalRole({
-        apps: [{ name: "github" }],
+        mcp: [{ name: "github" }],
       });
       const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
-      expect(agent.roles[0].apps[0].location).toBe("proxy");
+      expect(agent.roles[0].mcp[0].location).toBe("proxy");
     });
 
     it("preserves location: host when specified", () => {
       const role = minimalRole({
-        apps: [{ name: "xcode-sim", location: "host" }],
+        mcp: [{ name: "xcode-sim", location: "host" }],
       });
       const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
-      expect(agent.roles[0].apps[0].location).toBe("host");
+      expect(agent.roles[0].mcp[0].location).toBe("host");
     });
   });
 
@@ -286,7 +286,7 @@ describe("adaptRoleToResolvedAgent", () => {
   describe("permissions aggregation", () => {
     it("aggregates app tools into role permissions", () => {
       const role = minimalRole({
-        apps: [
+        mcp: [
           {
             name: "github",
             tools: { allow: ["create_issue", "list_repos"], deny: ["delete_repo"] },
@@ -312,7 +312,7 @@ describe("adaptRoleToResolvedAgent", () => {
 
     it("uses empty arrays for apps without tool declarations", () => {
       const role = minimalRole({
-        apps: [{ name: "bare-server" }],
+        mcp: [{ name: "bare-server" }],
       });
       const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
       expect(agent.roles[0].permissions["bare-server"]).toEqual({
@@ -501,11 +501,11 @@ describe("adaptRoleToResolvedAgent", () => {
       expect(resolvedRole.tasks[1].name).toBe("review-change");
 
       // Apps
-      expect(resolvedRole.apps).toHaveLength(2);
-      expect(resolvedRole.apps[0].name).toBe("github");
-      expect(resolvedRole.apps[0].transport).toBe("streamable-http");
-      expect(resolvedRole.apps[1].name).toBe("slack");
-      expect(resolvedRole.apps[1].command).toBe("node");
+      expect(resolvedRole.mcp).toHaveLength(2);
+      expect(resolvedRole.mcp[0].name).toBe("github");
+      expect(resolvedRole.mcp[0].transport).toBe("streamable-http");
+      expect(resolvedRole.mcp[1].name).toBe("slack");
+      expect(resolvedRole.mcp[1].command).toBe("node");
 
       // Skills
       expect(resolvedRole.skills).toHaveLength(2);
@@ -541,7 +541,7 @@ describe("adaptRoleToResolvedAgent", () => {
       expect(agent.runtimes).toEqual(["codex"]);
       // All other fields should be identical
       expect(agent.roles[0].tasks).toHaveLength(2);
-      expect(agent.roles[0].apps).toHaveLength(2);
+      expect(agent.roles[0].mcp).toHaveLength(2);
     });
 
     it("round-trips correctly for aider dialect", () => {
@@ -549,7 +549,7 @@ describe("adaptRoleToResolvedAgent", () => {
       const agent = adaptRoleToResolvedAgent(role, "aider");
       expect(agent.runtimes).toEqual(["aider"]);
       expect(agent.roles[0].tasks).toHaveLength(2);
-      expect(agent.roles[0].apps).toHaveLength(2);
+      expect(agent.roles[0].mcp).toHaveLength(2);
     });
   });
 });

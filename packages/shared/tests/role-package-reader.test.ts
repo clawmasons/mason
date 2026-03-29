@@ -79,7 +79,7 @@ tasks:
   - review-change
 skills:
   - '@acme/skill-prd-writing'
-apps:
+mcp:
   - name: github
     tools:
       allow:
@@ -164,10 +164,10 @@ describe("readPackagedRole — valid packages", () => {
     expect(role.tasks[1].name).toBe("review-change");
 
     // Apps
-    expect(role.apps).toHaveLength(1);
-    expect(role.apps[0].name).toBe("github");
-    expect(role.apps[0].tools.allow).toContain("create_issue");
-    expect(role.apps[0].tools.deny).toContain("delete_repo");
+    expect(role.mcp).toHaveLength(1);
+    expect(role.mcp[0].name).toBe("github");
+    expect(role.mcp[0].tools.allow).toContain("create_issue");
+    expect(role.mcp[0].tools.deny).toContain("delete_repo");
 
     // Skills
     expect(role.skills).toHaveLength(1);
@@ -205,8 +205,8 @@ describe("readPackagedRole — valid packages", () => {
     expect(role.tasks[0].name).toBe("define-change");
 
     // "mcp_servers" normalized to apps
-    expect(role.apps).toHaveLength(1);
-    expect(role.apps[0].name).toBe("github");
+    expect(role.mcp).toHaveLength(1);
+    expect(role.mcp[0].name).toBe("github");
 
     expect(role.source.type).toBe("package");
     expect(role.source.packageName).toBe("@acme/role-claude-prd");
@@ -307,7 +307,7 @@ Do minimal things.`,
     expect(role.metadata.description).toBe("A minimal role");
     expect(role.instructions).toBe("Do minimal things.");
     expect(role.tasks).toEqual([]);
-    expect(role.apps).toEqual([]);
+    expect(role.mcp).toEqual([]);
     expect(role.skills).toEqual([]);
     expect(role.source.type).toBe("package");
     expect(role.source.packageName).toBe("minimal-role");
@@ -330,7 +330,7 @@ tasks:
   - task-b
 skills:
   - '@acme/skill-x'
-apps:
+mcp:
   - name: server-a
     tools:
       allow:
@@ -384,7 +384,7 @@ Instructions for the role.`;
     expect(pkgRole.metadata).toEqual(localRole.metadata);
     expect(pkgRole.instructions).toBe(localRole.instructions);
     expect(pkgRole.tasks).toEqual(localRole.tasks);
-    expect(pkgRole.apps).toEqual(localRole.apps);
+    expect(pkgRole.mcp).toEqual(localRole.mcp);
     expect(pkgRole.governance.risk).toBe(localRole.governance.risk);
     expect(pkgRole.governance.credentials).toEqual(localRole.governance.credentials);
 

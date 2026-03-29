@@ -66,7 +66,7 @@ export async function readMaterializedRole(rolePath: string): Promise<Role> {
 
   // Normalize fields using dialect mapping
   const tasks = normalizeTasks(frontmatter, dialect);
-  const apps = normalizeApps(frontmatter, dialect);
+  const mcp = normalizeMcp(frontmatter, dialect);
   const skills = normalizeSkills(frontmatter, dialect, roleDir);
 
   // Container requirements (pass-through, no normalization needed)
@@ -92,7 +92,7 @@ export async function readMaterializedRole(rolePath: string): Promise<Role> {
     instructions: body,
     type: frontmatter.type as string | undefined,
     tasks,
-    apps,
+    mcp,
     skills,
     sources,
     container,
@@ -252,16 +252,21 @@ function normalizeTasks(
 }
 
 /**
- * Normalize the dialect-specific apps field.
- * All dialects currently use mcp_servers.
+ * Normalize the dialect-specific MCP servers field.
  * Returns raw objects — Zod validates and applies defaults.
  */
-function normalizeApps(
+function normalizeMcp(
   frontmatter: Record<string, unknown>,
   dialect: DialectEntry,
 ): Array<Record<string, unknown>> {
-  const fieldName = dialect.fieldMapping.apps;
-  const raw = frontmatter[fieldName];
+  const fieldName = dialect.fieldMapping.mcp;
+  let raw = frontmatter[fieldName];
+
+  // Backwards compat: accept old "mcp_servers" field
+  if (!raw && fieldName !== "mcp_servers" && frontmatter["mcp_servers"]) {
+    raw = frontmatter["mcp_servers"];
+  }
+
   if (!raw) return [];
 
   if (!Array.isArray(raw)) return [];

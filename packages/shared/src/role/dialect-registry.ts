@@ -4,7 +4,7 @@
  * Each supported agent runtime uses its own vocabulary in ROLE.md frontmatter.
  * The registry normalizes these to generic ROLE_TYPES field names:
  *   - tasks (Claude: commands, Codex: instructions, Aider: conventions)
- *   - apps (all: mcp_servers)
+ *   - mcp (all: mcp)
  *   - skills (all: skills)
  *
  * New runtimes are registered by calling `registerDialect()`.
@@ -15,8 +15,8 @@ import type { AgentTaskConfig, AgentSkillConfig } from "../types.js";
 export interface DialectFieldMapping {
   /** Agent-specific field name for tasks (e.g., "commands") */
   tasks: string;
-  /** Agent-specific field name for apps (e.g., "mcp_servers") */
-  apps: string;
+  /** Agent-specific field name for MCP servers (e.g., "mcp") */
+  mcp: string;
   /** Agent-specific field name for skills (e.g., "skills") */
   skills: string;
 }
@@ -115,7 +115,7 @@ export interface AgentDialectInfo {
   /** ROLE.md frontmatter field name overrides. */
   dialectFields?: {
     tasks?: string;
-    apps?: string;
+    mcp?: string;
     skills?: string;
   };
   /** Task file layout config. */
@@ -137,7 +137,7 @@ export function registerAgentDialect(info: AgentDialectInfo): void {
     directory: info.dialect,
     fieldMapping: {
       tasks: info.dialectFields?.tasks ?? "tasks",
-      apps: info.dialectFields?.apps ?? "mcp_servers",
+      mcp: info.dialectFields?.mcp ?? "mcp",
       skills: info.dialectFields?.skills ?? "skills",
     },
     taskConfig: info.tasks,
@@ -154,7 +154,7 @@ registerDialect({
   directory: "codex",
   fieldMapping: {
     tasks: "instructions",
-    apps: "mcp_servers",
+    mcp: "mcp",
     skills: "skills",
   },
 });
@@ -164,7 +164,7 @@ registerDialect({
   directory: "aider",
   fieldMapping: {
     tasks: "conventions",
-    apps: "mcp_servers",
+    mcp: "mcp",
     skills: "skills",
   },
 });
@@ -175,7 +175,7 @@ registerDialect({
   directory: "mason",
   fieldMapping: {
     tasks: "tasks",
-    apps: "mcp_servers",
+    mcp: "mcp",
     skills: "skills",
   },
   taskConfig: {
