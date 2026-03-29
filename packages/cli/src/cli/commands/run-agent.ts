@@ -9,7 +9,7 @@ import { checkDockerCompose } from "./docker-utils.js";
 
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedMcpServer, Role, McpServerConfig, TaskRef, SkillRef } from "@clawmasons/shared";
-import { resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect, createSession as createMetaSession, readSession, resolveLatestSession, listSessions, updateSession } from "@clawmasons/shared";
+import { resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect, readMaterializedRole, resolveRoleFields, createSession as createMetaSession, readSession, resolveLatestSession, listSessions, updateSession } from "@clawmasons/shared";
 import { getAgentFromRegistry, getAgentFromRegistryWithAutoInstall, initRegistry, getAllRegisteredNames, BUILTIN_AGENTS, materializeForAgent } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig, readDefaultAgent, resolveAgentPackageName } from "@clawmasons/agent-sdk";
 import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.js";
@@ -1097,6 +1097,122 @@ export async function generateProjectRole(
   return role;
 }
 
+// ── Default Project Role Auto-Creation ──────────���─────────────────────
+
+/**
+ * ROLE.md template for auto-creation (PRD §4.3).
+ * The `{DIALECT_DIR}` placeholder is replaced at creation time with the
+ * agent's dialect directory name (e.g., "claude").
+ */
+const DEFAULT_PROJECT_ROLE_TEMPLATE = `---
+name: project
+type: project
+description: Default project role — includes all tasks and skills from sources
+
+# sources: which agent configuration directories to scan for tasks, skills, and MCP servers
+# Accepted values: claude, codex, pi, mason (or dot-prefixed: .claude, .codex, etc.)
+# Multiple sources merge with first-wins deduplication.
+sources:
+  - {DIALECT_DIR}
+
+# role:
+#   includes:
+#     - @clawmasons/role-configure-project
+
+# tasks (also accepts "commands"): task references to include from sources
+# Use "*" to include ALL tasks. Use scoped wildcards: "deploy/*" for all tasks under deploy/.
+# Use explicit names to restrict: ["review", "build"] includes only those two.
+# An empty list (tasks: []) includes nothing.
+tasks:
+  - "*"
+
+# skills: skill references to include from sources
+# Use "*" to include ALL skills. Use explicit names to restrict.
+# An empty list (skills: []) includes nothing.
+skills:
+  - "*"
+
+# mcp: MCP server configurations (must be listed explicitly)
+# mcp:
+#   - name: github
+#     tools:
+#       allow: ['create_issue', 'list_repos']
+#       deny: ['delete_repo']
+
+# container:
+#   packages:
+#     apt: []
+#     npm: []
+#     pip: []
+#   ignore:
+#     paths: []
+#   mounts: []
+
+# risk: LOW
+# credentials: []
+---
+
+Started within a container created by the mason project. We are using .mason/roles/project/ROLE.md to configure roles for this project.
+`;
+
+/**
+ * Create the default project ROLE.md on disk (PRD §4.2).
+ *
+ * Writes the template to `.mason/roles/project/ROLE.md` with the dialect
+ * directory name substituted (e.g., "claude"). Returns `true` on success,
+ * warns and returns `false` on any write error.
+ *
+ * @param projectDir - Absolute path to the project root
+ * @param dialectDir - Dialect directory name (e.g., "claude"), NOT the registry key
+ * @returns `true` if the file was created, `false` if creation failed
+ */
+export async function createDefaultProjectRole(
+  projectDir: string,
+  dialectDir: string,
+): Promise<boolean> {
+  const roleDir = path.join(projectDir, ".mason", "roles", "project");
+  const rolePath = path.join(roleDir, "ROLE.md");
+
+  try {
+    fs.mkdirSync(roleDir, { recursive: true });
+    const content = DEFAULT_PROJECT_ROLE_TEMPLATE.replace("{DIALECT_DIR}", dialectDir);
+    fs.writeFileSync(rolePath, content, "utf-8");
+    return true;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `Warning: Could not create default project role at .mason/roles/project/ROLE.md (${reason}). Using in-memory project role.`,
+    );
+    return false;
+  }
+}
+
+/**
+ * Load and resolve the project ROLE.md through the full pipeline (PRD §4.2).
+ *
+ * Reads `.mason/roles/project/ROLE.md` via `readMaterializedRole()`,
+ * optionally applies `--source` override, then runs `resolveRoleFields()`
+ * to expand wildcards and resolve includes.
+ *
+ * @param projectDir - Absolute path to the project root
+ * @param sourceOverride - Optional --source flag values (dialect registry keys)
+ * @returns Resolved Role object
+ */
+export async function loadAndResolveProjectRole(
+  projectDir: string,
+  sourceOverride?: string[],
+): Promise<Role> {
+  const rolePath = path.join(projectDir, ".mason", "roles", "project", "ROLE.md");
+  let role = await readMaterializedRole(rolePath);
+
+  // Apply --source override before wildcard expansion
+  if (sourceOverride) {
+    role = { ...role, sources: sourceOverride };
+  }
+
+  return resolveRoleFields(role, projectDir);
+}
+
 export function normalizeSourceFlags(sources: string[]): string[] {
   const normalized: string[] = [];
   for (const s of sources) {
@@ -1313,7 +1429,7 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
       ? normalizeSourceFlags(options.source)
       : undefined;
 
-    // Generate project role when no explicit role is provided
+    // Generate project role when no explicit role is provided (PRD §4.1-4.2)
     let preResolvedRole: Role | undefined;
     if (!role) {
       // Determine sources: --source flags take precedence, else derive from agent type
@@ -1334,7 +1450,23 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         return;
       }
 
-      preResolvedRole = await generateProjectRole(projectDir, effectiveSources);
+      const projectRolePath = path.join(projectDir, ".mason", "roles", "project", "ROLE.md");
+      if (fs.existsSync(projectRolePath)) {
+        // File exists → load via readMaterializedRole() + resolveRoleFields()
+        preResolvedRole = await loadAndResolveProjectRole(projectDir, sourceOverride);
+      } else {
+        // File doesn't exist → try to create it
+        const dialectEntry = getDialect(effectiveSources[0]);
+        const dialectDir = dialectEntry?.directory ?? effectiveSources[0];
+        const created = await createDefaultProjectRole(projectDir, dialectDir);
+        if (created) {
+          // Created successfully → load the new file
+          preResolvedRole = await loadAndResolveProjectRole(projectDir, sourceOverride);
+        } else {
+          // Write failed → warn, fall back to generateProjectRole()
+          preResolvedRole = await generateProjectRole(projectDir, effectiveSources);
+        }
+      }
     }
 
     // Effective role name: explicit role name or "project" for auto-generated
