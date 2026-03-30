@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -689,5 +689,124 @@ Instructions.`,
     );
     const role = await readMaterializedRole(rolePath);
     expect(role.metadata.name).toBe("dir-name-role");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tasks/commands field aliasing (PRD §5, tests 24-26)
+// ---------------------------------------------------------------------------
+
+describe("readMaterializedRole — tasks/commands aliasing", () => {
+  it("recognizes 'commands' as alias for 'tasks' in mason dialect (PRD test 24)", async () => {
+    // Mason dialect primary field is "tasks", but we write "commands" instead
+    const rolePath = await createRoleFile(
+      "mason",
+      "alias-test",
+      `---
+name: alias-test
+description: Tests commands alias in mason dialect
+commands:
+  - review
+  - build
+---
+
+Instructions.`,
+    );
+    const role = await readMaterializedRole(rolePath);
+
+    expect(role.tasks).toHaveLength(2);
+    expect(role.tasks[0].name).toBe("review");
+    expect(role.tasks[1].name).toBe("build");
+  });
+
+  it("uses primary field and warns when both tasks and commands are present (PRD test 25)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      // Mason dialect: primary is "tasks", alias is "commands"
+      // Both present — primary should win
+      const rolePath = await createRoleFile(
+        "mason",
+        "both-fields",
+        `---
+name: both-fields
+description: Tests both fields present
+tasks:
+  - from-primary
+commands:
+  - from-alias
+---
+
+Instructions.`,
+      );
+      const role = await readMaterializedRole(rolePath);
+
+      // Primary wins
+      expect(role.tasks).toHaveLength(1);
+      expect(role.tasks[0].name).toBe("from-primary");
+
+      // Warning emitted
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Both "tasks" and "commands"'),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("mason"),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("standard dialect field works without alias (PRD test 26 — regression guard)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      // Mason dialect with primary field "tasks" — no alias needed
+      const rolePath = await createRoleFile(
+        "mason",
+        "no-alias",
+        `---
+name: no-alias
+description: Tests standard field with no alias
+tasks:
+  - deploy
+  - test
+---
+
+Instructions.`,
+      );
+      const role = await readMaterializedRole(rolePath);
+
+      expect(role.tasks).toHaveLength(2);
+      expect(role.tasks[0].name).toBe("deploy");
+      expect(role.tasks[1].name).toBe("test");
+
+      // No warning emitted
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("recognizes 'tasks' as alias for 'commands' in Claude dialect (symmetric)", async () => {
+    // Claude dialect primary field is "commands", but we write "tasks" instead
+    const rolePath = await createRoleFile(
+      "claude",
+      "claude-alias",
+      `---
+name: claude-alias
+description: Tests tasks alias in Claude dialect
+tasks:
+  - review
+  - deploy
+---
+
+Instructions.`,
+    );
+    const role = await readMaterializedRole(rolePath);
+
+    expect(role.tasks).toHaveLength(2);
+    expect(role.tasks[0].name).toBe("review");
+    expect(role.tasks[1].name).toBe("deploy");
   });
 });

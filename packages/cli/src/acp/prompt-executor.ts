@@ -128,6 +128,7 @@ export interface ExecutePromptStreamingOptions {
   source?: string;
   onSessionUpdate: (update: Record<string, unknown>) => void;
   masonSessionId?: string;  // When set, use --resume instead of --agent/--role
+  sessionId?: string;       // When set, pass as MASON_SESSION_ID env var so runAgentJsonMode reuses this session
 }
 
 export interface ExecutePromptStreamingResult {
@@ -152,7 +153,7 @@ export interface ExecutePromptStreamingResult {
 export function executePromptStreaming(
   options: ExecutePromptStreamingOptions,
 ): Promise<ExecutePromptStreamingResult> {
-  const { agent, role, text, cwd, signal, source, onSessionUpdate, masonSessionId } = options;
+  const { agent, role, text, cwd, signal, source, onSessionUpdate, masonSessionId, sessionId } = options;
   const masonBin = getMasonBinPath();
   acpLog("executePromptStreaming: resolved mason bin", { masonBin });
 
@@ -170,9 +171,16 @@ export function executePromptStreaming(
       return;
     }
 
+    // Pass session ID via env var so runAgentJsonMode reuses the ACP session
+    const env = { ...process.env };
+    if (sessionId) {
+      env.MASON_SESSION_ID = sessionId;
+    }
+
     const child = spawn(masonBin, args, {
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
+      env,
     });
 
     // Read stdout line-by-line

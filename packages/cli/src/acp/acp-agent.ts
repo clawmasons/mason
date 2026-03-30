@@ -348,6 +348,7 @@ export function createMasonAcpAgent(conn: AgentSideConnection): Agent {
           cwd: session.cwd,
           signal: abortController.signal,
           source: session.source,
+          sessionId,  // Pass ACP session ID so mason run reuses this session
           onSessionUpdate: (update) => {
             // Forward each parsed NDJSON line as a session update to the editor
             void conn.sessionUpdate({

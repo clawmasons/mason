@@ -281,4 +281,26 @@ describe("executePromptStreaming", () => {
     const spawnArgs = (spawn as ReturnType<typeof vi.fn>).mock.calls[0][1] as string[];
     expect(spawnArgs).not.toContain("--source");
   });
+
+  it("sets MASON_SESSION_ID env var when sessionId is provided", async () => {
+    const opts = defaultOptions({ sessionId: "019d2b36-aaaa-7000-bbbb-ccccddddeeee" });
+    const promise = executePromptStreaming(opts);
+    emitLines([]);
+
+    await promise;
+
+    const spawnOpts = (spawn as ReturnType<typeof vi.fn>).mock.calls[0][2] as { env: Record<string, string> };
+    expect(spawnOpts.env.MASON_SESSION_ID).toBe("019d2b36-aaaa-7000-bbbb-ccccddddeeee");
+  });
+
+  it("does not set MASON_SESSION_ID env var when sessionId is not provided", async () => {
+    const opts = defaultOptions();
+    const promise = executePromptStreaming(opts);
+    emitLines([]);
+
+    await promise;
+
+    const spawnOpts = (spawn as ReturnType<typeof vi.fn>).mock.calls[0][2] as { env: Record<string, string> };
+    expect(spawnOpts.env.MASON_SESSION_ID).toBeUndefined();
+  });
 });

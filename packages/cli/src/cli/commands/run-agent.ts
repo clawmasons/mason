@@ -9,7 +9,7 @@ import { checkDockerCompose } from "./docker-utils.js";
 
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedMcpServer, Role, McpServerConfig, TaskRef, SkillRef } from "@clawmasons/shared";
-import { resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect, createSession as createMetaSession, readSession, resolveLatestSession, listSessions, updateSession } from "@clawmasons/shared";
+import { resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect, readMaterializedRole, resolveRoleFields, createSession as createMetaSession, readSession, resolveLatestSession, listSessions, updateSession } from "@clawmasons/shared";
 import { getAgentFromRegistry, getAgentFromRegistryWithAutoInstall, initRegistry, getAllRegisteredNames, BUILTIN_AGENTS, materializeForAgent } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig, readDefaultAgent, resolveAgentPackageName } from "@clawmasons/agent-sdk";
 import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.js";
@@ -789,10 +789,13 @@ async function handleResume(
   }
 
   // 6. Extract agent + role from session metadata
-  const { agent: agentType, role: roleName } = session;
+  const { role: roleName } = session;
 
   // Initialize agent registry so we can look up agent package
   await initRegistry(projectDir, getCliVersion());
+
+  // Resolve alias to canonical agent type (e.g., "claude" → "claude-code-agent")
+  const agentType = (await resolveAgentTypeWithAutoInstall(session.agent)) ?? session.agent;
 
   // 7. Resolve resume args from agent's resume config
   const agentPkg = getAgentFromRegistry(agentType);
@@ -912,15 +915,74 @@ async function handleResume(
     return;
   }
 
-  // Start agent interactively
-  console.log(`  Starting agent (${agentServiceName})...\n`);
-  const runArgs = ["run", "--rm", "--service-ports"];
-  if (!process.stdin.isTTY) {
-    runArgs.push("-T");
-  }
-  runArgs.push(agentServiceName);
+  // Start agent
+  let agentCode: number;
 
-  const agentCode = await runAgentWithOciRestart(composeFile, runArgs);
+  if (opts.isJsonMode) {
+    // JSON streaming mode: capture NDJSON output instead of interactive TTY
+    const sessionLogsDir = path.join(projectDir, ".mason", "logs");
+    fs.mkdirSync(sessionLogsDir, { recursive: true });
+    const fileLogger = createFileLogger(sessionLogsDir);
+
+    // Redirect console to file logger
+    const origLog = console.log.bind(console);
+    const origError = console.error.bind(console);
+    console.log = (...args: unknown[]) => fileLogger.log(...args);
+    console.error = (...args: unknown[]) => fileLogger.error(...args);
+
+    const agentPkg = getAgentFromRegistry(agentType);
+    const parseJsonStreamAsACP = agentPkg?.jsonMode?.parseJsonStreamAsACP;
+
+    let previousLine: string | undefined;
+    const runArgs = ["run", "--rm", "--service-ports", "-T", agentServiceName];
+    fileLogger.log(`[json-resume] Docker command: docker compose -f ${composeFile} ${runArgs.join(" ")}`);
+    const { code, stderr: composeStderr } = await execComposeRunWithStreamCapture(composeFile, runArgs, (line) => {
+      fileLogger.log(`[stream] ${line}`);
+      if (parseJsonStreamAsACP) {
+        const trimmed = line.trimStart();
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+          try {
+            const result = parseJsonStreamAsACP(line, previousLine);
+            if (result !== null) {
+              const updates = Array.isArray(result) ? result : [result];
+              for (const update of updates) {
+                const validation = validateAcpUpdate(update);
+                if (!validation.valid) {
+                  fileLogger.error(`[stream] ACP validation error: ${validation.errors?.join("; ")}`);
+                }
+                process.stdout.write(JSON.stringify(update) + "\n");
+              }
+            }
+          } catch (err) {
+            fileLogger.error(`[stream] parse error: ${err instanceof Error ? err.message : String(err)}`);
+          }
+          previousLine = line;
+        }
+      }
+    });
+    agentCode = code;
+
+    if (composeStderr) {
+      for (const line of composeStderr.split("\n")) {
+        if (line.trim()) fileLogger.log(`[stderr] ${line}`);
+      }
+    }
+
+    // Restore console
+    console.log = origLog;
+    console.error = origError;
+    fileLogger.close();
+  } else {
+    // Interactive mode (existing behavior)
+    console.log(`  Starting agent (${agentServiceName})...\n`);
+    const runArgs = ["run", "--rm", "--service-ports"];
+    if (!process.stdin.isTTY) {
+      runArgs.push("-T");
+    }
+    runArgs.push(agentServiceName);
+
+    agentCode = await runAgentWithOciRestart(composeFile, runArgs);
+  }
 
   // Tear down
   console.log(`\n  Agent exited (code ${agentCode}). Tearing down services...`);
@@ -1078,7 +1140,7 @@ export async function generateProjectRole(
       description: `Auto-generated from project's ${sourceNames} configuration`,
     },
     type: "project",
-    instructions: "",
+    instructions: `Started within a container created by the mason project. We are using .mason/roles/project/ROLE.md to configure roles for this project.\n\nPath mapping: host ${projectDir} → container /home/mason/workspace/project`,
     tasks,
     skills,
     mcp,
@@ -1090,10 +1152,129 @@ export async function generateProjectRole(
     },
     governance: { risk: "LOW", credentials: [] },
     resources: [],
+    role: { includes: [] },
     source: { type: "local", agentDialect: primaryDialect, path: path.join(projectDir, ".mason", "roles", "project") },
   };
 
   return role;
+}
+
+// ── Default Project Role Auto-Creation ──────────���─────────────────────
+
+/**
+ * ROLE.md template for auto-creation (PRD §4.3).
+ * The `{DIALECT_DIR}` placeholder is replaced at creation time with the
+ * agent's dialect directory name (e.g., "claude").
+ */
+const DEFAULT_PROJECT_ROLE_TEMPLATE = `---
+name: project
+type: project
+description: Default project role — includes all tasks and skills from sources
+
+# sources: which agent configuration directories to scan for tasks, skills, and MCP servers
+# Accepted values: claude, codex, pi, mason (or dot-prefixed: .claude, .codex, etc.)
+# Multiple sources merge with first-wins deduplication.
+sources:
+  - {DIALECT_DIR}
+
+# role:
+#   includes:
+#     - @clawmasons/role-configure-project
+
+# tasks (also accepts "commands"): task references to include from sources
+# Use "*" to include ALL tasks. Use scoped wildcards: "deploy/*" for all tasks under deploy/.
+# Use explicit names to restrict: ["review", "build"] includes only those two.
+# An empty list (tasks: []) includes nothing.
+tasks:
+  - "*"
+
+# skills: skill references to include from sources
+# Use "*" to include ALL skills. Use explicit names to restrict.
+# An empty list (skills: []) includes nothing.
+skills:
+  - "*"
+
+# mcp: MCP server configurations (must be listed explicitly)
+# mcp:
+#   - name: github
+#     tools:
+#       allow: ['create_issue', 'list_repos']
+#       deny: ['delete_repo']
+
+# container:
+#   packages:
+#     apt: []
+#     npm: []
+#     pip: []
+#   ignore:
+#     paths: []
+#   mounts: []
+
+# risk: LOW
+# credentials: []
+---
+
+Started within a container created by the mason project. We are using .mason/roles/project/ROLE.md to configure roles for this project.
+
+Path mapping: host {PROJECT_DIR} → container /home/mason/workspace/project
+`;
+
+/**
+ * Create the default project ROLE.md on disk (PRD §4.2).
+ *
+ * Writes the template to `.mason/roles/project/ROLE.md` with the dialect
+ * directory name substituted (e.g., "claude"). Returns `true` on success,
+ * warns and returns `false` on any write error.
+ *
+ * @param projectDir - Absolute path to the project root
+ * @param dialectDir - Dialect directory name (e.g., "claude"), NOT the registry key
+ * @returns `true` if the file was created, `false` if creation failed
+ */
+export async function createDefaultProjectRole(
+  projectDir: string,
+  dialectDir: string,
+): Promise<boolean> {
+  const roleDir = path.join(projectDir, ".mason", "roles", "project");
+  const rolePath = path.join(roleDir, "ROLE.md");
+
+  try {
+    fs.mkdirSync(roleDir, { recursive: true });
+    const content = DEFAULT_PROJECT_ROLE_TEMPLATE.replace("{DIALECT_DIR}", dialectDir).replace("{PROJECT_DIR}", projectDir);
+    fs.writeFileSync(rolePath, content, "utf-8");
+    return true;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `Warning: Could not create default project role at .mason/roles/project/ROLE.md (${reason}). Using in-memory project role.`,
+    );
+    return false;
+  }
+}
+
+/**
+ * Load and resolve the project ROLE.md through the full pipeline (PRD §4.2).
+ *
+ * Reads `.mason/roles/project/ROLE.md` via `readMaterializedRole()`,
+ * optionally applies `--source` override, then runs `resolveRoleFields()`
+ * to expand wildcards and resolve includes.
+ *
+ * @param projectDir - Absolute path to the project root
+ * @param sourceOverride - Optional --source flag values (dialect registry keys)
+ * @returns Resolved Role object
+ */
+export async function loadAndResolveProjectRole(
+  projectDir: string,
+  sourceOverride?: string[],
+): Promise<Role> {
+  const rolePath = path.join(projectDir, ".mason", "roles", "project", "ROLE.md");
+  let role = await readMaterializedRole(rolePath);
+
+  // Apply --source override before wildcard expansion
+  if (sourceOverride) {
+    role = { ...role, sources: sourceOverride };
+  }
+
+  return resolveRoleFields(role, projectDir);
 }
 
 export function normalizeSourceFlags(sources: string[]): string[] {
@@ -1312,7 +1493,7 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
       ? normalizeSourceFlags(options.source)
       : undefined;
 
-    // Generate project role when no explicit role is provided
+    // Generate project role when no explicit role is provided (PRD §4.1-4.2)
     let preResolvedRole: Role | undefined;
     if (!role) {
       // Determine sources: --source flags take precedence, else derive from agent type
@@ -1333,7 +1514,23 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
         return;
       }
 
-      preResolvedRole = await generateProjectRole(projectDir, effectiveSources);
+      const projectRolePath = path.join(projectDir, ".mason", "roles", "project", "ROLE.md");
+      if (fs.existsSync(projectRolePath)) {
+        // File exists → load via readMaterializedRole() + resolveRoleFields()
+        preResolvedRole = await loadAndResolveProjectRole(projectDir, sourceOverride);
+      } else {
+        // File doesn't exist → try to create it
+        const dialectEntry = getDialect(effectiveSources[0]);
+        const dialectDir = dialectEntry?.directory ?? effectiveSources[0];
+        const created = await createDefaultProjectRole(projectDir, dialectDir);
+        if (created) {
+          // Created successfully → load the new file
+          preResolvedRole = await loadAndResolveProjectRole(projectDir, sourceOverride);
+        } else {
+          // Write failed → warn, fall back to generateProjectRole()
+          preResolvedRole = await generateProjectRole(projectDir, effectiveSources);
+        }
+      }
     }
 
     // Effective role name: explicit role name or "project" for auto-generated
@@ -1865,10 +2062,22 @@ async function runAgentJsonMode(
     ensureGitignore(projectDir, ".mason");
 
     // 5. Create session directory
+    // When MASON_SESSION_ID is set (e.g., from ACP), reuse that session ID
+    // instead of creating a new meta session. This ensures the ACP session
+    // and the mason run session share the same ID, so the SessionStart hook
+    // writes agentSessionId to the correct meta.json.
     const { uid, gid } = getHostIds();
     const declaredCredentialKeys = collectDeclaredCredentialKeys(agentType, agentConfigCredentials, roleType);
-    const createSessionStore = deps?.createSessionFn ?? createMetaSession;
-    const metaSession = await createSessionStore(projectDir, agentType, roleName);
+    const existingSessionId = process.env.MASON_SESSION_ID;
+    let metaSessionId: string;
+    if (existingSessionId) {
+      metaSessionId = existingSessionId;
+      console.log(`[json] Reusing session ID from MASON_SESSION_ID: ${existingSessionId}`);
+    } else {
+      const createSessionStore = deps?.createSessionFn ?? createMetaSession;
+      const metaSession = await createSessionStore(projectDir, agentType, roleName);
+      metaSessionId = metaSession.sessionId;
+    }
     const session = createSessionDirectory({
       projectDir,
       dockerBuildDir,
@@ -1882,7 +2091,7 @@ async function runAgentJsonMode(
       hostGid: gid,
       homeOverride,
       verbose,
-      sessionId: metaSession.sessionId,
+      sessionId: metaSessionId,
       agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
     });
 

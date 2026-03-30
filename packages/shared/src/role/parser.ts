@@ -86,6 +86,9 @@ export async function readMaterializedRole(rolePath: string): Promise<Role> {
     ? (frontmatter.sources as string[])
     : [];
 
+  // Extract role config (includes)
+  const role = frontmatter.role ?? {};
+
   // Build the role object and validate through Zod
   const roleData = {
     metadata,
@@ -98,6 +101,7 @@ export async function readMaterializedRole(rolePath: string): Promise<Role> {
     container,
     governance,
     resources,
+    role,
     source: {
       type: "local" as const,
       agentDialect: dialect.name,
@@ -224,9 +228,23 @@ function getKnownDirsForError(): string {
 // ---------------------------------------------------------------------------
 
 /**
+ * Alias map for the tasks/commands field pair.
+ * When the primary dialect field is not found, the alias is checked as a fallback.
+ * Only tasks/commands are aliased — other dialect field names (instructions, conventions)
+ * are semantically distinct and are not aliased.
+ */
+const TASK_FIELD_ALIASES: Record<string, string> = {
+  tasks: "commands",
+  commands: "tasks",
+};
+
+/**
  * Normalize the dialect-specific tasks field.
  * Claude: commands, Codex: instructions, Aider: conventions
  * Returns raw objects — Zod validates and applies defaults.
+ *
+ * Supports aliasing between `tasks` and `commands`: if the primary dialect field
+ * is not found, checks the alias. If both are present, uses the primary and warns.
  */
 function normalizeTasks(
   frontmatter: Record<string, unknown>,
@@ -234,8 +252,34 @@ function normalizeTasks(
 ): Array<Record<string, unknown>> {
   const fieldName = dialect.fieldMapping.tasks;
   const raw = frontmatter[fieldName];
-  if (!raw) return [];
 
+  // Primary field not found — check for alias fallback
+  if (!raw) {
+    const aliasField = TASK_FIELD_ALIASES[fieldName];
+    if (aliasField) {
+      const aliasRaw = frontmatter[aliasField];
+      if (aliasRaw) {
+        return normalizeTasksArray(aliasRaw);
+      }
+    }
+    return [];
+  }
+
+  // Warn if both primary and alias are present
+  const aliasField = TASK_FIELD_ALIASES[fieldName];
+  if (aliasField && frontmatter[aliasField]) {
+    console.warn(
+      `Warning: Both "${fieldName}" and "${aliasField}" are present in ROLE.md frontmatter. Using "${fieldName}" (the ${dialect.name} dialect field). Remove one to avoid confusion.`,
+    );
+  }
+
+  return normalizeTasksArray(raw);
+}
+
+/**
+ * Convert a raw frontmatter value into a normalized task array.
+ */
+function normalizeTasksArray(raw: unknown): Array<Record<string, unknown>> {
   if (!Array.isArray(raw)) {
     return [{ name: String(raw) }];
   }

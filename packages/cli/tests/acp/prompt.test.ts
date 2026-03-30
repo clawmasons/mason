@@ -201,12 +201,25 @@ describe("session/prompt handler", () => {
         role: "project",
         text: "help me refactor",
         cwd: tempDir,
+        sessionId,
         onSessionUpdate: expect.any(Function),
       }),
     );
     // Verify signal is an AbortSignal
     const callArgs = mockExecutePromptStreaming.mock.calls[0][0];
     expect(callArgs.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("passes sessionId to executePromptStreaming for session unification", async () => {
+    const sessionId = await initAndCreateSession(clientConn, tempDir);
+
+    await clientConn.prompt({
+      sessionId,
+      prompt: [{ type: "text", text: "hello" }],
+    });
+
+    const callArgs = mockExecutePromptStreaming.mock.calls[0][0];
+    expect(callArgs.sessionId).toBe(sessionId);
   });
 
   it("returns stopReason end_turn on success", async () => {
