@@ -315,4 +315,10 @@ Validate the full default-project-role lifecycle end-to-end through the CLI.
 - `npm run test:e2e`
 - In `../mason-extensions`: `npm run lint && npm run build && npm run test && npm run test:e2e`
 
-**Not Implemented Yet**
+**Implemented**
+
+**Artifacts:**
+- Proposal: [openspec/changes/archive/2026-03-29-e2e-default-project-role-tests/proposal.md](../../changes/archive/2026-03-29-e2e-default-project-role-tests/proposal.md)
+- Design: [openspec/changes/archive/2026-03-29-e2e-default-project-role-tests/design.md](../../changes/archive/2026-03-29-e2e-default-project-role-tests/design.md)
+- Tasks: [openspec/changes/archive/2026-03-29-e2e-default-project-role-tests/tasks.md](../../changes/archive/2026-03-29-e2e-default-project-role-tests/tasks.md)
+- Spec: [openspec/changes/archive/2026-03-29-e2e-default-project-role-tests/specs/e2e-default-project-role/spec.md](../../changes/archive/2026-03-29-e2e-default-project-role-tests/specs/e2e-default-project-role/spec.md)

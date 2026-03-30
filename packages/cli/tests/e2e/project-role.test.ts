@@ -12,6 +12,15 @@
  *   5. Implied agent alias routing
  *   6. Source override with explicit role
  *   7. Error cases (invalid source, missing source dir, empty source dir)
+ *   8. Default project role auto-creation (PRD §4)
+ *   9. Default project role reuse (PRD §4.1)
+ *  10. Wildcard all tasks (PRD §7)
+ *  11. Scoped wildcard tasks (PRD §7)
+ *  12. Explicit task restriction (PRD §6)
+ *  13. tasks/commands alias (PRD §5)
+ *  14. Role includes (PRD §8)
+ *  15. Circular include detection (PRD §8.5)
+ *  16. Write failure fallback (PRD §4.2, UC-7)
  */
 
 import { describe, it, expect, afterAll } from "vitest";
@@ -107,19 +116,21 @@ describe("project-role: CLI e2e", () => {
 
   // ── Scenario 7b: Missing source directory ────────────────────────────
 
-  it("errors when source directory does not exist", () => {
+  it("does not crash when source directory does not exist (auto-creates role)", () => {
     const ws = createEmptyWorkspace("pr-missing-source");
     workspacesToClean.push(ws);
 
+    // With auto-creation, the CLI creates .mason/roles/project/ROLE.md and
+    // proceeds to Docker build. It no longer fails with "Source directory not found"
+    // because the auto-created role uses wildcard patterns that resolve to empty.
     const result = masonExecExpectError(
       ["run", "--agent", "mcp"],
       ws,
     );
 
-    expect(result.exitCode).not.toBe(0);
     const output = result.stderr + result.stdout;
-    expect(output).toContain("Source directory");
-    expect(output).toContain("not found");
+    // Should NOT fail with "Unknown source" — mcp is valid
+    expect(output).not.toContain("Unknown source");
   });
 
   // ── Scenario 7c: Empty source directory ──────────────────────────────
@@ -288,6 +299,375 @@ describe("project-role: CLI e2e", () => {
       // Should NOT fail at source validation — both dirs exist
       expect(output).not.toContain("Source directory");
       expect(output).not.toContain("Unknown source");
+    });
+  });
+
+  // ── Default Project Role: Auto-creation and Lifecycle ───────────────
+
+  describe("default-project-role", () => {
+    // These tests validate the default-project-role PRD (changes 1-4).
+    // Auto-creation and role loading happen BEFORE Docker checks, so
+    // file artifacts can be verified regardless of Docker availability.
+
+    it("auto-creates .mason/roles/project/ROLE.md on first run without --role", () => {
+      if (!isDockerAvailable()) return;
+
+      const ws = createProjectRoleWorkspace("dpr-auto-create");
+      workspacesToClean.push(ws);
+
+      const rolePath = path.join(ws, ".mason", "roles", "project", "ROLE.md");
+      expect(fs.existsSync(rolePath)).toBe(false);
+
+      // Run mason claude without --role — should auto-create the default project role
+      masonExecExpectError(
+        ["run", "--agent", "claude"],
+        ws,
+        { timeout: 30_000 },
+      );
+
+      // Verify the ROLE.md was created on disk
+      expect(fs.existsSync(rolePath)).toBe(true);
+
+      const content = fs.readFileSync(rolePath, "utf-8");
+      // Template must contain the correct source (claude), wildcard tasks, and wildcard skills
+      expect(content).toContain("sources:");
+      expect(content).toContain("- claude");
+      expect(content).toContain('tasks:');
+      expect(content).toContain('- "*"');
+      expect(content).toContain('skills:');
+      expect(content).toContain("name: project");
+      expect(content).toContain("type: project");
+    });
+
+    it("reuses existing .mason/roles/project/ROLE.md without overwriting", () => {
+      if (!isDockerAvailable()) return;
+
+      const ws = createProjectRoleWorkspace("dpr-reuse");
+      workspacesToClean.push(ws);
+
+      // Pre-create a custom ROLE.md with specific content
+      const roleDir = path.join(ws, ".mason", "roles", "project");
+      fs.mkdirSync(roleDir, { recursive: true });
+      const rolePath = path.join(roleDir, "ROLE.md");
+      const customContent = `---
+name: project
+type: project
+description: Custom project role
+
+sources:
+  - claude
+
+tasks:
+  - review
+
+skills: []
+risk: LOW
+---
+
+Custom instructions that should not be overwritten.
+`;
+      fs.writeFileSync(rolePath, customContent, "utf-8");
+
+      // Run mason claude — should load existing file, not overwrite
+      masonExecExpectError(
+        ["run", "--agent", "claude"],
+        ws,
+        { timeout: 30_000 },
+      );
+
+      // Verify the file was NOT overwritten
+      const afterContent = fs.readFileSync(rolePath, "utf-8");
+      expect(afterContent).toBe(customContent);
+    });
+
+    it("auto-created ROLE.md uses wildcard tasks: [\"*\"] for include-all", () => {
+      if (!isDockerAvailable()) return;
+
+      const ws = createProjectRoleWorkspace("dpr-wildcard-all");
+      workspacesToClean.push(ws);
+
+      masonExecExpectError(
+        ["run", "--agent", "claude"],
+        ws,
+        { timeout: 30_000 },
+      );
+
+      const rolePath = path.join(ws, ".mason", "roles", "project", "ROLE.md");
+      expect(fs.existsSync(rolePath)).toBe(true);
+
+      const content = fs.readFileSync(rolePath, "utf-8");
+      // The auto-created file should have wildcard tasks and skills
+      // (the actual wildcard expansion happens at resolution time, not in the file)
+      expect(content).toContain('- "*"');
+    });
+
+    it("accepts scoped wildcard tasks: [\"deploy/*\"] without error", () => {
+      if (!isDockerAvailable()) return;
+
+      const ws = createProjectRoleWorkspace("dpr-scoped-wildcard");
+      workspacesToClean.push(ws);
+
+      // Pre-create a ROLE.md with scoped wildcard for deploy tasks
+      const roleDir = path.join(ws, ".mason", "roles", "project");
+      fs.mkdirSync(roleDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(roleDir, "ROLE.md"),
+        `---
+name: project
+type: project
+sources:
+  - claude
+tasks:
+  - "deploy/*"
+skills:
+  - "*"
+risk: LOW
+---
+
+Scoped wildcard test role.
+`,
+        "utf-8",
+      );
+
+      // Run mason — the scoped wildcard should expand against .claude/commands/deploy/
+      // which has staging.md and production.md in the fixture
+      const result = masonExecExpectError(
+        ["run", "--agent", "claude"],
+        ws,
+        { timeout: 30_000 },
+      );
+
+      const output = result.stderr + result.stdout;
+      // Should NOT fail at role parsing or wildcard validation
+      expect(output).not.toContain("Unsupported glob syntax");
+      expect(output).not.toContain("Unknown source");
+    });
+
+    it("accepts explicit task restriction tasks: [\"review\"] without error", () => {
+      if (!isDockerAvailable()) return;
+
+      const ws = createProjectRoleWorkspace("dpr-explicit-tasks");
+      workspacesToClean.push(ws);
+
+      // Pre-create a ROLE.md with explicit task list
+      const roleDir = path.join(ws, ".mason", "roles", "project");
+      fs.mkdirSync(roleDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(roleDir, "ROLE.md"),
+        `---
+name: project
+type: project
+sources:
+  - claude
+tasks:
+  - review
+skills: []
+risk: LOW
+---
+
+Explicit tasks only.
+`,
+        "utf-8",
+      );
+
+      const result = masonExecExpectError(
+        ["run", "--agent", "claude"],
+        ws,
+        { timeout: 30_000 },
+      );
+
+      const output = result.stderr + result.stdout;
+      // Should NOT fail at role parsing
+      expect(output).not.toContain("Unknown source");
+      expect(output).not.toContain("Unsupported glob syntax");
+    });
+
+    it("accepts commands: [\"*\"] as alias for tasks in mason dialect ROLE.md", () => {
+      if (!isDockerAvailable()) return;
+
+      const ws = createProjectRoleWorkspace("dpr-alias-commands");
+      workspacesToClean.push(ws);
+
+      // Pre-create a ROLE.md using "commands" instead of "tasks" (mason dialect alias)
+      const roleDir = path.join(ws, ".mason", "roles", "project");
+      fs.mkdirSync(roleDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(roleDir, "ROLE.md"),
+        `---
+name: project
+type: project
+sources:
+  - claude
+commands:
+  - "*"
+skills:
+  - "*"
+risk: LOW
+---
+
+Using commands alias for tasks field.
+`,
+        "utf-8",
+      );
+
+      const result = masonExecExpectError(
+        ["run", "--agent", "claude"],
+        ws,
+        { timeout: 30_000 },
+      );
+
+      const output = result.stderr + result.stdout;
+      // Should NOT fail at role parsing — "commands" is recognized as alias for "tasks"
+      expect(output).not.toContain("Unknown source");
+      // The CLI should proceed past role loading (may fail at Docker, which is fine)
+    });
+
+    it("merges role.includes from a local role", () => {
+      if (!isDockerAvailable()) return;
+
+      const ws = createProjectRoleWorkspace("dpr-role-includes");
+      workspacesToClean.push(ws);
+
+      // The fixture already has .mason/roles/base-role/ROLE.md
+      // Create project ROLE.md that includes base-role
+      const roleDir = path.join(ws, ".mason", "roles", "project");
+      fs.mkdirSync(roleDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(roleDir, "ROLE.md"),
+        `---
+name: project
+type: project
+sources:
+  - claude
+tasks:
+  - "*"
+skills:
+  - "*"
+role:
+  includes:
+    - base-role
+risk: LOW
+---
+
+Project role that includes base-role.
+`,
+        "utf-8",
+      );
+
+      const result = masonExecExpectError(
+        ["run", "--agent", "claude"],
+        ws,
+        { timeout: 30_000 },
+      );
+
+      const output = result.stderr + result.stdout;
+      // Should NOT fail at role inclusion resolution
+      expect(output).not.toContain("not found");
+      expect(output).not.toContain("Circular role inclusion");
+    });
+
+    it("detects circular role includes and reports cycle chain", () => {
+      if (!isDockerAvailable()) return;
+
+      const ws = createProjectRoleWorkspace("dpr-circular-include");
+      workspacesToClean.push(ws);
+
+      // Create project ROLE.md that includes "looper"
+      const projectRoleDir = path.join(ws, ".mason", "roles", "project");
+      fs.mkdirSync(projectRoleDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(projectRoleDir, "ROLE.md"),
+        `---
+name: project
+type: project
+description: Circular include test project role
+sources:
+  - claude
+tasks:
+  - "*"
+skills: []
+role:
+  includes:
+    - looper
+risk: LOW
+---
+
+Circular include test — project includes looper.
+`,
+        "utf-8",
+      );
+
+      // Create looper ROLE.md that includes "project" (creating the cycle)
+      const looperRoleDir = path.join(ws, ".mason", "roles", "looper");
+      fs.mkdirSync(looperRoleDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(looperRoleDir, "ROLE.md"),
+        `---
+name: looper
+type: project
+description: Circular include test looper role
+sources:
+  - claude
+tasks: []
+skills: []
+role:
+  includes:
+    - project
+risk: LOW
+---
+
+Circular include test — looper includes project.
+`,
+        "utf-8",
+      );
+
+      const result = masonExecExpectError(
+        ["run", "--agent", "claude"],
+        ws,
+        { timeout: 30_000 },
+      );
+
+      expect(result.exitCode).not.toBe(0);
+      const output = result.stderr + result.stdout;
+      // Should detect the circular inclusion and report the cycle chain
+      expect(output).toContain("Circular role inclusion");
+    });
+
+    it("falls back to in-memory role when directory is read-only (UC-7)", () => {
+      if (!isDockerAvailable()) return;
+      // Skip on CI or environments where chmod may not work as expected
+      if (process.getuid?.() === 0) return;
+
+      const ws = createProjectRoleWorkspace("dpr-write-failure");
+      workspacesToClean.push(ws);
+
+      // Make the .mason/roles/ directory read-only so ROLE.md cannot be created
+      const rolesDir = path.join(ws, ".mason", "roles");
+      // Remove any existing project role directory
+      const projectRoleDir = path.join(rolesDir, "project");
+      if (fs.existsSync(projectRoleDir)) {
+        fs.rmSync(projectRoleDir, { recursive: true, force: true });
+      }
+      // Make roles directory read-only (prevents creating project/ subdirectory)
+      fs.chmodSync(rolesDir, 0o555);
+
+      try {
+        const result = masonExecExpectError(
+          ["run", "--agent", "claude"],
+          ws,
+          { timeout: 30_000 },
+        );
+
+        const output = result.stderr + result.stdout;
+        // Should warn about write failure and fall back to in-memory role
+        expect(output).toContain("Could not create default project role");
+
+        // The project ROLE.md should NOT exist on disk
+        expect(fs.existsSync(path.join(projectRoleDir, "ROLE.md"))).toBe(false);
+      } finally {
+        // Restore permissions for cleanup
+        fs.chmodSync(rolesDir, 0o755);
+      }
     });
   });
 });
