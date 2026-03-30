@@ -789,10 +789,13 @@ async function handleResume(
   }
 
   // 6. Extract agent + role from session metadata
-  const { agent: agentType, role: roleName } = session;
+  const { role: roleName } = session;
 
   // Initialize agent registry so we can look up agent package
   await initRegistry(projectDir, getCliVersion());
+
+  // Resolve alias to canonical agent type (e.g., "claude" → "claude-code-agent")
+  const agentType = (await resolveAgentTypeWithAutoInstall(session.agent)) ?? session.agent;
 
   // 7. Resolve resume args from agent's resume config
   const agentPkg = getAgentFromRegistry(agentType);
@@ -912,15 +915,74 @@ async function handleResume(
     return;
   }
 
-  // Start agent interactively
-  console.log(`  Starting agent (${agentServiceName})...\n`);
-  const runArgs = ["run", "--rm", "--service-ports"];
-  if (!process.stdin.isTTY) {
-    runArgs.push("-T");
-  }
-  runArgs.push(agentServiceName);
+  // Start agent
+  let agentCode: number;
 
-  const agentCode = await runAgentWithOciRestart(composeFile, runArgs);
+  if (opts.isJsonMode) {
+    // JSON streaming mode: capture NDJSON output instead of interactive TTY
+    const sessionLogsDir = path.join(projectDir, ".mason", "logs");
+    fs.mkdirSync(sessionLogsDir, { recursive: true });
+    const fileLogger = createFileLogger(sessionLogsDir);
+
+    // Redirect console to file logger
+    const origLog = console.log.bind(console);
+    const origError = console.error.bind(console);
+    console.log = (...args: unknown[]) => fileLogger.log(...args);
+    console.error = (...args: unknown[]) => fileLogger.error(...args);
+
+    const agentPkg = getAgentFromRegistry(agentType);
+    const parseJsonStreamAsACP = agentPkg?.jsonMode?.parseJsonStreamAsACP;
+
+    let previousLine: string | undefined;
+    const runArgs = ["run", "--rm", "--service-ports", "-T", agentServiceName];
+    fileLogger.log(`[json-resume] Docker command: docker compose -f ${composeFile} ${runArgs.join(" ")}`);
+    const { code, stderr: composeStderr } = await execComposeRunWithStreamCapture(composeFile, runArgs, (line) => {
+      fileLogger.log(`[stream] ${line}`);
+      if (parseJsonStreamAsACP) {
+        const trimmed = line.trimStart();
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+          try {
+            const result = parseJsonStreamAsACP(line, previousLine);
+            if (result !== null) {
+              const updates = Array.isArray(result) ? result : [result];
+              for (const update of updates) {
+                const validation = validateAcpUpdate(update);
+                if (!validation.valid) {
+                  fileLogger.error(`[stream] ACP validation error: ${validation.errors?.join("; ")}`);
+                }
+                process.stdout.write(JSON.stringify(update) + "\n");
+              }
+            }
+          } catch (err) {
+            fileLogger.error(`[stream] parse error: ${err instanceof Error ? err.message : String(err)}`);
+          }
+          previousLine = line;
+        }
+      }
+    });
+    agentCode = code;
+
+    if (composeStderr) {
+      for (const line of composeStderr.split("\n")) {
+        if (line.trim()) fileLogger.log(`[stderr] ${line}`);
+      }
+    }
+
+    // Restore console
+    console.log = origLog;
+    console.error = origError;
+    fileLogger.close();
+  } else {
+    // Interactive mode (existing behavior)
+    console.log(`  Starting agent (${agentServiceName})...\n`);
+    const runArgs = ["run", "--rm", "--service-ports"];
+    if (!process.stdin.isTTY) {
+      runArgs.push("-T");
+    }
+    runArgs.push(agentServiceName);
+
+    agentCode = await runAgentWithOciRestart(composeFile, runArgs);
+  }
 
   // Tear down
   console.log(`\n  Agent exited (code ${agentCode}). Tearing down services...`);
@@ -1998,10 +2060,22 @@ async function runAgentJsonMode(
     ensureGitignore(projectDir, ".mason");
 
     // 5. Create session directory
+    // When MASON_SESSION_ID is set (e.g., from ACP), reuse that session ID
+    // instead of creating a new meta session. This ensures the ACP session
+    // and the mason run session share the same ID, so the SessionStart hook
+    // writes agentSessionId to the correct meta.json.
     const { uid, gid } = getHostIds();
     const declaredCredentialKeys = collectDeclaredCredentialKeys(agentType, agentConfigCredentials, roleType);
-    const createSessionStore = deps?.createSessionFn ?? createMetaSession;
-    const metaSession = await createSessionStore(projectDir, agentType, roleName);
+    const existingSessionId = process.env.MASON_SESSION_ID;
+    let metaSessionId: string;
+    if (existingSessionId) {
+      metaSessionId = existingSessionId;
+      console.log(`[json] Reusing session ID from MASON_SESSION_ID: ${existingSessionId}`);
+    } else {
+      const createSessionStore = deps?.createSessionFn ?? createMetaSession;
+      const metaSession = await createSessionStore(projectDir, agentType, roleName);
+      metaSessionId = metaSession.sessionId;
+    }
     const session = createSessionDirectory({
       projectDir,
       dockerBuildDir,
@@ -2015,7 +2089,7 @@ async function runAgentJsonMode(
       hostGid: gid,
       homeOverride,
       verbose,
-      sessionId: metaSession.sessionId,
+      sessionId: metaSessionId,
       agentShortName: getAgentFromRegistry(agentType)?.aliases?.[0] ?? agentType,
     });
 
