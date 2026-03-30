@@ -1140,7 +1140,7 @@ export async function generateProjectRole(
       description: `Auto-generated from project's ${sourceNames} configuration`,
     },
     type: "project",
-    instructions: "",
+    instructions: `Started within a container created by the mason project. We are using .mason/roles/project/ROLE.md to configure roles for this project.\n\nPath mapping: host ${projectDir} → container /home/mason/workspace/project`,
     tasks,
     skills,
     mcp,
@@ -1215,6 +1215,8 @@ skills:
 ---
 
 Started within a container created by the mason project. We are using .mason/roles/project/ROLE.md to configure roles for this project.
+
+Path mapping: host {PROJECT_DIR} → container /home/mason/workspace/project
 `;
 
 /**
@@ -1237,7 +1239,7 @@ export async function createDefaultProjectRole(
 
   try {
     fs.mkdirSync(roleDir, { recursive: true });
-    const content = DEFAULT_PROJECT_ROLE_TEMPLATE.replace("{DIALECT_DIR}", dialectDir);
+    const content = DEFAULT_PROJECT_ROLE_TEMPLATE.replace("{DIALECT_DIR}", dialectDir).replace("{PROJECT_DIR}", projectDir);
     fs.writeFileSync(rolePath, content, "utf-8");
     return true;
   } catch (err) {

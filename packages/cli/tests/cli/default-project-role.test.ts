@@ -55,6 +55,9 @@ describe("createDefaultProjectRole", () => {
     expect(content).toContain('tasks:\n  - "*"');
     expect(content).toContain('skills:\n  - "*"');
     expect(content).toContain("Started within a container created by the mason project.");
+    // Verify host-to-container path mapping with substituted project dir
+    expect(content).toContain(`Path mapping: host ${tmpDir}`);
+    expect(content).toContain("container /home/mason/workspace/project");
   });
 
   it("uses dialect directory name, not registry key", async () => {
