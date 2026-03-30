@@ -6,11 +6,8 @@
  * re-scanning the filesystem.
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import type { Role } from "@clawmasons/shared";
-import { discoverRoles } from "@clawmasons/shared";
+import { discoverRoles, getDialect } from "@clawmasons/shared";
 import type { AgentRegistry } from "@clawmasons/agent-sdk";
 import {
   createAgentRegistry,
@@ -18,7 +15,7 @@ import {
   readDefaultAgent,
 } from "@clawmasons/agent-sdk";
 import { default as mcpAgent } from "@clawmasons/mcp-agent/agent-package";
-import { inferAgentType } from "../cli/commands/run-agent.js";
+import { inferAgentType, createDefaultProjectRole } from "../cli/commands/run-agent.js";
 import { acpLog } from "./acp-logger.js";
 
 // Built-in agent packages — same as used by the materializer
@@ -59,8 +56,10 @@ export async function discoverForCwd(cwd: string): Promise<DiscoveryResult> {
   // If no non-packaged (local) roles, create a default project role
   const hasLocalRole = roles.some((r) => r.source.type === "local");
   if (!hasLocalRole) {
-    acpLog("discoverForCwd: no local roles, creating default");
-    await createDefaultProjectRole(cwd);
+    const agentName = readDefaultAgent(cwd) ?? "claude-code-agent";
+    const dialectDir = getDialect(agentName)?.directory ?? "claude";
+    acpLog("discoverForCwd: no local roles, creating default", { dialectDir });
+    await createDefaultProjectRole(cwd, dialectDir);
     roles = await discoverRoles(cwd);
   }
 
@@ -104,20 +103,3 @@ export function invalidateCache(cwd: string): void {
   cache.delete(cwd);
 }
 
-// ---------------------------------------------------------------------------
-// Default role creation
-// ---------------------------------------------------------------------------
-
-const DEFAULT_ROLE_CONTENT = `---
-name: project
-description: Default project role
----
-
-You are an assistant for this project. Help the user with their tasks.
-`;
-
-async function createDefaultProjectRole(cwd: string): Promise<void> {
-  const roleDir = join(cwd, ".mason", "roles", "project");
-  await mkdir(roleDir, { recursive: true });
-  await writeFile(join(roleDir, "ROLE.md"), DEFAULT_ROLE_CONTENT, "utf-8");
-}
