@@ -31,6 +31,9 @@
     "typescript-eslint": "^8.0.0",
     "vitest": "^3.0.0"
   },
+  "overrides": {
+    "brace-expansion": ">=1.1.13"
+  },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.16.0",
     "@clawmasons/role-configure-project": "^1.0.0",
