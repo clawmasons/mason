@@ -62,6 +62,7 @@ export {
   resolveAgentPackageName,
   ensureMasonPackageJson,
   autoInstallAgent,
+  hasDevSymlinks,
   syncExtensionVersions,
   resolveAgentWithAutoInstall,
 } from "./discovery.js";

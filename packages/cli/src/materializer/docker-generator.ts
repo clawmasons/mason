@@ -322,6 +322,7 @@ export function generateRoleDockerBuildDir(
         !fsDeps ? homeBuildDir : undefined,
       )
     : materializeForAgent(role, agentType, proxyEp, undefined, materializeOpts, !fsDeps ? homeBuildDir : undefined);
+  console.warn(`[DEBUG docker-gen] workspace files: ${[...workspace.keys()].join(', ')}`);
   for (const [filePath, content] of workspace) {
     const targetDir = filePath === "agent-launch.json"
       ? workspaceDir

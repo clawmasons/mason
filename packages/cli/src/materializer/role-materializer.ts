@@ -325,14 +325,17 @@ export function resolveSkillContent(agent: ResolvedAgent, role: Role): void {
   const sourceConfig = getSourceSkillConfig(role);
   const sourceProjectDir = getSourceProjectDir(role);
 
-  if (!sourceConfig || !sourceProjectDir) return;
+  console.warn(`[DEBUG resolveSkillContent] sourceConfig=${JSON.stringify(sourceConfig)} sourceProjectDir=${sourceProjectDir}`);
+  if (!sourceConfig || !sourceProjectDir) { console.warn(`[DEBUG resolveSkillContent] EARLY RETURN (no config or dir)`); return; }
 
   const sourceSkills = readSkills(sourceConfig, sourceProjectDir);
+  console.warn(`[DEBUG resolveSkillContent] sourceSkills=${sourceSkills.map(s => s.name).join(', ')}`);
 
   // Build lookup by skill name
   const sourceByName = new Map(sourceSkills.map((s) => [s.name, s]));
 
   for (const resolvedRole of agent.roles) {
+    console.warn(`[DEBUG resolveSkillContent] role "${resolvedRole.name}" has ${resolvedRole.skills.length} skills: ${resolvedRole.skills.map(s => s.name).join(', ')}`);
     for (const skill of resolvedRole.skills) {
       const source = sourceByName.get(skill.name);
       if (source) {

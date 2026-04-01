@@ -26,9 +26,21 @@ if (fs.existsSync(masonDir)) {
       if (parts.length !== 2) return;
       fs.mkdirSync(scopeDir, { recursive: true });
       const target = path.join(scopeDir, parts[1]);
-      if (!fs.existsSync(target)) {
-        fs.symlinkSync(path.resolve(agentDir), target, "dir");
+      const resolvedAgentDir = path.resolve(agentDir);
+      try {
+        const lstat = fs.lstatSync(target);
+        if (lstat.isSymbolicLink()) {
+          // Already a symlink — skip if pointing to the right place
+          if (fs.readlinkSync(target) === resolvedAgentDir) return;
+          fs.unlinkSync(target);
+        } else {
+          // Real directory (e.g. npm-installed) — replace with dev symlink
+          fs.rmSync(target, { recursive: true, force: true });
+        }
+      } catch {
+        // Target doesn't exist — will create below
       }
+      fs.symlinkSync(resolvedAgentDir, target, "dir");
     } catch {
       // skip silently — agent may be missing package.json or be malformed
     }
