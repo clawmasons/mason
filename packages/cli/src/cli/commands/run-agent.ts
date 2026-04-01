@@ -45,7 +45,45 @@ async function defaultResolveRole(
   roleName: string,
   projectDir: string,
 ): Promise<Role> {
-  return resolveRoleByName(roleName, projectDir);
+  try {
+    const role = await resolveRoleByName(roleName, projectDir);
+    return resolveRoleFields(role, projectDir);
+  } catch {
+    // Auto-create the "project" role if it doesn't exist yet (e.g. ACP invocation on fresh dir)
+    if (roleName === "project") {
+      return autoCreateAndResolveProjectRole(projectDir);
+    }
+    throw new Error(
+      `Role "${roleName}" not found. It is not a local role and is not installed as a package (also tried "@clawmasons/role-${roleName}").`,
+    );
+  }
+}
+
+/**
+ * Auto-create and resolve the "project" role when it doesn't exist yet.
+ *
+ * Determines the dialect from the first registered agent that has one,
+ * creates `.mason/roles/project/ROLE.md`, and resolves it through the
+ * full pipeline (wildcard expansion + includes).
+ */
+async function autoCreateAndResolveProjectRole(projectDir: string): Promise<Role> {
+  // Detect ALL agent directories that exist on disk (.claude/, .codex/, etc.)
+  const knownDirs = getKnownDirectories();
+  const existingDirs = knownDirs.filter(
+    (dir) => dir !== "mason" && fs.existsSync(path.join(projectDir, `.${dir}`)),
+  );
+  // Use all existing dirs (or "mason" fallback) so the persisted ROLE.md has all sources
+  const dialectDirs = existingDirs.length > 0 ? existingDirs : ["mason"];
+
+  const created = await createDefaultProjectRole(projectDir, dialectDirs);
+  if (created) {
+    return loadAndResolveProjectRole(projectDir);
+  }
+  // Fallback to in-memory role
+  const sources = existingDirs.length > 0
+    ? existingDirs.map((d) => resolveDialectName(d)).filter((s): s is string => s !== undefined)
+    : ["mason"];
+  return generateProjectRole(projectDir, sources);
 }
 
 /**
@@ -1232,14 +1270,18 @@ Path mapping: host {PROJECT_DIR} → container /home/mason/workspace/project
  */
 export async function createDefaultProjectRole(
   projectDir: string,
-  dialectDir: string,
+  dialectDir: string | string[],
 ): Promise<boolean> {
   const roleDir = path.join(projectDir, ".mason", "roles", "project");
   const rolePath = path.join(roleDir, "ROLE.md");
 
   try {
     fs.mkdirSync(roleDir, { recursive: true });
-    const content = DEFAULT_PROJECT_ROLE_TEMPLATE.replace("{DIALECT_DIR}", dialectDir).replace("{PROJECT_DIR}", projectDir);
+    const dirs = Array.isArray(dialectDir) ? dialectDir : [dialectDir];
+    const sourcesYaml = dirs.map((d) => `  - ${d}`).join("\n");
+    const content = DEFAULT_PROJECT_ROLE_TEMPLATE
+      .replace("  - {DIALECT_DIR}", sourcesYaml)
+      .replace("{PROJECT_DIR}", projectDir);
     fs.writeFileSync(rolePath, content, "utf-8");
     return true;
   } catch (err) {

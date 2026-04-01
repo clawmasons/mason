@@ -1672,7 +1672,7 @@ describe("generateProjectRole", () => {
 
     const role = await generateProjectRole(tmpDir, ["claude-code-agent"]);
 
-    expect(role.instructions).toBe("");
+    expect(role.instructions).toContain("Started within a container created by the mason project");
   });
 
   it("sets correct metadata and source fields", async () => {
@@ -1703,6 +1703,94 @@ describe("generateProjectRole", () => {
     expect(role.mcp).toHaveLength(1);
     expect(role.mcp[0].transport).toBe("sse");
     expect(role.mcp[0].url).toBe("http://localhost:8080");
+  });
+});
+
+// ── Default Project Role: Auto-Creation and Wildcard Expansion ──────────
+
+describe("createDefaultProjectRole + loadAndResolveProjectRole", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-default-role-"));
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("creates ROLE.md with correct template content", async () => {
+    const { createDefaultProjectRole } = await import("../../src/cli/commands/run-agent.js");
+    const created = await createDefaultProjectRole(tmpDir, "claude");
+
+    expect(created).toBe(true);
+
+    const rolePath = path.join(tmpDir, ".mason", "roles", "project", "ROLE.md");
+    expect(fs.existsSync(rolePath)).toBe(true);
+
+    const content = fs.readFileSync(rolePath, "utf-8");
+    expect(content).toContain("name: project");
+    expect(content).toContain("sources:");
+    expect(content).toContain("- claude");
+    expect(content).toContain('- "*"');
+  });
+
+  it("loadAndResolveProjectRole expands wildcard skills", async () => {
+    const { createDefaultProjectRole, loadAndResolveProjectRole } = await import("../../src/cli/commands/run-agent.js");
+
+    // Create .claude/skills/testing/ with a SKILL.md
+    const skillDir = path.join(tmpDir, ".claude", "skills", "testing");
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(path.join(skillDir, "SKILL.md"), "---\nname: testing\ndescription: Test skill\n---\n");
+
+    // Create .claude/commands/ with a task
+    const cmdDir = path.join(tmpDir, ".claude", "commands");
+    fs.mkdirSync(cmdDir, { recursive: true });
+    fs.writeFileSync(path.join(cmdDir, "review.md"), "# Review task");
+
+    // Create default project role
+    await createDefaultProjectRole(tmpDir, "claude");
+
+    // Load and resolve — wildcards should expand
+    const role = await loadAndResolveProjectRole(tmpDir);
+
+    // Skills wildcard * should expand to include "testing"
+    const skillNames = role.skills.map((s: { name: string }) => s.name);
+    expect(skillNames).toContain("testing");
+
+    // Tasks wildcard * should expand to include "review"
+    const taskNames = role.tasks.map((t: { name: string }) => t.name);
+    expect(taskNames).toContain("review");
+  });
+
+  it("loadAndResolveProjectRole returns empty arrays when no skills/tasks exist", async () => {
+    const { createDefaultProjectRole, loadAndResolveProjectRole } = await import("../../src/cli/commands/run-agent.js");
+
+    // Create empty .claude/ directory (no skills or commands)
+    fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true });
+
+    await createDefaultProjectRole(tmpDir, "claude");
+    const role = await loadAndResolveProjectRole(tmpDir);
+
+    // Wildcards expanded against empty sources → empty arrays
+    expect(role.skills).toHaveLength(0);
+    expect(role.tasks).toHaveLength(0);
+  });
+
+  it("loadAndResolveProjectRole applies --source override", async () => {
+    const { createDefaultProjectRole, loadAndResolveProjectRole } = await import("../../src/cli/commands/run-agent.js");
+
+    // Create ROLE.md with claude source
+    await createDefaultProjectRole(tmpDir, "claude");
+
+    // Override source to codex
+    const role = await loadAndResolveProjectRole(tmpDir, ["codex"]);
+
+    expect(role.sources).toEqual(["codex"]);
   });
 });
 
