@@ -16,10 +16,7 @@ import {
   type Role,
 } from "@clawmasons/shared";
 import { generateRoleDockerBuildDir } from "../../materializer/docker-generator.js";
-import {
-  ensureProxyDependencies,
-  synthesizeRolePackages,
-} from "../../materializer/proxy-dependencies.js";
+import { ensureProxyDependencies, copyAgentEntryBundle } from "../../materializer/proxy-dependencies.js";
 import { inferAgentType, resolveAgentType } from "./run-agent.js";
 import { readDefaultAgent } from "@clawmasons/agent-sdk";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
@@ -112,13 +109,11 @@ export async function runBuild(
     console.log(`  ✓ ${name} (${agentType}) → .mason/docker/${name}/`);
   }
 
-  // 6. Populate shared proxy dependencies (node_modules + package.json)
+  // 6. Generate Docker dependencies (bundles + config) for each role
   const dockerDir = path.join(projectDir, ".mason", "docker");
-  ensureProxyDependencies(dockerDir, projectDir);
-
-  // 7. Synthesize inline app/role packages for roles with mcp servers
+  copyAgentEntryBundle(dockerDir);
   for (const role of targetRoles) {
-    synthesizeRolePackages(role, dockerDir);
+    ensureProxyDependencies(dockerDir, role);
   }
 
   console.log(`\n  Build complete.\n`);

@@ -35,6 +35,10 @@ When generating the Dockerfile:
 - **AND** workspace COPY statements SHALL use `--chown=mason:mason`
 - **AND** no `RUN chown -R mason:mason /app` layer SHALL exist
 
+#### Scenario: Workspace COPY uses build/ path
+- **WHEN** `generateAgentDockerfile()` is called for a claude-code-agent agent in role "writer"
+- **THEN** the output Dockerfile SHALL contain `COPY --chown=mason:mason writer/claude-code-agent/build/workspace/ /home/mason/workspace/`
+
 #### Scenario: Base image precedence
 - **WHEN** `generateAgentDockerfile()` is called with an `AgentPackage` whose `dockerfile.baseImage` is `"python:3.12-slim"`
 - **AND** the role does not declare `baseImage`
@@ -70,8 +74,3 @@ When generating the Dockerfile:
 - **WHEN** the Dockerfile is generated with both apt and npm packages
 - **THEN** the `apt-get install` step SHALL appear before the `npm install -g` step
 - **AND** the `npm install -g` step SHALL appear before the `RUN groupadd` / user creation block
-
-#### Scenario: Workspace COPY uses build/ path
-- **WHEN** `generateAgentDockerfile()` is called for a claude-code-agent agent in role "writer"
-- **THEN** the output Dockerfile SHALL contain `COPY writer/claude-code-agent/build/workspace/ /home/mason/workspace/`
-- **AND** SHALL NOT contain `COPY writer/claude-code-agent/workspace/ /home/mason/workspace/`

@@ -23,7 +23,7 @@ vi.mock("../../src/materializer/docker-generator.js", () => ({
 
 vi.mock("../../src/materializer/proxy-dependencies.js", () => ({
   ensureProxyDependencies: vi.fn(),
-  synthesizeRolePackages: vi.fn(),
+  copyAgentEntryBundle: vi.fn(),
 }));
 
 vi.mock("../../src/cli/commands/run-agent.js", async () => {
@@ -89,7 +89,7 @@ describe("runBuild", () => {
   let discoverRoles: ReturnType<typeof vi.fn>;
   let generateRoleDockerBuildDir: ReturnType<typeof vi.fn>;
   let ensureProxyDependencies: ReturnType<typeof vi.fn>;
-  let synthesizeRolePackages: ReturnType<typeof vi.fn>;
+  let copyAgentEntryBundle: ReturnType<typeof vi.fn>;
   let adaptRoleToResolvedAgent: ReturnType<typeof vi.fn>;
   let inferAgentType: ReturnType<typeof vi.fn>;
   let runBuild: (projectDir: string, roleName?: string, agentTypeOverride?: string) => Promise<void>;
@@ -110,7 +110,7 @@ describe("runBuild", () => {
     adaptRoleToResolvedAgent = shared.adaptRoleToResolvedAgent as ReturnType<typeof vi.fn>;
     generateRoleDockerBuildDir = dockerGen.generateRoleDockerBuildDir as ReturnType<typeof vi.fn>;
     ensureProxyDependencies = proxyDeps.ensureProxyDependencies as ReturnType<typeof vi.fn>;
-    synthesizeRolePackages = proxyDeps.synthesizeRolePackages as ReturnType<typeof vi.fn>;
+    copyAgentEntryBundle = proxyDeps.copyAgentEntryBundle as ReturnType<typeof vi.fn>;
     inferAgentType = runAgentMod.inferAgentType as ReturnType<typeof vi.fn>;
 
     // Default happy-path returns
@@ -172,15 +172,28 @@ describe("runBuild", () => {
     expect(errorOutput).toContain("Missing required field: entrypoint");
   });
 
-  it("calls Docker generator, proxy deps, and package synthesis for all roles on success", async () => {
+  it("calls Docker generator and proxy deps for all roles on success", async () => {
     discoverRoles.mockResolvedValue([makeRole("role-a"), makeRole("role-b")]);
 
     await runBuild(tmpDir);
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     expect(generateRoleDockerBuildDir).toHaveBeenCalledTimes(2);
-    expect(ensureProxyDependencies).toHaveBeenCalledTimes(1);
-    expect(synthesizeRolePackages).toHaveBeenCalledTimes(2);
+    // ensureProxyDependencies called once per role (generates config per role)
+    expect(ensureProxyDependencies).toHaveBeenCalledTimes(2);
+  });
+
+  it("calls copyAgentEntryBundle for the docker dir on success", async () => {
+    discoverRoles.mockResolvedValue([makeRole("role-a")]);
+
+    await runBuild(tmpDir);
+
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+    // copyAgentEntryBundle called once (shared across roles, idempotent)
+    expect(copyAgentEntryBundle).toHaveBeenCalledTimes(1);
+    expect(copyAgentEntryBundle).toHaveBeenCalledWith(
+      expect.stringContaining(".mason/docker"),
+    );
   });
 
   it("uses agentTypeOverride instead of inferred agent type when specified", async () => {

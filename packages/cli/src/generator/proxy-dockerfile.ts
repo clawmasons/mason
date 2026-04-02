@@ -4,22 +4,24 @@ import { getAppShortName } from "@clawmasons/shared";
 /**
  * Generate a Dockerfile for a proxy container that serves a single role.
  *
- * The proxy image installs all mason packages from the local
- * `docker/node_modules/` build context (no registry pulls).  It boots
- * `mason proxy` configured for the given agent, which discovers
- * packages at runtime from node_modules/.
+ * The proxy image reads `proxy-config.json` (generated at build time) and
+ * boots via the esbuild-bundled `proxy-bundle.cjs`. No `node_modules/`
+ * or runtime package discovery needed.
+ *
+ * The mason user is created BEFORE COPY statements so that
+ * `COPY --chown=mason:mason` avoids a duplicate `chown -R` layer.
  *
  * All proxy images run as `USER mason`.
  *
  * The generated Dockerfile uses `docker/` as its build context
- * (the Dockerfile lives at `docker/proxy/<role-name>/Dockerfile`).
+ * (the Dockerfile lives at `docker/<role-name>/mcp-proxy/Dockerfile`).
  *
  * @param role       The resolved role this proxy serves.
- * @param agentName  The agent package name (passed to `mason proxy --agent`).
+ * @param agentName  The agent package name (unused after config migration,
+ *                   kept for call-site compatibility).
  */
 export function generateProxyDockerfile(
   role: ResolvedRole,
-  agentName: string,
 ): string {
   const roleShortName = getAppShortName(role.name);
 
@@ -34,25 +36,24 @@ ENV NODE_COMPILE_CACHE=/app/.cache/v8
 # Direct npm/npx package cache into the persistent .cache volume
 ENV NPM_CONFIG_CACHE=/app/.cache/npm
 
-# Copy esbuild-bundled proxy entry point (single file, fast boot)
-COPY proxy-bundle.cjs ./
-
-# Copy pre-populated node_modules (package.json for discovery)
-COPY package.json ./
-COPY node_modules/ ./node_modules/
-
-# Create mason user with host-matching UID/GID
+# Create mason user with host-matching UID/GID (before COPY for --chown)
 ARG HOST_UID=1000
 ARG HOST_GID=1000
 RUN (getent group $HOST_GID | cut -d: -f1 | xargs -r groupdel 2>/dev/null || true) \\
     && (getent passwd $HOST_UID | cut -d: -f1 | xargs -r userdel 2>/dev/null || true) \\
     && groupadd -g $HOST_GID mason && useradd -m -u $HOST_UID -g $HOST_GID mason \\
     && mkdir -p /home/mason/data /logs /mason-logs /app/.cache/v8 /app/.cache/npm \\
-    && chown -R mason:mason /app /home/mason/data /logs /mason-logs
+    && chown -R mason:mason /home/mason/data /logs /mason-logs /app/.cache
+
+# Copy esbuild-bundled proxy entry point (single file, fast boot)
+COPY --chown=mason:mason proxy-bundle.cjs ./
+
+# Copy pre-resolved proxy config (generated at build time)
+COPY --chown=mason:mason ${roleShortName}/mcp-proxy/proxy-config.json ./
 
 USER mason
 
 ENTRYPOINT ["node", "proxy-bundle.cjs"]
-CMD ["--agent", "${agentName}", "--transport", "streamable-http"]
+CMD ["--transport", "streamable-http"]
 `;
 }

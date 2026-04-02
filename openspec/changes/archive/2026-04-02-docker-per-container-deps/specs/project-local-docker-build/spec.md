@@ -1,10 +1,4 @@
-# Spec: Project-Local Docker Build
-
-## Purpose
-
-Docker build artifacts are materialized to a project-local directory (`{projectDir}/.clawmasons/docker/`) so that all docker contexts are self-contained within the project, eliminating dependency on global paths.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Docker build artifacts are materialized to project-local directory
 
