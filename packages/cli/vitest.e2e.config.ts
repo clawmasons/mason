@@ -16,5 +16,6 @@ export default defineConfig({
     testTimeout: 60_000,
     fileParallelism: false,
     pool: "forks",
+    globalTeardown: ["tests/e2e/global-teardown.ts"],
   },
 });

@@ -33,6 +33,7 @@ import {
   ensureDockerBuild,
   formatRelativeTime,
   getResumeDockerImage,
+  registerSessionCleanup,
 } from "../../src/cli/commands/run-agent.js";
 import { registerAgents } from "../../src/materializer/role-materializer.js";
 import {
@@ -2232,5 +2233,34 @@ describe("parseProxyPortOutput", () => {
 
   it("throws on output with no colon-delimited port", () => {
     expect(() => parseProxyPortOutput("127.0.0.1")).toThrow("Could not determine proxy port");
+  });
+});
+
+// ── registerSessionCleanup ──────────────────────────────────────────────
+
+describe("registerSessionCleanup", () => {
+  it("runs cleanup exactly once when triggered multiple times", async () => {
+    let callCount = 0;
+    const cleanup = async () => { callCount++; };
+    const { runCleanup } = registerSessionCleanup(cleanup);
+
+    await runCleanup();
+    await runCleanup();
+    await runCleanup();
+
+    expect(callCount).toBe(1);
+  });
+
+  it("unregister removes signal listeners", () => {
+    const cleanup = async () => {};
+    const { unregister } = registerSessionCleanup(cleanup);
+
+    const sigintBefore = process.listenerCount("SIGINT");
+    const sigtermBefore = process.listenerCount("SIGTERM");
+
+    unregister();
+
+    expect(process.listenerCount("SIGINT")).toBe(sigintBefore - 1);
+    expect(process.listenerCount("SIGTERM")).toBe(sigtermBefore - 1);
   });
 });

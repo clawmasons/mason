@@ -513,6 +513,8 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
   // Unique compose project name derived from project directory + session ID
   const projectHash = crypto.createHash("sha256").update(projectDir).digest("hex").slice(0, 8);
   const composeName = `mason-${projectHash}-${opts.sessionId}`;
+  // Stable prefix for image tags — excludes session ID so identical roles share cached images
+  const stableImagePrefix = `mason-${projectHash}`;
 
   // Compute relative paths from session directory.
   // Prefix with ./ so Docker Compose treats them as bind mounts (not named volumes).
@@ -675,6 +677,7 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
 name: ${composeName}
 services:
   ${proxyServiceName}:
+    image: ${stableImagePrefix}-${proxyServiceName}
     build:
       context: ${relDockerDir}
       dockerfile: ${path.relative(dockerDir, path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"))}
@@ -690,7 +693,7 @@ ${proxyEnvLines.join("\n")}
     restart: "no"
     init: true
 
-  ${agentServiceName}:${agentShortName ? `\n    image: ${composeName}-${agentServiceName}-${agentShortName}` : ""}
+  ${agentServiceName}:${agentShortName ? `\n    image: ${stableImagePrefix}-${agentServiceName}-${agentShortName}` : ""}
     build:
       context: ${relDockerDir}
       dockerfile: ${path.relative(dockerDir, path.join(dockerBuildDir, agentType, "Dockerfile"))}
