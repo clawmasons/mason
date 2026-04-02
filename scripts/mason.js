@@ -13,9 +13,12 @@ process.env.MASON_BIN = __filename;
 // Resolves the monorepo root from this script's location, then symlinks
 // all agents from the sibling mason-extensions/agents/ repo.
 // (mcp-agent is a built-in registered in Phase 1 of discovery — no symlink needed.)
-const masonDir = path.join(process.cwd(), ".mason");
-if (fs.existsSync(masonDir)) {
-  const monorepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const monorepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+function linkDevAgents() {
+  const masonDir = path.join(process.cwd(), ".mason");
+  if (!fs.existsSync(masonDir)) return;
+
   const scopeDir = path.join(masonDir, "node_modules", "@clawmasons");
 
   function linkAgent(agentDir) {
@@ -64,5 +67,10 @@ if (fs.existsSync(masonDir)) {
     }
   }
 }
+
+// Run at startup (handles .mason/ already exists)
+linkDevAgents();
+// Store for later use (handles .mason/ created mid-flow by ensureMasonConfig)
+globalThis.__masonDevLinker = linkDevAgents;
 
 run();

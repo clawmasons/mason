@@ -18,7 +18,6 @@ import type { Role } from "@clawmasons/shared";
 import { getAppShortName, CLI_NAME_UPPERCASE } from "@clawmasons/shared";
 import { materializeForAgent, getMaterializer, getAgentFromRegistry, resolveTaskContent, resolveSkillContent } from "./role-materializer.js";
 import { generateAgentDockerfile } from "../generator/agent-dockerfile.js";
-import { generateProxyDockerfile } from "../generator/proxy-dockerfile.js";
 import { adaptRoleToResolvedAgent } from "@clawmasons/shared";
 import { resolveRoleMountVolumes, type RoleMount } from "../generator/mount-volumes.js";
 import type { DevContainerCustomizations } from "@clawmasons/agent-sdk";
@@ -221,8 +220,6 @@ export interface BuildDirResult {
   buildDir: string;
   /** Relative path from build dir to the agent Dockerfile. */
   agentDockerfilePath: string;
-  /** Relative path from build dir to the proxy Dockerfile. */
-  proxyDockerfilePath: string;
 }
 
 /**
@@ -351,13 +348,6 @@ export function generateRoleDockerBuildDir(
     }
   }
 
-  // --- MCP Proxy subdirectory ---
-  const proxyDir = path.join(buildDir, "mcp-proxy");
-  deps.mkdirSync(proxyDir, { recursive: true });
-
-  const proxyDockerfile = generateProxyDockerfile(agentRole);
-  deps.writeFileSync(path.join(proxyDir, "Dockerfile"), proxyDockerfile);
-
   // --- Reference docker-compose.yaml ---
   const refCompose = generateReferenceBuildCompose(roleName, agentType);
   deps.writeFileSync(path.join(buildDir, "docker-compose.yaml"), refCompose);
@@ -365,7 +355,6 @@ export function generateRoleDockerBuildDir(
   return {
     buildDir,
     agentDockerfilePath: `${agentType}/Dockerfile`,
-    proxyDockerfilePath: "mcp-proxy/Dockerfile",
   };
 }
 
@@ -383,8 +372,8 @@ function generateReferenceBuildCompose(
 services:
   proxy-${roleName}:
     build:
-      context: ../../../docker
-      dockerfile: ../docker/${roleName}/mcp-proxy/Dockerfile
+      context: ../../../docker/mcp-proxy
+      dockerfile: Dockerfile
     environment:
       - ${CLI_NAME_UPPERCASE}_PROXY_TOKEN=\${${CLI_NAME_UPPERCASE}_PROXY_TOKEN}
       - RELAY_TOKEN=\${RELAY_TOKEN}
@@ -677,15 +666,16 @@ export function generateSessionComposeYml(opts: SessionComposeOptions): string {
 name: ${composeName}
 services:
   ${proxyServiceName}:
-    image: ${stableImagePrefix}-${proxyServiceName}
+    image: ${stableImagePrefix}-proxy
     build:
-      context: ${relDockerDir}
-      dockerfile: ${path.relative(dockerDir, path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"))}
+      context: ${relDockerDir}/mcp-proxy
+      dockerfile: Dockerfile
     volumes:
+      - ${relDockerDir}/${roleName}/mcp-proxy/proxy-config.json:/app/proxy-config.json:ro
       - ${relProjectDir}:${PROJECT_MOUNT_PATH}
       - ${relLogsDir}:/logs
       - ${relMasonLogsDir}:/mason-logs
-      - ${rel(path.join(dockerBuildDir, "mcp-proxy", ".cache"))}:/app/.cache
+      - ${rel(path.join(dockerDir, "mcp-proxy", ".cache"))}:/app/.cache
     environment:
 ${proxyEnvLines.join("\n")}
     ports:
