@@ -53,7 +53,9 @@ export async function expandRoleWildcards(
     .map((s) => resolveDialectName(s))
     .filter((d): d is string => d !== undefined);
 
+  console.warn(`[DEBUG expandRoleWildcards] sources=${JSON.stringify(role.sources)} -> dialects=${JSON.stringify(dialects)}`);
   const scanResult = await scanProject(projectDir, { dialects });
+  console.warn(`[DEBUG expandRoleWildcards] scan found ${scanResult.skills.length} skills, ${scanResult.commands.length} commands`);
 
   let tasks = role.tasks;
   let skills = role.skills;
@@ -67,11 +69,15 @@ export async function expandRoleWildcards(
   }
 
   if (hasSkillWildcards) {
+    console.warn(`[DEBUG] hasSkillWildcards=true, role.skills=${JSON.stringify(role.skills)}, discovered=${JSON.stringify(scanResult.skills.map(s=>s.name))}`);
     const result = expandSkillWildcards(role.skills, scanResult.skills);
     skills = result.expanded;
+    console.warn(`[DEBUG] expanded skills=${JSON.stringify(skills.map(s=>s.name))}`);
     for (const warning of result.warnings) {
       console.warn(`Warning: ${warning}`);
     }
+  } else {
+    console.warn(`[DEBUG] hasSkillWildcards=false, skills pass-through: ${JSON.stringify(role.skills)}`);
   }
 
   return { ...role, tasks, skills };

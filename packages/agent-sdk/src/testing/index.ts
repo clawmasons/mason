@@ -158,6 +158,27 @@ function copyDirRecursive(src: string, dest: string): void {
   }
 }
 
+/**
+ * Recursively list all files in a directory, returning paths relative to rootDir.
+ * Skips node_modules, .git, and docker image layers. Caps at 500 entries.
+ */
+function listFilesRecursive(dir: string, rootDir: string, results: string[] = []): string[] {
+  if (results.length >= 500) return results;
+  if (!fs.existsSync(dir)) return results;
+
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (results.length >= 500) break;
+    if (entry.name === "node_modules" || entry.name === ".git") continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      listFilesRecursive(full, rootDir, results);
+    } else {
+      results.push(path.relative(rootDir, full));
+    }
+  }
+  return results;
+}
+
 // ── Public API ──────────────────────────────────────────────────────────
 
 /**
@@ -489,7 +510,12 @@ export function testSessionLogContains(workspaceDir: string, text: string): void
 export function testFileContents(workspaceDir: string, relPath: string, expected: string): void {
   const filePath = path.join(workspaceDir, relPath);
   if (!fs.existsSync(filePath)) {
-    throw new Error(`File not found: ${filePath}`);
+    // List files in workspace to help diagnose where the file ended up
+    const fileList = listFilesRecursive(workspaceDir, workspaceDir);
+    throw new Error(
+      `File not found: ${filePath}\n` +
+      `Files in workspace:\n${fileList.join("\n")}`,
+    );
   }
   const contents = fs.readFileSync(filePath, "utf-8");
   if (!contents.includes(expected)) {
@@ -593,6 +619,81 @@ export async function runMasonJson(
   }
   logUpdatesSummary(updates);
   return { ...result, updates };
+}
+
+// ── Artifact Verification ───────────────────────────────────────────────
+
+type ArtifactCheck = { path: string; contains?: string };
+
+/**
+ * Verify that materialized workspace artifacts exist and optionally contain expected content.
+ *
+ * Resolves paths relative to `.mason/docker/<role>/<agentType>/`:
+ * - `buildFiles`     → `build/workspace/project/<path>`
+ * - `homeFiles`      → `home/<path>`
+ * - `workspaceFiles` → `workspace/<path>`
+ *
+ * Throws descriptive errors on missing files or content mismatches.
+ */
+export function testWorkspaceArtifacts(
+  workspaceDir: string,
+  role: string,
+  agentType: string,
+  checks: {
+    buildFiles?: ArtifactCheck[];
+    homeFiles?: ArtifactCheck[];
+    workspaceFiles?: ArtifactCheck[];
+  },
+): void {
+  const baseDir = path.join(workspaceDir, ".mason", "docker", role, agentType);
+
+  const categoryMap: Array<{ category: string; prefix: string; files: ArtifactCheck[] }> = [];
+
+  if (checks.buildFiles?.length) {
+    categoryMap.push({
+      category: "build",
+      prefix: path.join(baseDir, "build", "workspace", "project"),
+      files: checks.buildFiles,
+    });
+  }
+  if (checks.homeFiles?.length) {
+    categoryMap.push({
+      category: "home",
+      prefix: path.join(baseDir, "home"),
+      files: checks.homeFiles,
+    });
+  }
+  if (checks.workspaceFiles?.length) {
+    categoryMap.push({
+      category: "workspace",
+      prefix: path.join(baseDir, "workspace"),
+      files: checks.workspaceFiles,
+    });
+  }
+
+  for (const { category, prefix, files } of categoryMap) {
+    for (const check of files) {
+      const fullPath = path.join(prefix, check.path);
+
+      if (!fs.existsSync(fullPath)) {
+        throw new Error(
+          `[${category}] File not found: ${fullPath}\n` +
+          `Expected artifact at ${category}/${check.path} for role="${role}", agent="${agentType}"`,
+        );
+      }
+
+      if (check.contains) {
+        const contents = fs.readFileSync(fullPath, "utf-8");
+        if (!contents.includes(check.contains)) {
+          throw new Error(
+            `[${category}] File ${check.path} does not contain "${check.contains}".\n` +
+            `Full path: ${fullPath}\n` +
+            `File contents:\n${contents.slice(0, 2000)}`,
+          );
+        }
+      }
+    }
+  }
 }
 
 export { runMasonACP, type AcpResult } from "./acp-client.js";

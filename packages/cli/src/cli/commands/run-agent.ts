@@ -45,7 +45,45 @@ async function defaultResolveRole(
   roleName: string,
   projectDir: string,
 ): Promise<Role> {
-  return resolveRoleByName(roleName, projectDir);
+  try {
+    const role = await resolveRoleByName(roleName, projectDir);
+    return resolveRoleFields(role, projectDir);
+  } catch {
+    // Auto-create the "project" role if it doesn't exist yet (e.g. ACP invocation on fresh dir)
+    if (roleName === "project") {
+      return autoCreateAndResolveProjectRole(projectDir);
+    }
+    throw new Error(
+      `Role "${roleName}" not found. It is not a local role and is not installed as a package (also tried "@clawmasons/role-${roleName}").`,
+    );
+  }
+}
+
+/**
+ * Auto-create and resolve the "project" role when it doesn't exist yet.
+ *
+ * Determines the dialect from the first registered agent that has one,
+ * creates `.mason/roles/project/ROLE.md`, and resolves it through the
+ * full pipeline (wildcard expansion + includes).
+ */
+async function autoCreateAndResolveProjectRole(projectDir: string): Promise<Role> {
+  // Detect ALL agent directories that exist on disk (.claude/, .codex/, etc.)
+  const knownDirs = getKnownDirectories();
+  const existingDirs = knownDirs.filter(
+    (dir) => dir !== "mason" && fs.existsSync(path.join(projectDir, `.${dir}`)),
+  );
+  // Use all existing dirs (or "mason" fallback) so the persisted ROLE.md has all sources
+  const dialectDirs = existingDirs.length > 0 ? existingDirs : ["mason"];
+
+  const created = await createDefaultProjectRole(projectDir, dialectDirs);
+  if (created) {
+    return loadAndResolveProjectRole(projectDir);
+  }
+  // Fallback to in-memory role
+  const sources = existingDirs.length > 0
+    ? existingDirs.map((d) => resolveDialectName(d)).filter((s): s is string => s !== undefined)
+    : ["mason"];
+  return generateProjectRole(projectDir, sources);
 }
 
 /**
@@ -1232,14 +1270,18 @@ Path mapping: host {PROJECT_DIR} → container /home/mason/workspace/project
  */
 export async function createDefaultProjectRole(
   projectDir: string,
-  dialectDir: string,
+  dialectDir: string | string[],
 ): Promise<boolean> {
   const roleDir = path.join(projectDir, ".mason", "roles", "project");
   const rolePath = path.join(roleDir, "ROLE.md");
 
   try {
     fs.mkdirSync(roleDir, { recursive: true });
-    const content = DEFAULT_PROJECT_ROLE_TEMPLATE.replace("{DIALECT_DIR}", dialectDir).replace("{PROJECT_DIR}", projectDir);
+    const dirs = Array.isArray(dialectDir) ? dialectDir : [dialectDir];
+    const sourcesYaml = dirs.map((d) => `  - ${d}`).join("\n");
+    const content = DEFAULT_PROJECT_ROLE_TEMPLATE
+      .replace("  - {DIALECT_DIR}", sourcesYaml)
+      .replace("{PROJECT_DIR}", projectDir);
     fs.writeFileSync(rolePath, content, "utf-8");
     return true;
   } catch (err) {
@@ -1724,6 +1766,39 @@ export async function runAgent(
 // ── Shared Helpers ────────────────────────────────────────────────────
 
 /**
+ * Register signal handlers for Docker session cleanup.
+ * Returns `unregister` (remove listeners on normal exit) and `runCleanup` (invoke in catch blocks).
+ * The cleanup callback is idempotent — safe to call from both signal and catch paths.
+ */
+export function registerSessionCleanup(cleanup: () => Promise<void>): {
+  unregister: () => void;
+  runCleanup: () => Promise<void>;
+} {
+  let cleanedUp = false;
+
+  const runCleanup = async (): Promise<void> => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    await cleanup();
+  };
+
+  const onSignal = async () => {
+    await runCleanup();
+    process.exit(1);
+  };
+
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
+
+  const unregister = (): void => {
+    process.removeListener("SIGINT", onSignal);
+    process.removeListener("SIGTERM", onSignal);
+  };
+
+  return { unregister, runCleanup };
+}
+
+/**
  * Collect declared credential keys from SDK defaults, agent config, role governance, and app-level.
  */
 function collectDeclaredCredentialKeys(
@@ -1845,6 +1920,8 @@ async function runAgentInteractiveMode(
   const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
   const discoverPort = deps?.discoverProxyPortFn ?? discoverProxyPort;
 
+  let sessionCleanup: { unregister: () => void; runCleanup: () => Promise<void> } | undefined;
+
   try {
     // 1. Resolve role from project directory (skip if pre-resolved)
     const roleType = preResolvedRole ?? await resolveRoleFn(role, projectDir);
@@ -1962,6 +2039,11 @@ async function runAgentInteractiveMode(
       throw new Error(`Failed to start host proxy: ${err instanceof Error ? err.message : String(err)}`);
     }
 
+    sessionCleanup = registerSessionCleanup(async () => {
+      try { if (hostProxyHandle) await hostProxyHandle.stop(); } catch { /* best-effort */ }
+      await execCompose(composeFile, ["down", "--volumes"], { verbose });
+    });
+
     // 10. Start agent interactively
     console.log(`  Starting agent (${agentServiceName})...\n`);
 
@@ -1985,11 +2067,13 @@ async function runAgentInteractiveMode(
     } catch { /* best-effort */ }
 
     await execCompose(composeFile, ["down", "--volumes"], { verbose });
+    sessionCleanup.unregister();
 
     console.log(`  Services stopped.`);
     console.log(`  Session retained at: .mason/sessions/${sessionId}/`);
     console.log(`\n  agent complete\n`);
   } catch (error) {
+    if (sessionCleanup) await sessionCleanup.runCleanup();
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\n  agent failed: ${message}\n`);
     process.exit(1);
@@ -2028,6 +2112,7 @@ async function runAgentJsonMode(
   console.error = (...args: unknown[]) => { earlyBuffer.push(args); };
 
   let logger: { log(...args: unknown[]): void; error(...args: unknown[]): void; close(): void } | null = null;
+  let sessionCleanup: { unregister: () => void; runCleanup: () => Promise<void> } | undefined;
 
   try {
     // 1. Resolve role
@@ -2139,6 +2224,11 @@ async function runAgentJsonMode(
       throw new Error(`Failed to start host proxy: ${err instanceof Error ? err.message : String(err)}`);
     }
 
+    sessionCleanup = registerSessionCleanup(async () => {
+      try { if (hostProxyHandle) await hostProxyHandle.stop(); } catch { /* best-effort */ }
+      await execCompose(composeFile, ["down", "--volumes"], { verbose: false });
+    });
+
     // 8. Run agent with stream capture — emit ACP session updates as NDJSON
     console.log(`[json] Starting agent (${agentServiceName})...`);
 
@@ -2184,6 +2274,7 @@ async function runAgentJsonMode(
     console.log(`[json] Agent exited (code ${agentCode}). Tearing down...`);
     try { if (hostProxyHandle) await hostProxyHandle.stop(); } catch { /* best-effort */ }
     await execCompose(composeFile, ["down", "--volumes"], { verbose: false });
+    sessionCleanup.unregister();
 
     // 10. Restore console
     console.log = origLog;
@@ -2195,6 +2286,7 @@ async function runAgentJsonMode(
       process.exit(agentCode);
     }
   } catch (error) {
+    if (sessionCleanup) await sessionCleanup.runCleanup();
     // Restore console for error output
     console.log = origLog;
     console.error = origError;
@@ -2238,6 +2330,7 @@ async function runAgentPrintMode(
   console.error = (...args: unknown[]) => { earlyBuffer.push(args); };
 
   let logger: { log(...args: unknown[]): void; error(...args: unknown[]): void; close(): void } | null = null;
+  let sessionCleanup: { unregister: () => void; runCleanup: () => Promise<void> } | undefined;
 
   try {
     // 1. Resolve role
@@ -2337,6 +2430,11 @@ async function runAgentPrintMode(
       throw new Error(`Failed to start host proxy: ${err instanceof Error ? err.message : String(err)}`);
     }
 
+    sessionCleanup = registerSessionCleanup(async () => {
+      try { if (hostProxyHandle) await hostProxyHandle.stop(); } catch { /* best-effort */ }
+      await execCompose(composeFile, ["down", "--volumes"], { verbose: false });
+    });
+
     // 8. Run agent with stream capture
     console.log(`[print] Starting agent (${agentServiceName})...`);
 
@@ -2376,6 +2474,7 @@ async function runAgentPrintMode(
     console.log(`[print] Agent exited (code ${agentCode}). Tearing down...`);
     try { if (hostProxyHandle) await hostProxyHandle.stop(); } catch { /* best-effort */ }
     await execCompose(composeFile, ["down", "--volumes"], { verbose: false });
+    sessionCleanup.unregister();
 
     // 10. Restore console and output result
     console.log = origLog;
@@ -2393,6 +2492,7 @@ async function runAgentPrintMode(
       process.exit(agentCode);
     }
   } catch (error) {
+    if (sessionCleanup) await sessionCleanup.runCleanup();
     // Restore console for error output
     console.log = origLog;
     console.error = origError;
@@ -2447,6 +2547,8 @@ async function runAgentDevContainerMode(
   const waitForProxyHealth = deps?.waitForProxyHealthFn ?? defaultWaitForProxyHealth;
   const discoverPort = deps?.discoverProxyPortFn ?? discoverProxyPort;
   const adaptRoleFn = deps?.adaptRoleFn ?? defaultAdaptRole;
+
+  let sessionCleanup: { unregister: () => void; runCleanup: () => Promise<void> } | undefined;
 
   try {
     // 1. Resolve role (skip if pre-resolved)
@@ -2563,6 +2665,11 @@ async function runAgentDevContainerMode(
     });
     console.log(`  Host proxy connected.`);
 
+    sessionCleanup = registerSessionCleanup(async () => {
+      try { await hostProxyHandle.stop(); } catch { /* best-effort */ }
+      await execCompose(composeFile, ["down", "--volumes"], { verbose });
+    });
+
     // 10. Build and start agent container in background (detached)
     if (rebuilt || buildMode) {
       console.log(`\n  Building agent (${agentServiceName})...`);
@@ -2597,7 +2704,8 @@ async function runAgentDevContainerMode(
     // 12. Prompt to launch VSCode
     await promptAndLaunchVscode(containerName, "/home/mason/workspace/project");
 
-    // 13. Stay alive until Ctrl+C
+    // 13. Stay alive until Ctrl+C — signal triggers cleanup via registerSessionCleanup,
+    //     but we also need to wait here so the process doesn't exit prematurely.
     console.log(`  Session running. Press Ctrl+C to tear down.\n`);
     await new Promise<void>((resolve) => {
       const onSignal = () => resolve();
@@ -2609,11 +2717,13 @@ async function runAgentDevContainerMode(
     console.log(`\n  Tearing down services...`);
     try { await hostProxyHandle.stop(); } catch { /* best-effort */ }
     await execCompose(composeFile, ["down", "--volumes"], { verbose });
+    sessionCleanup.unregister();
     console.log(`  Services stopped.`);
     console.log(`  Session retained at: .mason/sessions/${sessionId}/`);
     console.log(`\n  dev-container session complete\n`);
 
   } catch (error) {
+    if (sessionCleanup) await sessionCleanup.runCleanup();
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\n  dev-container failed: ${message}\n`);
     process.exit(1);

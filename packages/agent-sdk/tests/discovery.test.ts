@@ -21,6 +21,7 @@ import {
   resolveAgentPackageName,
   ensureMasonPackageJson,
   autoInstallAgent,
+  hasDevSymlinks,
   syncExtensionVersions,
   resolveAgentWithAutoInstall,
 } from "../src/discovery.js";
@@ -1449,5 +1450,91 @@ describe("E2E validation: auto-install + discovery integration", () => {
     const agents = await discoverInstalledAgents(tmpDir);
     expect(agents).toHaveLength(1);
     expect(agents[0]!.name).toBe("valid-agent");
+  });
+});
+
+// ── hasDevSymlinks ───────────────────────────────────────────────────
+
+describe("hasDevSymlinks", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mason-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns false when scope dir does not exist", () => {
+    expect(hasDevSymlinks(tmpDir)).toBe(false);
+  });
+
+  it("returns false when scope dir has only real directories", () => {
+    const scopeDir = path.join(tmpDir, ".mason", "node_modules", "@clawmasons");
+    fs.mkdirSync(path.join(scopeDir, "some-agent"), { recursive: true });
+    expect(hasDevSymlinks(tmpDir)).toBe(false);
+  });
+
+  it("returns true when scope dir contains a symlink", () => {
+    const scopeDir = path.join(tmpDir, ".mason", "node_modules", "@clawmasons");
+    fs.mkdirSync(scopeDir, { recursive: true });
+    // Create a real dir to symlink to
+    const realDir = path.join(tmpDir, "real-agent");
+    fs.mkdirSync(realDir);
+    fs.symlinkSync(realDir, path.join(scopeDir, "linked-agent"), "dir");
+    expect(hasDevSymlinks(tmpDir)).toBe(true);
+  });
+
+  it("autoInstallAgent skips npm update when dev symlinks exist", () => {
+    // Set up scope dir with a symlink
+    const scopeDir = path.join(tmpDir, ".mason", "node_modules", "@clawmasons");
+    fs.mkdirSync(scopeDir, { recursive: true });
+    const realDir = path.join(tmpDir, "real-agent");
+    fs.mkdirSync(realDir);
+    fs.symlinkSync(realDir, path.join(scopeDir, "linked-agent"), "dir");
+    // Write package.json so autoInstallAgent doesn't fail
+    fs.writeFileSync(
+      path.join(tmpDir, ".mason", "package.json"),
+      JSON.stringify({ name: "mason-extensions", private: true, dependencies: {} }),
+      "utf-8",
+    );
+
+    mockExecSync.mockClear();
+    autoInstallAgent(tmpDir, "@clawmasons/codex-agent", "0.1.6");
+
+    // Should still write the dependency
+    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, ".mason", "package.json"), "utf-8"));
+    expect(content.dependencies["@clawmasons/codex-agent"]).toBe("~0.1.6");
+    // But should NOT call npm update
+    expect(mockExecSync).not.toHaveBeenCalled();
+  });
+
+  it("syncExtensionVersions skips npm update when dev symlinks exist", () => {
+    // Set up scope dir with a symlink
+    const scopeDir = path.join(tmpDir, ".mason", "node_modules", "@clawmasons");
+    fs.mkdirSync(scopeDir, { recursive: true });
+    const realDir = path.join(tmpDir, "real-agent");
+    fs.mkdirSync(realDir);
+    fs.symlinkSync(realDir, path.join(scopeDir, "linked-agent"), "dir");
+    // Write package.json with existing deps
+    fs.writeFileSync(
+      path.join(tmpDir, ".mason", "package.json"),
+      JSON.stringify({
+        name: "mason-extensions",
+        private: true,
+        dependencies: { "@clawmasons/codex-agent": "~0.1.5" },
+      }),
+      "utf-8",
+    );
+
+    mockExecSync.mockClear();
+    syncExtensionVersions(tmpDir, "0.2.0");
+
+    // Should still rewrite versions
+    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, ".mason", "package.json"), "utf-8"));
+    expect(content.dependencies["@clawmasons/codex-agent"]).toBe("~0.2.0");
+    // But should NOT call npm update
+    expect(mockExecSync).not.toHaveBeenCalled();
   });
 });

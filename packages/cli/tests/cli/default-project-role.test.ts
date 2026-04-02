@@ -119,6 +119,17 @@ describe("createDefaultProjectRole", () => {
     expect(content).toContain("# mcp:");
     expect(content).not.toMatch(/^mcp:/m);
   });
+
+  it("generates multi-source YAML when given an array of dirs", async () => {
+    await createDefaultProjectRole(tmpDir, ["claude", "codex"]);
+
+    const content = fs.readFileSync(
+      path.join(tmpDir, ".mason", "roles", "project", "ROLE.md"),
+      "utf-8",
+    );
+
+    expect(content).toContain("sources:\n  - claude\n  - codex");
+  });
 });
 
 // ── loadAndResolveProjectRole ──────────────────────────────────────────

@@ -633,6 +633,60 @@ Circular include test — looper includes project.
       expect(output).toContain("Circular role inclusion");
     });
 
+    it("auto-creates project role when --role project is specified on fresh directory", () => {
+      if (!isDockerAvailable()) return;
+
+      const ws = createProjectRoleWorkspace("dpr-explicit-role-fresh");
+      workspacesToClean.push(ws);
+
+      // Remove any pre-existing .mason/roles/project/ to simulate fresh dir
+      const projectRoleDir = path.join(ws, ".mason", "roles", "project");
+      if (fs.existsSync(projectRoleDir)) {
+        fs.rmSync(projectRoleDir, { recursive: true, force: true });
+      }
+
+      const rolePath = path.join(projectRoleDir, "ROLE.md");
+      expect(fs.existsSync(rolePath)).toBe(false);
+
+      // Run with explicit --role project — should auto-create the role
+      const result = masonExecExpectError(
+        ["run", "--agent", "claude", "--role", "project"],
+        ws,
+        { timeout: 30_000 },
+      );
+
+      const output = result.stderr + result.stdout;
+      // Should NOT fail with "Role project not found"
+      expect(output).not.toContain("Role \"project\" not found");
+
+      // The ROLE.md should have been auto-created
+      expect(fs.existsSync(rolePath)).toBe(true);
+    });
+
+    it("expands wildcard skills in auto-created project role", () => {
+      if (!isDockerAvailable()) return;
+
+      const ws = createProjectRoleWorkspace("dpr-wildcard-skill-expand");
+      workspacesToClean.push(ws);
+
+      // Verify the fixture has the testing skill
+      const skillPath = path.join(ws, ".claude", "skills", "testing", "SKILL.md");
+      expect(fs.existsSync(skillPath)).toBe(true);
+
+      // Run mason without --role — auto-creates and resolves project role with wildcards
+      const result = masonExecExpectError(
+        ["run", "--agent", "claude"],
+        ws,
+        { timeout: 30_000 },
+      );
+
+      const output = result.stderr + result.stdout;
+      // Wildcard expansion should succeed — no "skill * not found" warning
+      expect(output).not.toContain('skill "*" not found');
+      // Task wildcard should also expand — no "task * not found" warning
+      expect(output).not.toContain('task "*" not found');
+    });
+
     it("falls back to in-memory role when directory is read-only (UC-7)", () => {
       if (!isDockerAvailable()) return;
       // Skip on CI or environments where chmod may not work as expected

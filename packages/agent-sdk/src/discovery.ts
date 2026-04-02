@@ -860,6 +860,28 @@ export function ensureMasonPackageJson(projectDir: string): void {
 }
 
 /**
+ * Check whether any package in `.mason/node_modules/@clawmasons/` is a symlink.
+ * Symlinks indicate a dev environment where local sources are linked in
+ * (e.g. via `scripts/mason.js`). In that case, `npm update` should be skipped
+ * to avoid overwriting dev symlinks with registry versions.
+ */
+export function hasDevSymlinks(projectDir: string): boolean {
+  const scopeDir = path.join(projectDir, ".mason", "node_modules", "@clawmasons");
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(scopeDir);
+  } catch {
+    return false;
+  }
+  for (const entry of entries) {
+    try {
+      if (fs.lstatSync(path.join(scopeDir, entry)).isSymbolicLink()) return true;
+    } catch { /* skip */ }
+  }
+  return false;
+}
+
+/**
  * Auto-install an agent package into `.mason/node_modules/`.
  *
  * Writes (or updates) the dependency in `.mason/package.json` with a tilde-pinned
@@ -884,8 +906,10 @@ export function autoInstallAgent(projectDir: string, packageName: string, cliVer
 
   fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2) + "\n", "utf-8");
 
-  const masonDir = path.join(projectDir, ".mason");
-  execSync("npm update", { cwd: masonDir, stdio: "inherit" });
+  if (!hasDevSymlinks(projectDir)) {
+    const masonDir = path.join(projectDir, ".mason");
+    execSync("npm update", { cwd: masonDir, stdio: "inherit" });
+  }
 }
 
 /**
@@ -917,8 +941,10 @@ export function syncExtensionVersions(projectDir: string, cliVersion: string): v
 
   fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2) + "\n", "utf-8");
 
-  const masonDir = path.join(projectDir, ".mason");
-  execSync("npm update", { cwd: masonDir, stdio: "inherit" });
+  if (!hasDevSymlinks(projectDir)) {
+    const masonDir = path.join(projectDir, ".mason");
+    execSync("npm update", { cwd: masonDir, stdio: "inherit" });
+  }
 }
 
 /**
