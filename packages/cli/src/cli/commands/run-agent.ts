@@ -16,7 +16,8 @@ import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.
 import { HostProxy } from "@clawmasons/proxy";
 import { createFileLogger, type FileLogger } from "../../utils/file-logger.js";
 import { generateRoleDockerBuildDir, createSessionDirectory, getHostIds } from "../../materializer/docker-generator.js";
-import { ensureProxyDependencies, copyAgentEntryBundle } from "../../materializer/proxy-dependencies.js";
+import { ensureProxyDependencies, ensureSharedProxyBundle, copyAgentEntryBundle } from "../../materializer/proxy-dependencies.js";
+import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
 import { validateSessionUpdate as validateAcpUpdate } from "../../acp/validate-session-update.js";
 
 // ── Local type alias (mirrors DevContainerCustomizations from agent-sdk) ──────
@@ -552,12 +553,18 @@ export async function ensureDockerBuild(
       jsonMode: deps?.jsonMode,
     });
 
-    // Generate Docker dependencies (bundles + config) for this role
+    // Generate shared proxy Dockerfile + bundle (once, outside per-role)
+    const sharedProxyDir = path.join(dockerDir, "mcp-proxy");
+    fs.mkdirSync(sharedProxyDir, { recursive: true });
+    fs.writeFileSync(path.join(sharedProxyDir, "Dockerfile"), generateProxyDockerfile());
+    ensureSharedProxyBundle(dockerDir);
+
+    // Generate Docker dependencies (bundles + per-role config)
     copyAgentEntryBundle(dockerDir);
     ensureProxyDependencies(dockerDir, roleType);
 
-    // Create per-role cache directory for NODE_COMPILE_CACHE and NPM_CONFIG_CACHE
-    fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy", ".cache"), { recursive: true });
+    // Create shared cache directory for NODE_COMPILE_CACHE and NPM_CONFIG_CACHE
+    fs.mkdirSync(path.join(sharedProxyDir, ".cache"), { recursive: true });
 
     // Write packages hash so future runs can detect changes
     fs.writeFileSync(hashFilePath, packagesHash);
@@ -1392,6 +1399,13 @@ function createRunAction(overrideRole?: string, overridePrompt?: string) {
     // Auto-init .mason/config.json when an agent name is provided
     if (agentInput) {
       ensureMasonConfig(projectDir);
+
+      // Dev mode (scripts/mason.js): re-run agent linking now that .mason/ exists.
+      // On first run the directory didn't exist when mason.js ran its startup link pass.
+      const devLinker = (globalThis as Record<string, unknown>).__masonDevLinker;
+      if (typeof devLinker === "function") {
+        (devLinker as () => void)();
+      }
     }
 
     // Initialize agent registry early so agent type resolution can discover installed agents

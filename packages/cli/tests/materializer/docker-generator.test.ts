@@ -256,10 +256,9 @@ describe("generateRoleDockerBuildDir", () => {
     expect(writtenFiles.has(agentDockerfile)).toBe(true);
     expect(writtenFiles.get(agentDockerfile)).toContain("FROM");
 
-    // Proxy Dockerfile exists
+    // Proxy Dockerfile is NOT generated per-role (shared at .mason/docker/mcp-proxy/)
     const proxyDockerfile = path.join(result.buildDir, "mcp-proxy", "Dockerfile");
-    expect(writtenFiles.has(proxyDockerfile)).toBe(true);
-    expect(writtenFiles.get(proxyDockerfile)).toContain("FROM node:22-slim");
+    expect(writtenFiles.has(proxyDockerfile)).toBe(false);
 
     // Reference compose exists
     const composeFile = path.join(result.buildDir, "docker-compose.yaml");
@@ -298,10 +297,9 @@ describe("generateRoleDockerBuildDir", () => {
     );
 
     expect(result.agentDockerfilePath).toBe("claude-code-agent/Dockerfile");
-    expect(result.proxyDockerfilePath).toBe("mcp-proxy/Dockerfile");
   });
 
-  it("proxy Dockerfile uses node:22-slim and @clawmasons/proxy", () => {
+  it("does not generate proxy Dockerfile per-role (shared at docker root)", () => {
     const writtenFiles = new Map<string, string>();
 
     generateRoleDockerBuildDir(
@@ -320,10 +318,7 @@ describe("generateRoleDockerBuildDir", () => {
     const proxyDockerfile = [...writtenFiles.entries()].find(([k]) =>
       k.includes("mcp-proxy/Dockerfile"),
     );
-    expect(proxyDockerfile).toBeDefined();
-    expect(proxyDockerfile![1]).toContain("FROM node:22-slim");
-    expect(proxyDockerfile![1]).toContain("mason");
-    expect(proxyDockerfile![1]).toContain("proxy");
+    expect(proxyDockerfile).toBeUndefined();
   });
 
   it("generates .claude.json in home/ (not build/workspace/project/) and SKILL.md in build/workspace/project/", () => {
@@ -475,6 +470,29 @@ describe("generateSessionComposeYml", () => {
     expect(yml).toContain("services:");
     expect(yml).toContain("proxy-create-prd:");
     expect(yml).toContain("agent-create-prd:");
+  });
+
+  it("uses shared proxy image name without role suffix", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+
+    // Image should be mason-{hash}-proxy, NOT mason-{hash}-proxy-create-prd
+    expect(yml).toMatch(/image: mason-[a-f0-9]+-proxy\n/);
+    expect(yml).not.toMatch(/image:.*proxy-create-prd/);
+  });
+
+  it("mounts proxy-config.json as read-only volume from per-role path", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+    const proxySection = yml.split("agent-create-prd:")[0]!;
+
+    expect(proxySection).toContain("create-prd/mcp-proxy/proxy-config.json:/app/proxy-config.json:ro");
+  });
+
+  it("uses shared mcp-proxy/ as build context for proxy", () => {
+    const yml = generateSessionComposeYml(baseOpts);
+    const proxySection = yml.split("agent-create-prd:")[0]!;
+
+    expect(proxySection).toContain("/mcp-proxy");
+    expect(proxySection).toContain("dockerfile: Dockerfile");
   });
 
   it("includes volume masking for directories as named volumes (skipping overlay conflicts)", () => {

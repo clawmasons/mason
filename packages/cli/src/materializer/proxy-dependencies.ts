@@ -35,29 +35,33 @@ const CLI_PACKAGE_ROOT = path.resolve(__dirname, "../..");
 // ---------------------------------------------------------------------------
 
 /**
- * Ensure the proxy Docker build context has the proxy bundle and a
- * pre-resolved `proxy-config.json` for the given role.
+ * Copy the proxy bundle to the shared `mcp-proxy/` directory.
  *
- * - Copies `proxy-bundle.cjs` to `dockerDir/` (shared across roles, idempotent).
- * - Generates `proxy-config.json` in the role's `mcp-proxy/` subdirectory.
+ * This should be called once per build (outside the per-role loop).
+ * The shared directory at `dockerDir/mcp-proxy/` holds both the
+ * Dockerfile and `proxy-bundle.cjs`.
  *
- * Replaces the previous approach of copying `node_modules/` into the build
- * context. The proxy now reads config from JSON instead of scanning the
- * filesystem for packages.
+ * @param dockerDir - The Docker build root directory (`.mason/docker/`).
+ */
+export function ensureSharedProxyBundle(dockerDir: string): void {
+  const sharedProxyDir = path.join(dockerDir, "mcp-proxy");
+  fs.mkdirSync(sharedProxyDir, { recursive: true });
+  copyProxyBundle(sharedProxyDir);
+}
+
+/**
+ * Generate per-role `proxy-config.json` for the given role.
+ *
+ * Writes `proxy-config.json` to `dockerDir/{roleName}/mcp-proxy/`.
+ * The proxy container reads this config at runtime via a volume mount.
  *
  * @param dockerDir  - The Docker build root directory (`.mason/docker/`).
  * @param role       - The Role to generate proxy config for.
- * @param projectDir - The project root (unused after node_modules removal,
- *                     kept for call-site compatibility).
  */
 export function ensureProxyDependencies(
   dockerDir: string,
   role: Role,
 ): void {
-  // 1. Copy proxy bundle (shared, idempotent)
-  copyProxyBundle(dockerDir);
-
-  // 2. Generate proxy-config.json for this role
   const roleName = getAppShortName(role.metadata.name);
   const proxyDir = path.join(dockerDir, roleName, "mcp-proxy");
   fs.mkdirSync(proxyDir, { recursive: true });

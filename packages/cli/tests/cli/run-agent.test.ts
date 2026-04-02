@@ -386,7 +386,7 @@ describe("generateSessionComposeYml (run-agent scenarios)", () => {
     expect(yml).toContain("proxy-writer:");
     expect(yml).toContain("agent-writer:");
     expect(yml).not.toContain("credential-service:");
-    expect(yml).toContain("mcp-proxy/Dockerfile");
+    expect(yml).toContain("mcp-proxy");
     expect(yml).toContain("/home/mason/workspace/project");
     expect(yml).toContain('"127.0.0.1::9090"');
     expect(yml).toContain("stdin_open: true");
@@ -1019,7 +1019,7 @@ describe("runAgent", () => {
     const content = fs.readFileSync(composeFile, "utf-8");
 
     // Uses relative paths now
-    expect(content).toContain("mcp-proxy/Dockerfile");
+    expect(content).toContain("mcp-proxy");
     expect(content).toContain("claude-code-agent/Dockerfile");
   });
 
