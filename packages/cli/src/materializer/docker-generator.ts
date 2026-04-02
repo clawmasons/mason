@@ -253,7 +253,7 @@ export function generateRoleDockerBuildDir(
     writeFileSync: fsDeps?.writeFileSync ?? fs.writeFileSync,
   };
 
-  const { role, agentType, projectDir, agentName, proxyEndpoint } = opts;
+  const { role, agentType, projectDir, proxyEndpoint } = opts;
   const roleName = getAppShortName(role.metadata.name);
   const buildRoot = opts.dockerBuildRoot ?? path.join(projectDir, ".mason", "docker");
   const buildDir = path.join(buildRoot, roleName);
@@ -355,7 +355,7 @@ export function generateRoleDockerBuildDir(
   const proxyDir = path.join(buildDir, "mcp-proxy");
   deps.mkdirSync(proxyDir, { recursive: true });
 
-  const proxyDockerfile = generateProxyDockerfile(agentRole, agentName);
+  const proxyDockerfile = generateProxyDockerfile(agentRole);
   deps.writeFileSync(path.join(proxyDir, "Dockerfile"), proxyDockerfile);
 
   // --- Reference docker-compose.yaml ---

@@ -16,7 +16,7 @@ import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.
 import { HostProxy } from "@clawmasons/proxy";
 import { createFileLogger, type FileLogger } from "../../utils/file-logger.js";
 import { generateRoleDockerBuildDir, createSessionDirectory, getHostIds } from "../../materializer/docker-generator.js";
-import { ensureProxyDependencies, synthesizeRolePackages } from "../../materializer/proxy-dependencies.js";
+import { ensureProxyDependencies, copyAgentEntryBundle } from "../../materializer/proxy-dependencies.js";
 import { validateSessionUpdate as validateAcpUpdate } from "../../acp/validate-session-update.js";
 
 // ── Local type alias (mirrors DevContainerCustomizations from agent-sdk) ──────
@@ -552,11 +552,9 @@ export async function ensureDockerBuild(
       jsonMode: deps?.jsonMode,
     });
 
-    // Populate shared proxy dependencies
-    ensureProxyDependencies(dockerDir, projectDir);
-
-    // Synthesize inline app/role packages (e.g. mcp from ROLE.md)
-    synthesizeRolePackages(roleType, dockerDir);
+    // Generate Docker dependencies (bundles + config) for this role
+    copyAgentEntryBundle(dockerDir);
+    ensureProxyDependencies(dockerDir, roleType);
 
     // Create per-role cache directory for NODE_COMPILE_CACHE and NPM_CONFIG_CACHE
     fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy", ".cache"), { recursive: true });

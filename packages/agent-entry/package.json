@@ -9,7 +9,8 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    }
+    },
+    "./bin": "./dist/agent-entry.js"
   },
   "bin": {
     "agent-entry": "./dist/agent-entry.js"

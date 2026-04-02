@@ -70,6 +70,12 @@ export {
   type ToolFilter,
 } from "./toolfilter.js";
 
+// Proxy config (build-time generated, read at proxy startup)
+export type {
+  ProxyConfigFile,
+  ProxyConfigUpstream,
+} from "./types/proxy-config.js";
+
 // Role module (dialect registry, parser, resource scanner)
 export {
   registerDialect,

@@ -165,12 +165,12 @@ describe("generateAgentDockerfile", () => {
     expect(result).toContain("writer");
   });
 
-  it("copies materialized workspace files", () => {
+  it("copies materialized workspace files with --chown", () => {
     const agent = makeNoteTakerAgent();
     const writerRole = agent.roles[0];
     const result = generateAgentDockerfile(agent, writerRole);
 
-    expect(result).toContain("COPY writer/claude-code-agent/build/workspace/");
+    expect(result).toContain("COPY --chown=mason:mason writer/claude-code-agent/build/workspace/");
     expect(result).toContain("/home/mason/workspace/");
     expect(result).not.toContain("COPY writer/claude-code-agent/workspace/");
   });
@@ -181,6 +181,25 @@ describe("generateAgentDockerfile", () => {
 
     expect(result).toContain("claude-code-agent");
     expect(result).toContain('ENTRYPOINT ["agent-entry"]');
+  });
+
+  it("copies agent-entry bundle to /usr/local/bin and makes it executable", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).toContain("COPY agent-entry.js /usr/local/bin/agent-entry");
+    expect(result).toContain("RUN chmod +x /usr/local/bin/agent-entry");
+  });
+
+  it("installs agent-entry before USER mason", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    const copyPos = result.indexOf("COPY agent-entry.js /usr/local/bin/agent-entry");
+    const userPos = result.indexOf("USER mason");
+
+    expect(copyPos).toBeGreaterThan(-1);
+    expect(userPos).toBeGreaterThan(copyPos);
   });
 
   it("installs pi-coding-agent runtime and uses agent-entry entrypoint", () => {
@@ -210,18 +229,12 @@ describe("generateAgentDockerfile", () => {
     expect(result).not.toContain("LLM provider environment");
   });
 
-  it("copies node_modules from local build context", () => {
+  it("does not copy node_modules (agent-entry is self-contained)", () => {
     const agent = makeNoteTakerAgent();
     const result = generateAgentDockerfile(agent, agent.roles[0]);
 
-    expect(result).toContain("COPY node_modules/ /app/node_modules/");
-  });
-
-  it("adds node_modules/.bin to PATH for agent-entry access", () => {
-    const agent = makeNoteTakerAgent();
-    const result = generateAgentDockerfile(agent, agent.roles[0]);
-
-    expect(result).toContain('ENV PATH="/app/node_modules/.bin:$PATH"');
+    expect(result).not.toContain("COPY node_modules/");
+    expect(result).not.toContain("node_modules/.bin");
   });
 
   it("creates .claude directory for credential file installation", () => {
@@ -246,8 +259,8 @@ describe("generateAgentDockerfile", () => {
     const reviewerResult = generateAgentDockerfile(agent, agent.roles[1]);
 
     // They should differ in workspace COPY paths
-    expect(writerResult).toContain("writer/claude-code-agent/build/workspace/");
-    expect(reviewerResult).toContain("reviewer/claude-code-agent/build/workspace/");
+    expect(writerResult).toContain("COPY --chown=mason:mason writer/claude-code-agent/build/workspace/");
+    expect(reviewerResult).toContain("COPY --chown=mason:mason reviewer/claude-code-agent/build/workspace/");
   });
 
   // ── Base Image Tests ──────────────────────────────────────────────────
@@ -390,7 +403,7 @@ describe("generateAgentDockerfile", () => {
     const agent = makeNoteTakerAgent();
     const result = generateAgentDockerfile(agent, agent.roles[0], { hasHome: false });
 
-    expect(result).not.toContain("COPY writer/claude-code-agent/home/");
+    expect(result).not.toContain("COPY --chown=mason:mason writer/claude-code-agent/home/");
     expect(result).not.toContain("mason-from-build");
   });
 
@@ -401,12 +414,11 @@ describe("generateAgentDockerfile", () => {
     expect(result).not.toContain("mason-from-build");
   });
 
-  it("includes home COPY and backup when hasHome is true", () => {
+  it("includes home COPY with --chown and backup when hasHome is true", () => {
     const agent = makeNoteTakerAgent();
     const result = generateAgentDockerfile(agent, agent.roles[0], { hasHome: true });
 
-    expect(result).toContain("COPY writer/claude-code-agent/home/ /home/mason/");
-    expect(result).toContain("chown -R mason:mason /home/mason");
+    expect(result).toContain("COPY --chown=mason:mason writer/claude-code-agent/home/ /home/mason/");
     expect(result).toContain("cp -a /home/mason /home/mason-from-build");
   });
 
@@ -414,7 +426,7 @@ describe("generateAgentDockerfile", () => {
     const agent = makeNoteTakerAgent();
     const reviewerResult = generateAgentDockerfile(agent, agent.roles[1], { hasHome: true });
 
-    expect(reviewerResult).toContain("COPY reviewer/claude-code-agent/home/ /home/mason/");
+    expect(reviewerResult).toContain("COPY --chown=mason:mason reviewer/claude-code-agent/home/ /home/mason/");
   });
 
   // ── Role Type Tests ────────────────────────────────────────────────────
@@ -449,6 +461,32 @@ describe("generateAgentDockerfile", () => {
     expect(result).toContain("build/workspace/");
   });
 
+  it("creates mason user BEFORE workspace COPY for --chown support", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    const groupaddPos = result.indexOf("groupadd");
+    const workspaceCopyPos = result.indexOf("COPY --chown=mason:mason writer/claude-code-agent/build/workspace/");
+
+    expect(groupaddPos).toBeGreaterThan(-1);
+    expect(workspaceCopyPos).toBeGreaterThan(groupaddPos);
+  });
+
+  it("does not have separate chown -R for workspace (handled by --chown)", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).not.toContain("chown -R mason:mason /home/mason/workspace");
+  });
+
+  it("does not have chown -R /app (no node_modules to own)", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateAgentDockerfile(agent, agent.roles[0]);
+
+    expect(result).not.toContain("chown -R mason:mason /app");
+    expect(result).not.toContain("chown -R mason:mason /home/mason /app");
+  });
+
   it("sets workspaceFolder to /home/mason/workspace/project in devcontainer label for project role", () => {
     const agent = makeNoteTakerAgent();
     const result = generateAgentDockerfile(agent, agent.roles[0]);
@@ -470,7 +508,7 @@ describe("generateAgentDockerfile", () => {
 describe("generateProxyDockerfile", () => {
   it("returns a non-empty Dockerfile string", () => {
     const agent = makeNoteTakerAgent();
-    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+    const result = generateProxyDockerfile(agent.roles[0]);
 
     expect(result).toBeTypeOf("string");
     expect(result.length).toBeGreaterThan(0);
@@ -478,21 +516,21 @@ describe("generateProxyDockerfile", () => {
 
   it("uses node:22-slim as base image", () => {
     const agent = makeNoteTakerAgent();
-    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+    const result = generateProxyDockerfile(agent.roles[0]);
 
     expect(result).toContain("FROM node:22-slim");
   });
 
   it("sets USER mason", () => {
     const agent = makeNoteTakerAgent();
-    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+    const result = generateProxyDockerfile(agent.roles[0]);
 
     expect(result).toContain("USER mason");
   });
 
   it("creates mason user with host-matching UID/GID", () => {
     const agent = makeNoteTakerAgent();
-    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+    const result = generateProxyDockerfile(agent.roles[0]);
 
     expect(result).toContain("ARG HOST_UID=1000");
     expect(result).toContain("ARG HOST_GID=1000");
@@ -503,61 +541,79 @@ describe("generateProxyDockerfile", () => {
 
   it("does not install native build tools (no native addons needed)", () => {
     const agent = makeNoteTakerAgent();
-    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+    const result = generateProxyDockerfile(agent.roles[0]);
 
     expect(result).not.toContain("python3 make g++");
     expect(result).not.toContain("better-sqlite3");
   });
 
-  it("uses bundled proxy entry point with agent name", () => {
+  it("uses bundled proxy entry point with streamable-http transport", () => {
     const agent = makeNoteTakerAgent();
-    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+    const result = generateProxyDockerfile(agent.roles[0]);
 
     expect(result).toContain('ENTRYPOINT ["node", "proxy-bundle.cjs"]');
-    expect(result).toContain('CMD ["--agent", "@acme.platform/agent-note-taker", "--transport", "streamable-http"]');
+    expect(result).toContain('CMD ["--transport", "streamable-http"]');
+    expect(result).not.toContain("--agent");
   });
 
   it("includes role name in header comment", () => {
     const agent = makeNoteTakerAgent();
-    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+    const result = generateProxyDockerfile(agent.roles[0]);
 
     expect(result).toContain("writer");
   });
 
-  it("copies node_modules from local build context", () => {
+  it("copies proxy-config.json with --chown instead of node_modules", () => {
     const agent = makeNoteTakerAgent();
-    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+    const result = generateProxyDockerfile(agent.roles[0]);
 
-    expect(result).toContain("COPY node_modules/ ./node_modules/");
+    expect(result).toContain("COPY --chown=mason:mason writer/mcp-proxy/proxy-config.json ./");
+    expect(result).not.toContain("COPY node_modules/");
+    expect(result).not.toContain("COPY package.json");
   });
 
   it("does not reference any registry pull", () => {
     const agent = makeNoteTakerAgent();
-    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+    const result = generateProxyDockerfile(agent.roles[0]);
 
     expect(result).not.toContain("docker.io");
     expect(result).not.toContain("ghcr.io");
   });
 
-  it("embeds the correct agent name in CMD", () => {
+  it("copies proxy bundle with --chown", () => {
     const agent = makeNoteTakerAgent();
-    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+    const result = generateProxyDockerfile(agent.roles[0]);
 
-    expect(result).toContain("@acme.platform/agent-note-taker");
+    expect(result).toContain("COPY --chown=mason:mason proxy-bundle.cjs ./");
   });
 
-  it("generates different header comments per role", () => {
+  it("generates different header comments and config paths per role", () => {
     const agent = makeNoteTakerAgent();
-    const writerResult = generateProxyDockerfile(agent.roles[0], agent.name);
-    const reviewerResult = generateProxyDockerfile(agent.roles[1], agent.name);
+    const writerResult = generateProxyDockerfile(agent.roles[0]);
+    const reviewerResult = generateProxyDockerfile(agent.roles[1]);
 
     expect(writerResult).toContain("role: writer");
+    expect(writerResult).toContain("writer/mcp-proxy/proxy-config.json");
     expect(reviewerResult).toContain("role: reviewer");
+    expect(reviewerResult).toContain("reviewer/mcp-proxy/proxy-config.json");
+  });
+
+  it("creates mason user BEFORE COPY statements (for --chown)", () => {
+    const agent = makeNoteTakerAgent();
+    const result = generateProxyDockerfile(agent.roles[0]);
+
+    const groupaddPos = result.indexOf("groupadd");
+    const copyBundlePos = result.indexOf("COPY --chown=mason:mason proxy-bundle.cjs");
+    const copyConfigPos = result.indexOf("COPY --chown=mason:mason writer/mcp-proxy/proxy-config.json");
+
+    expect(groupaddPos).toBeGreaterThan(-1);
+    expect(copyBundlePos).toBeGreaterThan(groupaddPos);
+    expect(copyConfigPos).toBeGreaterThan(groupaddPos);
   });
 
   it("sets NODE_COMPILE_CACHE and NPM_CONFIG_CACHE env vars", () => {
     const agent = makeNoteTakerAgent();
-    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+    const result = generateProxyDockerfile(agent.roles[0]);
 
     expect(result).toContain("ENV NODE_COMPILE_CACHE=/app/.cache/v8");
     expect(result).toContain("ENV NPM_CONFIG_CACHE=/app/.cache/npm");
@@ -565,7 +621,7 @@ describe("generateProxyDockerfile", () => {
 
   it("creates both v8 and npm cache directories", () => {
     const agent = makeNoteTakerAgent();
-    const result = generateProxyDockerfile(agent.roles[0], agent.name);
+    const result = generateProxyDockerfile(agent.roles[0]);
 
     expect(result).toContain("/app/.cache/v8");
     expect(result).toContain("/app/.cache/npm");
