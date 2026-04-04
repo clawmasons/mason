@@ -817,7 +817,16 @@ async function handleResume(
     try {
       execSync(`docker image inspect "${imageName}"`, { stdio: "ignore" });
     } catch {
-      console.error(`\n  Error: Docker image "${imageName}" not found. The session's container image may have been removed.\n`);
+      // Distinguish Docker-not-available from image-not-found
+      try {
+        execSync("docker info", { stdio: "ignore", timeout: 5_000 });
+      } catch {
+        console.error(`\n  Error: Docker is not available. Ensure Docker Desktop is running.\n`);
+        process.exit(1);
+        return;
+      }
+      console.error(`\n  Error: Docker image "${imageName}" not found. The session's container image may have been removed.`);
+      console.error(`  Tip: Run "mason run --agent ${session.agent} --role ${session.role}" to create a new session with rebuilt images.\n`);
       process.exit(1);
       return;
     }
