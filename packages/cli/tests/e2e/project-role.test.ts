@@ -61,7 +61,7 @@ function copyDirRecursive(src: string, dest: string): void {
 function createProjectRoleWorkspace(name: string): string {
   const fixtureDir = path.join(FIXTURES_BASE, "project-role");
   const timestamp = Date.now();
-  const workspaceDir = path.join(E2E_ROOT, "tmp", `${name}-${timestamp}`);
+  const workspaceDir = path.join(process.cwd(), "tmp", `${name}-${timestamp}`);
   fs.mkdirSync(workspaceDir, { recursive: true });
 
   copyDirRecursive(fixtureDir, workspaceDir);
@@ -74,7 +74,7 @@ function createProjectRoleWorkspace(name: string): string {
  */
 function createEmptyWorkspace(name: string): string {
   const timestamp = Date.now();
-  const workspaceDir = path.join(E2E_ROOT, "tmp", `${name}-${timestamp}`);
+  const workspaceDir = path.join(process.cwd(), "tmp", `${name}-${timestamp}`);
   fs.mkdirSync(workspaceDir, { recursive: true });
   fs.writeFileSync(
     path.join(workspaceDir, "package.json"),

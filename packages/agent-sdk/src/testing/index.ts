@@ -10,7 +10,6 @@
  */
 
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { execFileSync, execSync, spawn, type ChildProcess } from "node:child_process";
 
@@ -114,8 +113,16 @@ function findProjectRoot(): string {
 /** Absolute path to the monorepo root. */
 export const PROJECT_ROOT: string = findProjectRoot();
 
-/** Absolute path to the `scripts/mason.js` CLI entry point. */
-export const MASON_BIN: string = path.join(PROJECT_ROOT, "scripts", "mason.js");
+/**
+ * Absolute path to the CLI entry JS that tests will launch as `mason`.
+ *
+ * Defaults to the dev-mode `scripts/mason.js` inside this monorepo. Set the
+ * `MASON_BIN` env var to override — for example, the `test:e2e:npm` script
+ * points this at the globally-installed `@clawmasons/mason/dist/cli/bin.js`
+ * so the existing e2e suite runs against a real `npm install -g` install.
+ */
+export const MASON_BIN: string =
+  process.env.MASON_BIN ?? path.join(PROJECT_ROOT, "scripts", "mason.js");
 
 /** Absolute path to `packages/agent-sdk/fixtures/`. */
 export const FIXTURES_DIR: string = path.join(
@@ -209,7 +216,8 @@ export function copyFixtureWorkspace(
 
   const timestamp = Date.now();
   const workspaceDir = path.join(
-    os.tmpdir(),
+    process.cwd(),
+    "tmp",
     `mason-e2e-${name}-${timestamp}`,
   );
   fs.mkdirSync(workspaceDir, { recursive: true });

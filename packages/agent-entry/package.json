@@ -1,6 +1,6 @@
 {
   "name": "@clawmasons/agent-entry",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Standalone entrypoint binary for bootstrapping agent containers",
   "type": "module",
   "main": "./dist/index.js",

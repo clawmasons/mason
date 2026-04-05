@@ -8,6 +8,7 @@
     "build": "tsc -b packages/shared packages/proxy && npm run build --workspace=packages/agent-sdk && npm run build --workspace=packages/mcp-agent && npm run build:types --workspace=packages/mcp-agent && npm run build --workspace=packages/agent-entry && tsc -b packages/cli && npm run build:proxy --workspace=packages/cli",
     "test": "vitest run",
     "test:e2e": "npx vitest run --config vitest.e2e.config.ts",
+    "test:e2e:npm": "npx tsx scripts/npm-install-global.ts && MASON_BIN=\"$(npm root -g)/@clawmasons/mason/dist/cli/bin.js\" npx vitest run --config vitest.e2e.config.ts",
     "test:extensions": "npx vitest run --config vitest.extensions.config.ts",
     "test:watch": "vitest",
     "lint": "eslint packages/*/src/ packages/*/tests/",

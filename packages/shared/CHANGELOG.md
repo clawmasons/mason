@@ -1,5 +1,11 @@
 # @clawmasons/shared
 
+## 0.1.7
+
+### Patch Changes
+
+- Patch bump all packages
+
 ## 0.1.6
 
 ### Patch Changes
