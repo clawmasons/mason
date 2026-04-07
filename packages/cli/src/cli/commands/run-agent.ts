@@ -10,7 +10,7 @@ import { checkDockerCompose } from "./docker-utils.js";
 import { ensureGitignoreEntry } from "../../runtime/gitignore.js";
 import type { ResolvedAgent, ResolvedMcpServer, Role, McpServerConfig, TaskRef, SkillRef } from "@clawmasons/shared";
 import { resolveRole as resolveRoleByName, adaptRoleToResolvedAgent, getAppShortName, resolveDialectName, getKnownDirectories, scanProject, getDialect, readMaterializedRole, resolveRoleFields, createSession as createMetaSession, readSession, resolveLatestSession, listSessions, updateSession } from "@clawmasons/shared";
-import { getAgentFromRegistry, getAgentFromRegistryWithAutoInstall, initRegistry, getAllRegisteredNames, BUILTIN_AGENTS, materializeForAgent } from "../../materializer/role-materializer.js";
+import { getAgentFromRegistry, getAgentFromRegistryWithAutoInstall, initRegistry, getAllRegisteredNames, materializeForAgent } from "../../materializer/role-materializer.js";
 import { loadConfigAgentEntry, loadConfigAliasEntry, getAgentConfig, saveAgentConfig, readDefaultAgent, resolveAgentPackageName } from "@clawmasons/agent-sdk";
 import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.js";
 import { HostProxy } from "@clawmasons/proxy";
@@ -591,8 +591,8 @@ Command Syntax:
   --terminal       Force terminal (interactive) mode, overriding config mode.
   --bash           Launch bash shell (overrides config mode).
 
-Agent Types (built-in):
-  claude (claude-code-agent), pi (pi-coding-agent), mcp (mcp-agent)
+Agent Types (auto-installed):
+  claude (claude-code-agent), pi (pi-coding-agent), codex (codex-agent)
 
 Side Effects:
   - Creates .mason/ in the project for docker builds and session state
@@ -608,17 +608,12 @@ Side Effects:
 // ── Config Auto-Init ──────────────────────────────────────────────────
 
 /**
- * Build the default `.mason/config.json` content from the built-in agent
- * packages. Uses the first alias as the config key (user-friendly short name)
- * and derives the npm package name from the agent's canonical name.
+ * Build the default `.mason/config.json` content.
+ * Emits an empty agents map — agents are auto-discovered from
+ * .mason/node_modules/ or resolved via auto-install at runtime.
  */
 export function buildDefaultMasonConfig(): string {
-  const agents: Record<string, { package: string }> = {};
-  for (const agent of BUILTIN_AGENTS) {
-    const configKey = agent.aliases?.[0] ?? agent.name;
-    agents[configKey] = { package: `@clawmasons/${agent.name}` };
-  }
-  return JSON.stringify({ agents }, null, 2);
+  return JSON.stringify({ agents: {} }, null, 2);
 }
 
 /**

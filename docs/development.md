@@ -11,7 +11,6 @@ mason/
     shared/               # @clawmasons/shared — schemas, types, utilities
     proxy/                # @clawmasons/proxy — MCP proxy server
     agent-entry/          # @clawmasons/agent-entry — agent bootstrap binary
-    mcp-agent/            # MCP agent runtime (REPL + ACP modes)
     placeholders/         # Stub packages for testing
     tests/                # End-to-end test suite
   scripts/                # CLI entry point and dev scripts

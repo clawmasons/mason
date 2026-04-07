@@ -24,31 +24,22 @@ Auto-init SHALL only trigger when the invocation references an agent by name (vi
 - **AND** the user runs `mason run --role writer` (no `--agent` flag)
 - **THEN** the CLI SHALL NOT create `.mason/config.json`
 
-### Requirement: Default template contains standard built-in agent entries
+### Requirement: Default template contains an empty agents map
 
 The auto-created `.mason/config.json` SHALL contain the following content exactly:
 
 ```json
 {
-  "agents": {
-    "claude": {
-      "package": "@clawmasons/claude-code-agent"
-    },
-    "pi-mono-agent": {
-      "package": "@clawmasons/pi-mono-agent"
-    },
-    "mcp": {
-      "package": "@clawmasons/mcp-agent"
-    }
-  }
+  "agents": {}
 }
 ```
+
+Agents are auto-discovered from `.mason/node_modules/` (Phase 2) or resolved via auto-install at runtime. No built-in agent entries are required in the default template.
 
 #### Scenario: created file matches default template
 - **WHEN** auto-init creates `.mason/config.json`
 - **THEN** the file SHALL be valid JSON
-- **AND** SHALL contain an `agents` object with keys `"claude"`, `"pi-mono-agent"`, and `"mcp"`
-- **AND** each entry SHALL have only a `"package"` field with the corresponding package name
+- **AND** SHALL contain an empty `agents` object
 
 ### Requirement: .mason directory is created if it does not exist
 

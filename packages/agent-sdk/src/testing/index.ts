@@ -4,8 +4,8 @@
  * Provides workspace setup, CLI execution helpers, Docker utilities,
  * and fixture management. Importable as `@clawmasons/agent-sdk/testing`.
  *
- * Dependency constraint: This module MUST NOT import from @clawmasons/cli,
- * @clawmasons/mcp-agent, or any agent implementation package. Only Node.js
+ * Dependency constraint: This module MUST NOT import from @clawmasons/cli
+ * or any agent implementation package. Only Node.js
  * built-ins and @agentclientprotocol/sdk are allowed.
  */
 

@@ -1,12 +1,12 @@
 ## ADDED Requirements
 
-### Requirement: CLI discovers built-in agent packages via static imports
+### Requirement: CLI discovers agent packages via auto-discovery
 
-The CLI SHALL discover built-in agent packages by importing them directly from its npm dependencies: `@clawmasons/claude-code-agent`, `@clawmasons/pi-coding-agent`, `@clawmasons/mcp-agent`. These packages SHALL be listed in the CLI's `package.json` dependencies.
+The CLI SHALL discover agent packages by scanning `.mason/node_modules/@clawmasons/` for packages with `mason.type === "agent"` in their `package.json`. There are no built-in agents; all agents are resolved through auto-discovery (Phase 2) or config-declared entries (Phase 3).
 
-#### Scenario: Built-in agents are always available
-- **WHEN** the CLI starts and no `.mason/config.json` exists
-- **THEN** the agent registry SHALL contain `claude-code-agent`, `pi-coding-agent`, and `mcp-agent`
+#### Scenario: Discovered agents are available
+- **WHEN** the CLI starts and agent packages are installed in `.mason/node_modules/`
+- **THEN** the agent registry SHALL contain all discovered agent packages
 
 #### Scenario: Built-in agent aliases are registered
 - **WHEN** the CLI starts and `@clawmasons/claude-code-agent` declares `aliases: ["claude"]`

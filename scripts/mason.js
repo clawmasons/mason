@@ -12,7 +12,6 @@ process.env.MASON_BIN = __filename;
 // Auto-link agents when CWD has a .mason/ directory (dev environments).
 // Resolves the monorepo root from this script's location, then symlinks
 // all agents from the sibling mason-extensions/agents/ repo.
-// (mcp-agent is a built-in registered in Phase 1 of discovery — no symlink needed.)
 const monorepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function linkDevAgents() {
@@ -48,9 +47,6 @@ function linkDevAgents() {
       // skip silently — agent may be missing package.json or be malformed
     }
   }
-
-  // Built-in mcp-agent from this monorepo
-  linkAgent(path.join(monorepoRoot, "packages", "mcp-agent"));
 
   // Sibling mason-extensions repo
   const extensionsDir = path.join(monorepoRoot, "..", "mason-extensions", "agents");

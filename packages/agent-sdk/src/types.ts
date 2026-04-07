@@ -40,7 +40,7 @@ export interface MaterializeOptions {
  * a specific runtime's native configuration format.
  */
 export interface RuntimeMaterializer {
-  /** Runtime identifier (e.g., "claude-code-agent", "mcp-agent"). */
+  /** Runtime identifier (e.g., "claude-code-agent", "codex-agent"). */
   name: string;
 
   /**

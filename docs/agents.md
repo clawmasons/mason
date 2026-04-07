@@ -43,23 +43,6 @@ mason run pi --role developer
 
 Mason generates `.pi/` directory structure with settings, MCP config, and task extensions.
 
-### MCP Agent
-
-A lightweight test runtime that doesn't require an LLM. Useful for testing roles, validating tool permissions, and debugging MCP server configurations.
-
-| | |
-|---|---|
-| **Package** | `@clawmasons/mcp-agent` |
-| **Alias** | `mcp` |
-| **Install** | Included with Mason |
-| **Credentials** | `TEST_TOKEN` |
-
-```bash
-mason run mcp --role developer
-```
-
-The MCP agent provides a REPL interface for calling tools directly and an ACP mode for editor integration.
-
 ## Custom Agents
 
 You can register custom agent runtimes by adding them to your project's `.mason/config.json`:

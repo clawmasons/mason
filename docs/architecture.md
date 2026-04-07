@@ -232,7 +232,6 @@ The same role definition is translated into runtime-specific configurations via 
 |---------|---------|-------------------|
 | **claude-code-agent** | `claude` | `.claude/` directory, `settings.json`, slash commands, skill files (SKILL.md + companions), Dockerfile |
 | **pi-coding-agent** | `pi` | pi-coding-agent configuration, instruction files, Dockerfile |
-| **mcp-agent** | `mcp` | Minimal config for testing (no LLM required) |
 
 The materializer reads the resolved role graph and produces everything the runtime needs, including Dockerfiles, configuration files, and mounted skill/prompt content. Custom agents can be registered in `.mason/config.json` by pointing to any npm package that implements the Agent Package SDK.
 

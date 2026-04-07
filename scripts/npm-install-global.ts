@@ -32,7 +32,6 @@ const PACKAGES = [
   "proxy",
   "agent-sdk",
   "agent-entry",
-  "mcp-agent",
   "cli",
 ] as const;
 

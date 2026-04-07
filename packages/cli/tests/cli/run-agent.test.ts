@@ -132,10 +132,6 @@ describe("resolveAgentType", () => {
     expect(resolveAgentType("pi")).toBe("pi-coding-agent");
   });
 
-  it("resolves alias 'mcp' to 'mcp-agent'", () => {
-    expect(resolveAgentType("mcp")).toBe("mcp-agent");
-  });
-
   it("resolves direct agent type 'claude-code-agent'", () => {
     expect(resolveAgentType("claude-code-agent")).toBe("claude-code-agent");
   });
@@ -149,7 +145,6 @@ describe("isKnownAgentType", () => {
   it("returns true for aliases", () => {
     expect(isKnownAgentType("claude")).toBe(true);
     expect(isKnownAgentType("pi")).toBe(true);
-    expect(isKnownAgentType("mcp")).toBe(true);
   });
 
   it("returns true for registered types", () => {
@@ -169,7 +164,6 @@ describe("getKnownAgentTypeNames", () => {
     expect(names).toContain("claude");
     expect(names).toContain("claude-code-agent");
     expect(names).toContain("pi");
-    expect(names).toContain("mcp");
     expect(names.length).toBeGreaterThan(3);
   });
 
@@ -219,14 +213,10 @@ describe("inferAgentType", () => {
 // ── buildDefaultMasonConfig ─────────────────────────────────────────────
 
 describe("buildDefaultMasonConfig", () => {
-  it("generates config with entries for all built-in agents", () => {
-    const config = JSON.parse(buildDefaultMasonConfig()) as { agents: Record<string, { package: string }> };
+  it("generates config with empty agents map", () => {
+    const config = JSON.parse(buildDefaultMasonConfig()) as { agents: Record<string, unknown> };
     expect(config.agents).toBeDefined();
-    // Only mcp-agent is a built-in now; others are auto-installed
-    expect(config.agents["mcp"]?.package).toBe("@clawmasons/mcp-agent");
-    // Removed agents should not appear
-    expect(config.agents["claude"]).toBeUndefined();
-    expect(config.agents["pi"]).toBeUndefined();
+    expect(Object.keys(config.agents)).toHaveLength(0);
   });
 
   it("returns valid JSON string", () => {
@@ -568,19 +558,16 @@ describe("ensureMasonConfig", () => {
     }
   });
 
-  it("creates .mason/config.json with default template derived from BUILTIN_AGENTS", () => {
+  it("creates .mason/config.json with empty agents map", () => {
     ensureMasonConfig(tmpDir);
 
     const configPath = path.join(tmpDir, ".mason", "config.json");
     expect(fs.existsSync(configPath)).toBe(true);
 
     const content = JSON.parse(fs.readFileSync(configPath, "utf-8")) as Record<string, unknown>;
-    const agents = content.agents as Record<string, { package: string }>;
+    const agents = content.agents as Record<string, unknown>;
     expect(agents).toBeDefined();
-    // Only mcp-agent is a built-in now; others are auto-installed
-    expect(agents["mcp"]?.package).toBe("@clawmasons/mcp-agent");
-    expect(agents["claude"]).toBeUndefined();
-    expect(agents["pi"]).toBeUndefined();
+    expect(Object.keys(agents)).toHaveLength(0);
   });
 
   it("creates .mason directory if it does not exist", () => {
@@ -1453,7 +1440,6 @@ describe("normalizeSourceFlags", () => {
     expect(output).toContain("claude");
     expect(output).toContain("codex");
     expect(output).toContain("aider");
-    expect(output).toContain("mcp");
     expect(output).toContain("mason");
   });
 });

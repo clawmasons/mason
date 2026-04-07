@@ -317,7 +317,7 @@ The `@clawmasons/agent-sdk` package SHALL export a `./testing` subpath (`@clawma
 - `waitForHealth(url, timeoutMs, diagnostics?)` — polls a health endpoint
 - `cleanupDockerSessions(workspaceDir)` — tears down Docker Compose sessions
 
-The testing module SHALL NOT import from `@clawmasons/cli`, `@clawmasons/mcp-agent`, or any agent implementation package. It SHALL only use Node.js built-ins.
+The testing module SHALL NOT import from `@clawmasons/cli` or any agent implementation package. It SHALL only use Node.js built-ins.
 
 #### Scenario: Import testing utilities from subpath
 - **WHEN** a test file runs `import { copyFixtureWorkspace, masonExec } from "@clawmasons/agent-sdk/testing"`
@@ -339,7 +339,7 @@ The testing module SHALL NOT import from `@clawmasons/cli`, `@clawmasons/mcp-age
 
 #### Scenario: Testing module has no circular dependencies
 - **WHEN** the testing module source is inspected
-- **THEN** it SHALL contain zero imports from `@clawmasons/cli`, `@clawmasons/mcp-agent`, `@clawmasons/claude-code-agent`, or `@clawmasons/pi-coding-agent`
+- **THEN** it SHALL contain zero imports from `@clawmasons/cli`, `@clawmasons/claude-code-agent`, or `@clawmasons/pi-coding-agent`
 
 ### Requirement: Shared fixtures directory contains claude-test-project
 
