@@ -16,7 +16,7 @@ import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.
 import { HostProxy } from "@clawmasons/proxy";
 import { createFileLogger, type FileLogger } from "../../utils/file-logger.js";
 import { generateRoleDockerBuildDir, createSessionDirectory, getHostIds } from "../../materializer/docker-generator.js";
-import { ensureProxyDependencies, ensureSharedProxyBundle, copyAgentEntryBundle } from "../../materializer/proxy-dependencies.js";
+import { ensureProxyDependencies, ensureSharedProxyBundle, copyAgentEntryBundle, copyChannelBundle } from "../../materializer/proxy-dependencies.js";
 import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
 import { validateSessionUpdate as validateAcpUpdate } from "../../acp/validate-session-update.js";
 
@@ -562,6 +562,7 @@ export async function ensureDockerBuild(
     // Generate Docker dependencies (bundles + per-role config)
     copyAgentEntryBundle(dockerDir);
     ensureProxyDependencies(dockerDir, roleType);
+    copyChannelBundle(dockerBuildDir, roleType, agentType);
 
     // Create shared cache directory for NODE_COMPILE_CACHE and NPM_CONFIG_CACHE
     fs.mkdirSync(path.join(sharedProxyDir, ".cache"), { recursive: true });

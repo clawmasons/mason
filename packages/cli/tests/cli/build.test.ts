@@ -25,6 +25,7 @@ vi.mock("../../src/materializer/proxy-dependencies.js", () => ({
   ensureProxyDependencies: vi.fn(),
   ensureSharedProxyBundle: vi.fn(),
   copyAgentEntryBundle: vi.fn(),
+  copyChannelBundle: vi.fn(),
 }));
 
 vi.mock("../../src/generator/proxy-dockerfile.js", () => ({

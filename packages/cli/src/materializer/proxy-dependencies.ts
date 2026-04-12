@@ -163,6 +163,56 @@ export function copyAgentEntryBundle(dockerDir: string): void {
 }
 
 // ---------------------------------------------------------------------------
+// Channel Bundle Copy
+// ---------------------------------------------------------------------------
+
+/**
+ * Copy the channel MCP server bundle into the Docker build context.
+ *
+ * When a role specifies a `channel` (e.g., `channel: slack`), this function
+ * resolves the channel server bundle from the agent package's exports
+ * (e.g., `@clawmasons/claude-code-agent/channels/slack`) and copies it into
+ * `{dockerBuildDir}/{agentType}/home/channels/{type}/server.js`.
+ *
+ * The existing `COPY --chown=mason:mason {role}/{agent}/home/ /home/mason/`
+ * Dockerfile instruction picks up the channels directory without changes.
+ *
+ * If the bundle cannot be resolved (e.g., CHANGE 2+3 not yet implemented),
+ * a warning is logged and the function returns gracefully.
+ */
+export function copyChannelBundle(
+  dockerBuildDir: string,
+  role: Role,
+  agentType: string,
+): void {
+  if (!role.channel) return;
+
+  const channelType = role.channel.type;
+  const agentDir = path.join(dockerBuildDir, agentType);
+  const dest = path.join(agentDir, "home", "channels", channelType, "server.js");
+
+  if (fs.existsSync(dest)) return;
+
+  const require = createRequire(import.meta.url);
+  let bundleSrc: string;
+  try {
+    bundleSrc = require.resolve(
+      `@clawmasons/claude-code-agent/channels/${channelType}`,
+    );
+  } catch {
+    console.warn(
+      `Warning: Channel bundle for "${channelType}" could not be resolved from ` +
+      `@clawmasons/claude-code-agent/channels/${channelType}. ` +
+      `The agent package may not include this channel type yet.`,
+    );
+    return;
+  }
+
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.cpSync(bundleSrc, dest);
+}
+
+// ---------------------------------------------------------------------------
 // Proxy Bundle Copy
 // ---------------------------------------------------------------------------
 
