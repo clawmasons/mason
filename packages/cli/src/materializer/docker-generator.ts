@@ -297,7 +297,8 @@ export function generateRoleDockerBuildDir(
   // - project role: everything else → {agentDir}/build/workspace/project/  (per-file overlay mounts)
   // - supervisor role: everything else → {agentDir}/home/         (merged into home mount at /home/mason/)
   const proxyEp = proxyEndpoint ?? `http://proxy-${roleName}:9090`;
-  const materializeOpts = (opts.agentConfigCredentials?.length || opts.agentArgs?.length || opts.initialPrompt || opts.llmConfig || opts.printMode || opts.jsonMode)
+  const channelConfig = role.channel ? { type: role.channel.type, args: role.channel.args ?? [] } : undefined;
+  const materializeOpts = (opts.agentConfigCredentials?.length || opts.agentArgs?.length || opts.initialPrompt || opts.llmConfig || opts.printMode || opts.jsonMode || channelConfig)
     ? {
         ...(opts.agentConfigCredentials?.length ? { agentConfigCredentials: opts.agentConfigCredentials } : {}),
         ...(opts.agentArgs?.length ? { agentArgs: opts.agentArgs } : {}),
@@ -305,6 +306,7 @@ export function generateRoleDockerBuildDir(
         ...(opts.llmConfig ? { llmConfig: opts.llmConfig } : {}),
         ...(opts.printMode ? { printMode: opts.printMode } : {}),
         ...(opts.jsonMode ? { jsonMode: opts.jsonMode } : {}),
+        ...(channelConfig ? { channelConfig } : {}),
       }
     : undefined;
   const workspaceDir = path.join(agentDir, "workspace");

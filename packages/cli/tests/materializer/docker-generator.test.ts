@@ -437,6 +437,162 @@ describe("generateRoleDockerBuildDir", () => {
     const agentLaunchFile = path.join("/project/.mason/docker", "create-prd", "claude-code-agent", "workspace", "agent-launch.json");
     expect(writtenFiles.has(agentLaunchFile)).toBe(true);
   });
+
+  describe("channel integration", () => {
+    it("role with channel: slack produces .claude.json with slack-channel MCP server", () => {
+      const writtenFiles = new Map<string, string>();
+
+      generateRoleDockerBuildDir(
+        {
+          role: makeTestRole({ channel: { type: "slack", args: [] } }),
+          agentType: "claude-code-agent",
+          projectDir: "/project",
+          agentName: "@acme/agent",
+        },
+        {
+          mkdirSync: () => {},
+          writeFileSync: (p, data) => { writtenFiles.set(p, data); },
+        },
+      );
+
+      // Find .claude.json in home/ directory
+      const claudeJsonFile = [...writtenFiles.entries()].find(([k]) =>
+        k.includes(path.join("claude-code-agent", "home")) && k.endsWith(".claude.json"),
+      );
+      expect(claudeJsonFile).toBeDefined();
+
+      const claudeJson = JSON.parse(claudeJsonFile![1]);
+      expect(claudeJson.mcpServers["slack-channel"]).toBeDefined();
+      expect(claudeJson.mcpServers["slack-channel"].command).toBe("node");
+      expect(claudeJson.mcpServers["slack-channel"].args[0]).toBe("/home/mason/channels/slack/server.js");
+    });
+
+    it("role with channel: slack produces settings.json with channel permission", () => {
+      const writtenFiles = new Map<string, string>();
+
+      generateRoleDockerBuildDir(
+        {
+          role: makeTestRole({ channel: { type: "slack", args: [] } }),
+          agentType: "claude-code-agent",
+          projectDir: "/project",
+          agentName: "@acme/agent",
+        },
+        {
+          mkdirSync: () => {},
+          writeFileSync: (p, data) => { writtenFiles.set(p, data); },
+        },
+      );
+
+      // Find settings.json
+      const settingsFile = [...writtenFiles.entries()].find(([k]) =>
+        k.endsWith("settings.json") && k.includes("build/workspace/project"),
+      );
+      expect(settingsFile).toBeDefined();
+
+      const settings = JSON.parse(settingsFile![1]);
+      expect(settings.permissions.allow).toContain("mcp__mason__*");
+      expect(settings.permissions.allow).toContain("mcp__slack-channel__*");
+    });
+
+    it("role with channel: slack produces agent-launch.json with channel flag", () => {
+      const writtenFiles = new Map<string, string>();
+
+      generateRoleDockerBuildDir(
+        {
+          role: makeTestRole({ channel: { type: "slack", args: [] } }),
+          agentType: "claude-code-agent",
+          projectDir: "/project",
+          agentName: "@acme/agent",
+        },
+        {
+          mkdirSync: () => {},
+          writeFileSync: (p, data) => { writtenFiles.set(p, data); },
+        },
+      );
+
+      const agentLaunchFile = [...writtenFiles.entries()].find(([k]) =>
+        k.endsWith("agent-launch.json"),
+      );
+      expect(agentLaunchFile).toBeDefined();
+
+      const config = JSON.parse(agentLaunchFile![1]);
+      expect(config.args).toContain("--dangerously-load-development-channels");
+      expect(config.args).toContain("server:slack-channel");
+    });
+
+    it("role with channel args passes them through to MCP server config", () => {
+      const writtenFiles = new Map<string, string>();
+
+      generateRoleDockerBuildDir(
+        {
+          role: makeTestRole({ channel: { type: "slack", args: ["--debug"] } }),
+          agentType: "claude-code-agent",
+          projectDir: "/project",
+          agentName: "@acme/agent",
+        },
+        {
+          mkdirSync: () => {},
+          writeFileSync: (p, data) => { writtenFiles.set(p, data); },
+        },
+      );
+
+      const claudeJsonFile = [...writtenFiles.entries()].find(([k]) =>
+        k.includes(path.join("claude-code-agent", "home")) && k.endsWith(".claude.json"),
+      );
+      expect(claudeJsonFile).toBeDefined();
+
+      const claudeJson = JSON.parse(claudeJsonFile![1]);
+      expect(claudeJson.mcpServers["slack-channel"].args).toEqual([
+        "/home/mason/channels/slack/server.js",
+        "--debug",
+      ]);
+    });
+
+    it("role without channel produces no channel artifacts", () => {
+      const writtenFiles = new Map<string, string>();
+
+      generateRoleDockerBuildDir(
+        {
+          role: makeTestRole(), // no channel
+          agentType: "claude-code-agent",
+          projectDir: "/project",
+          agentName: "@acme/agent",
+        },
+        {
+          mkdirSync: () => {},
+          writeFileSync: (p, data) => { writtenFiles.set(p, data); },
+        },
+      );
+
+      // .claude.json should not contain any channel server
+      const claudeJsonFile = [...writtenFiles.entries()].find(([k]) =>
+        k.endsWith(".claude.json"),
+      );
+      expect(claudeJsonFile).toBeDefined();
+
+      const claudeJson = JSON.parse(claudeJsonFile![1]);
+      expect(claudeJson.mcpServers["slack-channel"]).toBeUndefined();
+      expect(Object.keys(claudeJson.mcpServers)).toEqual(["mason"]);
+
+      // settings.json should only have mason permission
+      const settingsFile = [...writtenFiles.entries()].find(([k]) =>
+        k.endsWith("settings.json"),
+      );
+      expect(settingsFile).toBeDefined();
+
+      const settings = JSON.parse(settingsFile![1]);
+      expect(settings.permissions.allow).toEqual(["mcp__mason__*"]);
+
+      // agent-launch.json should not have channel flags
+      const agentLaunchFile = [...writtenFiles.entries()].find(([k]) =>
+        k.endsWith("agent-launch.json"),
+      );
+      expect(agentLaunchFile).toBeDefined();
+
+      const config = JSON.parse(agentLaunchFile![1]);
+      expect(config.args).not.toContain("--dangerously-load-development-channels");
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
