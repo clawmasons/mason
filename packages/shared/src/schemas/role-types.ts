@@ -101,6 +101,15 @@ export const roleConfigSchema = z.object({
   includes: z.array(z.string()).optional().default([]),
 });
 
+// --- Channel schema ---
+
+export const channelConfigSchema = z.object({
+  type: z.string(),
+  args: z.array(z.string()).optional().default([]),
+});
+
+export const channelFieldSchema = z.union([z.string(), channelConfigSchema]);
+
 // --- Top-level Role schema ---
 
 export const roleSchema = z.object({
@@ -114,6 +123,10 @@ export const roleSchema = z.object({
   container: containerRequirementsSchema.optional().default({}),
   governance: governanceConfigSchema.optional().default({}),
   resources: z.array(resourceFileSchema).optional().default([]),
+  channel: z.preprocess(
+    (val) => (typeof val === "string" ? { type: val, args: [] } : val),
+    channelConfigSchema,
+  ).optional(),
   role: roleConfigSchema.optional().default({}),
   source: roleSourceSchema,
 });

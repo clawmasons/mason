@@ -17,5 +17,7 @@ export {
   resourceFileSchema,
   roleSourceSchema,
   roleConfigSchema,
+  channelConfigSchema,
+  channelFieldSchema,
   roleSchema,
 } from "./role-types.js";

@@ -102,6 +102,14 @@ function buildResolvedRole(role: Role, version: string): ResolvedRole {
     skills,
   };
 
+  // Channel config
+  if (role.channel) {
+    resolvedRole.channel = {
+      type: role.channel.type,
+      args: [...role.channel.args],
+    };
+  }
+
   // Container requirements → ResolvedRole fields
   if (role.container) {
     const aptPackages = role.container.packages?.apt;

@@ -810,3 +810,75 @@ Instructions.`,
     expect(role.tasks[1].name).toBe("deploy");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Channel field parsing
+// ---------------------------------------------------------------------------
+
+describe("readMaterializedRole — channel field", () => {
+  it("parses channel: slack (string form) to { type: 'slack', args: [] }", async () => {
+    const rolePath = await createRoleFile(
+      "claude",
+      "channel-short",
+      `---
+name: channel-short
+description: Role with short-form channel
+channel: slack
+---
+
+Instructions.`,
+    );
+    const role = await readMaterializedRole(rolePath);
+    expect(role.channel).toEqual({ type: "slack", args: [] });
+  });
+
+  it("parses channel: { type: slack, args: ['--flag'] } (object form)", async () => {
+    const rolePath = await createRoleFile(
+      "claude",
+      "channel-long",
+      `---
+name: channel-long
+description: Role with long-form channel
+channel:
+  type: slack
+  args:
+    - '--flag'
+---
+
+Instructions.`,
+    );
+    const role = await readMaterializedRole(rolePath);
+    expect(role.channel).toEqual({ type: "slack", args: ["--flag"] });
+  });
+
+  it("parses role without channel field — channel is undefined", async () => {
+    const rolePath = await createRoleFile(
+      "claude",
+      "no-channel",
+      `---
+name: no-channel
+description: Role without channel
+---
+
+Instructions.`,
+    );
+    const role = await readMaterializedRole(rolePath);
+    expect(role.channel).toBeUndefined();
+  });
+
+  it("accepts any channel type string (e.g., telegram)", async () => {
+    const rolePath = await createRoleFile(
+      "claude",
+      "channel-telegram",
+      `---
+name: channel-telegram
+description: Role with telegram channel
+channel: telegram
+---
+
+Instructions.`,
+    );
+    const role = await readMaterializedRole(rolePath);
+    expect(role.channel).toEqual({ type: "telegram", args: [] });
+  });
+});

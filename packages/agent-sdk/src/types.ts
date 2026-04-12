@@ -31,6 +31,8 @@ export interface MaterializeOptions {
   printMode?: boolean;
   /** When true, enable JSON streaming mode: append jsonMode.jsonStreamArgs and prompt args in agent-launch.json. */
   jsonMode?: boolean;
+  /** Channel configuration from the role. Used by materializers to inject channel MCP server config and launch args. */
+  channelConfig?: { type: string; args: string[] };
 }
 
 /**

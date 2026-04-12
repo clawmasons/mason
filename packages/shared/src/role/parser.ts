@@ -86,6 +86,12 @@ export async function readMaterializedRole(rolePath: string): Promise<Role> {
     ? (frontmatter.sources as string[])
     : [];
 
+  // Normalize channel field: string -> { type, args: [] }
+  let channel = frontmatter.channel as unknown;
+  if (typeof channel === "string") {
+    channel = { type: channel, args: [] };
+  }
+
   // Extract role config (includes)
   const role = frontmatter.role ?? {};
 
@@ -101,6 +107,7 @@ export async function readMaterializedRole(rolePath: string): Promise<Role> {
     container,
     governance,
     resources,
+    channel,
     role,
     source: {
       type: "local" as const,
