@@ -124,7 +124,7 @@ export async function runBuild(
     const agentType = agentTypeOverride ?? inferAgentType(role, defaultAgent);
     const roleBuildDir = path.join(dockerDir, getAppShortName(role.metadata.name));
     ensureProxyDependencies(dockerDir, role);
-    copyChannelBundle(roleBuildDir, role, agentType);
+    copyChannelBundle(roleBuildDir, role, agentType, projectDir);
   }
 
   console.log(`\n  Build complete.\n`);

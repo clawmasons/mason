@@ -97,7 +97,7 @@ describe("copyChannelBundle", () => {
 
   it("does nothing when role has no channel", () => {
     const role = makeTestRole(); // no channel
-    copyChannelBundle("/build/test-role", role, "claude-code-agent");
+    copyChannelBundle("/build/test-role", role, "claude-code-agent", "/projects/test");
 
     expect(mockExistsSync).not.toHaveBeenCalled();
     expect(mockMkdirSync).not.toHaveBeenCalled();
@@ -115,7 +115,7 @@ describe("copyChannelBundle", () => {
       channel: { type: "slack", args: [] },
     });
 
-    copyChannelBundle("/build/test-role", role, "claude-code-agent");
+    copyChannelBundle("/build/test-role", role, "claude-code-agent", "/projects/test");
 
     const expectedDest = path.join(
       "/build/test-role",
@@ -143,7 +143,7 @@ describe("copyChannelBundle", () => {
       channel: { type: "slack", args: [] },
     });
 
-    copyChannelBundle("/build/test-role", role, "claude-code-agent");
+    copyChannelBundle("/build/test-role", role, "claude-code-agent", "/projects/test");
 
     // Should bail out after existsSync returns true
     expect(mockExistsSync).toHaveBeenCalled();
@@ -165,7 +165,7 @@ describe("copyChannelBundle", () => {
     });
 
     // Should not throw
-    copyChannelBundle("/build/test-role", role, "claude-code-agent");
+    copyChannelBundle("/build/test-role", role, "claude-code-agent", "/projects/test");
 
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -188,7 +188,7 @@ describe("copyChannelBundle", () => {
       channel: { type: "telegram", args: ["--debug"] },
     });
 
-    copyChannelBundle("/build/test-role", role, "claude-code-agent");
+    copyChannelBundle("/build/test-role", role, "claude-code-agent", "/projects/test");
 
     expect(mockResolve).toHaveBeenCalledWith(
       "@clawmasons/claude-code-agent/channels/telegram",

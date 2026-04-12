@@ -184,6 +184,7 @@ export function copyChannelBundle(
   dockerBuildDir: string,
   role: Role,
   agentType: string,
+  projectDir: string,
 ): void {
   if (!role.channel) return;
 
@@ -193,16 +194,20 @@ export function copyChannelBundle(
 
   if (fs.existsSync(dest)) return;
 
-  const require = createRequire(import.meta.url);
+  // Resolve from the project's .mason/node_modules/ where agent packages are installed,
+  // not from the CLI's own node_modules.
+  const masonRequire = createRequire(
+    path.join(projectDir, ".mason", "node_modules", ".package.json"),
+  );
   let bundleSrc: string;
   try {
-    bundleSrc = require.resolve(
-      `@clawmasons/claude-code-agent/channels/${channelType}`,
+    bundleSrc = masonRequire.resolve(
+      `@clawmasons/${agentType}/channels/${channelType}`,
     );
   } catch {
     console.warn(
       `Warning: Channel bundle for "${channelType}" could not be resolved from ` +
-      `@clawmasons/claude-code-agent/channels/${channelType}. ` +
+      `@clawmasons/${agentType}/channels/${channelType}. ` +
       `The agent package may not include this channel type yet.`,
     );
     return;
