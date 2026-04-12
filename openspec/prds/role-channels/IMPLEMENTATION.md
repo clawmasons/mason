@@ -64,11 +64,12 @@ Add the `channel` field to the Zod schema, extract it from ROLE.md frontmatter i
 
 ### CHANGE 2: `mcp/` Workspace and `claude-slack-channel` MCP Server Package
 
-Add `mcp/*` to mason-extensions workspaces and create the `claude-slack-channel` MCP server package implementing the Claude Code channel protocol for Slack.
+
+Add `../mcp-extensions/mcp/*` to mason-extensions workspaces and create the `claude-slack-channel` MCP server package implementing the Claude Code channel protocol for Slack.
 
 **PRD refs:** REQ-003, REQ-004
 
-**Summary:** Add `"mcp/*"` to the `workspaces` array in mason-extensions root `package.json`. Create `mcp/claude-slack-channel/` with a Slack channel MCP server implementing `claude/channel` and `claude/channel/permission` capabilities. The server connects to Slack via Socket Mode, forwards messages as `notifications/claude/channel` events, exposes MCP tools for reply/react/edit/history/download, implements permission relay, and gates inbound messages on a sender allowlist. Dependencies: `@modelcontextprotocol/sdk`, `@slack/socket-mode`, `@slack/web-api`, `zod`.
+**Summary:** Add `"mcp/*"` to the `workspaces` array in ../mason-extensions root `package.json`. Create `mcp/claude-slack-channel/` with a Slack channel MCP server implementing `claude/channel` and `claude/channel/permission` capabilities. The server connects to Slack via Socket Mode, forwards messages as `notifications/claude/channel` events, exposes MCP tools for reply/react/edit/history/download, implements permission relay, and gates inbound messages on a sender allowlist. Dependencies: `@modelcontextprotocol/sdk`, `@slack/socket-mode`, `@slack/web-api`, `zod`.
 
 The server source is based on the reference implementation at `github.com/jeremylongshore/claude-code-slack-channel`.
 
@@ -76,24 +77,40 @@ The server source is based on the reference implementation at `github.com/jeremy
 
 **Scope:**
 - Modify: `package.json` (root of mason-extensions) — Add `"mcp/*"` to workspaces
-- Create: `mcp/claude-slack-channel/package.json` — Package definition with deps
+- Modify: `vitest.config.ts` (root of mason-extensions) — Add `"mcp/*/tests/**/*.test.ts"` to `test.include` (and matching e2e exclude)
+- Create: `mcp/claude-slack-channel/package.json` — Package definition with deps, include `"test": "vitest run"` script and `vitest` as devDependency
 - Create: `mcp/claude-slack-channel/tsconfig.json`
 - Create: `mcp/claude-slack-channel/src/server.ts` — Main server (Socket Mode, MCP tools, channel/permission capabilities)
 - Create: `mcp/claude-slack-channel/src/lib.ts` — Security helpers (sender gating, message formatting)
-- Create: `mcp/claude-slack-channel/tests/server.test.ts` — Unit tests
+- Create: `mcp/claude-slack-channel/tests/server.test.ts` — Unit tests for MCP server (vi.mock `@slack/socket-mode` and `@slack/web-api`)
+- Create: `mcp/claude-slack-channel/tests/lib.test.ts` — Unit tests for security helpers and message formatting
 
 **Test cases:**
-- Message formatting produces correct `notifications/claude/channel` structure
-- Sender gating: allowed sender passes, disallowed sender blocked
-- Permission verdict parsing: `yes <id>` accepted, `no <id>` denied, garbage ignored
-- MCP tool schemas validate (reply, react, edit_message, get_history, download_attachment)
 
-**Testable output:** Package installs. TypeScript compiles. Unit tests pass.
+`tests/lib.test.ts` — security helpers (`describe`/`it`/`expect` with `vi.mock`):
+- Sender gating: allowed sender passes
+- Sender gating: disallowed sender blocked
+- Sender gating: empty allowlist blocks all
+- Message formatting: Slack message produces correct `notifications/claude/channel` structure
+- Message formatting: handles attachments
+- Permission verdict parsing: `yes <id>` accepted
+- Permission verdict parsing: `no <id>` denied
+- Permission verdict parsing: garbage input ignored
+
+`tests/server.test.ts` — MCP server (`vi.mock` for `@slack/socket-mode`, `@slack/web-api`):
+- Server registers `claude/channel` and `claude/channel/permission` capabilities
+- MCP tool schemas validate (reply, react, edit_message, get_history, download_attachment)
+- Inbound Slack message triggers `notifications/claude/channel` notification
+- Reply tool calls `chat.postMessage` with correct channel and text args
+- Missing env vars (`SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`) throws descriptive error
+
+**Testable output:** Package installs. TypeScript compiles. Unit tests pass via `npx vitest run mcp/claude-slack-channel/tests/` from mason-extensions root.
 
 **Tests to run:**
 - `npm install` (to discover new workspace)
 - In `../mason-extensions`: `npm run lint`
 - In `../mason-extensions`: `npx tsc --noEmit`
+- In `../mason-extensions`: `npx vitest run mcp/claude-slack-channel/tests/`
 - In `../mason-extensions`: `npm run test`
 - `npm run lint` (in mason)
 - `npm run build` (in mason)
