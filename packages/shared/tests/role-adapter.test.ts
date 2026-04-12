@@ -26,6 +26,7 @@ function minimalRole(overrides: Record<string, unknown> = {}): Role {
     container: raw.container ?? {},
     governance: raw.governance ?? {},
     resources: raw.resources ?? [],
+    channel: raw.channel,
     source: raw.source ?? { type: "local", agentDialect: "claude-code-agent", path: "/tmp/test" },
   });
 }
@@ -550,6 +551,32 @@ describe("adaptRoleToResolvedAgent", () => {
       expect(agent.runtimes).toEqual(["aider"]);
       expect(agent.roles[0].tasks).toHaveLength(2);
       expect(agent.roles[0].mcp).toHaveLength(2);
+    });
+  });
+
+  // ---- Channel mapping ----
+
+  describe("channel mapping", () => {
+    it("maps role with channel to ResolvedRole with matching channel", () => {
+      const role = minimalRole({
+        channel: { type: "slack", args: ["--debug"] },
+      });
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      expect(agent.roles[0].channel).toEqual({ type: "slack", args: ["--debug"] });
+    });
+
+    it("maps role with channel (no args) to ResolvedRole with empty args", () => {
+      const role = minimalRole({
+        channel: { type: "slack" },
+      });
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      expect(agent.roles[0].channel).toEqual({ type: "slack", args: [] });
+    });
+
+    it("role without channel produces ResolvedRole with no channel", () => {
+      const role = minimalRole();
+      const agent = adaptRoleToResolvedAgent(role, "claude-code-agent");
+      expect(agent.roles[0].channel).toBeUndefined();
     });
   });
 });

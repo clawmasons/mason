@@ -98,6 +98,7 @@ export interface ResolvedRole {
   baseImage?: string;
   aptPackages?: string[];
   npmPackages?: string[];
+  channel?: { type: string; args: string[] };
   tasks: ResolvedTask[];
   mcp: ResolvedMcpServer[];
   skills: ResolvedSkill[];

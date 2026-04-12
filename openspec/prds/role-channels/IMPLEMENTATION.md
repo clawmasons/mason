@@ -58,7 +58,11 @@ Add the `channel` field to the Zod schema, extract it from ROLE.md frontmatter i
 - `npx vitest run packages/agent-sdk/tests/`
 - In `../mason-extensions`: `npm run lint && npm run build && npm run test`
 
-** Not Implemented Yet**
+**Implemented:** 2026-04-12
+- [Proposal](../../changes/archive/2026-04-12-channel-field-schema-parser-adapter/proposal.md)
+- [Design](../../changes/archive/2026-04-12-channel-field-schema-parser-adapter/design.md)
+- [Tasks](../../changes/archive/2026-04-12-channel-field-schema-parser-adapter/tasks.md)
+- [Spec](../../changes/archive/2026-04-12-channel-field-schema-parser-adapter/spec.md)
 
 ---
 
