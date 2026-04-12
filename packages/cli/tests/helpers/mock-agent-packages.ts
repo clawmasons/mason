@@ -27,11 +27,26 @@ import type { ResolvedAgent } from "@clawmasons/shared";
 
 export const mockClaudeCodeMaterializer: RuntimeMaterializer = {
   name: "claude-code-agent",
-  materializeWorkspace: (_agent, proxyEndpoint, proxyToken) => {
+  materializeWorkspace: (_agent, proxyEndpoint, proxyToken, options) => {
     const files = new Map<string, string>();
-    files.set(".claude.json", JSON.stringify({ mcpServers: { mason: { type: "sse", url: `${proxyEndpoint || "http://proxy:3100"}/sse` } } }, null, 2));
+    const mcpServers: Record<string, unknown> = { mason: { type: "sse", url: `${proxyEndpoint || "http://proxy:3100"}/sse` } };
+    const permissions: string[] = ["mcp__mason__*"];
+    const args: string[] = ["--dangerously-skip-permissions", "--effort", "max"];
+
+    // Handle channel config (mirrors real materializer behavior)
+    if (options?.channelConfig) {
+      const { type: channelType, args: channelArgs } = options.channelConfig;
+      mcpServers[`${channelType}-channel`] = {
+        command: "node",
+        args: [`/home/mason/channels/${channelType}/server.js`, ...channelArgs],
+      };
+      permissions.push(`mcp__${channelType}-channel__*`);
+      args.push("--dangerously-load-development-channels", `server:${channelType}-channel`);
+    }
+
+    files.set(".claude.json", JSON.stringify({ mcpServers }, null, 2));
     files.set(".claude/settings.json", JSON.stringify({
-      permissions: { allow: ["mcp__mason__*"], deny: [] },
+      permissions: { allow: permissions, deny: [] },
       hooks: {
         SessionStart: [{
           hooks: [{
@@ -41,7 +56,7 @@ export const mockClaudeCodeMaterializer: RuntimeMaterializer = {
         }],
       },
     }, null, 2));
-    files.set("agent-launch.json", JSON.stringify({ agent: "claude-code-agent", proxy: proxyEndpoint || "http://proxy:3100", token: proxyToken || "" }, null, 2));
+    files.set("agent-launch.json", JSON.stringify({ agent: "claude-code-agent", proxy: proxyEndpoint || "http://proxy:3100", token: proxyToken || "", args }, null, 2));
     return files;
   },
 };
