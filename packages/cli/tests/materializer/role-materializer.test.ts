@@ -7,7 +7,6 @@ import {
   MaterializerError,
   registerAgents,
 } from "../../src/materializer/role-materializer.js";
-import { mcpAgentMaterializer } from "@clawmasons/mcp-agent/agent-package";
 import {
   mockClaudeCodeAgent,
   mockClaudeCodeMaterializer,
@@ -95,26 +94,21 @@ describe("materializer registry", () => {
       expect(getMaterializer("pi-coding-agent")).toBe(mockPiCodingAgentMaterializer);
     });
 
-    it("returns mcp-agent materializer for 'mcp-agent'", () => {
-      expect(getMaterializer("mcp-agent")).toBe(mcpAgentMaterializer);
-    });
-
     it("returns undefined for unknown agent type", () => {
       expect(getMaterializer("unknown-agent")).toBeUndefined();
     });
   });
 
   describe("getRegisteredAgentTypes", () => {
-    it("includes all four built-in agent types", () => {
+    it("includes all registered agent types", () => {
       const types = getRegisteredAgentTypes();
       expect(types).toContain("claude-code-agent");
       expect(types).toContain("pi-coding-agent");
       expect(types).toContain("codex-agent");
-      expect(types).toContain("mcp-agent");
     });
 
-    it("returns exactly four types", () => {
-      expect(getRegisteredAgentTypes()).toHaveLength(4);
+    it("returns exactly three types", () => {
+      expect(getRegisteredAgentTypes()).toHaveLength(3);
     });
   });
 });
@@ -155,7 +149,6 @@ describe("materializeForAgent", () => {
       } catch (err) {
         const msg = (err as Error).message;
         expect(msg).toContain("claude-code-agent");
-        expect(msg).toContain("mcp-agent");
         expect(msg).toContain("pi-coding-agent");
       }
     });

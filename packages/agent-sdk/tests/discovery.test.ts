@@ -244,15 +244,13 @@ describe("readConfigAgentNames", () => {
         agents: {
           claude: { package: "@clawmasons/claude-code-agent" },
           "pi-mono-agent": { package: "@clawmasons/pi-mono-agent" },
-          mcp: { package: "@clawmasons/mcp-agent" },
         },
       });
 
       const names = readConfigAgentNames(tmpDir);
       expect(names).toContain("claude");
       expect(names).toContain("pi-mono-agent");
-      expect(names).toContain("mcp");
-      expect(names).toHaveLength(3);
+      expect(names).toHaveLength(2);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

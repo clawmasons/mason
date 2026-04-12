@@ -47,7 +47,7 @@ function buildRole(
  *
  * @param projectDir - Absolute path to the project root
  * @param roleName - Optional role name to build (builds all if omitted)
- * @param agentTypeOverride - Optional agent type override (e.g., "mcp-agent")
+ * @param agentTypeOverride - Optional agent type override (e.g., "claude-code-agent")
  */
 export async function runBuild(
   projectDir: string,
@@ -135,7 +135,7 @@ export function registerBuildCommand(program: Command): void {
     .command("build")
     .description("Build Docker artifacts for roles in the workspace")
     .argument("[role]", "Role name to build (builds all if omitted)")
-    .option("--agent-type <type>", "Override agent type (e.g., mcp-agent, claude-code-agent)")
+    .option("--agent-type <type>", "Override agent type (e.g., claude-code-agent, pi-coding-agent)")
     .action(async (role: string | undefined, options: { agentType?: string }) => {
       let agentType: string | undefined;
       if (options.agentType) {

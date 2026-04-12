@@ -37,7 +37,7 @@ mason run <agent-type> --role <name> -p <prompt>
 
 | Argument | Description |
 |----------|-------------|
-| `<agent-type>` | Agent runtime to use (e.g., `claude` → `claude-code-agent`, `pi` → `pi-coding-agent`, `mcp-agent`) |
+| `<agent-type>` | Agent runtime to use (e.g., `claude` → `claude-code-agent`, `pi` → `pi-coding-agent`, `codex` → `codex-agent`) |
 | `[prompt]` | Optional initial prompt to send to the agent on startup (interactive mode) |
 
 | Option | Description |

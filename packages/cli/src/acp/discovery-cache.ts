@@ -14,12 +14,12 @@ import {
   getRegisteredAgentNames,
   readDefaultAgent,
 } from "@clawmasons/agent-sdk";
-import { default as mcpAgent } from "@clawmasons/mcp-agent/agent-package";
+import type { AgentPackage } from "@clawmasons/agent-sdk";
 import { inferAgentType, createDefaultProjectRole } from "../cli/commands/run-agent.js";
 import { acpLog } from "./acp-logger.js";
 
-// Built-in agent packages — same as used by the materializer
-const BUILTIN_AGENTS = [mcpAgent];
+// No built-in agents — all agents are auto-discovered from .mason/node_modules/
+const BUILTIN_AGENTS: AgentPackage[] = [];
 
 // ---------------------------------------------------------------------------
 // Types

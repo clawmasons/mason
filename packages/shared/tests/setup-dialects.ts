@@ -25,12 +25,6 @@ registerAgentDialect({
 });
 
 registerAgentDialect({
-  name: "mcp-agent",
-  dialect: "mcp",
-  dialectFields: { tasks: "commands" },
-});
-
-registerAgentDialect({
   name: "pi-coding-agent",
   dialect: "pi",
   dialectFields: { tasks: "prompts" },

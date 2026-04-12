@@ -204,11 +204,11 @@ describe("runBuild", () => {
   it("uses agentTypeOverride instead of inferred agent type when specified", async () => {
     discoverRoles.mockResolvedValue([makeRole("my-role")]);
 
-    await runBuild(tmpDir, undefined, "mcp-agent");
+    await runBuild(tmpDir, undefined, "claude-code-agent");
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     expect(generateRoleDockerBuildDir).toHaveBeenCalledWith(
-      expect.objectContaining({ agentType: "mcp-agent" }),
+      expect.objectContaining({ agentType: "claude-code-agent" }),
     );
     // inferAgentType should NOT have been called since override was provided
     expect(inferAgentType).not.toHaveBeenCalled();

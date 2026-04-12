@@ -9,8 +9,6 @@ export default defineConfig({
 
       "@clawmasons/agent-entry": resolve(__dirname, "packages/agent-entry/src/index.ts"),
       "@clawmasons/agent-sdk": resolve(__dirname, "packages/agent-sdk/src/index.ts"),
-      "@clawmasons/mcp-agent/agent-package": resolve(__dirname, "packages/mcp-agent/src/agent-package.ts"),
-      "@clawmasons/mcp-agent": resolve(__dirname, "packages/mcp-agent/src/index.ts"),
     },
   },
   test: {

@@ -36,7 +36,6 @@ PACKAGES=(
   "@clawmasons/shared"
   "@clawmasons/agent-sdk"
   "@clawmasons/proxy"
-  "@clawmasons/mcp-agent"
   "@clawmasons/agent-entry"
   "@clawmasons/mason"
 )

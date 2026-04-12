@@ -114,18 +114,6 @@ describe("resolveDialectName", () => {
     expect(resolveDialectName(".aider")).toBe("aider");
   });
 
-  it("resolves 'mcp' to 'mcp-agent'", () => {
-    expect(resolveDialectName("mcp")).toBe("mcp-agent");
-  });
-
-  it("resolves '.mcp' to 'mcp-agent'", () => {
-    expect(resolveDialectName(".mcp")).toBe("mcp-agent");
-  });
-
-  it("resolves 'mcp-agent' to 'mcp-agent'", () => {
-    expect(resolveDialectName("mcp-agent")).toBe("mcp-agent");
-  });
-
   it("resolves 'mason' to 'mason'", () => {
     expect(resolveDialectName("mason")).toBe("mason");
   });
@@ -161,7 +149,6 @@ describe("getAllDialects", () => {
     // Dynamic (from agent packages)
     expect(names).toContain("claude-code-agent");
     expect(names).toContain("pi-coding-agent");
-    expect(names).toContain("mcp-agent");
   });
 });
 
@@ -173,6 +160,5 @@ describe("getKnownDirectories", () => {
     expect(dirs).toContain("aider");
     expect(dirs).toContain("claude");
     expect(dirs).toContain("pi");
-    expect(dirs).toContain("mcp");
   });
 });

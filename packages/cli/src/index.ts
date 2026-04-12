@@ -39,7 +39,6 @@ export {
 } from "./validator/index.js";
 
 export {
-  mcpAgentMaterializer,
   PROVIDER_ENV_VARS,
   ACP_RUNTIME_COMMANDS,
   type RuntimeMaterializer,

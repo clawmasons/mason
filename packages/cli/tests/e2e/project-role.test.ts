@@ -104,7 +104,7 @@ describe("project-role: CLI e2e", () => {
     workspacesToClean.push(ws);
 
     const result = masonExecExpectError(
-      ["run", "--agent", "mcp", "--source", "gpt"],
+      ["run", "--agent", "claude", "--source", "gpt"],
       ws,
     );
 
@@ -124,12 +124,12 @@ describe("project-role: CLI e2e", () => {
     // proceeds to Docker build. It no longer fails with "Source directory not found"
     // because the auto-created role uses wildcard patterns that resolve to empty.
     const result = masonExecExpectError(
-      ["run", "--agent", "mcp"],
+      ["run", "--agent", "claude"],
       ws,
     );
 
     const output = result.stderr + result.stdout;
-    // Should NOT fail with "Unknown source" — mcp is valid
+    // Should NOT fail with "Unknown source" — claude is valid
     expect(output).not.toContain("Unknown source");
   });
 
@@ -140,14 +140,14 @@ describe("project-role: CLI e2e", () => {
     workspacesToClean.push(ws);
 
     // Create an empty source directory for the agent under test.
-    // mcp-agent looks for .mcp/, claude looks for .claude/, etc.
-    fs.mkdirSync(path.join(ws, ".mcp"), { recursive: true });
+    // claude-code-agent looks for .claude/, pi looks for .pi/, etc.
+    fs.mkdirSync(path.join(ws, ".claude"), { recursive: true });
 
     // The command may succeed (Docker builds an empty project role) or fail
     // at Docker compose, depending on the environment. Either way, it must
     // NOT fail with a "Source directory not found" error — the dir exists.
     const result = masonExecExpectError(
-      ["run", "--agent", "mcp"],
+      ["run", "--agent", "claude"],
       ws,
     );
 

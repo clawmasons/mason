@@ -20,7 +20,6 @@
     { "path": "../shared" },
     { "path": "../proxy" },
 
-    { "path": "../agent-sdk" },
-    { "path": "../mcp-agent" }
+    { "path": "../agent-sdk" }
   ]
 }

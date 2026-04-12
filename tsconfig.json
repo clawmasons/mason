@@ -18,9 +18,7 @@
 
       "@clawmasons/agent-entry": ["./packages/agent-entry/src/index.ts"],
       "@clawmasons/agent-sdk": ["./packages/agent-sdk/src/index.ts"],
-      "@clawmasons/agent-sdk/testing": ["./packages/agent-sdk/src/testing/index.ts"],
-      "@clawmasons/mcp-agent": ["./packages/mcp-agent/src/index.ts"],
-      "@clawmasons/mcp-agent/agent-package": ["./packages/mcp-agent/src/agent-package.ts"]
+      "@clawmasons/agent-sdk/testing": ["./packages/agent-sdk/src/testing/index.ts"]
     }
   },
   "include": [
@@ -28,12 +26,10 @@
     "packages/proxy/src/**/*",
     "packages/cli/src/**/*",
     "packages/agent-entry/src/**/*",
-    "packages/mcp-agent/src/**/*",
     "packages/proxy/tests/**/*",
     "packages/cli/tests/**/*",
     "packages/agent-entry/tests/**/*",
     "packages/shared/tests/**/*",
-    "packages/mcp-agent/tests/**/*",
     "packages/agent-sdk/src/**/*",
     "packages/agent-sdk/tests/**/*"
   ]

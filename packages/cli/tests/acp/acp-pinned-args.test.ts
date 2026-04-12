@@ -57,7 +57,7 @@ const mockDiscovery = {
     { metadata: { name: "writer" }, source: { type: "local" as const } },
     { metadata: { name: "editor" }, source: { type: "package" as const, packageName: "@test/editor" } },
   ],
-  agentNames: ["claude-code-agent", "mcp-agent"],
+  agentNames: ["claude-code-agent", "pi-coding-agent"],
 };
 
 describe("buildConfigOptions — pinned args filtering", () => {

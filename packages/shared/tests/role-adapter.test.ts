@@ -469,7 +469,7 @@ describe("adaptRoleToResolvedAgent", () => {
 
     it("accepts all registered dialects", () => {
       const role = minimalRole();
-      for (const agentType of ["claude-code-agent", "codex", "aider", "mcp-agent"]) {
+      for (const agentType of ["claude-code-agent", "codex", "aider"]) {
         const agent = adaptRoleToResolvedAgent(role, agentType);
         expect(agent.runtimes).toEqual([agentType]);
       }

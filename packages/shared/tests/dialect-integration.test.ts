@@ -125,7 +125,6 @@ describe("cross-dialect integration", () => {
     // Dynamic (registered via registerAgentDialect from agent packages)
     expect(allNames).toContain("claude-code-agent");
     expect(allNames).toContain("pi-coding-agent");
-    expect(allNames).toContain("mcp-agent");
   });
 
   it("getKnownDirectories includes directories from all dialects", () => {
@@ -139,7 +138,6 @@ describe("cross-dialect integration", () => {
     // Dynamic
     expect(dirs).toContain("claude");
     expect(dirs).toContain("pi");
-    expect(dirs).toContain("mcp");
   });
 
   it("simulated third-party agent registers and resolves", () => {

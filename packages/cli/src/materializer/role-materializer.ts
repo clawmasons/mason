@@ -12,11 +12,8 @@ import { adaptRoleToResolvedAgent, getDialect, getDialectByDirectory, registerAg
 import type { RuntimeMaterializer, MaterializationResult, MaterializeOptions, AgentPackage, AgentRegistry, AgentTaskConfig, AgentSkillConfig } from "@clawmasons/agent-sdk";
 import { createAgentRegistry, getAgent, getRegisteredAgentNames, readTask, readSkills, resolveAgentWithAutoInstall } from "@clawmasons/agent-sdk";
 
-// Built-in agent packages — only mcp-agent is bundled; others are auto-installed.
-import { default as mcpAgent } from "@clawmasons/mcp-agent/agent-package";
-
-/** Built-in agent packages list. */
-export const BUILTIN_AGENTS: AgentPackage[] = [mcpAgent];
+/** Built-in agent packages list (empty — all agents are now auto-discovered). */
+export const BUILTIN_AGENTS: AgentPackage[] = [];
 
 /** Default proxy endpoint used when none is provided. */
 const DEFAULT_PROXY_ENDPOINT = "http://mcp-proxy:9090";
