@@ -32,6 +32,8 @@ export {
   resourceFileSchema,
   roleSourceSchema,
   roleConfigSchema,
+  channelConfigSchema,
+  channelFieldSchema,
   roleSchema,
 } from "./schemas/index.js";
 
@@ -49,6 +51,7 @@ export type {
   MountConfig,
   ToolPermissions,
   RoleConfig,
+  ChannelConfig,
 } from "./types/role.js";
 
 // Resolved types

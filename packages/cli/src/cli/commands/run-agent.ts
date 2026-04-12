@@ -16,7 +16,7 @@ import { promptConfig, ConfigResolutionError } from "../../config/prompt-config.
 import { HostProxy } from "@clawmasons/proxy";
 import { createFileLogger, type FileLogger } from "../../utils/file-logger.js";
 import { generateRoleDockerBuildDir, createSessionDirectory, getHostIds } from "../../materializer/docker-generator.js";
-import { ensureProxyDependencies, ensureSharedProxyBundle, copyAgentEntryBundle } from "../../materializer/proxy-dependencies.js";
+import { ensureProxyDependencies, ensureSharedProxyBundle, copyAgentEntryBundle, copyChannelBundle } from "../../materializer/proxy-dependencies.js";
 import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
 import { validateSessionUpdate as validateAcpUpdate } from "../../acp/validate-session-update.js";
 
@@ -509,10 +509,13 @@ export async function ensureDockerBuild(
     fs.rmSync(dockerBuildDir, { recursive: true, force: true });
   }
 
-  // Compute hash of container.packages to detect changes since last build
+  // Compute hash of role fields that affect Docker build artifacts
   const packagesHash = crypto
     .createHash("sha256")
-    .update(JSON.stringify(roleType.container?.packages ?? {}))
+    .update(JSON.stringify({
+      packages: roleType.container?.packages ?? {},
+      channel: roleType.channel ?? null,
+    }))
     .digest("hex");
   const hashFilePath = path.join(dockerBuildDir, agentType, ".packages-hash");
 
@@ -562,6 +565,7 @@ export async function ensureDockerBuild(
     // Generate Docker dependencies (bundles + per-role config)
     copyAgentEntryBundle(dockerDir);
     ensureProxyDependencies(dockerDir, roleType);
+    copyChannelBundle(dockerBuildDir, roleType, agentType, projectDir);
 
     // Create shared cache directory for NODE_COMPILE_CACHE and NPM_CONFIG_CACHE
     fs.mkdirSync(path.join(sharedProxyDir, ".cache"), { recursive: true });
@@ -1878,7 +1882,16 @@ function refreshAgentLaunchJson(
   },
 ): void {
   try {
-    const workspace = materializeForAgent(roleType, agentType, undefined, undefined, options);
+    // Derive channelConfig from the role so the session agent-launch.json
+    // includes channel launch args (e.g., --dangerously-load-development-channels).
+    const channelConfig = roleType.channel
+      ? { type: roleType.channel.type, args: roleType.channel.args ?? [] }
+      : undefined;
+    const materializeOpts = {
+      ...options,
+      ...(channelConfig ? { channelConfig } : {}),
+    };
+    const workspace = materializeForAgent(roleType, agentType, undefined, undefined, materializeOpts);
     let launchJson = workspace.get("agent-launch.json");
     if (launchJson) {
       // Post-process to inject resume args when resuming a session.

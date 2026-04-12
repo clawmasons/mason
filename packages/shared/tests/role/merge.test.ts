@@ -229,4 +229,32 @@ describe("mergeRoles", () => {
 
     expect(result.sources).toEqual(["mason"]);
   });
+
+  it("channel: current wins (scalar semantics)", () => {
+    const current = makeRole({
+      channel: { type: "slack", args: ["--debug"] },
+    } as Partial<Role>);
+    const included = makeRole({
+      metadata: { name: "included", description: "Included role" },
+      channel: { type: "telegram", args: [] },
+    } as Partial<Role>);
+
+    const result = mergeRoles(current, included);
+
+    expect(result.channel).toEqual({ type: "slack", args: ["--debug"] });
+  });
+
+  it("channel: current without channel — included's channel does not propagate (scalar semantics)", () => {
+    const current = makeRole();
+    const included = makeRole({
+      metadata: { name: "included", description: "Included role" },
+      channel: { type: "slack", args: [] },
+    } as Partial<Role>);
+
+    const result = mergeRoles(current, included);
+
+    // Scalar current-wins: since current has no channel, result has no channel.
+    // The included's channel does not propagate.
+    expect(result.channel).toBeUndefined();
+  });
 });

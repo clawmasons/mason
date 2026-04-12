@@ -632,20 +632,24 @@ describe("packages-hash invalidation", () => {
     }
   });
 
-  function makeDockerBuildDir(packagesForHash: object) {
+  function makeDockerBuildDir(packagesForHash: object, role?: Role) {
     const dockerBuildDir = path.join(projectDir, ".mason", "docker", "writer");
     fs.mkdirSync(path.join(dockerBuildDir, "claude-code-agent"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", "Dockerfile"), "FROM node:20\n");
     fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
-    const hash = crypto.createHash("sha256").update(JSON.stringify(packagesForHash)).digest("hex");
+    const hashInput = JSON.stringify({
+      packages: packagesForHash,
+      channel: role?.channel ?? null,
+    });
+    const hash = crypto.createHash("sha256").update(hashInput).digest("hex");
     fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", ".packages-hash"), hash);
     return dockerBuildDir;
   }
 
   it("skips rebuild when packages hash matches", async () => {
     const role = makeRole();
-    const dockerBuildDir = makeDockerBuildDir(role.container?.packages ?? {});
+    const dockerBuildDir = makeDockerBuildDir(role.container?.packages ?? {}, role);
     const dockerfilePath = path.join(dockerBuildDir, "claude-code-agent", "Dockerfile");
     const mtime = fs.statSync(dockerfilePath).mtimeMs;
 
@@ -687,7 +691,7 @@ describe("packages-hash invalidation", () => {
 
     // Hash file should be written after build (even if some steps fail in test env)
     // The hash for empty packages is deterministic
-    const expectedHash = crypto.createHash("sha256").update(JSON.stringify({})).digest("hex");
+    const expectedHash = crypto.createHash("sha256").update(JSON.stringify({ packages: {}, channel: null })).digest("hex");
     if (fs.existsSync(hashFilePath)) {
       expect(fs.readFileSync(hashFilePath, "utf-8").trim()).toBe(expectedHash);
     }
@@ -766,7 +770,7 @@ describe("runAgent", () => {
       // Write packages hash so the hash-invalidation check doesn't trigger a rebuild
       const packagesHash = crypto
         .createHash("sha256")
-        .update(JSON.stringify(role.container?.packages ?? {}))
+        .update(JSON.stringify({ packages: role.container?.packages ?? {}, channel: role.channel ?? null }))
         .digest("hex");
       fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", ".packages-hash"), packagesHash);
       fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
@@ -937,7 +941,7 @@ describe("runAgent", () => {
     fs.mkdirSync(path.join(dockerBuildDir, "claude-code-agent"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", "Dockerfile"), "FROM node:20\n");
     fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", ".packages-hash"),
-      crypto.createHash("sha256").update(JSON.stringify(makeRole().container?.packages ?? {})).digest("hex"));
+      crypto.createHash("sha256").update(JSON.stringify({ packages: makeRole().container?.packages ?? {}, channel: null })).digest("hex"));
     fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
 
@@ -1219,7 +1223,7 @@ describe("runProxyOnly", () => {
     fs.mkdirSync(path.join(dockerBuildDir, "claude-code-agent"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", "Dockerfile"), "FROM node:20\n");
     fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", ".packages-hash"),
-      crypto.createHash("sha256").update(JSON.stringify(makeRole().container?.packages ?? {})).digest("hex"));
+      crypto.createHash("sha256").update(JSON.stringify({ packages: makeRole().container?.packages ?? {}, channel: null })).digest("hex"));
     fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
   });
@@ -1491,7 +1495,7 @@ describe("source override applied to role", () => {
     const dockerBuildDir = path.join(dockerDir, "writer");
     fs.mkdirSync(path.join(dockerBuildDir, "claude-code-agent"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", "Dockerfile"), "FROM node:20\n");
-    const packagesHash = crypto.createHash("sha256").update(JSON.stringify({})).digest("hex");
+    const packagesHash = crypto.createHash("sha256").update(JSON.stringify({ packages: {}, channel: null })).digest("hex");
     fs.writeFileSync(path.join(dockerBuildDir, "claude-code-agent", ".packages-hash"), packagesHash);
     fs.mkdirSync(path.join(dockerBuildDir, "mcp-proxy"), { recursive: true });
     fs.writeFileSync(path.join(dockerBuildDir, "mcp-proxy", "Dockerfile"), "FROM node:20\n");
