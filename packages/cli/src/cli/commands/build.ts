@@ -16,7 +16,7 @@ import {
   type Role,
 } from "@clawmasons/shared";
 import { generateRoleDockerBuildDir } from "../../materializer/docker-generator.js";
-import { ensureProxyDependencies, ensureSharedProxyBundle, copyAgentEntryBundle } from "../../materializer/proxy-dependencies.js";
+import { ensureProxyDependencies, ensureSharedProxyBundle, copyAgentEntryBundle, copyChannelBundle } from "../../materializer/proxy-dependencies.js";
 import { generateProxyDockerfile } from "../../generator/proxy-dockerfile.js";
 import { inferAgentType, resolveAgentType } from "./run-agent.js";
 import { readDefaultAgent } from "@clawmasons/agent-sdk";
@@ -119,9 +119,12 @@ export async function runBuild(
   fs.writeFileSync(path.join(sharedProxyDir, "Dockerfile"), generateProxyDockerfile());
   ensureSharedProxyBundle(dockerDir);
 
-  // 7. Generate per-role proxy config
+  // 7. Generate per-role proxy config and channel bundles
   for (const role of targetRoles) {
+    const agentType = agentTypeOverride ?? inferAgentType(role, defaultAgent);
+    const roleBuildDir = path.join(dockerDir, getAppShortName(role.metadata.name));
     ensureProxyDependencies(dockerDir, role);
+    copyChannelBundle(roleBuildDir, role, agentType);
   }
 
   console.log(`\n  Build complete.\n`);

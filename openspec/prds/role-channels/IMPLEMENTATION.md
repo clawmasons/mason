@@ -217,6 +217,8 @@ If the agent package doesn't export the channel type (resolve fails), warn and c
 - Role with `channel.type: slack` → build context contains `{role}/{agent}/home/channels/slack/server.js`
 - Role without channel → no `channels/` directory in build context
 - Missing channel bundle → warning, build continues
+- Idempotent: skips copy when destination already exists
+- Uses channel type from role to construct resolve path (e.g., `telegram`)
 
 **Testable output:** Unit tests pass. Build context contains channel bundle when role has channel.
 
@@ -226,7 +228,11 @@ If the agent package doesn't export the channel type (resolve fails), warn and c
 - `npx vitest run packages/cli/tests/`
 - In `../mason-extensions`: `npm run lint && npm run build && npm run test`
 
-** Not Implemented Yet**
+**Implemented:** 2026-04-12
+- [Proposal](../../changes/archive/2026-04-12-docker-generator-channel-bundle/proposal.md)
+- [Design](../../changes/archive/2026-04-12-docker-generator-channel-bundle/design.md)
+- [Tasks](../../changes/archive/2026-04-12-docker-generator-channel-bundle/tasks.md)
+- [Spec](../../changes/archive/2026-04-12-docker-generator-channel-bundle/spec.md)
 
 ---
 
