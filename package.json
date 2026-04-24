@@ -37,7 +37,6 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.16.0",
-    "@clawmasons/role-configure-project": "^1.0.0",
-    "configure-project": "file:.mason/roles/configure-project/build/configure-project-1.0.0.tgz"
+    "@clawmasons/role-configure-project": "^1.0.0"
   }
 }
